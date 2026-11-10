@@ -21,6 +21,8 @@ Fixtures live in `core/tests/fixtures/format/`, including a valid table and reje
 
 The ordered CSS transition has a focused foundation gate: `node --test core/tests/declarations.test.js core/tests/codec.test.js core/tests/format-types.test.ts`. It covers declaration order/fallbacks, first-position set/remove operations, property case, input isolation, legacy-map equivalence and shared serialization in the current codec. It does not establish schema-3/frame-2 admission or native cascade emission; those remain transition work.
 
+The renderer requirement seam has a separate focused gate: `node --test core/tests/engine.test.js core/tests/no-engine.test.js core/tests/format-types.test.ts`. It covers explicit native CSS with installed/absent providers, exact and order-independent selection, receiver/input preservation, missing/version/ambiguity/capability refusals, compiler-error propagation and unchanged omitted-requirement draft behavior. This does not prove project `requires` admission, bundled dependency identity, cache-independent required rebuilds or engine-disable conversion; those remain integration work.
+
 ## Native HTML stabilization
 
 `node --test core/tests/html-import.test.js core/tests/import.test.js` checks core-owned HTML admission without an HTML plugin registration, with no style engine, and through explicit `.html`/`.htm` opening, folder-page ingestion and re-import. It covers reported sanitization losses, preserved sources, existing destinations, listing policy, link refusal and unsupported input. It does not establish managed-cache reverse editing; generated-page hand edits remain diagnosed rather than imported.

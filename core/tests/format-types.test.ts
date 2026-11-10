@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Attrs, Override, CssDeclaration, CssDeclarationOperation } from '../lib/model.ts';
+import type { StyleEngine, StyleEngineRequirement, ResolvedStyleEngine } from '../lib/engine.ts';
 
 const removal: Override = { attrs: { title: null, 'aria-label': 'Buy' } };
 // @ts-expect-error Only override attributes admit null; persisted element attributes remain strings.
@@ -12,6 +13,20 @@ const operation: CssDeclarationOperation = ['display', null];
 const invalidDeclaration: CssDeclaration = ['display', null];
 // @ts-expect-error A declaration is exactly one property/value pair.
 const invalidTuple: CssDeclaration = ['color', 'red', 'blue'];
+
+const requiredEngine: StyleEngineRequirement = { id: 'example', version: 'renderer-1' };
+const legacyEngine: StyleEngine = { id: 'legacy' };
+// @ts-expect-error Exact renderer requirements cannot omit the version.
+const missingRendererVersion: StyleEngineRequirement = { id: 'example' };
+// @ts-expect-error A resolved rendering requirement must provide compilation.
+const missingCompiler: ResolvedStyleEngine = { id: 'example', version: 'renderer-1' };
+// @ts-expect-error Renderer identities are strings, separate from numeric content revisions.
+const numericRendererVersion: StyleEngineRequirement = { id: 'example', version: 1 };
+
+test('renderer types distinguish legacy capabilities from exact compiling requirements', () => {
+  assert.equal(requiredEngine.version, 'renderer-1');
+  assert.equal(legacyEngine.version, undefined);
+});
 
 test('ordered CSS types distinguish literal declarations from property operations', () => {
   assert.deepEqual(declaration, ['display', 'flex']);

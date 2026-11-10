@@ -28,9 +28,14 @@ export interface ClassResourceOptions {
   onVariableDefinition?: (name: string) => void;
 }
 
-/** Everything a style engine may provide. All of it is optional: without an engine the core still renders and edits, with plain CSS. */
+/** Exact renderer identity in a validated requirement; version is an opaque token, not a semver range. */
+export interface StyleEngineRequirement { id: string; version: string }
+
+/** Everything a style engine may provide. Capabilities are optional; a required renderer must provide compilation. */
 export interface StyleEngine {
   id: string;
+  /** Effective compiler/configuration identity. Unversioned providers can serve legacy calls only. */
+  version?: string;
   label?: string;
   kind?: string;
   /** Browser modules this engine contributes: `entry` is served at `plugins/<id>/<entry>` from `root`. */
@@ -49,6 +54,9 @@ export interface StyleEngine {
   propertyOfClass?: (name: string, colourNames?: ReadonlySet<string>) => string | null;
 }
 
+/** A resolved rendering requirement guarantees both its exact version and the compilation capability. */
+export type ResolvedStyleEngine = StyleEngine & { version: string; compileClasses: NonNullable<StyleEngine['compileClasses']> };
+
 const engines: StyleEngine[] = [tailwind as StyleEngine];
 /** The active style engine: the first registered (Tailwind ships with the package). Engines carry no core imports, so this seam never cycles. */
 export const styleEngine = (): StyleEngine => engines[0] as StyleEngine;
@@ -60,6 +68,19 @@ export const registerStyleEngine = (engine: StyleEngine): void => { if (!engines
 
 /** Replace the registered engines (tests and hosts that run the core with plain CSS pass an empty list). */
 export const setStyleEngines = (list: StyleEngine[]): void => { engines.length = 0; engines.push(...list); };
+
+/** Resolve caller-validated requirement data without changing the active engine or invoking any provider. Null means native CSS. */
+export function resolveStyleEngine(requirement: StyleEngineRequirement | null): ResolvedStyleEngine | null {
+  if (requirement === null) return null;
+  const providers = engines.filter(engine => engine.id === requirement.id);
+  if (!providers.length) throw Object.assign(new Error(`Required style engine ${requirement.id} is not installed.`), { code: 'STYLE_ENGINE_UNAVAILABLE' });
+  const matches = providers.filter(engine => typeof engine.version === 'string' && engine.version.length > 0 && engine.version === requirement.version);
+  if (!matches.length) throw Object.assign(new Error(`Style engine ${requirement.id} does not provide exact renderer version ${requirement.version}.`), { code: 'STYLE_ENGINE_VERSION_MISMATCH' });
+  if (matches.length > 1) throw Object.assign(new Error(`Multiple providers claim style engine ${requirement.id} renderer version ${requirement.version}.`), { code: 'STYLE_ENGINE_AMBIGUOUS' });
+  const engine = matches[0] as StyleEngine;
+  if (typeof engine.compileClasses !== 'function') throw Object.assign(new Error(`Style engine ${requirement.id} renderer version ${requirement.version} cannot compile CSS.`), { code: 'STYLE_ENGINE_CAPABILITY_MISSING' });
+  return engine as ResolvedStyleEngine;
+}
 
 /**
  * `fallback` is what the core does without an engine: read-side features (compiling, explaining, suggesting) degrade to
@@ -76,7 +97,13 @@ function through<Args extends unknown[], Result>(name: keyof StyleEngine, fallba
   };
 }
 
-export const compileClasses = through<Parameters<NonNullable<StyleEngine['compileClasses']>>, Promise<string>>('compileClasses', async () => '');
+const legacyCompileClasses = through<Parameters<NonNullable<StyleEngine['compileClasses']>>, Promise<string>>('compileClasses', async () => '');
+/** An explicit requirement never falls back. Omission preserves draft-schema callers until their versioned cutover. */
+export function compileClasses(tokens: Record<string, string>, candidates: string[], base?: string, requirement?: StyleEngineRequirement | null): Promise<string> {
+  if (requirement === undefined) return legacyCompileClasses(tokens, candidates, base);
+  const engine = resolveStyleEngine(requirement);
+  return engine ? engine.compileClasses(tokens, candidates, base) : Promise.resolve('');
+}
 export const unknownClasses = through<Parameters<NonNullable<StyleEngine['unknownClasses']>>, Promise<Record<string, string[]>>>('unknownClasses', async () => ({}));
 export const createClassResourceMapper = through<Parameters<NonNullable<StyleEngine['createClassResourceMapper']>>, Promise<ClassResourceMapper>>('createClassResourceMapper');
 export const customClasses = through<Parameters<NonNullable<StyleEngine['customClasses']>>, CustomClasses>('customClasses', () => new Map());
