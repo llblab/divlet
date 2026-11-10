@@ -2,6 +2,7 @@
 import { fileURLToPath } from 'node:url';
 import { compileClasses, unknownClasses, createClassResourceMapper, customClasses, explainClasses, suggestClasses, warmSuggestions } from './lib/styling.js';
 import { applyStyles, declarationClass, propertyOfClass } from './lib/styles.js';
+export { createRenderer } from './lib/renderer.ts';
 
 export default {
   id: 'tailwind',

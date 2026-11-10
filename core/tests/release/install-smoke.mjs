@@ -29,15 +29,26 @@ try {
   await writeFile(path.join(target, 'smoke.mjs'), `
     import path from 'node:path';
     import { openRuntime } from 'divlet';
+    import { compileClasses, resolveStyleEngine, setStyleEngines } from 'divlet/engine';
+    import { pathToFileURL } from 'node:url';
     const runtime = await openRuntime({ file: path.resolve('proj/project.divlet'), watch: false, createDemo: true });
     const info = runtime.info();
     const served = async file => (await fetch(new URL(file, info.url))).status;
-    console.log(JSON.stringify({ frames: info.documents.length, index: await served('./'), board: await served('board.js'), lib: await served('lib/store.js'), panel: await served('plugins/tailwind/panel.js') }));
+    const board = { frames: info.documents.length, index: await served('./'), board: await served('board.js'), lib: await served('lib/store.js'), panel: await served('plugins/tailwind/panel.js') };
     await runtime.close();
+    // Internal packaging probe: the versioned descriptor is not yet a default or a new public subpath.
+    const { createRenderer } = await import(pathToFileURL(path.resolve('node_modules/divlet/dist/plugins/tailwind/index.js')).href);
+    const renderer = createRenderer();
+    setStyleEngines([renderer]);
+    const requirement = { id: renderer.id, version: renderer.version };
+    if (resolveStyleEngine(requirement) !== renderer || !(await compileClasses({}, ['p-4'], process.cwd(), requirement)).includes('.p-4')) throw new Error('Installed versioned renderer failed');
+    console.log(JSON.stringify({ ...board, renderer: renderer.version }));
     process.exit(0);
   `);
   const result = JSON.parse(execFileSync(process.execPath, ['smoke.mjs'], { cwd: target, encoding: 'utf8' }).trim().split('\n').pop());
-  assert.deepEqual(result, { frames: 1, index: 200, board: 200, lib: 200, panel: 200 }, 'the installed package starts a board and serves it');
+  const { renderer, ...board } = result;
+  assert.deepEqual(board, { frames: 1, index: 200, board: 200, lib: 200, panel: 200 }, 'the installed package starts a board and serves it');
+  assert.match(renderer, /^divlet-tailwind-1-[a-f0-9]{64}$/, 'the installed build establishes and executes an exact renderer identity');
 
   // The MCP server from the installed package: initialize, list the shared tools, open a project, read it, and stop on EOF.
   await writeFile(path.join(target, 'mcp-smoke.mjs'), `
