@@ -50,13 +50,13 @@ A rejected candidate leaves accepted state intact; authored edits are retained f
 
 Reverse editing must preserve identity and component semantics. An edit expressible as an allowed override may update that override. An unsupported or ambiguous structural edit must be refused or require an explicit structural operation, never silently detach an instance. Text identities, nested instance addresses, resource provenance and generated-versus-authored CSS are part of this contract, not details that can be discarded by a generic HTML import.
 
+## Native HTML admission
+
+HTML input belongs to the core, not to an optional importer plugin. The core admits external `.html`/`.htm` pages into the native supported profile: parsing, supported sanitization, initial identity assignment and import provenance. Unsupported input may be rejected; lossy conversion must report what was removed or transformed. Explicit opening, adding a page to a project and importing the source again must share this admission policy without requiring importer registration or a style engine.
+
+Keep three contracts distinct: external-page admission, guarded reverse editing of a managed projection, and clean static export. Their parsing/validation primitives may be shared, but lossy external sanitization must not erase native identity or provenance during cache reconciliation. A source page is not a second canonical project file; explicit opening creates or reuses a sibling `.divlet` without overwriting the original or an existing destination.
+
 ## Plugin boundaries
-
-### HTML importer
-
-The HTML importer admits external pages into the native supported profile: parsing, supported sanitization, initial identity assignment and import provenance. Unsupported input may be rejected; lossy conversion must report what was removed or transformed.
-
-It does not own the native HTML codec, normal browser rendering, selection mapping or reverse editing of the managed cache. An external `.html` import is not equivalent to reading an edited native projection.
 
 ### PEN importer
 

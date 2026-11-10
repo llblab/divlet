@@ -1,14 +1,15 @@
 /*
- * Opening a foreign source (any registered importer: see plugins.ts) converts it into a Divlet project beside it:
- * `<name>.divlet` holds the converted frames and the generated HTML cache lives in `.divlet/<name>/`. The foreign file stays
+ * Native HTML admission and foreign importer plugins share bounded reading and non-overwriting publication:
+ * `<name>.divlet` holds the converted frames and the generated HTML cache lives in `.divlet/<name>/`. The input file stays
  * exactly as it was; all further editing happens in the Divlet project. An existing `<name>.divlet` is never overwritten —
  * it is simply opened.
  */
 import { createHash } from 'node:crypto';
 import { constants, promises as fs } from 'node:fs';
 import path from 'node:path';
-import { importerFor, importExtensions } from './plugins.ts';
+import { importerFor, importExtensions, pageExtensions } from './plugins.ts';
 import type { Importer, ReadSource } from './plugins.ts';
+import { convertHtml, decodePage, summarizeHtml, isHtmlSource, HTML_EXTENSIONS } from './html-import.ts';
 import { SOURCE_LIMITS } from './model.ts';
 import type { Metadata } from './model.ts';
 
@@ -19,11 +20,24 @@ export interface ImportResult { file: string; created: boolean; frames: number; 
 /** Whether the file a project came from still matches the bytes that were imported. */
 export interface ImportStatus { source: string; changed: boolean }
 
-/** Whether an importer recognises `file`; `all` includes formats that are not listed as projects in folders (opened by path only). */
-export const isImportable = (file: string, { all = false }: { all?: boolean } = {}): boolean => importExtensions({ all }).has(path.extname(file).toLowerCase());
+/** Operations shared by native admission and foreign importers; native HTML is not registered as a plugin. */
+type SourceReader = Pick<Importer, 'id' | 'convert' | 'page' | 'summarize' | 'detach'>;
+const htmlSource: SourceReader = {
+  id: 'html',
+  convert: (bytes, context) => convertHtml(new TextDecoder().decode(bytes), context),
+  page: (bytes, context) => decodePage(new TextDecoder().decode(bytes), context),
+  summarize: bytes => summarizeHtml(new TextDecoder().decode(bytes)),
+};
+
+/** Native sources take precedence; foreign formats remain behind the importer registry. */
+export const sourceFor = async (file: string, read: ReadSource): Promise<SourceReader | null> => isHtmlSource(file) ? htmlSource : importerFor(file, read);
+/** Native pages and any foreign formats with an explicit one-page admission capability. */
+export const pageSourceExtensions = (): Set<string> => new Set([...HTML_EXTENSIONS, ...pageExtensions()]);
+/** HTML opens only by explicit path; it is never offered as a project in folder listings. */
+export const isImportable = (file: string, { all = false }: { all?: boolean } = {}): boolean => isHtmlSource(file) ? all : importExtensions({ all }).has(path.extname(file).toLowerCase());
 export const importedName = (file: string): string => path.join(path.dirname(file), `${path.basename(file, path.extname(file))}.divlet`);
 
-const provenanceOf = (name: string, importer: Importer, bytes: Uint8Array): ImportProvenance => ({ source: name, format: importer.id, sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length });
+const provenanceOf = (name: string, importer: SourceReader, bytes: Uint8Array): ImportProvenance => ({ source: name, format: importer.id, sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length });
 
 /** Read one bounded regular file, refusing links and files that change while they are read. */
 const readBounded: ReadSource = async (file: string): Promise<Uint8Array> => {
@@ -50,13 +64,13 @@ const readBounded: ReadSource = async (file: string): Promise<Uint8Array> => {
  * `{ file, created, frames, utilities, arbitrary }`: counts of converted frames and of Tailwind utility / arbitrary-property
  * classes written (zero for an existing project).
  */
-export async function importSource(input: string, importer?: Importer): Promise<ImportResult> {
+export async function importSource(input: string, importer?: SourceReader): Promise<ImportResult> {
   const source = path.resolve(input);
   const file = importedName(source);
   const existing: ImportResult = { file, created: false, frames: 0, utilities: 0, arbitrary: 0 };
   const occupied = await fs.lstat(file).catch(error => { if (error.code === 'ENOENT') return null; throw error; });
   if (occupied) return existing;
-  const chosen = importer ?? await importerFor(source, readBounded);
+  const chosen = importer ?? await sourceFor(source, readBounded);
   if (!chosen) throw Object.assign(new Error(`${path.basename(source)} is not a format divlet can import.`), { code: 'INVALID_PROJECT' });
   const bytes = await readBounded(source);
   let converted;
@@ -86,7 +100,7 @@ export async function importAgain(projectFile: string, metadata: Metadata | null
   const record = (metadata as any)?.import;
   if (typeof record?.source !== 'string' || record.source !== path.basename(record.source)) throw Object.assign(new Error('This project was not imported from a file.'), { code: 'INVALID_PROJECT' });
   const source = path.join(path.dirname(projectFile), record.source);
-  const importer = await importerFor(source, readBounded);
+  const importer = await sourceFor(source, readBounded);
   if (!importer) throw Object.assign(new Error(`${record.source} is not a format divlet can import.`), { code: 'INVALID_PROJECT' });
   const bytes = await readBounded(source);
   const stem = path.basename(source, path.extname(source));
@@ -99,9 +113,9 @@ export async function importAgain(projectFile: string, metadata: Metadata | null
   throw Object.assign(new Error('Too many re-imports beside the source.'), { code: 'INVALID_TARGET' });
 }
 
-/** Make `file` ready to open: a foreign source (or a foreign source squatting on a `.divlet` name) is converted; anything else is returned as is. */
+/** Admit native HTML or a foreign source; foreign sources squatting on a `.divlet` name are detached by their importer. */
 export async function resolveOpenFile(file: string): Promise<ImportResult> {
-  const importer = await importerFor(file, readBounded);
+  const importer = await sourceFor(file, readBounded);
   // "Nothing to convert": the file opens as itself, and no project was created.
   const asIs: ImportResult = { file, created: false, frames: 0, utilities: 0, arbitrary: 0 };
   if (!importer) return asIs;

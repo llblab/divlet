@@ -3,8 +3,7 @@ import { constants, promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { PROJECT_SCHEMA, validateSettings, writeProject } from './project.ts';
-import { importedName, isImportable } from './import.ts';
-import { importerFor } from './plugins.ts';
+import { importedName, isImportable, sourceFor } from './import.ts';
 import { buildStatic } from './static.js';
 import { prepareFrame, frameMetadata } from './render.ts';
 import type { FrameEntry, PreparedFrame } from './render.ts';
@@ -92,10 +91,10 @@ async function summarize(file: string, from: string): Promise<ProjectEntry> {
       if (length !== stat.size || after.size !== stat.size || after.mtimeMs !== stat.mtimeMs || after.ctimeMs !== stat.ctimeMs) throw Object.assign(new Error(), { code: 'SUMMARY_CHANGED' });
       bytes = buffer.subarray(0, length);
     } finally { await handle.close(); }
-    const importer = await importerFor(file, async () => bytes);
+    const importer = await sourceFor(file, async () => bytes);
     let roots: any[], name: unknown;
     if (importer?.summarize) {
-      // A foreign source is summarized by its importer, without converting it.
+      // Admission providers can summarize a source without converting it.
       const card = importer.summarize(bytes);
       if (card.name) name = card.name;
       entry.frames = card.frames; entry.frameNames = card.frameNames;

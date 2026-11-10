@@ -10,6 +10,10 @@
 | Contract | `npm run test:contract` | One tool list; the JSON Schema and TypeBox renderings agreeing on required parameters; the agent vocabulary; a board running only the tools it publishes; the board registry (one live owner, stale entries removed). |
 | Pi RPC | `npm run test:pi` | A real Pi in RPC mode with a scripted model: a board request reaches a divlet tool, changes the project and returns as a reply. Skipped when the `pi` CLI is absent. |
 
+## Native HTML stabilization
+
+`node --test core/tests/html-import.test.js core/tests/import.test.js` checks core-owned HTML admission without an HTML plugin registration, with no style engine, and through explicit `.html`/`.htm` opening, folder-page ingestion and re-import. It covers reported sanitization losses, preserved sources, existing destinations, listing policy, link refusal and unsupported input. It does not establish managed-cache reverse editing; generated-page hand edits remain diagnosed rather than imported.
+
 ## Conventions
 
 - Assert actual state (project file, model, accepted version), not only that a request returned.

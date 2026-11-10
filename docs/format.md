@@ -57,4 +57,4 @@ Edits to the model regenerate the page. Hand-edited generated pages are diagnose
 
 ## Importing
 
-Importer plugins convert foreign sources into this format and are described in [architecture](architecture.md#core-and-plugins).
+The core admits external `.html`/`.htm` pages directly into this format; no HTML importer plugin or style engine is required. Foreign formats use importer plugins. Both paths retain bounded source reads, import provenance and non-overwriting sibling publication; see [architecture](architecture.md#core-and-plugins). External-page admission is not reverse editing of an existing managed HTML projection.

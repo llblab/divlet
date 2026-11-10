@@ -8,7 +8,6 @@ import { isDeepStrictEqual } from 'node:util';
 import { prepareFrame, frameMetadata } from './render.ts';
 import { applyDocumentPatch, colourNames, inspectDocument, DivletError, validateDocument, SOURCE_LIMITS, LIMITS } from './model.ts';
 import { exportHtml } from './codec.ts';
-import { importerFor, pageExtensions } from './plugins.ts';
 import { startServer } from './server.ts';
 import { registerBoard, unregisterBoard } from './boards.ts';
 import { buildSite } from './site.ts';
@@ -18,7 +17,7 @@ import { expandPath, inspectPath, initProject, resolveProject, isProjectFile } f
 import { OutputStore, safeDirectory } from './output.ts';
 import { buildStatic, readResourceBytes, normalizeExternalFiles } from './static.js';
 import { readProject, writeProject, validateSettings, patchSettings, expandFrame, listComponents, instancesOf } from './project.ts';
-import { importStatus, importAgain } from './import.ts';
+import { importStatus, importAgain, sourceFor, pageSourceExtensions } from './import.ts';
 import { clientPlugins, customClasses, explainClasses, suggestClasses, warmSuggestions } from './engine.ts';
 
 const PACKAGE_ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -748,7 +747,7 @@ export class DivletRuntime extends EventEmitter {
     return id === document.id ? document : validateDocument({ ...document, id });
   }
 
-  async listFiles(directory = this.projectDir, files = [], pages = pageExtensions()) {
+  async listFiles(directory = this.projectDir, files = [], pages = pageSourceExtensions()) {
     for (const item of await fs.readdir(directory, { withFileTypes: true })) {
       if (item.name.startsWith('.')) continue;
       const full = path.join(directory, item.name);
@@ -887,12 +886,12 @@ await this.importProject(project.settings, project.frames, hash);
     }
   }
 
-  /** Import one dropped page into a frame through its importer; `{ document, dropped }`. */
+  /** Admit one dropped page through native HTML handling or a foreign page provider. */
   async pageFrame(file, text) {
-    const importer = await importerFor(file, candidate => this.fileContents(candidate));
+    const importer = await sourceFor(file, candidate => this.fileContents(candidate));
     if (typeof importer?.page !== 'function') fail('INVALID_PROJECT', `${path.basename(file)} is not a page this board can import.`);
     const fallbackId = path.basename(file).replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_.:-]/g, '-').replace(/^[^a-zA-Z]+/, '') || 'imported';
-    const { document, dropped } = importer.page(text, { fallbackId, source: path.basename(file) });
+    const { document, dropped } = importer.page(Buffer.from(text), { fallbackId, source: path.basename(file) });
     return { document, dropped };
   }
 

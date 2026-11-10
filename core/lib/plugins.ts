@@ -10,7 +10,6 @@
  */
 import path from 'node:path';
 import pen from '../../plugins/pen/index.js';
-import html from '../../plugins/html/index.js';
 import type { DocumentModel } from './model.ts';
 import type { ProjectSettings } from './project.ts';
 
@@ -22,10 +21,18 @@ export type SourceBytes = Uint8Array;
 /** Read a source file (bounded, no links); the importer decides what a file is from its bytes. */
 export type ReadSource = (file: string) => Promise<SourceBytes>;
 
+/** Conversion counts, including structured counts of content lost during conversion. */
+export interface ConversionStats {
+  frames?: number;
+  nodes?: number;
+  utilities?: number;
+  arbitrary?: number;
+  [key: string]: number | Record<string, number> | undefined;
+}
 /** What a plugin returns when it converts one file into a whole project. */
-export interface ConvertResult { text: string; stats?: Record<string, number> }
+export interface ConvertResult { text: string; stats?: ConversionStats }
 /** One file turned into one frame (a page dropped into a project folder). */
-export interface PageResult { document: DocumentModel; dropped?: string[] }
+export interface PageResult { document: DocumentModel; dropped?: string[] | Record<string, number> }
 /** A launcher card, computed without converting. */
 export interface ImportSummary { name?: string; frames: number; frameNames?: string[] }
 
@@ -64,7 +71,7 @@ export interface ExportedBytes { name: string; bytes: string | Uint8Array }
 export interface ExportFile { name: string; bytes: Uint8Array; mime: string }
 
 // A plugin descriptor is JavaScript; the registry is the boundary that promises it satisfies `Importer`.
-const importers: Importer[] = [pen as unknown as Importer, html as unknown as Importer];
+const importers: Importer[] = [pen as unknown as Importer];
 const exporters: Exporter[] = [];
 
 /*
@@ -120,7 +127,7 @@ export async function exportAs(id: string, input: Parameters<Exporter['export']>
 
 export const registerImporter = (importer: Importer): void => { if (!importers.some(item => item.id === importer.id)) importers.push(importer); };
 export const importerList = (): Importer[] => [...importers];
-/** File extensions a single file can be turned into one frame from (dropped into a project folder); the core names no format. */
+/** Foreign page-provider extensions; the core source dispatcher adds native HTML separately. */
 export const pageExtensions = (): Set<string> => new Set(importers.filter(importer => typeof importer.page === 'function').flatMap(importer => importer.extensions));
 /** File extensions of every registered foreign format (they are listed as projects and imported on open). */
 export const importExtensions = ({ all = false }: { all?: boolean } = {}): Set<string> => new Set(importers.filter(importer => all || importer.listed !== false).flatMap(importer => importer.extensions));

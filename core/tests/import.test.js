@@ -159,7 +159,7 @@ test('an HTML page opens by path (converted beside it) but is not offered as a p
   assert.equal(runtime.info().documents.length, 1);
 });
 
-test('a page dropped into a folder of its own is decoded by the importer plugin, not by the core codec', async t => {
+test('a page dropped into a folder of its own uses native external-HTML admission, not strict cache decoding', async t => {
   const dir = await workspace(t);
   const text = '<!doctype html><title>Folder page</title><link rel="stylesheet" href="x.css"><style>.x{color:red}</style><body class="p-4"><main class="x" onclick="go()"><h1>Hello</h1><p>World</p><script>alert(1)</script></main></body>';
   await fs.writeFile(path.join(dir, 'dropped.html'), text);
@@ -177,7 +177,7 @@ test('a page dropped into a folder of its own is decoded by the importer plugin,
   assert.ok(runtime.info().diagnostics.length === 0 || !runtime.info().diagnostics.some(item => item.code === 'INVALID_HTML'));
 });
 
-test('a page dropped into a project folder becomes a frame through the same importer', async t => {
+test('a page dropped into a project folder becomes a frame through the same native HTML admission', async t => {
   const dir = await workspace(t);
   await fs.writeFile(path.join(dir, 'project.divlet'), JSON.stringify({ schemaVersion: 2, name: 'Dropped', version: 1, tokens: {}, css: '', metadata: {}, frames: [
     { id: 'kept', name: 'Kept', version: 1, artboard: { x: 0, y: 0, width: 320, height: 200 }, rootId: 'root', tokens: {}, css: '', metadata: {}, nodes: { root: { id: 'root', type: 'element', tag: 'main', className: 'p-4', attrs: {}, style: {}, metadata: {}, children: [] } } },
