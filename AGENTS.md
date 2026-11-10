@@ -1,6 +1,6 @@
 # divlet project context
 
-divlet is a local browser layout board for agents. It edits validated static HTML/SVG/CSS projects, not arbitrary applications. Start with [README.md](README.md) for usage and [docs/README.md](docs/README.md) for technical documentation. The [web-native core contract](docs/web-native.md) owns the target semantics and plugin boundaries; [docs/format.md](docs/format.md) describes the current wire format.
+divlet is a local browser layout board for agents. It edits validated static HTML/SVG/CSS projects, not arbitrary applications. Start with [README.md](README.md) for usage and [docs/README.md](docs/README.md) for technical documentation. The [web-native core contract](docs/web-native.md) owns the target semantics and plugin boundaries; [docs/format.md](docs/format.md) owns the wire-format specification and its explicit compatibility status.
 
 ## Meta-Protocol Principles
 

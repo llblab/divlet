@@ -4,6 +4,16 @@ This is the canonical list of remaining work. Contributor rules live in [AGENTS.
 
 Order is priority, highest first. Every item names what is left, not history.
 
+## P1 — format freeze preparation
+
+Prepare the first-release specification candidate in [docs/format.md](docs/format.md), with executable evidence and a precise freeze assessment. The preparation scope does not authorize schema changes, declaring stability, publishing, tagging or deployment. Stop when the candidate, baseline evidence and attributed blockers are ready; implementation/release work needs its own scope.
+
+Checkpoint: accepted/rejected examples and semantic read/write expectations support the candidate; every unresolved persisted-semantics decision has a named owner and unblocker, without making all editor work a format-freeze prerequisite.
+
+- [ ] **FORMAT-EVIDENCE — Establish a portable conformance baseline and reader-boundary witnesses.** Reuse the model/project/codec validators rather than introducing a competing schema. Add plain JSON examples for supported project/frame/node/component forms and rejected classes, verify defaults and semantic read/write stability, and validate the specification's complete JSON example. Audit project-versus-frame name/metadata validation, null/default rules, unknown/future fields and numeric representability; record counterexamples as blockers, not compatibility guarantees. Use a focused `core/tests/format.test.js` family with portable data under `core/tests/fixtures/format/`; distinguish baseline coverage from full conformance.
+- [ ] **FORMAT-ASSESS — Review the candidate against its evidence and classify freeze gates.** Check field/default coverage, version/revision distinctions, supported HTML/SVG/CSS, resource/identity semantics and compatibility claims. Attribute persisted rendering-dependency decisions to WEB-3 and component/override/DOM-ID decisions to WEB-4; identify whether WEB-1/WEB-2/WEB-5 require a saved-model change or only implementation. Record concrete recommendations and remaining approval/implementation gates in the format reference, with no duplicate work list. Verify every reported blocker against code or a reproducible witness and reconcile this checkpoint.
+- [ ] **FORMAT-FREEZE — Approval-gated: accept the final format and compatibility policy.** After preparation, resolve the reported reader/compatibility and WEB-3/WEB-4 persisted-semantics blockers, update their implementation/conformance evidence and obtain explicit approval for the exact candidate. Only then replace candidate status with a frozen declaration. npm publication remains a separate gate in [docs/publishing.md](docs/publishing.md).
+
 ## P1 — web-native contract
 
 Implement the accepted [web-native core contract](docs/web-native.md). These are remaining conformance tasks, not shipped capabilities. Keep existing working behavior until each replacement passes its acceptance checks; adopting the document does not itself change the wire schema or authorize a schema freeze.
