@@ -224,6 +224,149 @@ test('external file edits appear in the log as file changes and can be undone', 
   validateDocument(runtime.read({ view: 'document', documentId: id }));
 });
 
+test('multi-step history replays dependent edits in order with one accepted commit', async t => {
+  const { runtime, id } = await fixture(t);
+  const base = runtime.read({ view: 'document', documentId: id });
+  await runtime.patch({ documentId: id, expectedVersion: 1, patch: { artboard: { x: 400 } } });
+  await runtime.patch({ documentId: id, expectedVersion: 2, patch: { artboard: { x: 700 } } });
+  const revision = runtime.revision;
+  let writes = 0;
+  const persist = runtime.persist.bind(runtime);
+  runtime.persist = (...args) => { writes++; return persist(...args); };
+  await runtime.undo({ steps: 2 });
+  assert.equal(runtime.read({ view: 'document', documentId: id }).artboard.x, base.artboard.x);
+  assert.equal(runtime.read({ view: 'document', documentId: id }).version, 4, 'one new frame revision, not two intermediate commits');
+  assert.equal(runtime.revision, revision + 1);
+  assert.equal(writes, 1);
+  assert.equal(runtime.undoStack.length, 0);
+  assert.equal(runtime.redoStack.length, 2);
+  await runtime.redo({ steps: 2 });
+  assert.equal(runtime.read({ view: 'document', documentId: id }).artboard.x, 700);
+  assert.equal(runtime.read({ view: 'document', documentId: id }).version, 5);
+  assert.equal(runtime.revision, revision + 2);
+  assert.equal(writes, 2);
+  assert.equal(runtime.undoStack.length, 2);
+  assert.equal(runtime.redoStack.length, 0);
+});
+
+test('multi-step history includes grouped frame movement, project settings and content', async t => {
+  const { runtime, id } = await fixture(t);
+  const other = { ...runtime.read({ view: 'document', documentId: id }), id: 'other', name: 'Other' };
+  await runtime.create({ document: other, undoable: false });
+  const baseName = runtime.settings.name, baseText = other.nodes['title-text'].content;
+  const group = runtime.newGroup();
+  for (const documentId of [id, 'other']) await runtime.patch({ documentId, expectedVersion: 1, group, patch: { artboard: { x: 900, y: 400 } } });
+  await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { name: 'History target' } });
+  await runtime.patch({ documentId: id, expectedVersion: 2, patch: { nodes: { 'title-text': { content: 'New title' } } } });
+  assert.equal(runtime.undoStack.length, 3, 'a two-frame gesture is still one step');
+  await runtime.undo({ steps: 3 });
+  for (const documentId of [id, 'other']) assert.deepEqual(runtime.read({ view: 'document', documentId }).artboard, other.artboard);
+  assert.equal(runtime.settings.name, baseName);
+  assert.equal(runtime.read({ view: 'document', documentId: id }).nodes['title-text'].content, baseText);
+  await runtime.redo({ steps: 3 });
+  for (const documentId of [id, 'other']) assert.equal(runtime.read({ view: 'document', documentId }).artboard.x, 900);
+  assert.equal(runtime.settings.name, 'History target');
+  assert.equal(runtime.read({ view: 'document', documentId: id }).nodes['title-text'].content, 'New title');
+});
+
+test('multi-step history preserves frame lifecycle ordering and frame-scoped selectivity', async t => {
+  const { runtime, id } = await fixture(t);
+  const created = await runtime.createArtboard({ name: 'Transient' });
+  await runtime.patch({ documentId: created.documentId, expectedVersion: created.version, patch: { artboard: { x: 1700 } } });
+  await runtime.removeDocument({ documentId: created.documentId });
+  await runtime.undo({ steps: 3 });
+  assert.equal(runtime.info().documents.some(doc => doc.id === created.documentId), false);
+  await runtime.redo({ steps: 2 });
+  assert.equal(runtime.read({ view: 'document', documentId: created.documentId }).artboard.x, 1700);
+  await runtime.redo();
+  assert.equal(runtime.info().documents.some(doc => doc.id === created.documentId), false);
+  const first = runtime.read({ view: 'document', documentId: id });
+  await runtime.patch({ documentId: id, expectedVersion: first.version, patch: { artboard: { x: 400 } } });
+  await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { name: 'Keep unrelated settings' } });
+  await runtime.patch({ documentId: id, expectedVersion: first.version + 1, patch: { artboard: { y: 500 } } });
+  await runtime.undo({ documentId: id, steps: 2 });
+  assert.deepEqual(runtime.read({ view: 'document', documentId: id }).artboard, first.artboard);
+  assert.equal(runtime.settings.name, 'Keep unrelated settings');
+  await runtime.redo({ documentId: id, steps: 2 });
+  assert.equal(runtime.read({ view: 'document', documentId: id }).artboard.x, 400);
+  assert.equal(runtime.read({ view: 'document', documentId: id }).artboard.y, 500);
+});
+
+test('a later conflict in multi-step replay preserves accepted state, disk, outputs and stacks', async t => {
+  for (const direction of ['undo', 'redo']) await t.test(direction, async t => {
+    const { runtime, id } = await fixture(t);
+    await runtime.patch({ documentId: id, expectedVersion: 1, patch: { nodes: { 'title-text': { content: 'one' } } } });
+    await runtime.patch({ documentId: id, expectedVersion: 2, patch: { artboard: { x: 700 } } });
+    if (direction === 'redo') await runtime.undo({ steps: 2 });
+    const version = runtime.read({ view: 'document', documentId: id }).version;
+    const patch = direction === 'undo' ? { nodes: { 'title-text': { content: 'external override' } } } : { artboard: { x: 999 } };
+    await runtime.patch({ documentId: id, expectedVersion: version, patch, undoable: false });
+    const before = runtime.read({ view: 'document', documentId: id });
+    const stacks = structuredClone([runtime.undoStack, runtime.redoStack]);
+    const history = runtime.readHistory(), revision = runtime.revision;
+    const source = await fs.readFile(runtime.projectPath);
+    const output = await fs.readFile(runtime.getEntry(id).htmlPath);
+    await assert.rejects(() => runtime[direction]({ steps: 2 }), { code: 'CANNOT_UNDO' });
+    assert.deepEqual(runtime.read({ view: 'document', documentId: id }), before);
+    assert.deepEqual([runtime.undoStack, runtime.redoStack], stacks);
+    assert.deepEqual(runtime.readHistory(), history);
+    assert.equal(runtime.revision, revision);
+    assert.deepEqual(await fs.readFile(runtime.projectPath), source);
+    assert.deepEqual(await fs.readFile(runtime.getEntry(id).htmlPath), output);
+  });
+});
+
+test('multi-step pre-publication refusal leaves state and stack authority intact', async t => {
+  const { runtime, id } = await fixture(t);
+  await runtime.patch({ documentId: id, expectedVersion: 1, patch: { artboard: { x: 400 } } });
+  await runtime.patch({ documentId: id, expectedVersion: 2, patch: { artboard: { y: 400 } } });
+  const before = runtime.read({ view: 'document', documentId: id }), stacks = structuredClone([runtime.undoStack, runtime.redoStack]);
+  const history = runtime.readHistory(), revision = runtime.revision;
+  const source = await fs.readFile(runtime.projectPath);
+  const persist = runtime.persist;
+  runtime.persist = async () => { throw new Error('Injected publication refusal'); };
+  try { await assert.rejects(() => runtime.undo({ steps: 2 }), /Injected publication refusal/); }
+  finally { runtime.persist = persist; }
+  assert.deepEqual(runtime.read({ view: 'document', documentId: id }), before);
+  assert.deepEqual([runtime.undoStack, runtime.redoStack], stacks);
+  assert.deepEqual(runtime.readHistory(), history);
+  assert.equal(runtime.revision, revision);
+  assert.deepEqual(await fs.readFile(runtime.projectPath), source);
+});
+
+test('multi-step output preflight refusal cannot accept a valid movement prefix', async t => {
+  const { runtime, cwd, id } = await fixture(t);
+  const oldOutput = runtime.outputDir;
+  await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { outputDir: 'build/current' } });
+  await runtime.patch({ documentId: id, expectedVersion: 1, patch: { artboard: { x: 777 } } });
+  const oldPage = path.join(oldOutput, `${id}.html`), target = path.join(cwd, 'protected.txt');
+  await fs.writeFile(target, 'keep these bytes');
+  await fs.rm(oldPage); await fs.symlink(target, oldPage);
+  const before = runtime.read({ view: 'document', documentId: id }), settings = structuredClone(runtime.settings);
+  const stacks = structuredClone([runtime.undoStack, runtime.redoStack]), history = runtime.readHistory(), revision = runtime.revision;
+  const source = await fs.readFile(runtime.projectPath), output = await fs.readFile(runtime.getEntry(id).htmlPath);
+  await assert.rejects(() => runtime.undo({ steps: 2 }), { code: 'UNSAFE_PATH' });
+  assert.deepEqual(runtime.read({ view: 'document', documentId: id }), before);
+  assert.deepEqual(runtime.settings, settings);
+  assert.deepEqual([runtime.undoStack, runtime.redoStack], stacks);
+  assert.deepEqual(runtime.readHistory(), history);
+  assert.equal(runtime.revision, revision);
+  assert.deepEqual(await fs.readFile(runtime.projectPath), source);
+  assert.deepEqual(await fs.readFile(runtime.getEntry(id).htmlPath), output);
+  assert.equal(await fs.readFile(target, 'utf8'), 'keep these bytes');
+});
+
+test('invalid or unavailable history step counts refuse without consuming any step', async t => {
+  const { runtime, id } = await fixture(t);
+  await runtime.patch({ documentId: id, expectedVersion: 1, patch: { artboard: { x: 400 } } });
+  const before = runtime.read({ view: 'document', documentId: id }), stacks = structuredClone([runtime.undoStack, runtime.redoStack]);
+  for (const steps of [0, -1, 1.5, '2', NaN, Infinity, 201]) await assert.rejects(() => runtime.undo({ steps }), { code: 'INVALID_QUERY' });
+  await assert.rejects(() => runtime.undo({ steps: 2 }), { code: 'NOTHING_TO_UNDO' });
+  await assert.rejects(() => runtime.redo({ steps: 1 }), { code: 'NOTHING_TO_UNDO' });
+  assert.deepEqual(runtime.read({ view: 'document', documentId: id }), before);
+  assert.deepEqual([runtime.undoStack, runtime.redoStack], stacks);
+});
+
 test('HTTP mutation endpoints act as the user and stream change events', async t => {
   const { runtime, id } = await fixture(t);
   const url = runtime.url;

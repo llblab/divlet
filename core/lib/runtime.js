@@ -1190,17 +1190,22 @@ await this.importProject(project.settings, project.frames, hash);
     }
   }
 
-  _step(from, to, direction, { documentId, actor = 'user' } = {}) {
+  _step(from, to, direction, { documentId, actor = 'user', steps = 1 } = {}) {
     return this.enqueue(async () => {
-      let index = -1;
-      for (let i = from.length - 1; i >= 0; i--) if (!documentId || from[i].items.some(item => item.documentId === documentId || item.documentIds?.includes(documentId))) { index = i; break; }
-      if (index < 0) fail('NOTHING_TO_UNDO', direction === 'undo' ? 'Nothing to undo.' : 'Nothing to redo.');
-      const [entry] = from.splice(index, 1);
-      try { await this._applyEntry(entry, direction, actor); }
-      catch (error) { from.splice(index, 0, entry); throw error; }
-      to.push(entry);
+      if (!Number.isInteger(steps) || steps < 1 || steps > UNDO_LIMIT) fail('INVALID_QUERY', `steps must be an integer from 1 to ${UNDO_LIMIT}.`);
+      const indexes = [];
+      for (let i = from.length - 1; i >= 0 && indexes.length < steps; i--) if (!documentId || from[i].items.some(item => item.documentId === documentId || item.documentIds?.includes(documentId))) indexes.push(i);
+      if (indexes.length < steps) fail('NOTHING_TO_UNDO', steps === 1 ? `Nothing to ${direction}.` : `Not enough history to ${direction} ${steps} steps.`);
+      const entries = indexes.map(index => from[index]);
+      const label = steps === 1 ? entries[0].label : `${direction} ${steps} steps`;
+      // _applyEntry reverses an undo's items; compose chronological entries so it reverses the whole traversal once.
+      const ordered = direction === 'undo' ? [...entries].reverse() : entries;
+      await this._applyEntry({ label, items: ordered.flatMap(entry => entry.items) }, direction, actor);
+      // Stack authority changes only after the complete candidate has validated and persisted.
+      for (const index of indexes) from.splice(index, 1);
+      to.push(...entries);
       this.publish();
-      return { ...this.historyHead(), label: entry.label };
+      return { ...this.historyHead(), label };
     });
   }
 

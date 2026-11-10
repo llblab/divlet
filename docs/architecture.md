@@ -88,6 +88,14 @@ the owner is alive, and attaches instead of opening a second writer. Attached ca
 the owner's process disappears the entry is stale and the next client opens the project itself. The registry lives outside the
 project, is owner-only on disk, and grants nothing beyond the board's own local API.
 
+## History replay
+
+The readable action log and the runtime's inverse/forward undo stacks are separate, bounded session state. Moving a frame patches its authored artboard coordinates and is undoable like content or project settings; a grouped gesture can contain several frame patches. Browser reloads attach to the same runtime history, but restarting the runtime does not restore a persistent timeline.
+
+The owning runtime supports `undo({ steps })` and `redo({ steps })`, defaulting to one and admitting integers from 1 to the retained undo bound (currently 200). With `documentId`, it selects that many matching groups without removing unrelated groups. It composes the entries in replay order and passes one candidate through the existing whole-project validation and persistence path; source versions advance monotonically, not back to historical revision numbers. Only after persistence succeeds do entries move between the stacks. A later conflict, insufficient history or pre-source persistence refusal cannot leave an accepted prefix or consume stack entries. This reuses the source owner's existing commit policy: failures in derived-output publication after the canonical source write are diagnosed and retried as a pending generation, not presented as a failed source transaction or rolled back by history.
+
+This is a core traversal foundation, not yet a state-point/cursor API: browser and agent contracts still request ordinary single-step Undo/Redo, and clicking a History row still selects/reveals its affected frame. State addressing and the History panel's navigation remain tracked in `BACKLOG.md`; log sequence numbers alone are not a state cursor, especially after frame-scoped selective undo.
+
 ## Modules
 
 | Module | Responsibility |
