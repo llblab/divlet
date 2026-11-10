@@ -399,7 +399,7 @@ function showTip(target) {
   const h = tip.offsetHeight * uiScale();
   const above = r.bottom + h + 14 > innerHeight || (r.top > innerHeight / 2 && r.top > h + 14);
   tip.style.left = `${clamp(r.left + r.width / 2 - w / 2, 6, innerWidth - w - 6)}px`;
-  tip.style.top = `${above ? r.top - h - 8 : r.bottom + 8}px`;
+  tip.style.top = `${clamp(above ? r.top - h - 8 : r.bottom + 8, 6, innerHeight - h - 6)}px`;
 }
 const hideTip = () => { clearTimeout(tipTimer); tip.classList.remove('show'); };
 document.addEventListener('pointerover', event => {

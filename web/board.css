@@ -532,10 +532,10 @@ textarea.field { overflow: auto; }
 
 /* ---- floating hints ------------------------------------------------------- */
 /* Floating surfaces follow the theme like panels and menus: never an inverted white box in dark mode. */
-.tip { transform-origin: 0 0; position: fixed; z-index: 100; max-width: 280px; padding: 4px 9px; border: 1px solid var(--hair); border-radius: var(--radius-small); background: var(--solid); color: var(--ink); box-shadow: var(--shadow); font-size: 11.5px; line-height: 1.35; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transform: scale(var(--ui)) translateY(2px); transition: opacity .12s, transform .12s; }
+.tip { transform-origin: 0 0; position: fixed; z-index: 100; width: max-content; max-width: min(280px, calc(var(--vw) - 12px)); padding: 4px 9px; border: 1px solid var(--hair); border-radius: var(--radius-small); background: var(--solid); color: var(--ink); box-shadow: var(--shadow); font-size: 11.5px; line-height: 1.35; pointer-events: none; white-space: pre-wrap; overflow-wrap: anywhere; opacity: 0; transform: scale(var(--ui)) translateY(2px); transition: opacity .12s, transform .12s; }
 .tip.show { opacity: 1; transform: scale(var(--ui)); }
 .tip.code { max-width: min(380px, calc(var(--vw) - 12px)); padding: 7px 10px 8px; white-space: normal; }
-.tip-title { display: block; margin-bottom: 4px; font: 600 11px var(--mono); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tip-title { display: block; margin-bottom: 4px; font: 600 11px var(--mono); color: var(--ink); white-space: normal; overflow-wrap: anywhere; }
 .tip-code { margin: 0; font: 11px/1.5 var(--mono); color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; max-height: calc(var(--vh) * 0.5); overflow: hidden; }
 .toast { position: fixed; z-index: 90; left: 50%; top: calc(var(--edge) + 2px); display: flex; align-items: center; gap: 10px; max-width: min(540px, calc(var(--vw) - 24px)); padding: 6px 6px 6px 14px; transform: translateX(-50%); border: 1px solid var(--hair); border-radius: 12px; background: var(--solid); color: var(--ink); box-shadow: var(--shadow); }
 .toast.pop { animation: rise .2s var(--ease); }

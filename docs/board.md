@@ -6,7 +6,7 @@ The board displays real HTML in each artboard. Use the canvas for direct edits, 
 
 ## Canvas, selection and panels
 
-The interface uses few permanent labels. Hover for tooltips with keyboard shortcuts; `?` opens help, and `Ctrl K` opens all commands. The theme is available in Settings.
+The interface uses few permanent labels. Hover for tooltips with keyboard shortcuts; tooltip copy wraps instead of ending in an ellipsis, with width constrained to the available screen; `?` opens help, and `Ctrl K` opens all commands. The theme is available in Settings.
 
 ### Canvas
 

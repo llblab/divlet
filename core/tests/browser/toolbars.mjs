@@ -665,6 +665,27 @@ try {
       const overlap = await narrow.evaluate(() => { const i = document.querySelector('#inspector'), d = document.querySelector('#dock'); if (i.hidden || d.offsetParent === null) return 0; return i.getBoundingClientRect().bottom - d.getBoundingClientRect().top; });
       assert.ok(overlap <= 1, `the inspector never sits under the toolbar at ${w}px, ${size}%, ${state} (${overlap}px)`);
     }
+    // Long tooltip copy must wrap whole, including unbroken references, and stay inside the physical viewport.
+    const tooltipCopy = 'Centre the children horizontally and vertically (flex, items-center, justify-center). ' + 'unbroken_reference_'.repeat(21);
+    await narrow.evaluate(copy => { const target = document.createElement('button'); target.id = 'tooltip-check'; target.textContent = '?'; target.dataset.tip = copy; Object.assign(target.style, { position: 'fixed', left: '6px', top: '6px', width: '26px', height: '26px', zIndex: '80' }); document.body.append(target); }, tooltipCopy);
+    for (const [left, top] of [[6, 6], [w - 32, 6], [w - 32, 768], [w / 2, 390]]) {
+      await narrow.mouse.move(w / 2, 780);
+      await narrow.locator('#tooltip-check').evaluate((node, pos) => { node.style.left = `${pos[0]}px`; node.style.top = `${pos[1]}px`; }, [left, top]);
+      await narrow.locator('#tooltip-check').hover();
+      await narrow.locator('.tip.show').waitFor();
+      await narrow.waitForTimeout(150);
+      const tooltip = await narrow.locator('.tip').evaluate(node => { const box = node.getBoundingClientRect(), style = getComputedStyle(node); return { text: node.textContent, wrapped: node.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom) > parseFloat(style.lineHeight) * 1.5, clipped: node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1, inside: box.left >= 5 && box.top >= 5 && box.right <= innerWidth - 5 && box.bottom <= innerHeight - 5 }; });
+      assert.deepEqual(tooltip, { text: tooltipCopy, wrapped: true, clipped: false, inside: true }, `whole tooltip at ${w}px/${size}% near ${left},${top}`);
+    }
+    await narrow.locator('#tooltip-check').evaluate(node => { node.dataset.tipCode = '/assets/example.svg\n/assets/another-example.png'; });
+    await narrow.keyboard.press('Escape');
+    await narrow.locator('#tooltip-check').focus();
+    await narrow.locator('.tip.code.show').waitFor();
+    assert.equal(await narrow.locator('.tip-title').textContent(), tooltipCopy, 'keyboard tooltips retain their whole diagnostic heading');
+    assert.ok(await narrow.locator('.tip-title').evaluate(node => node.scrollWidth <= node.clientWidth + 1 && getComputedStyle(node).textOverflow !== 'ellipsis'), 'diagnostic headings wrap as well');
+    await narrow.keyboard.press('Escape');
+    await narrow.locator('#tooltip-check').evaluate(node => node.remove());
+    await narrow.mouse.move(w / 2, 780);
     // The command palette lists whole labels too.
     await narrow.evaluate(async () => (await import('./lib/palette.js')).toggle(true));
     await narrow.waitForTimeout(400);
@@ -673,6 +694,7 @@ try {
     await narrow.close();
   }
   checks.push('no chrome text is clipped at 1280 and 390px wide, at 100% and 200% interface size');
+  checks.push('tooltip copy and diagnostic headings wrap whole, including unbroken references, with hover/keyboard activation and viewport-safe placement at edges and 200% size');
 
   // A collapsed selector: the label sits on the left and the current value is right-aligned, on the label's own baseline.
   {
