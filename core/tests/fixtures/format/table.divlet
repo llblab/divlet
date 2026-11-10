@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 2,
+  "name": "Table",
+  "frames": [
+    {
+      "id": "table",
+      "name": "Table",
+      "version": 1,
+      "artboard": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 400
+      },
+      "rootId": "root",
+      "nodes": {
+        "root": {
+          "id": "root",
+          "type": "element",
+          "tag": "table",
+          "children": [
+            "caption",
+            "columns",
+            "header",
+            "body",
+            "footer"
+          ]
+        },
+        "caption": {
+          "id": "caption",
+          "type": "element",
+          "tag": "caption",
+          "children": [
+            "captionText"
+          ]
+        },
+        "captionText": {
+          "id": "captionText",
+          "type": "text",
+          "content": "A native table"
+        },
+        "columns": {
+          "id": "columns",
+          "type": "element",
+          "tag": "colgroup",
+          "children": [
+            "column"
+          ]
+        },
+        "column": {
+          "id": "column",
+          "type": "element",
+          "tag": "col",
+          "children": []
+        },
+        "header": {
+          "id": "header",
+          "type": "element",
+          "tag": "thead",
+          "children": [
+            "headRow"
+          ]
+        },
+        "headRow": {
+          "id": "headRow",
+          "type": "element",
+          "tag": "tr",
+          "children": [
+            "headCell"
+          ]
+        },
+        "headCell": {
+          "id": "headCell",
+          "type": "element",
+          "tag": "th",
+          "children": [
+            "heading"
+          ]
+        },
+        "heading": {
+          "id": "heading",
+          "type": "text",
+          "content": "Heading"
+        },
+        "body": {
+          "id": "body",
+          "type": "element",
+          "tag": "tbody",
+          "children": [
+            "gap",
+            "row"
+          ]
+        },
+        "gap": {
+          "id": "gap",
+          "type": "text",
+          "content": " \n\t\f"
+        },
+        "row": {
+          "id": "row",
+          "type": "element",
+          "tag": "tr",
+          "children": [
+            "cell"
+          ]
+        },
+        "cell": {
+          "id": "cell",
+          "type": "element",
+          "tag": "td",
+          "children": [
+            "value"
+          ]
+        },
+        "value": {
+          "id": "value",
+          "type": "text",
+          "content": "Value"
+        },
+        "footer": {
+          "id": "footer",
+          "type": "element",
+          "tag": "tfoot",
+          "children": [
+            "footRow"
+          ]
+        },
+        "footRow": {
+          "id": "footRow",
+          "type": "element",
+          "tag": "tr",
+          "children": [
+            "footCell"
+          ]
+        },
+        "footCell": {
+          "id": "footCell",
+          "type": "element",
+          "tag": "td",
+          "children": [
+            "footText"
+          ]
+        },
+        "footText": {
+          "id": "footText",
+          "type": "text",
+          "content": "Footer"
+        }
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createDemoDocument, validateDocument, applyDocumentPatch, DivletError } from '../lib/model.ts';
+import { createDemoDocument, validateDocument, applyDocumentPatch, DivletError, HTML_TAGS } from '../lib/model.ts';
 import { encodeHtml, decodeHtml, renderFile } from '../lib/codec.ts';
 import { operationPatch } from '../lib/ops.ts';
 
@@ -15,6 +15,33 @@ test('Generated HTML roundtrips the canonical document exactly, including metada
   assert.match(html, /<!--divlet:text:title-text-->/);
   assert.ok(!html.includes('</script><script>not executed'));
   assert.equal(decodeHtml(html).css, '');
+});
+
+test('admitted simple HTML trees retain their structure across the native projection', () => {
+  const covered = new Set();
+  const check = (tag, childTag) => {
+    let doc;
+    try {
+      doc = validateDocument({ schemaVersion: 1, id: 'fidelity', name: 'Fidelity', version: 1, artboard: { x: 0, y: 0, width: 100, height: 100 }, rootId: 'root', nodes: {
+        root: { id: 'root', type: 'element', tag, children: childTag ? ['child'] : [] },
+        ...(childTag ? { child: { id: 'child', type: 'element', tag: childTag } } : {}),
+      } });
+    } catch (error) {
+      if (error instanceof DivletError) return;
+      throw error;
+    }
+    assert.deepEqual(decodeHtml(encodeHtml(doc)), doc, `${tag}${childTag ? ` > ${childTag}` : ''}`);
+    covered.add(tag);
+    if (childTag) covered.add(childTag);
+  };
+  for (const tag of HTML_TAGS) {
+    check(tag);
+    for (const childTag of HTML_TAGS) check(tag, childTag);
+  }
+  const table = decodeHtml('<table><caption>Caption</caption><colgroup><col></colgroup><thead><tr><th>Heading</th></tr></thead><tbody> \n<tr><td>Value</td></tr></tbody><tfoot><tr><td>Footer</td></tr></tfoot></table>');
+  assert.deepEqual(decodeHtml(encodeHtml(table)), table);
+  for (const node of Object.values(table.nodes)) if (node.type === 'element') covered.add(node.tag);
+  assert.deepEqual(covered, HTML_TAGS, 'fidelity must not be achieved by dropping supported tags');
 });
 
 test('Actual edited HTML wins over metadata: content, classes, inline CSS, token and authored CSS', () => {

@@ -99,12 +99,36 @@ test('SVG filter tags remain confined to SVG and reject executable attributes', 
 });
 
 test('Content model rejects browser-repaired paragraph and list trees', () => {
-  for (const tags of [['p', 'span', 'div'], ['ul', 'li', 'li']]) {
+  for (const tags of [['p', 'span', 'div'], ['ul', 'li', 'li'], ...['details', 'dialog', 'figcaption', 'summary'].map(tag => ['p', 'span', tag])]) {
     const doc = sample();
     doc.nodes = Object.fromEntries(tags.map((tag, index) => [`node-${index}`, { id: `node-${index}`, type: 'element', tag, children: index + 1 < tags.length ? [`node-${index + 1}`] : [] }]));
     doc.rootId = 'node-0';
     assert.throws(() => validateDocument(doc), DivletError);
   }
+});
+
+test('table roles require their parent context at roots and below ordinary elements', () => {
+  for (const tag of ['caption', 'col', 'colgroup', 'thead', 'tbody', 'tfoot', 'tr', 'td', 'th']) {
+    const root = sample();
+    root.nodes = { root: { id: 'root', type: 'element', tag } };
+    assert.throws(() => validateDocument(root), { code: 'INVALID_DOCUMENT' }, `root ${tag}`);
+    const nested = sample();
+    nested.nodes.label = { id: 'label', type: 'element', tag };
+    assert.throws(() => validateDocument(nested), { code: 'INVALID_DOCUMENT' }, `main > ${tag}`);
+  }
+});
+
+test('table text uses HTML whitespace rather than JavaScript trim semantics', () => {
+  for (const content of ['\u00a0', '\u2003']) {
+    const doc = sample();
+    doc.nodes.root.tag = 'table';
+    doc.nodes.label.content = content;
+    assert.throws(() => validateDocument(doc), { code: 'INVALID_DOCUMENT' });
+  }
+  const doc = sample();
+  doc.nodes.root.tag = 'table';
+  doc.nodes.label.content = ' \t\r\n\f';
+  assert.equal(validateDocument(doc).nodes.label.content, ' \t\n\f');
 });
 
 test('Inspection returns bounded contextual nodes and preserves design metadata', () => {

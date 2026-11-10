@@ -181,6 +181,45 @@
           }
         }
       ]
+    },
+    {
+      "id": "native-table-contexts",
+      "file": "table.divlet",
+      "checks": [
+        {
+          "path": [
+            "frames",
+            0,
+            "nodes",
+            "root",
+            "tag"
+          ],
+          "equals": "table"
+        },
+        {
+          "path": [
+            "frames",
+            0,
+            "nodes",
+            "body",
+            "children"
+          ],
+          "equals": [
+            "gap",
+            "row"
+          ]
+        },
+        {
+          "path": [
+            "frames",
+            0,
+            "nodes",
+            "gap",
+            "content"
+          ],
+          "equals": " \n\t\f"
+        }
+      ]
     }
   ],
   "rejected": [
@@ -615,6 +654,108 @@
         ]
       },
       "errorCode": "INVALID_PROJECT"
+    },
+    {
+      "id": "contextless-table-row",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "invalid-context",
+            "name": "Invalid context",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 400
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "tr",
+                "children": []
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "INVALID_DOCUMENT"
+    },
+    {
+      "id": "paragraph-browser-repair",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "invalid-context",
+            "name": "Invalid context",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 400
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "p",
+                "children": [
+                  "details"
+                ]
+              },
+              "details": {
+                "id": "details",
+                "type": "element",
+                "tag": "details",
+                "children": []
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "INVALID_DOCUMENT"
+    },
+    {
+      "id": "foster-parented-table-text",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "invalid-context",
+            "name": "Invalid context",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 400
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "table",
+                "children": [
+                  "value"
+                ]
+              },
+              "value": {
+                "id": "value",
+                "type": "text",
+                "content": " "
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "INVALID_DOCUMENT"
     }
   ]
 }

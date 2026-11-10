@@ -105,6 +105,23 @@ test('instances cannot break HTML nesting rules once expanded', async t => {
   await assert.rejects(runtime.patch({ documentId: 'components', expectedVersion: 1, patch: { nodes: { card: { tag: 'button' } } } }), /Buttons cannot be nested/);
 });
 
+test('reusable table rows remain valid only when their expanded parent context is valid', () => {
+  const source = { ...components(), id: 'rows', nodes: {
+    root: element('root', 'table', ['body']), body: element('body', 'tbody', ['row']),
+    row: element('row', 'tr', ['cell'], { reusable: true }), cell: element('cell', 'td', ['label']), label: text('label', 'Cell'),
+  } };
+  const consumer = { ...page(), nodes: {
+    root: element('root', 'table', ['body']), body: element('body', 'tbody', ['instance']),
+    instance: { id: 'instance', type: 'ref', ref: 'rows/row' },
+  } };
+  const accepted = readProject({ schemaVersion: 2, frames: [source, consumer] });
+  assert.equal(accepted.frames[1].nodes.instance.type, 'ref');
+  const misplaced = structuredClone(consumer);
+  misplaced.nodes.root = element('root', 'main', ['instance']);
+  delete misplaced.nodes.body;
+  assert.throws(() => readProject({ schemaVersion: 2, frames: [source, misplaced] }), { code: 'INVALID_DOCUMENT' });
+});
+
 test('detach turns an instance into ordinary nodes that keep its ID', async t => {
   const { runtime } = await fixture(t);
   const result = await runtime.edit({ documentId: 'landing', expectedVersion: 1, op: { type: 'detach', id: 'feature' } });

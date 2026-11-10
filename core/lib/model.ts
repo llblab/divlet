@@ -98,7 +98,14 @@ export const SVG_TAGS: ReadonlySet<string> = new Set('svg g path rect circle ell
 export const HTML_TAGS: ReadonlySet<string> = new Set('a abbr address article aside b bdi bdo blockquote br button caption cite code col colgroup data datalist dd del details dfn dialog div dl dt em fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr i img input ins kbd label legend li main mark menu meter nav ol optgroup option output p picture pre progress q rp rt ruby s samp section select small source span strong sub summary sup table tbody td textarea tfoot th thead time tr track u ul var video audio wbr'.split(' '));
 /** Whether a tag can be stored in a divlet document (SVG tags only inside <svg>). */
 export const supportsTag = (tag: string, inSvg = false): boolean => (inSvg ? SVG_TAGS.has(tag) : HTML_TAGS.has(tag) || tag === 'svg');
-const BLOCK_TAGS: ReadonlySet<string> = new Set('address article aside blockquote div dl fieldset figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr main menu nav ol p pre section table ul'.split(' '));
+const BLOCK_TAGS: ReadonlySet<string> = new Set('address article aside blockquote details dialog div dl fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr main menu nav ol p pre section summary table ul'.split(' '));
+const TABLE_CHILDREN: Readonly<Record<string, readonly string[]>> = { table: ['caption', 'colgroup', 'thead', 'tbody', 'tfoot'], thead: ['tr'], tbody: ['tr'], tfoot: ['tr'], tr: ['td', 'th'], colgroup: ['col'] };
+const CONTENT_CHILDREN: Readonly<Record<string, readonly string[]>> = { ...TABLE_CHILDREN, select: ['option', 'optgroup'], optgroup: ['option'] };
+// One authored table grammar defines both child content and required parent contexts.
+const TABLE_PARENTS = new Map<string, string[]>();
+for (const [parent, children] of Object.entries(TABLE_CHILDREN)) {
+  for (const child of children) TABLE_PARENTS.set(child, [...(TABLE_PARENTS.get(child) ?? []), parent]);
+}
 const BAD_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
 export const ID = /^[A-Za-z][A-Za-z0-9_.:-]{0,95}$/;
 const TOKEN = /^--[A-Za-z_][A-Za-z0-9_-]*$/;
@@ -172,7 +179,8 @@ export function validateCss(css: unknown, limits: Limits = LIMITS): string {
 export function metadata(value: unknown, label: string): Metadata {
   const record = object(value, label);
   json(record, label);
-  if (JSON.stringify(record).length > 65536) fail(`${label} exceeds 64 KiB`);
+  const maxLength = 65536;
+  if (JSON.stringify(record).length > maxLength) fail(`${label} exceeds ${maxLength} serialized UTF-16 code units`);
   return structuredClone(record) as Metadata;
 }
 
@@ -221,7 +229,7 @@ function validOverrides(input: unknown, id: string): Record<string, Override> {
       const attrs = object(override.attrs, `${id} → ${address}.attrs`);
       for (const [name, value] of Object.entries(attrs)) if (value !== null) safeAttribute(name, value as string, `${id} → ${address}`);
     }
-    if (override.metadata !== undefined) object(override.metadata, `${id} → ${address}.metadata`);
+    if (override.metadata !== undefined) override.metadata = metadata(override.metadata, `${id} → ${address}.metadata`);
   }
   return overrides as Record<string, Override>;
 }
@@ -235,9 +243,12 @@ function validateParent(parent: ElementNode, child: Node, nodes: Record<NodeId, 
   if (tag === 'a' && ancestors.some(id => tagOf(id) === 'a')) fail('Links cannot be nested');
   if (tag === 'button' && ancestors.some(id => tagOf(id) === 'button')) fail('Buttons cannot be nested');
   if (tag === 'form' && ancestors.some(id => tagOf(id) === 'form')) fail('Forms cannot be nested');
-  const tableRules: Record<string, string[]> = { table: ['caption', 'colgroup', 'thead', 'tbody', 'tfoot'], thead: ['tr'], tbody: ['tr'], tfoot: ['tr'], tr: ['td', 'th'], colgroup: ['col'], select: ['option', 'optgroup'], optgroup: ['option'] };
-  const allowed = tableRules[parent.tag];
-  if (allowed && (tag ? !allowed.includes(tag) : (child as TextNode).content.trim() !== '')) fail(`Unsupported child of ${parent.tag}`);
+  const allowed = CONTENT_CHILDREN[parent.tag];
+  if (allowed) {
+    const text = child.type === 'text' ? child.content : '';
+    const nonWhitespace = Object.hasOwn(TABLE_CHILDREN, parent.tag) ? /[^\t\n\f\r ]/.test(text) : text.trim() !== '';
+    if (tag ? !allowed.includes(tag) : nonWhitespace) fail(`Unsupported child of ${parent.tag}`);
+  }
   if (parent.tag === 'option' && tag) fail('option supports text only');
   if (tag === 'li' && !['ul', 'ol', 'menu'].includes(parent.tag)) fail('li must be a direct child of a list');
   if (tag !== null && ['dt', 'dd'].includes(tag) && parent.tag !== 'dl') fail(`${tag} must be a direct child of dl`);
@@ -305,6 +316,11 @@ export function validateDocument(input: unknown, { limits = LIMITS }: { limits?:
       const inSvg = ancestors.some(parentId => at(nodes, parentId).tag === 'svg');
       if (node.tag !== 'svg' && SVG_TAGS.has(node.tag) && !HTML_TAGS.has(node.tag) && !inSvg) fail(`SVG element ${node.tag} must be inside svg`);
       if (inSvg && !SVG_TAGS.has(node.tag)) fail(`Unsupported HTML element inside SVG: ${node.tag}`);
+      const parents = TABLE_PARENTS.get(node.tag);
+      if (parents) {
+        const parentId = ancestors.at(-1);
+        if (!parentId || !parents.includes(at(nodes, parentId).tag)) fail(`${node.tag} must be a direct child of ${parents.join(', ')}`);
+      }
       if (!inSvg && node.tag !== 'svg') {
         const normalized: Attrs = {};
         for (const [name, value] of Object.entries(node.attrs)) {

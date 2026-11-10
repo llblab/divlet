@@ -24,6 +24,10 @@ for (const entry of corpus.accepted) {
     assert.equal(serialized.schemaVersion, 2);
     assert.ok(serialized.frames.every(frame => !Object.hasOwn(frame, 'schemaVersion')), 'stored frames omit the standalone envelope marker');
     assert.deepEqual(readProject(serialized), project, 'semantic identity is retained, not JSON formatting');
+    for (const frame of project.frames) {
+      const expanded = expandFrame(frame, id => project.frames.find(item => item.id === id), project.settings).document;
+      assert.deepEqual(decodeHtml(encodeHtml(expanded)), expanded, 'the expanded static projection retains the admitted model');
+    }
   });
 }
 
@@ -110,6 +114,45 @@ test('metadata rejects non-JSON and unsafe values before serialization can erase
     assert.throws(() => validateMetadata(metadata, 'metadata'), { code: 'INVALID_DOCUMENT' });
     assert.throws(() => validateSettings({ metadata }), { code: 'INVALID_DOCUMENT' });
   }
+});
+
+test('stored override metadata uses the same serialized-code-unit budget before null deletions are applied', async () => {
+  const base = await readJson('components.divlet');
+  for (const length of [65536, 65537]) {
+    const metadata = { ['é'.repeat(length - JSON.stringify({ '': null }).length)]: null };
+    assert.equal(JSON.stringify(metadata).length, length);
+    assert.ok(Buffer.byteLength(JSON.stringify(metadata)) > length, 'the documented budget counts UTF-16 units, not UTF-8 bytes');
+    const input = structuredClone(base);
+    input.frames[1].nodes.action.descendants.button.metadata = metadata;
+    if (length > 65536) {
+      assert.throws(() => validateSettings({ metadata }), { code: 'INVALID_DOCUMENT' });
+      assert.throws(() => readProject(input), { code: 'INVALID_DOCUMENT' });
+      continue;
+    }
+    assert.deepEqual(validateSettings({ metadata }).metadata, metadata);
+    const project = readProject(input);
+    assert.deepEqual(project.frames[1].nodes.action.descendants.button.metadata, metadata);
+    const restored = readProject(JSON.parse(writeProject(project.settings, project.frames)));
+    assert.deepEqual(restored.frames[1].nodes.action.descendants.button.metadata, metadata);
+    const expanded = expandFrame(project.frames[1], id => project.frames.find(frame => frame.id === id), project.settings).document;
+    assert.deepEqual(expanded.nodes.action.metadata, { purpose: 'call-to-action' });
+    assert.deepEqual(input.frames[1].nodes.action.descendants.button.metadata, metadata, 'admission does not erase authored deletion maps');
+  }
+});
+
+test('metadata overrides keep null deletion and recursive application data semantics', async () => {
+  const input = await readJson('components.divlet');
+  input.frames[0].nodes.button.metadata = { remove: 'old', keep: { original: true } };
+  input.frames[0].nodes.caption.metadata = { remove: 'old', keep: true };
+  input.frames[1].nodes.action.descendants.button.metadata = { remove: null, keep: { added: 1 }, application: { onClick: 'inert data' } };
+  input.frames[1].nodes.action.descendants.caption.metadata = { remove: null };
+  const before = structuredClone(input);
+  const project = readProject(input);
+  const expanded = expandFrame(project.frames[1], id => project.frames.find(frame => frame.id === id), project.settings).document;
+  assert.deepEqual(expanded.nodes.action.metadata, { keep: { original: true, added: 1 }, application: { onClick: 'inert data' }, purpose: 'call-to-action' });
+  assert.deepEqual(expanded.nodes['action:caption'].metadata, { keep: true });
+  assert.equal(project.frames[1].nodes.action.descendants.button.metadata.remove, null);
+  assert.deepEqual(input, before);
 });
 
 test('the reader audit is a regression gate for every retained boundary witness', () => {
