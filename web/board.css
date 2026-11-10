@@ -346,7 +346,7 @@ body.is-expanded .resize-handle, body:has(.scrim:not([hidden])) .resize-handle {
 .html-presentation { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
 .html-presentation:disabled { opacity: var(--disabled); }
 .html-scope-toggle { justify-self: start; height: auto; min-height: 30px; padding: 5px 8px; white-space: normal; text-align: left; }
-.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 6px; }
+.grid2, .box3, .box4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 6px; }
 /* layout, spacing, effects: small controls that write Tailwind classes */
 .layout-box, .spacing-box { display: grid; gap: 8px; }
 .pick { position: relative; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; min-width: 0; min-height: 30px; padding: 4px 22px 4px 9px; border: 0; border-radius: var(--radius-inner); background: var(--field); color: var(--ink); text-align: left; }
@@ -418,8 +418,7 @@ body.is-expanded .resize-handle, body:has(.scrim:not([hidden])) .resize-handle {
 @container core (max-width: 40px) {
   .bm-core { font-size: 0; min-height: 0; background: none; }
 }
-.box4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; min-width: 0; flex: 1; }
-.box3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.box4 { min-width: 0; flex: 1 1 140px; }
 .caption.has-variants::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 4px; border-radius: 50%; background: var(--accent); vertical-align: 1px; }
 .quick-attrs { margin-top: 1px; }
 /* code with colors: a highlighted copy under a transparent textarea, identical metrics */
@@ -815,8 +814,7 @@ html.w720 .side-tabs { bottom: calc(max(var(--edge), env(safe-area-inset-bottom)
 html.w720 .crumbs-bar { bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + var(--chrome-h) + 12px); }
 html.w720 .panel.right { left: var(--edge); right: var(--edge); width: auto; bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + var(--chrome-h) + 16px); max-height: calc(var(--vh) * 0.5); }
 html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { display: none; }
-  html.w720 .grid2 { grid-template-columns: 1fr 1fr 1fr 1fr; }
-    html.w440 .search-pill-text, html.w440 .search-pill kbd { display: none; } html.w440 .search-pill { padding: 0 9px; }
+      html.w440 .search-pill-text, html.w440 .search-pill kbd { display: none; } html.w440 .search-pill { padding: 0 9px; }
 /* A full-screen page owns the screen: only the Back pill and the page title stay. */
 body.is-expanded .brand, body.is-expanded .side-tabs, body.is-expanded .panel, body.is-expanded .dock, body.is-expanded .crumbs-bar { display: none; }
 /* Phones: the dock keeps tools, zoom, undo and settings; the rest is in Ctrl K and the menus. */ html.w420 .dock .zoom-step { display: none; }

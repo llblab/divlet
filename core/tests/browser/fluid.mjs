@@ -26,6 +26,25 @@ try {
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(runtime.url); await page.waitForFunction(() => document.querySelectorAll('.artboard').length > 0);
     await page.evaluate(async size => { (await import('./lib/help.js')).setUiSize(size); const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav']); }, size);
+    const readableNumbers = label => page.evaluate(label => {
+      const context = document.createElement('canvas').getContext('2d');
+      return [...document.querySelectorAll('#inspector .num-input, #inspector .vf-input:not(.color-hex)')].flatMap(input => {
+        if (!input.getBoundingClientRect().width) return [];
+        const text = input.value || input.placeholder;
+        const style = getComputedStyle(input);
+        context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        const needed = context.measureText(text).width;
+        const available = input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        return needed > available + 1 ? [`${label}: ${input.dataset.key} clips ${JSON.stringify(text)} (${needed.toFixed(1)}px > ${available.toFixed(1)}px)`] : [];
+      });
+    }, label);
+    await page.locator('#inspector [data-key="opacity"]').waitFor();
+    assert.deepEqual(await readableNumbers(`${width}px@${size}% element`), []);
+    await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', []));
+    await page.locator('#inspector [data-key="width"]').waitFor();
+    assert.deepEqual(await readableNumbers(`${width}px@${size}% artboard`), []);
+    await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', ['nav']));
+    await page.locator('#inspector [data-key="opacity"]').waitFor();
     const audit = label => page.evaluate(label => {
       const bad = [];
       const roots = ['#sidebar', '#inspector', '#help', '#palette', '#project', '#brand', '#side-tabs', '#dock', '.menu'].map(selector => document.querySelector(selector)).filter(node => node && !node.hidden && node.getClientRects().length);
@@ -58,6 +77,7 @@ try {
     await page.close();
   }
   checks.push('inspector, layers, history, agent, shortcuts and palette never overflow sideways at 390px, 390px/200% and 820px; keys, counts, times and tags are never clipped');
+  checks.push('numeric fields show their whole current/default values for element and artboard inspection, including at 200% UI size');
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'passed', checks }, null, 2));
 } finally { await browser?.close(); await runtime.close(); await rm(cwd, { recursive: true, force: true }); }

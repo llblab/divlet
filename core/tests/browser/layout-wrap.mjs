@@ -27,12 +27,39 @@ try {
     })[0];
     host.append(layout);
     document.querySelector('#ui').append(host);
+    const fields = document.createElement('section');
+    fields.id = 'fields-fixture';
+    fields.style.cssText = host.style.cssText;
+    fields.style.top = '340px';
+    const className = 'absolute top-[123456px] right-[654321px] bottom-[123456px] left-[654321px] opacity-100 z-[999999] blur-[12px] text-[length:24px]';
+    for (const [name, , content] of layoutSections([{ id: 'positioned', className }], { parent: null, apply() {} })) {
+      if (name !== 'spacing') fields.append(content);
+    }
+    document.querySelector('#ui').append(fields);
   });
   let wrapped = 0, together = 0;
   for (const viewport of [390, 768, 1280]) {
     await page.setViewportSize({ width: viewport, height: 800 });
     for (const width of [170, 220, 260, 280, 300, 320]) {
-      await page.locator('#wrap-fixture').evaluate((host, width) => { host.style.width = width + 'px'; }, width);
+      await page.locator('#wrap-fixture, #fields-fixture').evaluateAll((hosts, width) => { for (const host of hosts) host.style.width = width + 'px'; }, width);
+      const clipped = await page.locator('#fields-fixture').evaluate(host => {
+        const context = document.createElement('canvas').getContext('2d');
+        const bad = [];
+        for (const input of host.querySelectorAll('.vf-input:not(.color-hex)')) {
+          const style = getComputedStyle(input);
+          context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+          const text = input.value || input.placeholder;
+          const available = input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+          if (context.measureText(text).width > available + 1) bad.push(`${input.dataset.key}: ${text} clips at ${available}px`);
+        }
+        for (const grid of host.querySelectorAll('.grid2')) {
+          const box = grid.getBoundingClientRect(), last = grid.lastElementChild.getBoundingClientRect();
+          if (Math.abs(box.right - last.right) > 1) bad.push('paired controls leave unused columns');
+        }
+        if (host.scrollWidth > host.clientWidth + 1) bad.push('numeric controls overflow the host');
+        return bad;
+      });
+      assert.deepEqual(clipped, [], `readable numeric grids at viewport ${viewport}, container ${width}`);
       const groups = await page.locator('#wrap-fixture .align-controls').evaluate(row => ({
         width: row.clientWidth, scroll: row.scrollWidth,
         groups: [...row.children].map(group => {
@@ -65,7 +92,7 @@ try {
   await fs.mkdir('artifacts', { recursive: true });
   await page.locator('#wrap-fixture').screenshot({ path: 'artifacts/layout-wrap.png' });
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ status: 'passed', checks: ['Text/Self labels wrap with their own buttons', '170–320px rows at 390/768/1280px viewports', 'wide rows retain both groups on one line', '200% UI scale', 'keyboard self-alignment action'], screenshot: 'artifacts/layout-wrap.png' }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', checks: ['Text/Self labels wrap with their own buttons', '170–320px rows at 390/768/1280px viewports', 'wide rows retain both groups on one line', '200% UI scale', 'keyboard self-alignment action', 'full numeric values and paired controls without unused tracks across viewport/container widths'], screenshot: 'artifacts/layout-wrap.png' }, null, 2));
 } finally {
   await browser?.close(); await runtime?.close(); await fs.rm(cwd, { recursive: true, force: true });
 }

@@ -440,9 +440,9 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
     const row = el('div', 'flow-row');
     row.append(alignGrid('Pin to', current.x, current.y, (x, y) => run(cls => tw.setPin(cls, x, y), `pin ${y} ${x}`)));
     const inset = el('div', 'box4');
-    for (const [side, label, tip] of [['t', 'T', 'Top'], ['r', 'R', 'Right'], ['b', 'B', 'Bottom'], ['l', 'L', 'Left']]) {
+    for (const [side, tip] of [['t', 'Top'], ['r', 'Right'], ['b', 'Bottom'], ['l', 'Left']]) {
       const token = value(cls => tw.sides(cls, 'inset')[side]);
-      inset.append(field(`inset-${side}`, label, token === MIXED ? MIXED : tw.display(token), next => run(cls => tw.setSide(cls, 'inset', side, next), `${tip.toLowerCase()} ${next ?? 'auto'}`), { tip: `${tip} offset, px`, unit: 'px', placeholder: 'auto', parse: tw.fromInput }));
+      inset.append(field(`inset-${side}`, tip, token === MIXED ? MIXED : tw.display(token), next => run(cls => tw.setSide(cls, 'inset', side, next), `${tip.toLowerCase()} ${next ?? 'auto'}`), { tip: `${tip} offset, px`, unit: 'px', placeholder: 'auto', parse: tw.fromInput }));
     }
     row.append(inset);
     layout.append(row);
@@ -528,8 +528,8 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
   const z = value(cls => tw.valueOf(cls, 'z'));
   const blur = value(cls => tw.valueOf(cls, 'blur'));
   effects.append(
-    field('opacity', 'Op', opacity, next => run(cls => tw.set(cls, 'opacity', next), `opacity ${next ? next.slice(8) : 100}%`), { tip: 'Opacity, %', unit: '%', placeholder: '100', min: 0, max: 100, parse: raw => tw.classFor('opacity', raw) }),
-    field('z', 'Z', z, next => run(cls => tw.set(cls, 'z', next), `z-index ${next ?? 'auto'}`), { tip: 'Stacking order (z-index)', placeholder: 'auto', parse: raw => tw.classFor('z', raw) }),
+    field('opacity', 'Opacity', opacity, next => run(cls => tw.set(cls, 'opacity', next), `opacity ${next ? next.slice(8) : 100}%`), { tip: 'Opacity, %', unit: '%', placeholder: '100', min: 0, max: 100, parse: raw => tw.classFor('opacity', raw) }),
+    field('z', 'Z-index', z, next => run(cls => tw.set(cls, 'z', next), `z-index ${next ?? 'auto'}`), { tip: 'Stacking order (z-index)', placeholder: 'auto', parse: raw => tw.classFor('z', raw) }),
     field('blur', 'Blur', blur, next => run(cls => tw.set(cls, 'blur', next), `blur ${next ?? 'none'}`), { tip: 'Blur, px', unit: 'px', placeholder: '0', min: 0, max: 200, parse: raw => tw.classFor('blur', raw) }),
   );
 
