@@ -10,6 +10,15 @@
 | Contract | `npm run test:contract` | One tool list; the JSON Schema and TypeBox renderings agreeing on required parameters; the agent vocabulary; a board running only the tools it publishes; the board registry (one live owner, stale entries removed). |
 | Pi RPC | `npm run test:pi` | A real Pi in RPC mode with a scripted model: a board request reaches a divlet tool, changes the project and returns as a reply. Skipped when the `pi` CLI is absent. |
 
+## Format candidate
+
+Run these from a source checkout:
+
+- `npm run test:format`: Green baseline for portable accepted/rejected JSON examples, normalization, project read/write stability, component addresses, plain CSS with no engine and the specification's example/tag lists. It is included in the unit suite, but is not full standard conformance or a managed-HTML reverse-editing test.
+- `npm run test:format:audit`: Separate reader-boundary report. It exits 1 while data-loss or field-policy witnesses remain unresolved; this is intentional freeze-gate evidence, not a test that locks the inconsistent behavior in place. Its JSON identifies the input, the two readers' admission outcomes, project read/write stability and the exact unblocker. Runtime/I/O errors still fail rather than appearing as policy findings.
+
+Fixtures live in `core/tests/fixtures/format/`; the audit uses raw JSON value strings so numeric overflow is not erased by fixture serialization. These source-checkout tests are not installed package APIs. See [the candidate's evidence boundary](format.md#evidence-and-freeze-boundary).
+
 ## Native HTML stabilization
 
 `node --test core/tests/html-import.test.js core/tests/import.test.js` checks core-owned HTML admission without an HTML plugin registration, with no style engine, and through explicit `.html`/`.htm` opening, folder-page ingestion and re-import. It covers reported sanitization losses, preserved sources, existing destinations, listing policy, link refusal and unsupported input. It does not establish managed-cache reverse editing; generated-page hand edits remain diagnosed rather than imported.

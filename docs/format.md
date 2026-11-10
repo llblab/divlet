@@ -156,6 +156,17 @@ The core admits external `.html`/`.htm` pages directly into this format without 
 
 ## Evidence and freeze boundary
 
-Existing model, component, codec, output and native HTML tests provide implementation evidence, not a declaration of complete standard conformance. The preparation gate in [BACKLOG.md](../BACKLOG.md) requires portable accepted/rejected examples, verified normalization/read-write expectations and an explicit classification of remaining decisions. A passing codec round trip alone does not prove whole-project identity or managed-cache reverse editing.
+`npm run test:format` runs the candidate baseline from a source checkout: three accepted JSON inputs and 17 rejected cases under `core/tests/fixtures/format/`, explicit normalization expectations, semantic project read/write checks, component-address behavior and the complete example/tag profiles in this document. The corpus is plain JSON, not a second validator. Error codes identify this implementation's refusal boundaries; they do not prescribe another implementation's diagnostic wording. The tests also exercise an expanded static HTML round trip, not reverse editing of a managed component projection.
+
+Existing model, component, codec, output and native HTML suites provide further implementation evidence, not a declaration of complete standard conformance. The baseline does not prove resource closure, every operational limit, rendering dependencies or unresolved component policies. The preparation gate in [BACKLOG.md](../BACKLOG.md) owns the remaining assessment.
+
+### Reader-boundary witnesses
+
+`npm run test:format:audit` is a separate freeze-preparation check, not part of the green baseline. It reports JSON and exits 1 while its invariants remain unresolved. Inputs and precise unblockers are retained in `core/tests/fixtures/format/reader-boundaries.json`; the audit compares project settings with a valid standalone frame without changing either reader. Policy differences require a deliberate decision, not an automatic promise that the fields must become identical.
+
+- **`metadata-number-overflow` — Data loss:** JSON metadata `{"value":1e400}` is admitted at project level as a non-finite number, then saved as `null`; frame admission refuses it. Accepted project data does not survive semantic read/write. Rejecting an unrepresentable number or choosing an explicit lossless representation is required; silently rewriting it is not a compatibility policy.
+- **`metadata-safe-keys` — Policy decision:** project metadata admits an own `__proto__` key that frame metadata rejects. Safe-key and extension rules need an explicit boundary.
+- **`name-line-endings` — Policy decision:** the project name preserves CRLF while a frame name normalizes it to LF. The different normalization must be reconciled or deliberately specified.
+- **`name-unpaired-surrogate` — Policy decision:** the project name admits an unpaired surrogate that a frame name rejects. Rendered-name representability needs a consistent or explicitly justified policy.
 
 Actual freeze needs an explicit approved candidate, resolved persisted-semantics blockers and passing evidence for that candidate. Editor implementation tasks are not automatically format blockers: they block freeze only where their unresolved design would change persisted meaning, identity or necessary rendering dependencies. Publication, tagging and deployment require separate authorization.

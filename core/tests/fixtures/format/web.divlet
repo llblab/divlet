@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 2,
+  "name": "Plain web",
+  "tokens": {
+    "--accent": "#123456"
+  },
+  "css": ".card{color:var(--accent)}",
+  "metadata": {
+    "application": {
+      "enabled": true,
+      "values": [
+        1,
+        null,
+        "web"
+      ]
+    }
+  },
+  "frames": [
+    {
+      "schemaVersion": 1,
+      "id": "page",
+      "name": "Web\r\nframe",
+      "version": 1,
+      "artboard": {
+        "x": -12.5,
+        "y": 3.25,
+        "width": 390.5,
+        "height": 844
+      },
+      "rootId": "root",
+      "nodes": {
+        "root": {
+          "id": "root",
+          "type": "element",
+          "tag": "main",
+          "attrs": {
+            "TITLE": "Card\r\nexample"
+          },
+          "className": "card",
+          "style": {
+            "padding": " 12px "
+          },
+          "children": [
+            "label",
+            "photo",
+            "vector"
+          ],
+          "reusable": false
+        },
+        "label": {
+          "id": "label",
+          "type": "text",
+          "content": "Hello\r\nweb\rworld",
+          "metadata": {
+            "empty": ""
+          }
+        },
+        "photo": {
+          "id": "photo",
+          "type": "element",
+          "tag": "img",
+          "attrs": {
+            "src": "assets/icon.svg",
+            "alt": ""
+          },
+          "className": null,
+          "style": null,
+          "metadata": null,
+          "children": null,
+          "reusable": false
+        },
+        "vector": {
+          "id": "vector",
+          "type": "element",
+          "tag": "svg",
+          "attrs": {
+            "viewBox": "0 0 20 20"
+          },
+          "children": [
+            "defs",
+            "shape"
+          ]
+        },
+        "defs": {
+          "id": "defs",
+          "type": "element",
+          "tag": "defs",
+          "children": [
+            "soft"
+          ]
+        },
+        "soft": {
+          "id": "soft",
+          "type": "element",
+          "tag": "filter",
+          "attrs": {
+            "id": "soft"
+          },
+          "children": [
+            "blur"
+          ]
+        },
+        "blur": {
+          "id": "blur",
+          "type": "element",
+          "tag": "feGaussianBlur",
+          "attrs": {
+            "stdDeviation": "2 3"
+          }
+        },
+        "shape": {
+          "id": "shape",
+          "type": "element",
+          "tag": "rect",
+          "attrs": {
+            "width": "20",
+            "height": "20",
+            "filter": "url(#soft)"
+          }
+        }
+      },
+      "tokens": {
+        "--accent": "#c06030"
+      },
+      "css": "main{padding:4px}"
+    }
+  ]
+}

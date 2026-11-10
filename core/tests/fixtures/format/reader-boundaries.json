@@ -1,0 +1,34 @@
+[
+  {
+    "id": "metadata-number-overflow",
+    "field": "metadata",
+    "valueJson": "{\"value\":1e400}",
+    "invariant": "semantic-roundtrip",
+    "category": "data-loss",
+    "unblocker": "Reject unrepresentable metadata before acceptance, or provide an explicit lossless numeric representation."
+  },
+  {
+    "id": "metadata-safe-keys",
+    "field": "metadata",
+    "valueJson": "{\"__proto__\":{\"marker\":true}}",
+    "invariant": "same-field-policy",
+    "category": "policy-decision",
+    "unblocker": "Align project/frame metadata key validation, or approve a deliberate field-specific extension policy."
+  },
+  {
+    "id": "name-line-endings",
+    "field": "name",
+    "valueJson": "\"A\\r\\nB\"",
+    "invariant": "same-field-policy",
+    "category": "policy-decision",
+    "unblocker": "Align project/frame name normalization, or approve and specify their different normalization rules."
+  },
+  {
+    "id": "name-unpaired-surrogate",
+    "field": "name",
+    "valueJson": "\"\\ud800\"",
+    "invariant": "same-field-policy",
+    "category": "policy-decision",
+    "unblocker": "Align rendered-name representability checks, or approve a precise alternative representation policy."
+  }
+]

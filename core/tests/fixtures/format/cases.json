@@ -1,0 +1,620 @@
+{
+  "accepted": [
+    {
+      "id": "empty-project-and-null-defaults",
+      "file": "minimal.divlet",
+      "checks": [
+        {
+          "path": [
+            "settings"
+          ],
+          "equals": {
+            "name": "Untitled project",
+            "version": 1,
+            "tokens": {},
+            "css": "",
+            "metadata": {},
+            "outputDir": null
+          }
+        },
+        {
+          "path": [
+            "frames"
+          ],
+          "equals": []
+        }
+      ]
+    },
+    {
+      "id": "plain-web-normalization",
+      "file": "web.divlet",
+      "checks": [
+        {
+          "path": [
+            "frames",
+            0,
+            "schemaVersion"
+          ],
+          "equals": 1
+        },
+        {
+          "path": [
+            "frames",
+            0,
+            "name"
+          ],
+          "equals": "Web\nframe"
+        },
+        {
+          "path": [
+            "frames",
+            0,
+            "nodes",
+            "root",
+            "attrs"
+          ],
+          "equals": {
+            "title": "Card\nexample"
+          }
+        },
+        {
+          "path": [
+            "frames",
+            0,
+            "nodes",
+            "root",
+            "style"
+          ],
+          "equals": {
+            "padding": "12px"
+          }
+        },
+        {
+          "path": [
+            "frames",
+            0,
+            "nodes",
+            "label",
+            "content"
+          ],
+          "equals": "Hello\nweb\nworld"
+        },
+        {
+          "path": [
+            "frames",
+            0,
+            "nodes",
+            "photo"
+          ],
+          "equals": {
+            "id": "photo",
+            "type": "element",
+            "tag": "img",
+            "attrs": {
+              "src": "assets/icon.svg",
+              "alt": ""
+            },
+            "className": "",
+            "style": {},
+            "metadata": {},
+            "children": []
+          }
+        },
+        {
+          "path": [
+            "frames",
+            0,
+            "nodes",
+            "vector",
+            "attrs"
+          ],
+          "equals": {
+            "viewBox": "0 0 20 20"
+          }
+        },
+        {
+          "path": [
+            "frames",
+            0,
+            "nodes",
+            "blur",
+            "attrs"
+          ],
+          "equals": {
+            "stdDeviation": "2 3"
+          }
+        }
+      ]
+    },
+    {
+      "id": "local-cross-frame-and-nested-instances",
+      "file": "components.divlet",
+      "checks": [
+        {
+          "path": [
+            "settings",
+            "outputDir"
+          ],
+          "equals": "public/build"
+        },
+        {
+          "path": [
+            "frames",
+            0,
+            "nodes",
+            "button",
+            "reusable"
+          ],
+          "equals": true
+        },
+        {
+          "path": [
+            "frames",
+            0,
+            "nodes",
+            "badgeUse",
+            "ref"
+          ],
+          "equals": "badge"
+        },
+        {
+          "path": [
+            "frames",
+            1,
+            "nodes",
+            "action",
+            "type"
+          ],
+          "equals": "ref"
+        },
+        {
+          "path": [
+            "frames",
+            1,
+            "nodes",
+            "action",
+            "descendants",
+            "badgeUse/badgeText"
+          ],
+          "equals": {
+            "content": "New"
+          }
+        }
+      ]
+    }
+  ],
+  "rejected": [
+    {
+      "id": "non-object-project",
+      "input": null,
+      "errorCode": "INVALID_PROJECT"
+    },
+    {
+      "id": "future-project-schema",
+      "input": {
+        "schemaVersion": 99,
+        "frames": []
+      },
+      "errorCode": "INVALID_PROJECT"
+    },
+    {
+      "id": "unknown-project-field",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [],
+        "custom": "use metadata"
+      },
+      "errorCode": "INVALID_PROJECT"
+    },
+    {
+      "id": "non-array-frames",
+      "input": {
+        "schemaVersion": 2,
+        "frames": {}
+      },
+      "errorCode": "INVALID_PROJECT"
+    },
+    {
+      "id": "css-build-directive",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [],
+        "css": "@import \"outside.css\";"
+      },
+      "errorCode": "UNSUPPORTED_CSS"
+    },
+    {
+      "id": "future-frame-schema",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "page",
+            "name": "Page",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "main"
+              }
+            },
+            "schemaVersion": 2
+          }
+        ]
+      },
+      "errorCode": "INVALID_DOCUMENT"
+    },
+    {
+      "id": "unknown-node-field",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "page",
+            "name": "Page",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "main",
+                "unknown": true
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "INVALID_DOCUMENT"
+    },
+    {
+      "id": "node-key-mismatch",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "page",
+            "name": "Page",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "other",
+                "type": "element",
+                "tag": "main"
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "INVALID_DOCUMENT"
+    },
+    {
+      "id": "missing-child",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "page",
+            "name": "Page",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "main",
+                "children": [
+                  "missing"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "INVALID_DOCUMENT"
+    },
+    {
+      "id": "unreachable-node",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "page",
+            "name": "Page",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "main"
+              },
+              "orphan": {
+                "id": "orphan",
+                "type": "text",
+                "content": "Unreachable"
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "INVALID_DOCUMENT"
+    },
+    {
+      "id": "executable-tag",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "page",
+            "name": "Page",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "script"
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "INVALID_DOCUMENT"
+    },
+    {
+      "id": "executable-url",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "page",
+            "name": "Page",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "main",
+                "attrs": {
+                  "href": "java\nscript:alert(1)"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "INVALID_DOCUMENT"
+    },
+    {
+      "id": "numeric-inline-value",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "page",
+            "name": "Page",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "main",
+                "style": {
+                  "padding": 12
+                }
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "INVALID_DOCUMENT"
+    },
+    {
+      "id": "unsafe-frame-metadata-key",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "page",
+            "name": "Page",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "main"
+              }
+            },
+            "metadata": {
+              "__proto__": {
+                "marker": true
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "INVALID_DOCUMENT"
+    },
+    {
+      "id": "missing-component",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "page",
+            "name": "Page",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "main",
+                "children": [
+                  "use"
+                ]
+              },
+              "use": {
+                "id": "use",
+                "type": "ref",
+                "ref": "missing"
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "INVALID_REF"
+    },
+    {
+      "id": "component-cycle",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "page",
+            "name": "Page",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "main",
+                "reusable": true,
+                "children": [
+                  "use"
+                ]
+              },
+              "use": {
+                "id": "use",
+                "type": "ref",
+                "ref": "root"
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "COMPONENT_CYCLE"
+    },
+    {
+      "id": "duplicate-frame-id",
+      "input": {
+        "schemaVersion": 2,
+        "frames": [
+          {
+            "id": "page",
+            "name": "Page",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "main"
+              }
+            }
+          },
+          {
+            "id": "page",
+            "name": "Page",
+            "version": 1,
+            "artboard": {
+              "x": 0,
+              "y": 0,
+              "width": 390,
+              "height": 844
+            },
+            "rootId": "root",
+            "nodes": {
+              "root": {
+                "id": "root",
+                "type": "element",
+                "tag": "main"
+              }
+            }
+          }
+        ]
+      },
+      "errorCode": "INVALID_PROJECT"
+    }
+  ]
+}

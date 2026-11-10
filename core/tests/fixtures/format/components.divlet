@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 2,
+  "name": "Components",
+  "outputDir": "public/build",
+  "css": ".button,.cta{padding:8px}",
+  "frames": [
+    {
+      "id": "definitions",
+      "name": "Definitions",
+      "version": 1,
+      "artboard": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 844
+      },
+      "rootId": "root",
+      "nodes": {
+        "root": {
+          "id": "root",
+          "type": "element",
+          "tag": "main",
+          "children": [
+            "button",
+            "badge"
+          ]
+        },
+        "button": {
+          "id": "button",
+          "type": "element",
+          "tag": "button",
+          "attrs": {
+            "type": "button",
+            "title": "Default"
+          },
+          "className": "button",
+          "children": [
+            "caption",
+            "badgeUse"
+          ],
+          "reusable": true
+        },
+        "caption": {
+          "id": "caption",
+          "type": "text",
+          "content": "Default"
+        },
+        "badgeUse": {
+          "id": "badgeUse",
+          "type": "ref",
+          "ref": "badge"
+        },
+        "badge": {
+          "id": "badge",
+          "type": "element",
+          "tag": "span",
+          "children": [
+            "badgeText"
+          ],
+          "reusable": true
+        },
+        "badgeText": {
+          "id": "badgeText",
+          "type": "text",
+          "content": "Badge"
+        }
+      }
+    },
+    {
+      "id": "consumer",
+      "name": "Consumer",
+      "version": 1,
+      "artboard": {
+        "x": 480,
+        "y": 0,
+        "width": 390,
+        "height": 844
+      },
+      "rootId": "root",
+      "nodes": {
+        "root": {
+          "id": "root",
+          "type": "element",
+          "tag": "main",
+          "children": [
+            "action"
+          ]
+        },
+        "action": {
+          "id": "action",
+          "type": "ref",
+          "ref": "definitions/button",
+          "descendants": {
+            "button": {
+              "className": "cta",
+              "attrs": {
+                "title": null,
+                "aria-label": "Buy now"
+              },
+              "style": {
+                "color": "red"
+              }
+            },
+            "caption": {
+              "content": "Buy"
+            },
+            "badgeUse/badgeText": {
+              "content": "New"
+            }
+          },
+          "metadata": {
+            "purpose": "call-to-action"
+          }
+        }
+      }
+    }
+  ]
+}
