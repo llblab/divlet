@@ -39,6 +39,47 @@ try {
   await page.waitForSelector('#inspector [data-section="appearance"] [data-key="fill"]');
   checks.push('the inspector has an Appearance fold with radius, fill and text colour');
 
+  // Use the real resize control, not an artificial viewport breakpoint: the desktop floor is 280px.
+  const handle = page.locator('.resize-handle[data-panel="inspector"]');
+  const edge = await handle.boundingBox();
+  await page.mouse.move(edge.x + 4, edge.y + edge.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(edge.x + 240, edge.y + edge.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await waitUntil(() => page.locator('#inspector').evaluate(node => Math.round(node.getBoundingClientRect().width) === 280), 'the inspector reaches its actual resize minimum');
+  const shape = await page.locator('#inspector .appearance-geometry').evaluate(node => {
+    const radius = node.querySelector('[data-key="radius"]').closest('.vf').getBoundingClientRect();
+    const border = node.querySelector('[data-key="border-width"]').closest('.vf').getBoundingClientRect();
+    return { sameRow: Math.abs(radius.top - border.top) < 1, sideBySide: radius.right < border.left, halfWidth: radius.width < node.clientWidth * 0.55 && border.width < node.clientWidth * 0.55 };
+  });
+  assert.deepEqual(shape, { sameRow: true, sideBySide: true, halfWidth: true }, 'radius and border width stay adjacent at the minimum');
+  await page.locator('#inspector [data-key="radius"]').focus();
+  await page.keyboard.press('Tab');
+  assert.equal(await page.locator('#inspector [data-key="border-width"]').evaluate(node => document.activeElement === node), true, 'Tab follows the paired fields before their optional presets');
+  await page.locator('#inspector [data-key="border-width"]').fill('2'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('border-2'), 'the adjacent border field edits its own property');
+  await page.locator('#inspector [data-key="pick:Weight"]').click();
+  await page.locator('.menu .menu-item', { hasText: 'Extra bold 800' }).click();
+  await waitUntil(() => classesOf('cta').includes('font-extrabold'), 'a long weight option can still be selected');
+  assert.equal(await page.locator('#inspector [data-key="pick:Weight"] .pick-v').evaluate(node => node.scrollWidth <= node.clientWidth + 1), true, 'long selector values wrap inside their own control');
+  await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', []));
+  await page.locator('#inspector [data-key="width"]').waitFor();
+  const dimensions = await page.locator('#inspector .geometry-grid').evaluate(node => {
+    const boxes = [...node.querySelectorAll('.num')].map(field => field.getBoundingClientRect());
+    const context = document.createElement('canvas').getContext('2d');
+    const readable = [...node.querySelectorAll('input')].every(input => {
+      const style = getComputedStyle(input);
+      context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      const sample = ['x', 'y'].includes(input.dataset.key) ? '-10000000' : '16384';
+      return context.measureText(sample).width <= input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1;
+    });
+    return { paired: Math.abs(boxes[0].top - boxes[1].top) < 1 && Math.abs(boxes[2].top - boxes[3].top) < 1 && boxes[2].top > boxes[0].top, readable };
+  });
+  assert.deepEqual(dimensions, { paired: true, readable: true }, 'artboard dimensions use two readable columns at minimum panel width');
+  await select('cta');
+  await page.locator('#inspector [data-key="radius"]').waitFor();
+  checks.push('real minimum-width resizing keeps radius/border and artboard dimensions in readable pairs, including long dropdown values');
+
   // Fill and text colour by typing a hex value: the class that set the colour before is replaced.
   await page.locator('#inspector [data-key="fill"]').fill('#112233'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('bg-[#112233]') && !classesOf('cta').some(name => /^bg-(accent|surface)$/.test(name)), 'typing a fill colour sets one background class and replaces the old one');
@@ -67,6 +108,7 @@ try {
   await waitUntil(() => classesOf('cta').includes('rounded-xl'), 'the 12 preset sets rounded-xl');
   await page.locator('#inspector [data-key="radius"]').fill('10'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('rounded-[10px]') && !classesOf('cta').includes('rounded-xl'), 'a typed number sets an arbitrary radius and replaces the preset');
+  assert.ok(classesOf('cta').includes('border-2'), 'changing radius does not change the adjacent border value');
   await page.locator('#inspector [data-key="radius"]').fill('full'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('rounded-full'), 'typing Full sets rounded-full');
   await page.locator('#inspector [data-key="radius"]').fill(''); await page.keyboard.press('Enter');

@@ -346,7 +346,8 @@ body.is-expanded .resize-handle, body:has(.scrim:not([hidden])) .resize-handle {
 .html-presentation { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
 .html-presentation:disabled { opacity: var(--disabled); }
 .html-scope-toggle { justify-self: start; height: auto; min-height: 30px; padding: 5px 8px; white-space: normal; text-align: left; }
-.grid2, .box3, .box4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 6px; }
+.grid2, .box3, .box4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--control-min, 140px)), 1fr)); gap: 6px; }
+.geometry-grid, .box3, .box4, .layout-box > .grid2, .appearance-box > .grid2 { --control-min: 120px; }
 /* layout, spacing, effects: small controls that write Tailwind classes */
 .layout-box, .spacing-box { display: grid; gap: 8px; }
 .pick { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-width: 0; min-height: 30px; padding: 6px 22px 6px 9px; line-height: 18px; border: 0; border-radius: var(--radius-inner); background: var(--field); color: var(--ink); text-align: left; }
@@ -409,7 +410,7 @@ body.is-expanded .resize-handle, body:has(.scrim:not([hidden])) .resize-handle {
 @container core (max-width: 40px) {
   .bm-core { font-size: 0; min-height: 0; background: none; }
 }
-.box4 { min-width: 0; flex: 1 1 140px; }
+.box4 { min-width: 0; flex: 1 1 var(--control-min); }
 .caption.has-variants::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 4px; border-radius: 50%; background: var(--accent); vertical-align: 1px; }
 .quick-attrs { margin-top: 1px; }
 /* code with colors: a highlighted copy under a transparent textarea, identical metrics */
@@ -840,7 +841,8 @@ body.is-expanded .brand, body.is-expanded .side-tabs, body.is-expanded .panel, b
 
 /* Appearance fold: radius, fill and text colour. */
 .appearance-box { display: grid; gap: 8px; }
-.radius-row { display: grid; gap: 6px; }
+.appearance-box > .grid2 { align-items: center; }
+.appearance-geometry { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 6px; }
 .radius-presets { display: flex; flex-wrap: wrap; gap: 4px; }
 .radius-presets .chip.on { background: var(--accent-soft); color: var(--accent-ink); }
 .color-field { position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 28px; padding: 0 4px 0 0; border-radius: var(--radius-inner); background: var(--field); }

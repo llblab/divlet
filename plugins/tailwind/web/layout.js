@@ -258,11 +258,10 @@ function appearanceFold(nodes, { value, run, measured, tokens }) {
   const radiusClass = value(cls => tw.get(cls, 'radius'));
   const radiusPx = radiusClass === MIXED ? MIXED : radiusClass == null ? null : radiusClass === 'rounded-full' ? 'Full' : RADIUS_PX[radiusClass] ?? (/^rounded-\[(\d+(?:\.\d+)?)px\]$/.exec(radiusClass)?.[1] ?? radiusClass);
   const computedRadius = measured?.colors?.radius ? String(Math.round(parseFloat(measured.colors.radius) || 0)) : '0';
-  const radius = el('div', 'radius-row');
-  radius.append(field('radius', 'R', radiusPx, (next, text) => run(cls => tw.set(cls, 'radius', next), `radius ${text || 'default'}`), {
+  const radius = field('radius', 'R', radiusPx, (next, text) => run(cls => tw.set(cls, 'radius', next), `radius ${text || 'default'}`), {
     tip: 'Corner radius, px · type Full for a pill', unit: 'px', placeholder: computedRadius, min: 0, max: 1000,
     parse: raw => (/^full$/i.test(raw.trim()) ? 'rounded-full' : raw.trim() === '' ? null : /^\d+(?:\.\d+)?$/.test(raw.trim()) ? (Object.entries(RADIUS_PX).find(([, px]) => px === Number(raw.trim()))?.[0] ?? `rounded-[${Number(raw.trim())}px]`) : undefined),
-  }));
+  });
   const presets = el('div', 'radius-presets');
   presets.setAttribute('role', 'group');
   presets.setAttribute('aria-label', 'Corner radius presets');
@@ -273,7 +272,6 @@ function appearanceFold(nodes, { value, run, measured, tokens }) {
     chip.addEventListener('click', () => run(cls => tw.set(cls, 'radius', name), `radius ${text}`));
     presets.append(chip);
   }
-  radius.append(presets);
   // Typography: size (Tailwind steps or any px) and weight.
   const FONT_STEPS = { 'text-xs': 12, 'text-sm': 14, 'text-base': 16, 'text-lg': 18, 'text-xl': 20, 'text-2xl': 24, 'text-3xl': 30, 'text-4xl': 36, 'text-5xl': 48, 'text-6xl': 60, 'text-7xl': 72, 'text-8xl': 96, 'text-9xl': 128 };
   const sizeClass = value(cls => tw.get(cls, 'fontSize'));
@@ -292,11 +290,10 @@ function appearanceFold(nodes, { value, run, measured, tokens }) {
   const BORDER_STEPS = [['0', 'border-0'], ['1', 'border'], ['2', 'border-2'], ['4', 'border-4']];
   const borderClass = value(cls => tw.get(cls, 'borderWidth'));
   const borderPx = borderClass === MIXED ? MIXED : borderClass == null ? null : borderClass === 'border' ? 1 : borderClass === 'border-0' ? 0 : /^border-(\d+)$/.exec(borderClass)?.[1] ?? /^border-\[(\d+(?:\.\d+)?)px\]$/.exec(borderClass)?.[1] ?? borderClass;
-  const border = el('div', 'radius-row');
-  border.append(field('border-width', 'B', borderPx, next => run(cls => tw.set(cls, 'borderWidth', next), `border ${next ? '' : 'none'}`.trim()), {
+  const border = field('border-width', 'B', borderPx, next => run(cls => tw.set(cls, 'borderWidth', next), `border ${next ? '' : 'none'}`.trim()), {
     tip: 'Border width, px', unit: 'px', placeholder: '0', min: 0, max: 64,
     parse: raw => { const t = raw.trim(); if (!t) return null; if (!/^\d+(?:\.\d+)?$/.test(t)) return undefined; return Number(t) === 1 ? 'border' : Number(t) === 0 ? 'border-0' : [2, 4, 8].includes(Number(t)) ? `border-${Number(t)}` : `border-[${Number(t)}px]`; },
-  }));
+  });
   const borderPresets = el('div', 'radius-presets');
   borderPresets.setAttribute('role', 'group');
   borderPresets.setAttribute('aria-label', 'Border width presets');
@@ -307,14 +304,14 @@ function appearanceFold(nodes, { value, run, measured, tokens }) {
     chip.addEventListener('click', () => run(cls => tw.set(cls, 'borderWidth', name), `border ${text}px`));
     borderPresets.append(chip);
   }
-  border.append(borderPresets);
+  const geometry = el('div', 'appearance-geometry');
+  geometry.append(radius, border, presets, borderPresets);
   box.append(
-    radius,
+    geometry,
     colorField({ key: 'fill', label: 'Fill', tip: 'Background colour', group: 'bgColor', prefix: 'bg', value, run, computed: measured?.colors?.background, tokens }),
+    colorField({ key: 'stroke', label: 'Border', tip: 'Border colour', group: 'borderColor', prefix: 'border', value, run, computed: measured?.colors?.borderColor, tokens }),
     colorField({ key: 'ink', label: 'Text', tip: 'Text colour', group: 'textColor', prefix: 'text', value, run, computed: measured?.colors?.color, tokens }),
     type,
-    border,
-    colorField({ key: 'stroke', label: 'Border', tip: 'Border colour', group: 'borderColor', prefix: 'border', value, run, computed: measured?.colors?.borderColor, tokens }),
   );
   return box;
 }

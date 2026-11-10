@@ -244,7 +244,7 @@ function artboardView(doc, model) {
   const view = [];
   view.push(section('name', textField('name', doc.name, value => quiet(commit(id, { name: value.trim() || doc.name }, { label: `rename to “${value.trim()}”` })), { placeholder: 'Artboard name', label: 'Artboard name' })));
 
-  const geometry = el('div', 'grid2');
+  const geometry = el('div', 'grid2 geometry-grid');
   geometry.append(
     numberField('x', 'X', a.x, patchArtboard('x'), { tip: 'X position' }),
     numberField('y', 'Y', a.y, patchArtboard('y'), { tip: 'Y position' }),

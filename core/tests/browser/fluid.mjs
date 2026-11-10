@@ -40,6 +40,19 @@ try {
     }, label);
     await page.locator('#inspector [data-key="opacity"]').waitFor();
     assert.deepEqual(await readableNumbers(`${width}px@${size}% element`), []);
+    const compactShape = await page.evaluate(() => {
+      const node = document.querySelector('#inspector .appearance-geometry');
+      const radius = node.querySelector('[data-key="radius"]'), border = node.querySelector('[data-key="border-width"]');
+      const a = radius.closest('.vf').getBoundingClientRect(), b = border.closest('.vf').getBoundingClientRect();
+      const context = document.createElement('canvas').getContext('2d');
+      const readable = [[radius, 'Full'], [border, '64']].every(([input, text]) => {
+        const style = getComputedStyle(input);
+        context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        return context.measureText(text).width <= input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1;
+      });
+      return { paired: Math.abs(a.top - b.top) < 1 && a.right < b.left, readable, diagnostic: { radius: { x: a.x, y: a.y, w: a.width }, border: { x: b.x, y: b.y, w: b.width }, columns: getComputedStyle(node).gridTemplateColumns, open: node.closest('details').open } };
+    });
+    assert.deepEqual({ paired: compactShape.paired, readable: compactShape.readable }, { paired: true, readable: true }, `compact radius/border pair at ${width}px/${size}%: ${JSON.stringify(compactShape.diagnostic)}`);
     const spacingCollisions = await page.locator('#inspector .boxmodel').evaluate(model => {
       const fields = [...model.querySelectorAll('.bm-field')].map(node => node.getBoundingClientRect());
       const overlaps = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;
