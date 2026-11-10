@@ -9,6 +9,7 @@ Start with the [project README](../README.md) for the product overview and a wor
 
 ## Technical guides
 
+- [Web-native core contract](web-native.md): Accepted target semantics, the saved model/editor state/browser projection split, and importer/style-plugin boundaries; not a claim of complete implementation.
 - [Architecture](architecture.md): Module ownership, accepted-state commits, persistence, undo/redo, preview trust and the Pi bridge.
 - [Project format](format.md): Entry point to the canonical shipped format reference; project schemas, frames, components and generated outputs.
 - [Markdown sites](site.md): Configuration, template slots, routes, source ownership, links, live updates and current limits.

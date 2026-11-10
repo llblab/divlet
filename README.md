@@ -135,6 +135,7 @@ The [workflow skill](skills/divlet/SKILL.md) teaches the loop; the [tool guide](
 - [Agent integration](docs/agents.md) — Pi, MCP, tools and the JavaScript API.
 - [Format reference](docs/format.md) — The JSON model and generated files.
 - [Architecture](docs/architecture.md) — Core, plugins, adapters and trust boundaries.
+- [Web-native core contract](docs/web-native.md) — Accepted design direction; implementation gaps remain in the backlog.
 - [Documentation index](docs/README.md) — All guides, examples and contributor references.
 
 ## Development
