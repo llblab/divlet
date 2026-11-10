@@ -1,0 +1,1314 @@
+{
+  "schemaVersion": 2,
+  "name": "divlet examples",
+  "version": 2,
+  "tokens": {
+    "--accent": "#d7b474",
+    "--surface": "#14121c",
+    "--ink": "#f4efff"
+  },
+  "css": "",
+  "metadata": {},
+  "frames": [
+    {
+      "id": "mobile",
+      "name": "Ideas on mobile",
+      "version": 1,
+      "artboard": {
+        "x": 1040,
+        "y": 100,
+        "width": 390,
+        "height": 1180
+      },
+      "rootId": "root",
+      "tokens": {
+        "--accent": "#d7b474",
+        "--surface": "#14121c"
+      },
+      "css": "",
+      "metadata": {
+        "intent": "The same native responsive markup at a mobile viewport. Resize via artboard dimensions; browser zoom is independent."
+      },
+      "nodes": {
+        "root": {
+          "id": "root",
+          "type": "element",
+          "tag": "main",
+          "attrs": {},
+          "className": "min-h-screen bg-[#14121c] text-[#f4efff] p-6 sm:p-10 font-sans",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "nav",
+            "hero",
+            "cards",
+            "footer"
+          ]
+        },
+        "nav": {
+          "id": "nav",
+          "type": "element",
+          "tag": "header",
+          "attrs": {},
+          "className": "flex items-center justify-between mb-14",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "brand",
+            "status"
+          ]
+        },
+        "brand-text": {
+          "id": "brand-text",
+          "type": "text",
+          "content": "divlet / studio",
+          "metadata": {}
+        },
+        "brand": {
+          "id": "brand",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "text-lg font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "brand-text"
+          ]
+        },
+        "status-text": {
+          "id": "status-text",
+          "type": "text",
+          "content": "A little space for big ideas",
+          "metadata": {}
+        },
+        "status": {
+          "id": "status",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "rounded-full border border-white/10 px-3 py-1 text-xs text-[#c2b2df]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "status-text"
+          ]
+        },
+        "hero": {
+          "id": "hero",
+          "type": "element",
+          "tag": "section",
+          "attrs": {},
+          "className": "max-w-xl mb-10",
+          "style": {},
+          "metadata": {
+            "intent": "A welcoming hero. Keep the title the strongest visual element."
+          },
+          "children": [
+            "eyebrow",
+            "title",
+            "description",
+            "cta"
+          ]
+        },
+        "eyebrow-text": {
+          "id": "eyebrow-text",
+          "type": "text",
+          "content": "YOUR NEXT GOOD IDEA",
+          "metadata": {}
+        },
+        "eyebrow": {
+          "id": "eyebrow",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs uppercase tracking-[0.22em] text-[#bda3ef] mb-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "eyebrow-text"
+          ]
+        },
+        "title-text": {
+          "id": "title-text",
+          "type": "text",
+          "content": "Make room for\nsomething new.",
+          "metadata": {}
+        },
+        "title": {
+          "id": "title",
+          "type": "element",
+          "tag": "h1",
+          "attrs": {},
+          "className": "text-4xl sm:text-5xl leading-[1.08] font-semibold tracking-tight mb-5",
+          "style": {
+            "white-space": "pre-line"
+          },
+          "metadata": {},
+          "children": [
+            "title-text"
+          ]
+        },
+        "description-text": {
+          "id": "description-text",
+          "type": "text",
+          "content": "Shape a thought, explore a direction, and watch it become real. Your agent handles the details. You keep the vision.",
+          "metadata": {}
+        },
+        "description": {
+          "id": "description",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-base leading-7 text-[#b4a9c7] mb-7",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "description-text"
+          ]
+        },
+        "cta-text": {
+          "id": "cta-text",
+          "type": "text",
+          "content": "Start exploring  ↗",
+          "metadata": {}
+        },
+        "cta": {
+          "id": "cta",
+          "type": "element",
+          "tag": "button",
+          "attrs": {
+            "type": "button"
+          },
+          "className": "rounded-xl bg-[#d7b474] px-5 py-3 font-semibold text-[#211a14] shadow-lg",
+          "style": {},
+          "metadata": {
+            "purpose": "primary-action",
+            "note": "A static prototype button; no application behavior is attached."
+          },
+          "children": [
+            "cta-text"
+          ]
+        },
+        "cards": {
+          "id": "cards",
+          "type": "element",
+          "tag": "section",
+          "attrs": {},
+          "className": "grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-one",
+            "card-two",
+            "card-three"
+          ]
+        },
+        "card-one": {
+          "id": "card-one",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "rounded-2xl border border-white/10 bg-white/[0.035] p-5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-one-number",
+            "card-one-title",
+            "card-one-detail"
+          ]
+        },
+        "card-one-number-text": {
+          "id": "card-one-number-text",
+          "type": "text",
+          "content": "01",
+          "metadata": {}
+        },
+        "card-one-number": {
+          "id": "card-one-number",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs text-[#8d7ca9] mb-6",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-one-number-text"
+          ]
+        },
+        "card-one-title-text": {
+          "id": "card-one-title-text",
+          "type": "text",
+          "content": "A clear direction",
+          "metadata": {}
+        },
+        "card-one-title": {
+          "id": "card-one-title",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "font-medium mb-2 text-sm",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-one-title-text"
+          ]
+        },
+        "card-one-detail-text": {
+          "id": "card-one-detail-text",
+          "type": "text",
+          "content": "Start with what matters.",
+          "metadata": {}
+        },
+        "card-one-detail": {
+          "id": "card-one-detail",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs leading-5 text-[#a79bb9]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-one-detail-text"
+          ]
+        },
+        "card-two": {
+          "id": "card-two",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "rounded-2xl border border-white/10 bg-white/[0.035] p-5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-two-number",
+            "card-two-title",
+            "card-two-detail"
+          ]
+        },
+        "card-two-number-text": {
+          "id": "card-two-number-text",
+          "type": "text",
+          "content": "02",
+          "metadata": {}
+        },
+        "card-two-number": {
+          "id": "card-two-number",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs text-[#8d7ca9] mb-6",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-two-number-text"
+          ]
+        },
+        "card-two-title-text": {
+          "id": "card-two-title-text",
+          "type": "text",
+          "content": "Small iterations",
+          "metadata": {}
+        },
+        "card-two-title": {
+          "id": "card-two-title",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "font-medium mb-2 text-sm",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-two-title-text"
+          ]
+        },
+        "card-two-detail-text": {
+          "id": "card-two-detail-text",
+          "type": "text",
+          "content": "Make one good change.",
+          "metadata": {}
+        },
+        "card-two-detail": {
+          "id": "card-two-detail",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs leading-5 text-[#a79bb9]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-two-detail-text"
+          ]
+        },
+        "card-three": {
+          "id": "card-three",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "rounded-2xl border border-white/10 bg-white/[0.035] p-5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-three-number",
+            "card-three-title",
+            "card-three-detail"
+          ]
+        },
+        "card-three-number-text": {
+          "id": "card-three-number-text",
+          "type": "text",
+          "content": "03",
+          "metadata": {}
+        },
+        "card-three-number": {
+          "id": "card-three-number",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs text-[#8d7ca9] mb-6",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-three-number-text"
+          ]
+        },
+        "card-three-title-text": {
+          "id": "card-three-title-text",
+          "type": "text",
+          "content": "A living canvas",
+          "metadata": {}
+        },
+        "card-three-title": {
+          "id": "card-three-title",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "font-medium mb-2 text-sm",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-three-title-text"
+          ]
+        },
+        "card-three-detail-text": {
+          "id": "card-three-detail-text",
+          "type": "text",
+          "content": "See every idea take shape.",
+          "metadata": {}
+        },
+        "card-three-detail": {
+          "id": "card-three-detail",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs leading-5 text-[#a79bb9]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-three-detail-text"
+          ]
+        },
+        "footer": {
+          "id": "footer",
+          "type": "element",
+          "tag": "footer",
+          "attrs": {},
+          "className": "flex flex-wrap items-center justify-between gap-4 text-xs text-[#776a8b] border-t border-white/10 pt-5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "footer-left-wrap",
+            "footer-right-wrap"
+          ]
+        },
+        "footer-left": {
+          "id": "footer-left",
+          "type": "text",
+          "content": "Built with Pi. Rendered by the web.",
+          "metadata": {}
+        },
+        "footer-left-wrap": {
+          "id": "footer-left-wrap",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "footer-left"
+          ]
+        },
+        "footer-right": {
+          "id": "footer-right",
+          "type": "text",
+          "content": "MODEL ↔ HTML",
+          "metadata": {}
+        },
+        "footer-right-wrap": {
+          "id": "footer-right-wrap",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "tracking-wider",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "footer-right"
+          ]
+        }
+      }
+    },
+    {
+      "id": "plain-css",
+      "name": "Plain CSS · no utilities",
+      "version": 1,
+      "artboard": {
+        "x": 80,
+        "y": 1040,
+        "width": 600,
+        "height": 340
+      },
+      "rootId": "card",
+      "tokens": {
+        "--accent": "#d7b474"
+      },
+      "css": ".plain-card{min-height:100vh;padding:42px;background:#eef0eb;color:#24342c;font:16px/1.6 system-ui}.plain-card h1{font-size:34px;line-height:1.15;margin:16px 0}.plain-card p{max-width:450px}.eyebrow{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#607264}",
+      "metadata": {
+        "intent": "A static layout authored entirely with ordinary CSS and inline style; Tailwind utilities are optional."
+      },
+      "nodes": {
+        "card": {
+          "id": "card",
+          "type": "element",
+          "tag": "main",
+          "attrs": {},
+          "className": "plain-card",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "eyebrow",
+            "heading",
+            "body"
+          ]
+        },
+        "eyebrow": {
+          "id": "eyebrow",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "eyebrow",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "eyebrow-text"
+          ]
+        },
+        "eyebrow-text": {
+          "id": "eyebrow-text",
+          "type": "text",
+          "content": "Native HTML · Ordinary CSS",
+          "metadata": {}
+        },
+        "heading": {
+          "id": "heading",
+          "type": "element",
+          "tag": "h1",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "heading-text"
+          ]
+        },
+        "heading-text": {
+          "id": "heading-text",
+          "type": "text",
+          "content": "Keep the model.\nChoose your styles.",
+          "metadata": {}
+        },
+        "body": {
+          "id": "body",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "",
+          "style": {
+            "white-space": "pre-line"
+          },
+          "metadata": {},
+          "children": [
+            "body-text"
+          ]
+        },
+        "body-text": {
+          "id": "body-text",
+          "type": "text",
+          "content": "Change this text in plain-css.html or update its node through patch_divlet. Both paths reach the same validated runtime state.",
+          "metadata": {}
+        }
+      }
+    },
+    {
+      "id": "welcome",
+      "name": "A space for ideas",
+      "version": 1,
+      "artboard": {
+        "x": 80,
+        "y": 100,
+        "width": 860,
+        "height": 780
+      },
+      "rootId": "root",
+      "tokens": {
+        "--accent": "#d7b474",
+        "--surface": "#14121c"
+      },
+      "css": "",
+      "metadata": {
+        "intent": "An editable starter artboard. Select it on the board, then ask Pi to change its layout or text."
+      },
+      "nodes": {
+        "root": {
+          "id": "root",
+          "type": "element",
+          "tag": "main",
+          "attrs": {},
+          "className": "min-h-screen bg-[#14121c] text-[#f4efff] p-6 sm:p-10 font-sans",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "nav",
+            "hero",
+            "cards",
+            "footer"
+          ]
+        },
+        "nav": {
+          "id": "nav",
+          "type": "element",
+          "tag": "header",
+          "attrs": {},
+          "className": "flex items-center justify-between mb-14",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "brand",
+            "status"
+          ]
+        },
+        "brand-text": {
+          "id": "brand-text",
+          "type": "text",
+          "content": "divlet / studio",
+          "metadata": {}
+        },
+        "brand": {
+          "id": "brand",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "text-lg font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "brand-text"
+          ]
+        },
+        "status-text": {
+          "id": "status-text",
+          "type": "text",
+          "content": "A little space for big ideas",
+          "metadata": {}
+        },
+        "status": {
+          "id": "status",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "rounded-full border border-white/10 px-3 py-1 text-xs text-[#c2b2df]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "status-text"
+          ]
+        },
+        "hero": {
+          "id": "hero",
+          "type": "element",
+          "tag": "section",
+          "attrs": {},
+          "className": "max-w-xl mb-10",
+          "style": {},
+          "metadata": {
+            "intent": "A welcoming hero. Keep the title the strongest visual element."
+          },
+          "children": [
+            "eyebrow",
+            "title",
+            "description",
+            "cta"
+          ]
+        },
+        "eyebrow-text": {
+          "id": "eyebrow-text",
+          "type": "text",
+          "content": "YOUR NEXT GOOD IDEA",
+          "metadata": {}
+        },
+        "eyebrow": {
+          "id": "eyebrow",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs uppercase tracking-[0.22em] text-[#bda3ef] mb-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "eyebrow-text"
+          ]
+        },
+        "title-text": {
+          "id": "title-text",
+          "type": "text",
+          "content": "Make room for\nsomething new.",
+          "metadata": {}
+        },
+        "title": {
+          "id": "title",
+          "type": "element",
+          "tag": "h1",
+          "attrs": {},
+          "className": "text-4xl sm:text-5xl leading-[1.08] font-semibold tracking-tight mb-5",
+          "style": {
+            "white-space": "pre-line"
+          },
+          "metadata": {},
+          "children": [
+            "title-text"
+          ]
+        },
+        "description-text": {
+          "id": "description-text",
+          "type": "text",
+          "content": "Shape a thought, explore a direction, and watch it become real. Your agent handles the details. You keep the vision.",
+          "metadata": {}
+        },
+        "description": {
+          "id": "description",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-base leading-7 text-[#b4a9c7] mb-7",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "description-text"
+          ]
+        },
+        "cta-text": {
+          "id": "cta-text",
+          "type": "text",
+          "content": "Start exploring  ↗",
+          "metadata": {}
+        },
+        "cta": {
+          "id": "cta",
+          "type": "element",
+          "tag": "button",
+          "attrs": {
+            "type": "button"
+          },
+          "className": "rounded-xl bg-[#d7b474] px-5 py-3 font-semibold text-[#211a14] shadow-lg",
+          "style": {},
+          "metadata": {
+            "purpose": "primary-action",
+            "note": "A static prototype button; no application behavior is attached."
+          },
+          "children": [
+            "cta-text"
+          ]
+        },
+        "cards": {
+          "id": "cards",
+          "type": "element",
+          "tag": "section",
+          "attrs": {},
+          "className": "grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-one",
+            "card-two",
+            "card-three"
+          ]
+        },
+        "card-one": {
+          "id": "card-one",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "rounded-2xl border border-white/10 bg-white/[0.035] p-5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-one-number",
+            "card-one-title",
+            "card-one-detail"
+          ]
+        },
+        "card-one-number-text": {
+          "id": "card-one-number-text",
+          "type": "text",
+          "content": "01",
+          "metadata": {}
+        },
+        "card-one-number": {
+          "id": "card-one-number",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs text-[#8d7ca9] mb-6",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-one-number-text"
+          ]
+        },
+        "card-one-title-text": {
+          "id": "card-one-title-text",
+          "type": "text",
+          "content": "A clear direction",
+          "metadata": {}
+        },
+        "card-one-title": {
+          "id": "card-one-title",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "font-medium mb-2 text-sm",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-one-title-text"
+          ]
+        },
+        "card-one-detail-text": {
+          "id": "card-one-detail-text",
+          "type": "text",
+          "content": "Start with what matters.",
+          "metadata": {}
+        },
+        "card-one-detail": {
+          "id": "card-one-detail",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs leading-5 text-[#a79bb9]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-one-detail-text"
+          ]
+        },
+        "card-two": {
+          "id": "card-two",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "rounded-2xl border border-white/10 bg-white/[0.035] p-5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-two-number",
+            "card-two-title",
+            "card-two-detail"
+          ]
+        },
+        "card-two-number-text": {
+          "id": "card-two-number-text",
+          "type": "text",
+          "content": "02",
+          "metadata": {}
+        },
+        "card-two-number": {
+          "id": "card-two-number",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs text-[#8d7ca9] mb-6",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-two-number-text"
+          ]
+        },
+        "card-two-title-text": {
+          "id": "card-two-title-text",
+          "type": "text",
+          "content": "Small iterations",
+          "metadata": {}
+        },
+        "card-two-title": {
+          "id": "card-two-title",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "font-medium mb-2 text-sm",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-two-title-text"
+          ]
+        },
+        "card-two-detail-text": {
+          "id": "card-two-detail-text",
+          "type": "text",
+          "content": "Make one good change.",
+          "metadata": {}
+        },
+        "card-two-detail": {
+          "id": "card-two-detail",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs leading-5 text-[#a79bb9]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-two-detail-text"
+          ]
+        },
+        "card-three": {
+          "id": "card-three",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "rounded-2xl border border-white/10 bg-white/[0.035] p-5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-three-number",
+            "card-three-title",
+            "card-three-detail"
+          ]
+        },
+        "card-three-number-text": {
+          "id": "card-three-number-text",
+          "type": "text",
+          "content": "03",
+          "metadata": {}
+        },
+        "card-three-number": {
+          "id": "card-three-number",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs text-[#8d7ca9] mb-6",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-three-number-text"
+          ]
+        },
+        "card-three-title-text": {
+          "id": "card-three-title-text",
+          "type": "text",
+          "content": "A living canvas",
+          "metadata": {}
+        },
+        "card-three-title": {
+          "id": "card-three-title",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "font-medium mb-2 text-sm",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-three-title-text"
+          ]
+        },
+        "card-three-detail-text": {
+          "id": "card-three-detail-text",
+          "type": "text",
+          "content": "See every idea take shape.",
+          "metadata": {}
+        },
+        "card-three-detail": {
+          "id": "card-three-detail",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs leading-5 text-[#a79bb9]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "card-three-detail-text"
+          ]
+        },
+        "footer": {
+          "id": "footer",
+          "type": "element",
+          "tag": "footer",
+          "attrs": {},
+          "className": "flex flex-wrap items-center justify-between gap-4 text-xs text-[#776a8b] border-t border-white/10 pt-5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "footer-left-wrap",
+            "footer-right-wrap"
+          ]
+        },
+        "footer-left": {
+          "id": "footer-left",
+          "type": "text",
+          "content": "Built with Pi. Rendered by the web.",
+          "metadata": {}
+        },
+        "footer-left-wrap": {
+          "id": "footer-left-wrap",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "footer-left"
+          ]
+        },
+        "footer-right": {
+          "id": "footer-right",
+          "type": "text",
+          "content": "MODEL ↔ HTML",
+          "metadata": {}
+        },
+        "footer-right-wrap": {
+          "id": "footer-right-wrap",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "tracking-wider",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "footer-right"
+          ]
+        }
+      }
+    },
+    {
+      "id": "components",
+      "name": "Components",
+      "version": 1,
+      "artboard": {
+        "x": 1520,
+        "y": 100,
+        "width": 560,
+        "height": 620
+      },
+      "rootId": "root",
+      "tokens": {},
+      "css": "",
+      "metadata": {
+        "intent": "The design system: edit a component here and every frame that uses it follows."
+      },
+      "nodes": {
+        "root": {
+          "id": "root",
+          "type": "element",
+          "tag": "main",
+          "attrs": {},
+          "className": "min-h-screen bg-[var(--surface)] p-10 text-[var(--ink)] font-sans",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "heading",
+            "button",
+            "plan"
+          ]
+        },
+        "heading": {
+          "id": "heading",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "mb-8 text-xs uppercase tracking-[0.22em] text-[#bda3ef]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "heading-text"
+          ]
+        },
+        "heading-text": {
+          "id": "heading-text",
+          "type": "text",
+          "content": "Components",
+          "metadata": {}
+        },
+        "button": {
+          "id": "button",
+          "type": "element",
+          "tag": "button",
+          "attrs": {
+            "type": "button"
+          },
+          "className": "inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 font-semibold text-[#211a14] shadow-lg",
+          "style": {},
+          "metadata": {
+            "name": "Button/Primary",
+            "intent": "The one primary action of a view."
+          },
+          "children": [
+            "button-label"
+          ],
+          "reusable": true
+        },
+        "button-label": {
+          "id": "button-label",
+          "type": "text",
+          "content": "Get started",
+          "metadata": {}
+        },
+        "plan": {
+          "id": "plan",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "mt-8 flex max-w-xs flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.035] p-6",
+          "style": {},
+          "metadata": {
+            "name": "Card/Plan",
+            "intent": "One pricing plan; instances override the name, price and note."
+          },
+          "children": [
+            "plan-name",
+            "plan-price",
+            "plan-note",
+            "plan-action"
+          ],
+          "reusable": true
+        },
+        "plan-name": {
+          "id": "plan-name",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "text-sm font-medium text-[#c2b2df]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "plan-name-text"
+          ]
+        },
+        "plan-name-text": {
+          "id": "plan-name-text",
+          "type": "text",
+          "content": "Plan",
+          "metadata": {}
+        },
+        "plan-price": {
+          "id": "plan-price",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-4xl font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "plan-price-text"
+          ]
+        },
+        "plan-price-text": {
+          "id": "plan-price-text",
+          "type": "text",
+          "content": "$0",
+          "metadata": {}
+        },
+        "plan-note": {
+          "id": "plan-note",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "mb-3 text-sm leading-6 text-[#a79bb9]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "plan-note-text"
+          ]
+        },
+        "plan-note-text": {
+          "id": "plan-note-text",
+          "type": "text",
+          "content": "What this plan is for.",
+          "metadata": {}
+        },
+        "plan-action": {
+          "id": "plan-action",
+          "type": "ref",
+          "ref": "button",
+          "descendants": {
+            "button-label": {
+              "content": "Choose plan"
+            }
+          },
+          "metadata": {}
+        }
+      }
+    },
+    {
+      "id": "pricing",
+      "name": "Pricing · built from components",
+      "version": 1,
+      "artboard": {
+        "x": 1520,
+        "y": 820,
+        "width": 1040,
+        "height": 640
+      },
+      "rootId": "root",
+      "tokens": {},
+      "css": "",
+      "metadata": {
+        "intent": "Three instances of Card/Plan with overrides; restyle the plan card in Components to see them follow."
+      },
+      "nodes": {
+        "root": {
+          "id": "root",
+          "type": "element",
+          "tag": "main",
+          "attrs": {},
+          "className": "min-h-screen bg-[var(--surface)] px-10 py-12 text-[var(--ink)] font-sans",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "intro",
+            "plans"
+          ]
+        },
+        "intro": {
+          "id": "intro",
+          "type": "element",
+          "tag": "header",
+          "attrs": {},
+          "className": "mb-10 max-w-xl",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "title",
+            "lead"
+          ]
+        },
+        "title": {
+          "id": "title",
+          "type": "element",
+          "tag": "h1",
+          "attrs": {},
+          "className": "mb-3 text-4xl font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "title-text"
+          ]
+        },
+        "title-text": {
+          "id": "title-text",
+          "type": "text",
+          "content": "Simple plans",
+          "metadata": {}
+        },
+        "lead": {
+          "id": "lead",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-base leading-7 text-[#b4a9c7]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "lead-text"
+          ]
+        },
+        "lead-text": {
+          "id": "lead-text",
+          "type": "text",
+          "content": "Every card below is an instance of the Card/Plan component.",
+          "metadata": {}
+        },
+        "plans": {
+          "id": "plans",
+          "type": "element",
+          "tag": "section",
+          "attrs": {},
+          "className": "grid grid-cols-1 gap-5 md:grid-cols-3",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "starter",
+            "pro",
+            "team"
+          ]
+        },
+        "starter": {
+          "id": "starter",
+          "type": "ref",
+          "ref": "components/plan",
+          "descendants": {
+            "plan-name-text": {
+              "content": "Starter"
+            },
+            "plan-price-text": {
+              "content": "$0"
+            },
+            "plan-note-text": {
+              "content": "For a first idea and a weekend."
+            }
+          },
+          "metadata": {}
+        },
+        "pro": {
+          "id": "pro",
+          "type": "ref",
+          "ref": "components/plan",
+          "descendants": {
+            "plan-name-text": {
+              "content": "Pro"
+            },
+            "plan-price-text": {
+              "content": "$12"
+            },
+            "plan-note-text": {
+              "content": "For people who ship every week."
+            },
+            "plan": {
+              "className": "flex flex-col gap-3 rounded-2xl border border-[var(--accent)] bg-white/[0.06] p-6 shadow-[0_0_0_4px_rgba(215,180,116,0.12)]"
+            },
+            "plan-action/button-label": {
+              "content": "Start Pro"
+            }
+          },
+          "metadata": {}
+        },
+        "team": {
+          "id": "team",
+          "type": "ref",
+          "ref": "components/plan",
+          "descendants": {
+            "plan-name-text": {
+              "content": "Team"
+            },
+            "plan-price-text": {
+              "content": "$40"
+            },
+            "plan-note-text": {
+              "content": "Shared components and reviews."
+            }
+          },
+          "metadata": {}
+        }
+      }
+    }
+  ]
+}

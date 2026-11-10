@@ -1,0 +1,132 @@
+{
+  "name": "divlet",
+  "version": "0.0.1",
+  "description": "A browser layout board for agents: one project file, live frames, reusable components; the same tools through Pi and MCP",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/llblab/divlet.git"
+  },
+  "homepage": "https://github.com/llblab/divlet#readme",
+  "bugs": {
+    "url": "https://github.com/llblab/divlet/issues"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "keywords": [
+    "components",
+    "design",
+    "layout",
+    "tailwindcss",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "pi": {
+    "extensions": [
+      "./dist/adapters/pi/index.js"
+    ]
+  },
+  "bin": {
+    "divlet": "./dist/adapters/cli/index.js",
+    "divlet-mcp": "./dist/adapters/mcp/index.js"
+  },
+  "exports": {
+    ".": "./dist/core/index.js",
+    "./runtime": "./dist/core/lib/runtime.js",
+    "./codec": "./dist/core/lib/codec.js",
+    "./model": "./dist/core/lib/model.js",
+    "./project": "./dist/core/lib/project.js",
+    "./contract": "./dist/core/lib/contract.js",
+    "./boards": "./dist/core/lib/boards.js",
+    "./plugins": "./dist/core/lib/plugins.js",
+    "./engine": "./dist/core/lib/engine.js",
+    "./pi": "./dist/adapters/pi/index.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "docs",
+    "examples",
+    "README.md",
+    "AGENTS.md",
+    "BACKLOG.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node ./adapters/cli/index.js",
+    "demo": "node ./adapters/cli/index.js --cwd ./examples",
+    "demo:site": "node ./adapters/cli/index.js --cwd ./examples/site",
+    "demo:pen": "node ./adapters/cli/index.js ./examples/pen/field-notes.pen",
+    "pretest": "tsc --noEmit",
+    "test": "node --test",
+    "test:browser": "node core/tests/browser/run.mjs",
+    "test:responsive": "node core/tests/browser/responsive.mjs",
+    "test:layout": "node core/tests/browser/layout-wrap.mjs",
+    "test:site": "node core/tests/browser/site.mjs",
+    "test:fullscreen": "node core/tests/browser/fullscreen.mjs",
+    "test:interact": "node core/tests/browser/interact.mjs",
+    "test:filenames": "node --test core/tests/frame-filenames.test.js",
+    "test:selection-completion": "node core/tests/browser/selection-completion.mjs",
+    "test:controls": "node core/tests/browser/selection-completion.mjs && node core/tests/browser/size-editor.mjs && node core/tests/browser/controls.mjs",
+    "test:settings": "node core/tests/browser/settings.mjs",
+    "test:defaults": "node core/tests/browser/native-default.mjs",
+    "test:browser:all": "node core/tests/browser/run.mjs && node core/tests/browser/responsive.mjs && node core/tests/browser/layout-wrap.mjs && node core/tests/browser/site.mjs && node core/tests/browser/fullscreen.mjs && node core/tests/browser/settings.mjs && node core/tests/browser/interact.mjs && node core/tests/browser/selection-completion.mjs && node core/tests/browser/size-editor.mjs && node core/tests/browser/controls.mjs && node core/tests/browser/features.mjs && node core/tests/browser/spacing.mjs && node core/tests/browser/toolbars.mjs && node core/tests/browser/appearance.mjs && node core/tests/browser/reimport.mjs && node core/tests/browser/chrome.mjs && node core/tests/browser/fluid.mjs && node core/tests/browser/snapshots.mjs && node core/tests/browser/launcher.mjs && node core/tests/browser/launcher-errors.mjs && node core/tests/browser/native-collections.mjs && node core/tests/browser/projects.mjs && node core/tests/browser/security.mjs && node core/tests/browser/static.mjs && node core/tests/browser/native-default.mjs",
+    "test:features": "node core/tests/browser/features.mjs",
+    "test:spacing": "node core/tests/browser/spacing.mjs",
+    "test:chrome": "node core/tests/browser/chrome.mjs",
+    "test:fluid": "node core/tests/browser/fluid.mjs",
+    "test:snapshots": "node core/tests/browser/snapshots.mjs",
+    "test:size-editor": "node core/tests/browser/size-editor.mjs",
+    "test:ellipses": "node --test core/tests/native-ellipse.test.js",
+    "test:paths": "node --test core/tests/native-path.test.js",
+    "test:launcher": "node core/tests/browser/launcher.mjs && node core/tests/browser/launcher-errors.mjs && node core/tests/browser/native-collections.mjs",
+    "test:projects": "node core/tests/browser/projects.mjs",
+    "test:security": "node core/tests/browser/security.mjs",
+    "test:static": "node core/tests/browser/static.mjs",
+    "test:source": "node core/tests/browser/native-collections.mjs && node core/tests/browser/native-default.mjs",
+    "test:release": "node core/tests/release/install-smoke.mjs",
+    "test:pen-fidelity": "node plugins/pen/tests/fidelity.mjs",
+    "test:pi": "node adapters/pi/tests/e2e/pi.mjs",
+    "test:mcp": "node --test adapters/mcp/tests/*.test.js",
+    "test:contract": "node --test core/tests/contract.test.js",
+    "typecheck": "tsc --noEmit",
+    "landing:hash": "node scripts/landing-hash.mjs",
+    "build": "node scripts/build.mjs",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "@tailwindcss/node": "^4.1.0",
+    "lucide-static": "1.67.0",
+    "marked": "^18.1.2",
+    "parse5": "^8.0.0",
+    "postcss": "^8.5.6",
+    "postcss-value-parser": "^4.2.0",
+    "svg-pathdata": "8.0.0",
+    "tailwindcss": "^4.1.0",
+    "yaml": "^2.9.1"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "typebox": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "playwright": "^1.62.1",
+    "typebox": "^1.0.0",
+    "typescript": "5.9"
+  },
+  "workspaces": [
+    "plugins/*"
+  ]
+}

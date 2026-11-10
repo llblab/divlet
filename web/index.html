@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="light dark">
+    <title>divlet</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 20 20%27%3E%3Cpath d=%27M8 4.5 2.5 10 8 15.5M10.5 4.5H12L17.5 10 12 15.5h-1.5Z%27 fill=%27none%27 stroke=%27%235b5bf0%27 stroke-width=%271.5%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+    <script>try { const theme = localStorage.getItem('divlet:theme'); if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme; const ui = Number(localStorage.getItem('divlet:ui')); if (ui >= 1 && ui <= 2) document.documentElement.style.setProperty('--ui', String(ui)); } catch {}
+      // Layouts react to the width the interface really has: the window divided by the interface size.
+      const fit = () => { const w = innerWidth / (Number.parseFloat(document.documentElement.style.getPropertyValue('--ui')) || 1); for (const t of [720, 560, 440, 420]) document.documentElement.classList.toggle('w' + t, w <= t); };
+      fit(); addEventListener('resize', fit); window.__divletFit = fit;</script>
+    <link rel="stylesheet" href="./board.css">
+    <script type="module" src="./board.js"></script>
+  </head>
+  <body>
+    <main id="viewport" class="viewport mode-board" tabindex="0" aria-label="Canvas">
+      <div id="stage" class="stage"></div>
+      <div id="guides" class="guides"></div>
+      <div id="hover-badge" class="hover-badge" aria-hidden="true" hidden></div>
+      <div id="marquee" class="marquee" hidden></div>
+      <div id="empty" class="empty" hidden>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4.5 2.5 10 8 15.5"/><path d="M10.5 4.5H12L17.5 10 12 15.5h-1.5Z"/></svg>
+        <p>An empty canvas</p>
+        <button id="empty-new" class="cta" type="button">New artboard <kbd>N</kbd></button>
+        <span class="hint">or ask Pi to design something</span>
+      </div>
+      <div id="loading" class="loading"><i></i></div>
+    </main>
+
+    <div id="ui">
+      <!-- Top left: the logo/project button and search. Together with the sidebar and its tabs it reads as one column that stays when the sidebar folds. -->
+      <header id="brand" class="brand chrome">
+        <button id="status" class="status" type="button" aria-label="Project status"><span id="status-dot" class="logo" data-kind="connecting" aria-hidden="true"></span><span id="project-name" class="project">DIVLET</span></button>
+        <button id="palette-open" class="tool search-pill" type="button" aria-label="Search and commands"><span class="search-pill-text">Search</span><kbd id="palette-keys">Ctrl K</kbd></button>
+      </header>
+
+      <aside id="sidebar" class="panel left chrome" aria-label="Layers, history and agent" hidden>
+        <section id="layers" class="pane" role="region" aria-labelledby="open-layers"></section>
+        <section id="activity" class="pane" role="region" aria-labelledby="open-history" hidden></section>
+        <section id="agent" class="pane agent-pane" role="region" aria-labelledby="open-agent" hidden></section>
+      </aside>
+      <!-- The tabs sit under the sidebar. A tab that is already open folds the sidebar; the strip itself always stays. -->
+      <nav id="side-tabs" class="side-tabs chrome" role="tablist" aria-label="Sidebar">
+        <button id="open-layers" class="tab" type="button" role="tab" aria-label="Layers" aria-pressed="false" aria-controls="layers" data-tip="Artboards and elements · L"><span class="tool-label">Layers</span></button>
+        <button id="open-history" class="tab" type="button" role="tab" aria-label="History" aria-pressed="false" aria-controls="activity" data-tip="History of changes · H"><span class="tool-label">History</span><b id="diag-count" class="badge" hidden>0</b></button>
+        <button id="open-agent" class="tab" type="button" role="tab" aria-label="Agent" aria-pressed="false" aria-controls="agent" data-tip="Talk to the agent · A"><span class="tool-label">Agent</span><b id="agent-count" class="badge" hidden>0</b></button>
+      </nav>
+      <aside id="inspector" class="panel right chrome" aria-label="Inspector" hidden></aside>
+
+      <nav id="crumbs" class="crumbs crumbs-bar chrome" aria-label="Selected element path" hidden></nav>
+      <nav id="dock" class="dock chrome" aria-label="Tools"></nav>
+      <span id="live-count" class="sr-only">0/0</span>
+      <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+      <div id="sr" class="sr-only" role="status" aria-live="polite"></div>
+
+      <div id="palette" class="scrim chrome palette-scrim" hidden>
+        <section class="dialog palette" role="dialog" aria-modal="true" aria-label="Search and commands"></section>
+      </div>
+
+      <div id="help" class="scrim chrome" hidden>
+        <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="help-title"></section>
+      </div>
+
+      <section id="expanded-preview" class="expanded-bar" role="dialog" aria-modal="true" aria-labelledby="expanded-title" hidden>
+        <button id="expanded-back" class="expanded-back" type="button" aria-label="Back to the canvas" data-tip="Back to the canvas · Esc · drag to move"><span id="expanded-title"></span></button>
+        <button id="expanded-open-site" class="tool" type="button" aria-label="Open site" data-tip="Browse the site here" hidden></button>
+      </section>
+    </div>
+  </body>
+</html>

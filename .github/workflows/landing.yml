@@ -1,0 +1,77 @@
+# Publish landing/ to GitHub Pages, and only when it changed.
+#
+# The published site is the root of the `gh-pages` branch: this folder's files, plus `.landing-hash` — the fingerprint of exactly
+# those files. If that line already matches what `scripts/landing-hash.mjs` says today, the workflow stops without a commit, so a
+# push that does not touch the page cannot rewrite it. Serve Pages from the `gh-pages` branch root (Settings → Pages).
+name: Landing
+
+on:
+  push:
+    branches: [main]
+    paths: ['landing/**', 'scripts/landing-hash.mjs', '.github/workflows/landing.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: landing
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The branch we publish to, so the comparison and the commit happen without a second clone.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Fingerprint the landing folder
+        id: landing
+        run: echo "hash=$(node scripts/landing-hash.mjs)" >> "$GITHUB_OUTPUT"
+
+      - name: Check the published fingerprint
+        id: published
+        run: |
+          # The branch may never have been published, or may not be in the clone's remote refs yet.
+          git fetch --quiet --depth=1 origin gh-pages:refs/remotes/origin/gh-pages 2>/dev/null || true
+          if git show origin/gh-pages:.landing-hash >/dev/null 2>&1; then
+            echo "hash=$(git show origin/gh-pages:.landing-hash | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+          else
+            echo "hash=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Nothing to publish
+        if: steps.landing.outputs.hash == steps.published.outputs.hash
+        run: echo "gh-pages already serves ${{ steps.landing.outputs.hash }} — no commit."
+
+      - name: Publish
+        if: steps.landing.outputs.hash != steps.published.outputs.hash
+        run: |
+          set -euo pipefail
+          workspace="$(mktemp -d)"
+          # The same module that hashed the folder decides what gets published.
+          node scripts/landing-hash.mjs --copy "$workspace" > /dev/null
+          echo "${{ steps.landing.outputs.hash }}" > "$workspace/.landing-hash"
+          cd "$workspace"
+          git init --quiet --initial-branch=gh-pages
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add --all
+          git commit --quiet --message "Landing: ${{ steps.landing.outputs.hash }}"
+          git push --quiet --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
+
+      - name: Summary
+        run: |
+          {
+            echo "### Landing"
+            echo ""
+            echo "- fingerprint: \`${{ steps.landing.outputs.hash }}\`"
+            echo "- published: \`${{ steps.published.outputs.hash || '(never)' }}\`"
+            echo "- action: ${{ steps.landing.outputs.hash == steps.published.outputs.hash && 'nothing to do' || 'published to gh-pages' }}"
+          } >> "$GITHUB_STEP_SUMMARY"

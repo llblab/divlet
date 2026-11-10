@@ -1,0 +1,46 @@
+{
+  "name": "divlet-pi",
+  "version": "0.0.1",
+  "description": "The Pi extension for divlet: the board tools, the /divlet command and the bundled skill, on top of the divlet package",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/llblab/divlet.git",
+    "directory": "packages/divlet-pi"
+  },
+  "homepage": "https://github.com/llblab/divlet#readme",
+  "bugs": {
+    "url": "https://github.com/llblab/divlet/issues"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "pi": {
+    "extensions": [
+      "./index.js"
+    ]
+  },
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "divlet",
+    "design",
+    "layout"
+  ],
+  "dependencies": {
+    "divlet": "0.0.1"
+  },
+  "peerDependencies": {
+    "typebox": "*"
+  },
+  "files": [
+    "index.js",
+    "README.md"
+  ]
+}

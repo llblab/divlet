@@ -1,0 +1,9 @@
+{
+  "name": "@divlet/mcp",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "divlet over MCP (stdio): the same layout tools as the Pi extension, for any MCP client",
+  "bin": { "divlet-mcp": "./index.js" },
+  "engines": { "node": ">=22.19.0" }
+}

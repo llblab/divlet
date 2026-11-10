@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "title": "Divlet Fieldnotes",
+  "templateId": "docs-template",
+  "contentDir": "content",
+  "slots": {
+    "content": "content-slot",
+    "title": "title-slot",
+    "navigation": "navigation-slot"
+  }
+}

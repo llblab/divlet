@@ -1,0 +1,559 @@
+{
+  "schemaVersion": 2,
+  "name": "divlet site example",
+  "version": 2,
+  "tokens": {},
+  "css": "",
+  "metadata": {},
+  "frames": [
+    {
+      "id": "docs-template",
+      "name": "Fieldnotes · shared template",
+      "version": 1,
+      "artboard": {
+        "x": 80,
+        "y": 80,
+        "width": 1120,
+        "height": 980
+      },
+      "rootId": "fieldnotes-root",
+      "tokens": {},
+      "css": "\n:root{color-scheme:light}\n*{box-sizing:border-box}\n.fieldnotes{min-height:100vh;background:#fbfaf7;color:#243447;font:16px/1.7 system-ui,sans-serif}\n.site-header{height:84px;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(24px,5vw,72px);border-bottom:1px solid #e3e5e6;background:#fffefa}\n.site-brand{display:flex;align-items:center;gap:12px;color:#172b43;text-decoration:none;font-weight:740;letter-spacing:-.04em;font-size:21px}\n.site-brand img{width:32px;height:32px}\n.site-label{font-size:11px;font-weight:650;letter-spacing:.12em;text-transform:uppercase;color:#7c8997}\n.site-shell{display:grid;grid-template-columns:240px minmax(0,1fr);max-width:1216px;margin:auto;min-height:calc(100vh - 84px)}\n.site-sidebar{padding:48px 28px 40px 36px;border-right:1px solid #e3e5e6}\n.nav-label{margin:0 0 20px;color:#8a95a0;font-size:10px;font-weight:750;letter-spacing:.16em;text-transform:uppercase}\n.site-navigation ul{list-style:none;margin:0;padding:0}\n.site-navigation ul ul{margin:8px 0 16px;padding-left:14px;border-left:1px solid #d9e0e7}\n.site-navigation li{margin:7px 0}\n.site-navigation a{color:#63758a;text-decoration:none;font-size:13px;line-height:1.6;display:block;padding:3px 0}\n.site-navigation a:hover{color:#172b43;text-decoration:underline;text-underline-offset:4px}\n.site-navigation a[aria-current=\"page\"]{color:#172b43;font-weight:700}\n.sidebar-note{margin-top:48px;color:#96a0aa;font-size:11px;line-height:1.7}\n.site-main{min-width:0;padding:54px clamp(28px,5vw,76px) 64px}\n.page-eyebrow{display:flex;align-items:center;gap:9px;color:#a27b45;font-size:10px;font-weight:750;letter-spacing:.14em;text-transform:uppercase;margin:0 0 14px}\n.page-eyebrow span{display:block;width:20px;height:1px;background:#b89868}\n.page-title{font-size:clamp(31px,4vw,46px);line-height:1.15;letter-spacing:-.05em;font-weight:690;color:#172b43;margin:0 0 32px;max-width:680px}\n.page-content{max-width:720px;color:#596b7f;font-size:15px;line-height:1.85;overflow-wrap:anywhere}\n.page-content>p:first-child{font-size:17px;line-height:1.8;color:#6b7b8d;margin-bottom:28px}\n.page-content h1,.page-content h2,.page-content h3{color:#24384e;letter-spacing:-.025em;line-height:1.35;scroll-margin-top:24px}\n.page-content h1{font-size:30px}.page-content h2{font-size:21px;margin:38px 0 12px}.page-content h3{font-size:17px;margin:28px 0 10px}\n.page-content p{margin:0 0 18px}.page-content strong{color:#344c65;font-weight:650}\n.page-content a{color:#386b9c;text-decoration:underline;text-decoration-color:#c3d3e2;text-underline-offset:3px}\n.page-content a:hover{color:#172b43;text-decoration-color:currentColor}\n.page-content ul,.page-content ol{padding-left:22px;margin:0 0 22px}.page-content li{padding-left:3px;margin:7px 0}\n.page-content blockquote{margin:28px 0;padding:10px 22px;border-left:3px solid #c6ab85;background:#f3f0e9;color:#7a776f;border-radius:0 8px 8px 0}.page-content blockquote p{margin:0}\n.page-content table{border-collapse:collapse;width:100%;margin:22px 0 28px;font-size:13px}.page-content th{text-align:left;color:#53677d;background:#f0f2f3;font-weight:650}.page-content td,.page-content th{padding:12px 16px;border-bottom:1px solid #e2e6e9;vertical-align:top}\n.page-content pre{padding:22px 24px;background:#172b43;border-radius:12px;color:#e6edf4;line-height:1.7;overflow:auto;font-size:12px}.page-content code{font-family:ui-monospace,SFMono-Regular,monospace;font-size:.87em}.page-content :not(pre)>code{background:#edf0f2;color:#456079;border-radius:4px;padding:2px 5px}\n.page-content img{display:block;max-width:100%;height:auto;border-radius:16px;margin:28px 0}\n.site-footer{max-width:720px;border-top:1px solid #e1e5e8;margin-top:52px;padding-top:20px;display:flex;justify-content:space-between;gap:20px;color:#98a1aa;font-size:10px;letter-spacing:.02em}\n@media(max-width:760px){.site-header{height:72px;padding:0 24px}.site-label{font-size:9px}.site-shell{display:block}.site-sidebar{border-right:0;border-bottom:1px solid #e3e5e6;padding:24px}.nav-label{margin-bottom:12px}.sidebar-note{display:none}.site-navigation>ul{display:flex;flex-wrap:wrap;gap:8px 22px}.site-navigation ul ul{margin:5px 0 0}.site-main{padding:36px 24px 48px}.page-title{margin-bottom:24px}.page-content{font-size:14px}.page-content>p:first-child{font-size:16px}.page-content td,.page-content th{padding:10px}.site-footer{margin-top:36px}}\n",
+      "metadata": {
+        "intent": "Shared responsive documentation shell; content stays in Markdown files",
+        "role": "site-template"
+      },
+      "nodes": {
+        "fieldnotes-root": {
+          "id": "fieldnotes-root",
+          "type": "element",
+          "tag": "div",
+          "attrs": {
+            "id": "fieldnotes-root"
+          },
+          "className": "fieldnotes",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-1",
+            "node-2",
+            "text-9",
+            "node-10",
+            "text-47"
+          ]
+        },
+        "text-1": {
+          "id": "text-1",
+          "type": "text",
+          "content": "\n  ",
+          "metadata": {}
+        },
+        "node-2": {
+          "id": "node-2",
+          "type": "element",
+          "tag": "header",
+          "attrs": {},
+          "className": "site-header",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-3",
+            "node-7"
+          ]
+        },
+        "node-3": {
+          "id": "node-3",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "/"
+          },
+          "className": "site-brand",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-4",
+            "node-5"
+          ]
+        },
+        "node-4": {
+          "id": "node-4",
+          "type": "element",
+          "tag": "img",
+          "attrs": {
+            "src": "./assets/divlet-mark.svg",
+            "alt": ""
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "node-5": {
+          "id": "node-5",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-6"
+          ]
+        },
+        "text-6": {
+          "id": "text-6",
+          "type": "text",
+          "content": "Divlet Fieldnotes",
+          "metadata": {}
+        },
+        "node-7": {
+          "id": "node-7",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "site-label",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-8"
+          ]
+        },
+        "text-8": {
+          "id": "text-8",
+          "type": "text",
+          "content": "A living notebook",
+          "metadata": {}
+        },
+        "text-9": {
+          "id": "text-9",
+          "type": "text",
+          "content": "\n  ",
+          "metadata": {}
+        },
+        "node-10": {
+          "id": "node-10",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "site-shell",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-11",
+            "node-12",
+            "text-29",
+            "node-30",
+            "text-46"
+          ]
+        },
+        "text-11": {
+          "id": "text-11",
+          "type": "text",
+          "content": "\n    ",
+          "metadata": {}
+        },
+        "node-12": {
+          "id": "node-12",
+          "type": "element",
+          "tag": "aside",
+          "attrs": {},
+          "className": "site-sidebar",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-13",
+            "navigation-slot",
+            "node-25"
+          ]
+        },
+        "node-13": {
+          "id": "node-13",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "nav-label",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-14"
+          ]
+        },
+        "text-14": {
+          "id": "text-14",
+          "type": "text",
+          "content": "Explore the notes",
+          "metadata": {}
+        },
+        "navigation-slot": {
+          "id": "navigation-slot",
+          "type": "element",
+          "tag": "nav",
+          "attrs": {
+            "id": "navigation-slot",
+            "aria-label": "Site pages"
+          },
+          "className": "site-navigation",
+          "style": {},
+          "metadata": {
+            "intent": "Hierarchy and labels supplied by the content tree"
+          },
+          "children": [
+            "node-15"
+          ]
+        },
+        "node-15": {
+          "id": "node-15",
+          "type": "element",
+          "tag": "ul",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-16",
+            "node-19",
+            "node-22"
+          ]
+        },
+        "node-16": {
+          "id": "node-16",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-17"
+          ]
+        },
+        "node-17": {
+          "id": "node-17",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "/"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-18"
+          ]
+        },
+        "text-18": {
+          "id": "text-18",
+          "type": "text",
+          "content": "Introduction",
+          "metadata": {}
+        },
+        "node-19": {
+          "id": "node-19",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-20"
+          ]
+        },
+        "node-20": {
+          "id": "node-20",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "/guide/"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-21"
+          ]
+        },
+        "text-21": {
+          "id": "text-21",
+          "type": "text",
+          "content": "The guide",
+          "metadata": {}
+        },
+        "node-22": {
+          "id": "node-22",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-23"
+          ]
+        },
+        "node-23": {
+          "id": "node-23",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "/guide/start/"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-24"
+          ]
+        },
+        "text-24": {
+          "id": "text-24",
+          "type": "text",
+          "content": "First steps",
+          "metadata": {}
+        },
+        "node-25": {
+          "id": "node-25",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "sidebar-note",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-26",
+            "node-27",
+            "text-28"
+          ]
+        },
+        "text-26": {
+          "id": "text-26",
+          "type": "text",
+          "content": "One shared layout.",
+          "metadata": {}
+        },
+        "node-27": {
+          "id": "node-27",
+          "type": "element",
+          "tag": "br",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "text-28": {
+          "id": "text-28",
+          "type": "text",
+          "content": "Room for every new idea.",
+          "metadata": {}
+        },
+        "text-29": {
+          "id": "text-29",
+          "type": "text",
+          "content": "\n    ",
+          "metadata": {}
+        },
+        "node-30": {
+          "id": "node-30",
+          "type": "element",
+          "tag": "main",
+          "attrs": {},
+          "className": "site-main",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-31",
+            "title-slot",
+            "content-slot",
+            "node-41"
+          ]
+        },
+        "node-31": {
+          "id": "node-31",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "page-eyebrow",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-32",
+            "text-33"
+          ]
+        },
+        "node-32": {
+          "id": "node-32",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "text-33": {
+          "id": "text-33",
+          "type": "text",
+          "content": "Fieldnotes / documentation",
+          "metadata": {}
+        },
+        "title-slot": {
+          "id": "title-slot",
+          "type": "element",
+          "tag": "h1",
+          "attrs": {
+            "id": "title-slot"
+          },
+          "className": "page-title",
+          "style": {},
+          "metadata": {
+            "intent": "Page title supplied by frontmatter"
+          },
+          "children": [
+            "text-34"
+          ]
+        },
+        "text-34": {
+          "id": "text-34",
+          "type": "text",
+          "content": "A small place for big ideas",
+          "metadata": {}
+        },
+        "content-slot": {
+          "id": "content-slot",
+          "type": "element",
+          "tag": "article",
+          "attrs": {
+            "id": "content-slot"
+          },
+          "className": "page-content",
+          "style": {},
+          "metadata": {
+            "intent": "Markdown blocks replace this placeholder content"
+          },
+          "children": [
+            "node-35",
+            "node-37",
+            "node-39"
+          ]
+        },
+        "node-35": {
+          "id": "node-35",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-36"
+          ]
+        },
+        "text-36": {
+          "id": "text-36",
+          "type": "text",
+          "content": "Markdown content appears here. Edit the shared template with your agent, then connect a tree of pages.",
+          "metadata": {}
+        },
+        "node-37": {
+          "id": "node-37",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-38"
+          ]
+        },
+        "text-38": {
+          "id": "text-38",
+          "type": "text",
+          "content": "One layout, many pages",
+          "metadata": {}
+        },
+        "node-39": {
+          "id": "node-39",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-40"
+          ]
+        },
+        "text-40": {
+          "id": "text-40",
+          "type": "text",
+          "content": "The runtime composes this shell with each Markdown source and publishes a validated site snapshot.",
+          "metadata": {}
+        },
+        "node-41": {
+          "id": "node-41",
+          "type": "element",
+          "tag": "footer",
+          "attrs": {},
+          "className": "site-footer",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-42",
+            "node-44"
+          ]
+        },
+        "node-42": {
+          "id": "node-42",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-43"
+          ]
+        },
+        "text-43": {
+          "id": "text-43",
+          "type": "text",
+          "content": "Written in Markdown. Shaped in divlet.",
+          "metadata": {}
+        },
+        "node-44": {
+          "id": "node-44",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-45"
+          ]
+        },
+        "text-45": {
+          "id": "text-45",
+          "type": "text",
+          "content": "Keep iterating ↗",
+          "metadata": {}
+        },
+        "text-46": {
+          "id": "text-46",
+          "type": "text",
+          "content": "\n  ",
+          "metadata": {}
+        },
+        "text-47": {
+          "id": "text-47",
+          "type": "text",
+          "content": "\n",
+          "metadata": {}
+        }
+      }
+    }
+  ]
+}

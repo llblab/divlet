@@ -1,0 +1,9 @@
+{
+  "name": "@divlet/cli",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Standalone command-line adapter for divlet: opens the Divlet board for a folder or project file",
+  "type": "module",
+  "main": "./index.js",
+  "license": "MIT"
+}

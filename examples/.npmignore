@@ -1,0 +1,8 @@
+# Ship authored fixtures, never runtime build state.
+.divlet/
+.trash/
+.cache/
+.divlet-build.json
+.divlet-write.lock
+.divlet-save-*
+.divlet-upload-*/

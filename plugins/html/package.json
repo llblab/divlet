@@ -1,0 +1,12 @@
+{
+  "name": "@divlet/plugin-html",
+  "version": "0.0.1",
+  "private": true,
+  "description": "HTML importer plugin for divlet: opens a static .html page by converting it into a Divlet project beside it",
+  "type": "module",
+  "main": "./index.js",
+  "license": "MIT",
+  "dependencies": {
+    "parse5": "^8.0.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@divlet/plugin-tailwind",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Tailwind CSS style engine for divlet: compiles utility classes locally, explains and suggests them, and converts CSS declarations to utilities",
+  "type": "module",
+  "main": "./index.js",
+  "license": "MIT",
+  "dependencies": {
+    "@tailwindcss/node": "^4.1.0",
+    "postcss": "^8.5.6",
+    "postcss-value-parser": "^4.2.0",
+    "tailwindcss": "^4.1.0"
+  }
+}
