@@ -15,6 +15,18 @@ const expanded = new Set();
 const unreadBadge = $('#agent-count');
 let unread = 0;
 let focusSeq = null;
+let followLatest = true;
+let readWidth = 0, readHeight = 0;
+const atBottom = () => list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+const scrollToLatest = () => { if (followLatest && list.clientHeight) list.scrollTop = list.scrollHeight; };
+list.addEventListener('scroll', () => {
+  // A queued scroll from the old layout is not a reader leaving the bottom after the composer/status resizes.
+  if (list.clientHeight && list.clientWidth === readWidth && list.clientHeight === readHeight) followLatest = atBottom();
+}, { passive: true });
+new ResizeObserver(() => {
+  readWidth = list.clientWidth; readHeight = list.clientHeight;
+  scrollToLatest();
+}).observe(list);
 
 /** Plain text with `code`, **bold** and line breaks, built as DOM (never as HTML). */
 function richText(text) {
@@ -103,21 +115,23 @@ function paintUnread() {
 /** A new request or answer arrived: unseen answers are counted on the Agent tab until it is opened. */
 export function note(change) {
   if (!isChat(change)) return;
+  if (change.kind === 'ask') followLatest = true;
   if (change.kind === 'reply' && !sidebar.isOpen('agent')) { unread++; paintUnread(); }
   render();
 }
 
 export function render() {
-  const pinned = list.scrollHeight - list.scrollTop - list.clientHeight < 40 || !list.childElementCount;
+  const top = list.scrollTop;
   const messages = store.recent.filter(isChat);
   list.replaceChildren(...(messages.length ? messages.map(bubble) : [el('div', 'quiet', 'No conversation yet. Ask the agent to change the layout below; its answers appear here, and every edit it makes is in History.')]));
   if (sidebar.isOpen('agent')) { unread = 0; paintUnread(); }
   if (focusSeq !== null) {
     const target = [...list.querySelectorAll('[data-seq]')].find(node => node.dataset.seq === String(focusSeq));
     focusSeq = null;
-    if (target) { target.scrollIntoView({ block: 'nearest' }); target.classList.add('flash'); setTimeout(() => target.classList.remove('flash'), 1200); return; }
+    if (target) { followLatest = false; target.scrollIntoView({ block: 'nearest' }); followLatest = atBottom(); target.classList.add('flash'); setTimeout(() => target.classList.remove('flash'), 1200); return; }
   }
-  if (pinned) list.scrollTop = list.scrollHeight;
+  if (followLatest) scrollToLatest();
+  else if (list.clientHeight) list.scrollTop = top;
 }
 
 /** Scroll to one message once the pane shows it. */
