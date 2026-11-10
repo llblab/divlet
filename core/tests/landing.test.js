@@ -64,7 +64,7 @@ test('the page says what it is in the terms a crawler and a reader need', async 
 test('installation examples distinguish the npm package from its commands and unpublished status', async () => {
   const html = await read('index.html');
   const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
-  const wrapper = JSON.parse(await readFile(path.join(root, 'packages/divlet-pi/package.json'), 'utf8'));
+  const wrapper = JSON.parse(await readFile(path.join(root, 'packages/pi-divlet/package.json'), 'utf8'));
   assert.ok(html.includes(`npx -y ${pkg.name} ./my-project`), 'the CLI uses the product package');
   assert.ok(html.includes(`npx -y --package=${pkg.name} divlet-mcp --cwd ./my-project`), 'MCP selects the package explicitly');
   assert.ok(pkg.bin['divlet-mcp'], 'the package ships that server binary');

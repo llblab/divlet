@@ -90,12 +90,12 @@ try {
   assert.equal(mcp.url, 'http://…', 'and opens a board');
   assert.equal(mcp.frames, 1);
   // The separately published Pi wrapper must resolve the already installed product, not an unpublished registry version.
-  const wrapper = JSON.parse(execFileSync('npm', ['pack', '--json', '--pack-destination', work], { cwd: path.join(root, 'packages/divlet-pi'), encoding: 'utf8' }))[0];
-  assert.equal(wrapper.name, 'divlet-pi');
+  const wrapper = JSON.parse(execFileSync('npm', ['pack', '--json', '--pack-destination', work], { cwd: path.join(root, 'packages/pi-divlet'), encoding: 'utf8' }))[0];
+  assert.equal(wrapper.name, 'pi-divlet');
   execFileSync('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline', path.join(work, wrapper.filename)], { cwd: target, stdio: 'pipe' });
   await writeFile(path.join(target, 'pi-smoke.mjs'), `
     import assert from 'node:assert/strict';
-    import wrapper from 'divlet-pi';
+    import wrapper from 'pi-divlet';
     import adapter from 'divlet/pi';
     assert.equal(typeof wrapper, 'function');
     assert.equal(wrapper, adapter);

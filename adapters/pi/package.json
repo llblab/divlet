@@ -2,7 +2,7 @@
   "name": "@divlet/pi",
   "version": "0.0.1",
   "private": true,
-  "description": "The Pi adapter inside the divlet repository (tools, /divlet command, bundled skill). Published Pi packaging lives in packages/divlet-pi, which re-exports divlet/pi, so the adapter is never copied.",
+  "description": "The Pi adapter inside the divlet repository (tools, /divlet command, bundled skill). Published Pi packaging lives in packages/pi-divlet, which re-exports divlet/pi, so the adapter is never copied.",
   "type": "module",
   "main": "./index.js",
   "exports": {

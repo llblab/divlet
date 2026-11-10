@@ -44,11 +44,12 @@ test('the adapter is a package a host can install by itself', async () => {
 });
 
 test('host packaging lives in its own package, with no copy of the adapter', async () => {
-  const wrapper = JSON.parse(await readFile(path.join(root, 'packages/divlet-pi/package.json'), 'utf8'));
-  assert.equal(wrapper.name, 'divlet-pi');
+  const wrapper = JSON.parse(await readFile(path.join(root, 'packages/pi-divlet/package.json'), 'utf8'));
+  assert.equal(wrapper.name, 'pi-divlet');
+  assert.equal(wrapper.repository.directory, 'packages/pi-divlet');
   assert.deepEqual(wrapper.pi.extensions, ['./index.js'], 'Pi installs the thin package');
   assert.equal(wrapper.dependencies.divlet, pkg.version, 'and depends on the product at its current version');
-  const index = await readFile(path.join(root, 'packages/divlet-pi/index.js'), 'utf8');
+  const index = await readFile(path.join(root, 'packages/pi-divlet/index.js'), 'utf8');
   assert.match(index, /from 'divlet\/pi'/, 'it re-exports the adapter instead of shipping a copy');
   assert.equal(wrapper.files.includes('index.js'), true);
   for (const keyword of ['pi', 'pi-package']) assert.ok(wrapper.keywords.includes(keyword), `the host keywords live with the host package (${keyword})`);

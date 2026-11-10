@@ -11,7 +11,7 @@ core/        the Divlet core: index.js (public API — the package's `.`), lib/,
 web/         the web client (a peer of core: plugins may act on both): `board.js` entry, `index.html`, `board.css`, modules by domain in `web/lib/`
 plugins/     importers/exporters/style engines, one package each (index.js, lib/, tests/)
 adapters/    host adapters, one package each: `pi/` (the Pi extension and its skill), `mcp/` (the MCP stdio server) and `cli/` (the standalone CLI)
-packages/    host packaging that is published on its own: `divlet-pi` is the Pi manifest plus a re-export of `divlet/pi`
+packages/    host packaging that is published on its own: `pi-divlet` is the Pi manifest plus a re-export of `divlet/pi`
 examples/    example projects (studio, a Markdown site, a PEN file)
 ```
 
@@ -21,7 +21,7 @@ The root package says what it is: `.` is the library (`core/index.js` — `openR
 `resolveOpenFile`), the bins are `divlet` (CLI) and `divlet-mcp` (MCP server), and every other surface is a named subpath
 (`./runtime`, `./contract`, `./model`, `./project`, `./codec`, `./boards`, `./plugins`, `./engine`, `./pi`). A host manifest field
 points at that host's adapter entry — `pi.extensions` is `dist/adapters/pi/index.js`, not a root shim — and the host's own package
-(`packages/divlet-pi`) carries the host keywords and re-exports `divlet/pi`, so the adapter is never copied and cannot drift.
+(`packages/pi-divlet`) carries the host keywords and re-exports `divlet/pi`, so the adapter is never copied and cannot drift.
 There is no root `index.js`: an entry that meant "this package is a Pi extension" was the wrong shape for a product whose other
 hosts are a CLI and an MCP server.
 

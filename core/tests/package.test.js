@@ -17,7 +17,7 @@ test('the standalone CLI advertises the package and project naming contract', ()
   assert.match(result.stdout, /<(?:path|folder)>\/project\.divlet/);
   assert.match(result.stdout, /\.divlet\/<filename stem>\/.*outputDir/);
   assert.match(result.stdout, /divlet\.config\.json/);
-  assert.match(result.stdout, /pi install npm:divlet-pi/);
+  assert.match(result.stdout, /pi install npm:pi-divlet/);
 });
 
 test('example packaging excludes retained private upload stages but keeps authored assets', async t => {

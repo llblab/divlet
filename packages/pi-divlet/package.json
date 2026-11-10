@@ -1,5 +1,5 @@
 {
-  "name": "divlet-pi",
+  "name": "pi-divlet",
   "version": "0.0.1",
   "description": "The Pi extension for divlet: the board tools, the /divlet command and the bundled skill, on top of the divlet package",
   "type": "module",
@@ -7,7 +7,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/llblab/divlet.git",
-    "directory": "packages/divlet-pi"
+    "directory": "packages/pi-divlet"
   },
   "homepage": "https://github.com/llblab/divlet#readme",
   "bugs": {

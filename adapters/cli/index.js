@@ -16,7 +16,7 @@ Local resources are resolved automatically, including files outside the project 
 Grants require one selected project, never extend to siblings, and remain fixed until restart.
 Generated pages default to .divlet/<filename stem>/; set project outputDir to change it.
 Set { "projects": "folder" } in <path>/divlet.config.json to use another collection folder.
-Port 0 chooses a free port. Install in Pi with: pi install npm:divlet-pi (after npm publication) or pi install /absolute/path/to/divlet (from a copy)`);
+Port 0 chooses a free port. Install in Pi with: pi install npm:pi-divlet (after npm publication) or pi install /absolute/path/to/divlet (from a copy)`);
   process.exit(0);
 }
 let target = process.cwd();

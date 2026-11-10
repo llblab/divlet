@@ -17,5 +17,5 @@ Keep it self-contained: the check is `node --test core/tests/landing.test.js`, a
 external asset. Edit the text and layout here; the page is not generated from the product.
 
 The install section names the npm package `divlet`, its two commands (`divlet` and `divlet-mcp`) and the optional Pi wrapper
-`divlet-pi`. Keep the pre-publication notice until the packages are actually available; the repository's publication guide is
+`pi-divlet`. Keep the pre-publication notice until the packages are actually available; the repository's publication guide is
 `docs/publishing.md`. Long commands wrap so the examples remain readable on narrow screens.

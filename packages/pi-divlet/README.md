@@ -1,10 +1,10 @@
-# divlet-pi
+# pi-divlet
 
 The Pi extension for [divlet](https://www.npmjs.com/package/divlet): the board's tools, the `/divlet` command, the agent bridge
 and the bundled `divlet` skill.
 
 ```bash
-pi install npm:divlet-pi    # from npm, after both divlet and divlet-pi are published
+pi install npm:pi-divlet    # from npm, after both divlet and pi-divlet are published
 pi install /path/to/divlet  # or from a copy of the product repository
 ```
 

@@ -91,7 +91,7 @@ npx -y --package=divlet divlet-mcp --cwd ./my-project
 npm install -g divlet
 ```
 
-For Pi, install `pi install npm:divlet-pi` only after **both** `divlet` and `divlet-pi` have been published. The thin wrapper depends on the product; it does not copy the adapter.
+For Pi, install `pi install npm:pi-divlet` only after **both** `divlet` and `pi-divlet` have been published. The thin wrapper depends on the product; it does not copy the adapter.
 
 See [npm publication](docs/publishing.md) for version pinning, package identity and release gates.
 
