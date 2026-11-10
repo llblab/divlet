@@ -76,8 +76,9 @@ function toggle(iconName, tip, on, run) {
 /**
  * A compact value field: a short label you can drag to scrub (Shift ×10), arrows step by 1,
  * any text the parser accepts (px numbers, auto, 50%, 1/2). Empty clears the value.
+ * stepFrom defines the numeric gesture/arrow origin independently of the authored-value parser.
  */
-function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw => raw, step = 1, min = -1e6, max = 1e6, variants = [], unit = '' } = {}) {
+function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw => raw, stepFrom = Number.parseFloat, step = 1, min = -1e6, max = 1e6, variants = [], unit = '' } = {}) {
   const wrap = el('label', 'vf');
   const name = el('span', 'vf-k', label);
   const input = el('input', 'vf-input');
@@ -138,7 +139,7 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
     if (event.key === 'Enter') { event.preventDefault(); commit(input.value); input.blur(); }
     else if (event.key === 'Escape') { input.value = current; input.blur(); }
     else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-      const number = Number.parseFloat(input.value || placeholder || '0');
+      const number = stepFrom(input.value || placeholder || '0');
       if (!Number.isFinite(number)) return;
       event.preventDefault();
       input.value = String(clamp(number + (event.key === 'ArrowUp' ? step : -step) * (event.shiftKey ? 10 : 1), min, max));
@@ -147,23 +148,38 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
     }
   });
   name.addEventListener('pointerdown', event => {
-    const origin = Number.parseFloat(input.value || placeholder || '0');
+    if (event.button !== 0 || !event.isPrimary || wrap.classList.contains('scrubbing')) return;
+    const origin = stepFrom(input.value || placeholder || '0');
     if (!Number.isFinite(origin)) return;
     event.preventDefault();
+    clearTimeout(typing);
     name.setPointerCapture(event.pointerId);
-    const x0 = event.clientX;
+    const initial = input.value, x0 = event.clientX;
     wrap.classList.add('scrubbing');
-    const move = e => { input.value = String(clamp(origin + Math.round((e.clientX - x0) / 3) * step * (e.shiftKey ? 10 : 1), min, max)); syncUnit(); };
-    const up = () => {
+    const move = e => {
+      const delta = Math.round((e.clientX - x0) / 3) * step * (e.shiftKey ? 10 : 1);
+      input.value = delta ? String(clamp(origin + delta, min, max)) : initial;
+      syncUnit();
+    };
+    const finish = cancelled => {
       name.removeEventListener('pointermove', move);
       name.removeEventListener('pointerup', up);
-      name.removeEventListener('pointercancel', up);
+      name.removeEventListener('pointercancel', cancel);
+      name.removeEventListener('lostpointercapture', cancel);
+      document.removeEventListener('keydown', keydown, true);
       wrap.classList.remove('scrubbing');
-      commit(input.value);
+      if (name.hasPointerCapture(event.pointerId)) name.releasePointerCapture(event.pointerId);
+      if (cancelled) { input.value = initial; syncUnit(); }
+      else commit(input.value);
     };
+    const up = () => finish(false);
+    const cancel = () => finish(true);
+    const keydown = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); } };
     name.addEventListener('pointermove', move);
     name.addEventListener('pointerup', up);
-    name.addEventListener('pointercancel', up);
+    name.addEventListener('pointercancel', cancel);
+    name.addEventListener('lostpointercapture', cancel);
+    document.addEventListener('keydown', keydown, true);
   });
   return wrap;
 }
@@ -507,7 +523,7 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
   const blur = value(cls => tw.valueOf(cls, 'blur'));
   effects.append(
     field('opacity', 'Opacity', opacity, next => run(cls => tw.set(cls, 'opacity', next), `opacity ${next ? next.slice(8) : 100}%`), { tip: 'Opacity, %', unit: '%', placeholder: '100', min: 0, max: 100, parse: raw => tw.classFor('opacity', raw) }),
-    field('z', 'Z-index', z, next => run(cls => tw.set(cls, 'z', next), `z-index ${next ?? 'auto'}`), { tip: 'Stacking order (z-index)', placeholder: 'auto', parse: raw => tw.classFor('z', raw) }),
+    field('z', 'Z-index', z, next => run(cls => tw.set(cls, 'z', next), `z-index ${next ?? 'auto'}`), { tip: 'Stacking order (z-index)', placeholder: 'auto', stepFrom: raw => raw.trim().toLowerCase() === 'auto' ? 0 : Number.parseInt(raw, 10), parse: raw => tw.classFor('z', raw) }),
     field('blur', 'Blur', blur, next => run(cls => tw.set(cls, 'blur', next), `blur ${next ?? 'none'}`), { tip: 'Blur, px', unit: 'px', placeholder: '0', min: 0, max: 200, parse: raw => tw.classFor('blur', raw) }),
   );
 

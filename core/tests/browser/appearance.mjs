@@ -1,4 +1,4 @@
-// Appearance in the inspector: corner radius, fill and text colour, and one-click centring.
+// Appearance and Effects in the inspector: colours, radius, numeric gestures and one-click centring.
 import assert from 'node:assert/strict';
 import { legacyProject } from '../fixtures/legacy-project.js';
 import { cp, mkdtemp, rm } from 'node:fs/promises';
@@ -30,7 +30,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(runtime.info().url);
   await page.waitForFunction(() => document.querySelectorAll('.artboard').length > 0);
-  const select = id => page.evaluate(async id => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', [id]); }, id);
+  const select = id => page.evaluate(async id => { document.activeElement?.blur?.(); const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', [id]); }, id);
   const afterVersion = () => runtime.read({ view: 'document', documentId: 'welcome' }).version;
 
   // A project colour exists: it shows up as a swatch.
@@ -121,6 +121,55 @@ try {
   checks.push('corner radius: presets, a typed number, Full and removal');
   checks.push('an empty radius field quotes the page\'s real number, not a stale measurement');
 
+  // Effects scrub from implicit/explicit auto, keep integer z-order and honour gesture cancellation.
+  const effect = key => page.locator(`#inspector [data-key="${key}"]`);
+  const scrub = async (key, delta, { shift = false, cancel } = {}) => {
+    const label = effect(key).locator('..').locator('.vf-k');
+    const box = await waitUntil(async () => { await label.hover(); return await label.boundingBox(); }, `the ${key} scrub label is attached and visible`);
+    const x = box.x + box.width / 2, y = box.y + box.height / 2;
+    await label.evaluate(node => node.addEventListener('pointerdown', event => { node.dataset.testPointer = String(event.pointerId); }, { once: true }));
+    await page.mouse.move(x, y); await page.mouse.down();
+    if (shift) await page.keyboard.down('Shift');
+    await page.mouse.move(x + delta, y, { steps: 4 });
+    if (key === 'z' && delta) assert.match(await effect(key).inputValue(), /^-?\d+$/, 'z-index scrubs in whole, unitless numbers');
+    if (cancel === 'escape') await page.keyboard.press('Escape');
+    if (cancel === 'pointer') await label.dispatchEvent('pointercancel', { pointerId: Number(await label.getAttribute('data-test-pointer')) });
+    if (cancel === 'capture') await label.evaluate(node => node.releasePointerCapture(Number(node.dataset.testPointer)));
+    await page.mouse.up();
+    if (shift) await page.keyboard.up('Shift');
+  };
+  const typeZ = async text => {
+    await effect('z').fill(text); await effect('z').press('Enter');
+    await waitUntil(() => text === '' ? !classesOf('cta').some(name => /^-?z-/.test(name)) : classesOf('cta').includes(text === 'auto' ? 'z-auto' : Number(text) < 0 ? `-z-${-Number(text)}` : `z-${text}`), `z-index ${text || 'default'} reaches the model`);
+  };
+  await select('cta'); await effect('z').waitFor();
+  const untouched = afterVersion();
+  await scrub('z', 0);
+  assert.equal(afterVersion(), untouched, 'a label click preserves implicit auto without an edit');
+  await scrub('z', 30);
+  await waitUntil(() => classesOf('cta').includes('z-10'), 'dragging implicit auto starts from zero');
+  assert.equal(await effect('z').locator('..').locator('.vf-unit').count(), 0, 'z-index has no px or percentage unit');
+  await page.locator('#viewport').focus(); await page.keyboard.press('Control+z');
+  await waitUntil(() => !classesOf('cta').some(name => /^-?z-/.test(name)), 'one undo reverts the entire scrub');
+  await typeZ('auto');
+  await scrub('z', -30);
+  await waitUntil(() => classesOf('cta').includes('-z-10') && !classesOf('cta').includes('z-auto'), 'explicit auto can be scrubbed into negative order');
+  await scrub('z', 6, { shift: true });
+  await waitUntil(() => classesOf('cta').includes('z-10'), 'Shift scrubs by tens');
+  await typeZ('auto'); await effect('z').press('ArrowDown');
+  await waitUntil(() => classesOf('cta').includes('-z-1'), 'the same integer origin works for keyboard stepping from auto');
+  await typeZ('auto');
+  for (const cancel of ['escape', 'pointer', 'capture']) {
+    const before = afterVersion(); await scrub('z', 30, { cancel }); await sleep(180);
+    assert.equal(afterVersion(), before, `${cancel} cancels without writing or adding an undo step`);
+    assert.equal(await effect('z').inputValue(), 'auto');
+    assert.ok(classesOf('cta').includes('z-auto'));
+    assert.equal(await page.locator('#inspector .scrubbing').count(), 0, 'pointer/keyboard listeners finish the gesture');
+  }
+  await scrub('opacity', -30); await waitUntil(() => classesOf('cta').includes('opacity-90'), 'opacity still scrubs from its 100% default');
+  await scrub('blur', 30); await waitUntil(() => classesOf('cta').includes('blur-[10px]'), 'blur still scrubs in px from zero');
+  checks.push('z-index label scrubs integer positive/negative order from auto, Shift accelerates, arrows step, one undo reverts and Escape/pointer/capture cancellation writes nothing; opacity/blur retain their defaults');
+
   // Several selected elements share one Appearance edit.
   await page.evaluate(() => document.activeElement?.blur?.());
   await page.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav', 'cta']); });
@@ -129,6 +178,8 @@ try {
   await page.locator('#inspector [data-key="radius"]').fill('9'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('nav').includes('rounded-[9px]') && classesOf('cta').includes('rounded-[9px]'), `one radius edit applies to every selected element (nav ${classesOf('nav').join(' ')}, cta ${classesOf('cta').join(' ')})`);
   checks.push('one Appearance edit applies to several selected elements');
+  await scrub('z', 6);
+  await waitUntil(() => classesOf('nav').includes('z-2') && classesOf('cta').includes('z-2'), 'a mixed z-index scrub applies one integer to every selected element');
 
   // Centring a container that is not flex yet.
   const doc = runtime.read({ view: 'document', documentId: 'welcome' });
@@ -142,6 +193,10 @@ try {
   await waitUntil(() => classesOf(plain).includes('mx-auto'), 'Center element adds auto side margins');
   checks.push('one-click centring of the content or of the element itself');
 
+  await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(200));
+  await select('cta'); await effect('z').waitFor();
+  await typeZ('auto'); await scrub('z', 6);
+  await waitUntil(() => classesOf('cta').includes('z-2'), 'z-index scrubbing works at 200% interface size');
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'passed', checks }, null, 2));
 } finally { await browser?.close(); await runtime.close(); await rm(cwd, { recursive: true, force: true }); }
