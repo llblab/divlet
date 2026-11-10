@@ -92,6 +92,8 @@ function paintSession() {
 // cannot (MCP) shows the hints. Pi users are assumed to know the shortcuts; the selectors carry their own tips.
 foot.append(sessionChips, hint, el('span', 'grow'), send);
 const scope = el('div', 'ask-scope');
+scope.id = 'ask-context';
+input.setAttribute('aria-describedby', scope.id);
 const suggest = el('div', 'ask-suggest');
 const composer = el('div', 'agent-composer');
 // Order is the reading order: what the request is about, the box, then send — with the session selectors in its footer.
@@ -127,7 +129,7 @@ function paintScope() {
       value.append(el('span', 'ask-scope-tail', nodes.length === 1 ? `#${nodes[0]}` : `${nodes.length} elements`));
     }
   }
-  scope.replaceChildren(el('span', 'ask-scope-k', 'About'), value);
+  scope.replaceChildren(el('span', 'ask-scope-k', 'About'), ' ', value);
   scope.dataset.tip = 'Your next request goes to the agent together with this selection';
 }
 

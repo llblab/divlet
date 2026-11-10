@@ -181,7 +181,7 @@ kbd { flex: none; white-space: nowrap; font: 600 11px var(--mono); color: var(--
 :is([data-panels="left"], [data-panels="right"], [data-panels="both"]) .pill { background: var(--solid); backdrop-filter: none; }
 /* The tab row is as wide as the sidebar whether the sidebar is open or folded, and its tabs share that width equally: opening
    the sidebar then changes only the surface behind the labels, never where a label sits. */
-.side-tabs { position: fixed; z-index: 65; left: var(--edge); bottom: max(var(--edge), env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 6px; width: min(var(--sidebar-w, 300px), calc(var(--vw) - 2 * var(--edge))); max-width: calc(var(--vw) - 2 * var(--edge)); }
+.side-tabs { position: fixed; z-index: 65; left: var(--edge); bottom: max(var(--edge), env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 6px; width: min(var(--sidebar-w, 300px), calc(var(--vw) - 2 * var(--edge))); max-width: calc(var(--vw) - 2 * var(--edge)); border: 1px solid transparent; border-top: 0; border-bottom: 0; container: sidebar-tabs / inline-size; }
 .side-tabs .tab { flex: 1 1 0; }
 /* Opening the sidebar changes the surroundings of the tabs, never their boxes: the row keeps its height, padding and gap, so
    the labels stay exactly where they were and only the surface behind them (and the pill borders) changes. */
@@ -209,15 +209,19 @@ body.has-sidebar .tab { border-color: transparent; border-radius: var(--radius-i
 .status:hover { background: var(--solid); }
 .status .project { font-weight: 700; letter-spacing: .12em; }
 .status:hover { cursor: pointer; }
-.tab { position: relative; display: inline-flex; flex: 1 1 auto; align-items: center; justify-content: center; gap: 6px; min-width: 0; height: var(--brand-h); padding: 0 14px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--panel); backdrop-filter: blur(18px) saturate(1.4); box-shadow: var(--shadow); color: var(--muted); font-size: 12.5px; white-space: nowrap; transition: background .12s, color .12s; }
+.tab { position: relative; display: inline-flex; flex: 1 1 auto; align-items: center; justify-content: center; gap: 6px; min-width: 0; height: var(--brand-h); padding: 0 4px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--panel); backdrop-filter: blur(18px) saturate(1.4); box-shadow: var(--shadow); color: var(--muted); font-size: 12.5px; white-space: nowrap; transition: background .12s, color .12s; }
 .tab:hover { background: var(--field-hover); color: var(--ink); }
 .tab.on { background: var(--accent-soft); color: var(--accent); }
 .tab .icon { width: 15px; height: 15px; }
-.tab .badge { position: absolute; top: 0; right: 2px; min-width: 14px; padding: 0 4px; font-size: 9.5px; line-height: 14px; pointer-events: none; }
-/* A dragged-narrow sidebar makes the tab row itself narrow: the count joins the label in the flow (so it cannot sit on the
-   text) and the label is allowed to ellipsize instead of pushing the tab wider than the panel. */
-html[data-sidebar="narrow"] .tab .badge, html[data-sidebar="tiny"] .tab .badge { position: static; flex: none; }
-html[data-sidebar="narrow"] .tab .tool-label, html[data-sidebar="tiny"] .tab .tool-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tab-mark { display: inline-flex; flex: none; align-items: center; gap: 3px; }
+.tab .badge { position: static; flex: none; min-width: 14px; padding: 0 4px; font-size: 9.5px; line-height: 14px; pointer-events: none; }
+.tab .tool-label { flex: none; line-height: 16px; }
+/* The tabs own their density, even while the pane is folded. Icons/counts share the top line instead of clipping names. */
+@container sidebar-tabs (max-width: 340px) {
+  .tab { flex-direction: column; gap: 0; padding: 0 2px; }
+  .tab-mark { height: 14px; }
+  .tab .icon { width: 13px; height: 13px; }
+}
 .tab .spinner { width: 10px; height: 10px; }
 /* Working: a band sweeps across the tab, over the surface it already has. No spinner, so the label never shifts or runs out of
    room, and the same shape works on the folded pills and inside the open panel's bar. */
@@ -668,9 +672,6 @@ html.w440 .shortcut-group dd { text-align: left; padding-bottom: 5px; white-spac
 .crumbs-bar .crumb.home { flex: 0 1 auto; min-width: 0; }
 .crumb.current { background: var(--field); color: var(--ink); }
 .ask-more { padding: 0 6px; font: 11px var(--mono); color: var(--muted); }
-.ask-scope { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 7px; color: var(--muted); font-size: 11.5px; }
-.ask-scope .icon { width: 13px; height: 13px; }
-.ask-scope.faint { color: var(--muted); }
 .ask-input { width: 100%; min-height: 40px; max-height: 220px; padding: 9px 11px; border: 0; border-radius: var(--radius-inner); background: var(--field); color: var(--ink); font: 13.5px/1.45 var(--font); resize: none; outline: none; }
 .ask-input:focus { outline-offset: 1px; outline: var(--focus-ring) solid var(--accent); }
 .ask-input::placeholder { color: var(--faint); }
@@ -685,7 +686,7 @@ html.w440 .shortcut-group dd { text-align: left; padding-bottom: 5px; white-spac
 .agent-settings-error { margin-top: 4px; padding: 5px 8px; border-radius: var(--radius-small); background: var(--field); color: var(--bad); font-size: 11.5px; line-height: 1.4; }
 .ask-hint { flex: 1 1 140px; min-width: 0; white-space: normal; color: var(--muted); font-size: 11.5px; line-height: 1.4; }
 .ask-hint.busy { color: var(--accent); }
-.ask-scope { display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: baseline; padding: 0 2px 6px; font-size: 11.5px; color: var(--muted); }
+.ask-scope { display: flex; flex-wrap: wrap; gap: 2px 6px; align-items: baseline; padding: 0 2px; font-size: 11.5px; line-height: 1.4; color: var(--muted); }
 .ask-scope-k { flex: none; font-weight: 600; }
 .ask-scope-v { display: inline-flex; align-items: baseline; gap: 4px; min-width: 0; max-width: 100%; color: var(--ink); }
 /* The frame name may be long; it is the one part of the scope line that is cut. What follows it never is. */

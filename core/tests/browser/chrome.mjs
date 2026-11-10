@@ -37,6 +37,13 @@ try {
   const rect = (page, selector) => page.evaluate(selector => { const node = document.querySelector(selector); if (!node || node.hidden || !node.getClientRects().length) return null; const r = node.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; }, selector);
   const select = page => page.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav']); });
 
+  const readTabs = page => page.evaluate(() => [...document.querySelectorAll('#side-tabs .tab')].map(tab => {
+    const box = tab.getBoundingClientRect(), label = tab.querySelector('.tool-label'), r = label.getBoundingClientRect();
+    const parts = [...tab.querySelectorAll('.icon, .tool-label, .badge:not([hidden])')].map(node => node.getBoundingClientRect());
+    return { text: label.textContent, x: r.x, y: r.y, clipped: label.scrollWidth > label.clientWidth + 1 || parts.some(p => p.left < box.left - 1 || p.right > box.right + 1 || p.top < box.top - 1 || p.bottom > box.bottom + 1),
+      overlap: parts.some((a, i) => parts.slice(i + 1).some(b => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1)) };
+  }));
+
   /* ---- desktop ------------------------------------------------------------ */
   const page = await open(1400, 860);
   await select(page);
@@ -65,6 +72,34 @@ try {
   assert.ok(await rect(page, '#side-tabs') && await rect(page, '#brand'), 'the tabs and the logo row stay');
   assert.equal(await page.locator('#open-agent').getAttribute('aria-selected'), 'false');
   checks.push('the logo/search islands stay put, the tabs join the sidebar when it opens; a tab switches panes and, when open, folds the sidebar while the tabs and logo row stay');
+
+  // The actual 240px edge resize must keep complete labels, even with counters, open or folded.
+  await page.locator('#open-agent').click();
+  const edge = await page.locator('.resize-handle[data-panel="sidebar"]').boundingBox();
+  await page.mouse.move(edge.x + 4, edge.y + edge.height / 2); await page.mouse.down();
+  await page.mouse.move(edge.x - 160, edge.y + edge.height / 2, { steps: 6 }); await page.mouse.up();
+  await waitUntil(async () => Math.abs((await rect(page, '#sidebar')).width - 240) < 1, 'sidebar reaches its 240px minimum');
+  await page.evaluate(() => { for (const [id, count] of [['diag-count', '1234'], ['agent-count', '99+']]) { const n = document.getElementById(id); n.hidden = false; n.textContent = count; } });
+  for (const mode of ['board', 'frame', 'node']) {
+    const scope = await page.evaluate(async mode => {
+      const m = await import('./lib/store.js'); m.selectArtboards(mode === 'board' ? [] : ['welcome']); if (mode === 'node') m.selectNodes('welcome', ['nav']);
+      const header = document.querySelector('.ask-scope'), input = document.querySelector('.ask-input'), box = header.getBoundingClientRect();
+      const bottom = Math.max(...[...header.querySelectorAll('span')].map(n => n.getBoundingClientRect().bottom));
+      return { contained: bottom <= box.bottom + 1, described: !!header.id && input.getAttribute('aria-describedby') === header.id, gap: input.getBoundingClientRect().top - bottom, text: header.textContent };
+    }, mode);
+    assert.ok(scope.contained && scope.described && scope.gap >= 4, `the ${mode} context has intrinsic height and stays clear of the input: ${JSON.stringify(scope)}`);
+  }
+  const narrowOpen = await readTabs(page);
+  assert.deepEqual(narrowOpen.map(({ text, clipped, overlap }) => ({ text, clipped, overlap })), ['Layers', 'History', 'Agent'].map(text => ({ text, clipped: false, overlap: false })), 'full labels, icons and counters fit the narrow open tabs');
+  await page.locator('#open-agent').click();
+  const narrowFolded = await readTabs(page);
+  for (let i = 0; i < 3; i++) {
+    assert.equal(narrowFolded[i].clipped || narrowFolded[i].overlap, false);
+    assert.ok(Math.abs(narrowOpen[i].x - narrowFolded[i].x) < .6 && Math.abs(narrowOpen[i].y - narrowFolded[i].y) < .6, 'folding does not reset the tab layout or move its label');
+  }
+  await page.locator('#open-agent').click(); await page.locator('.resize-handle[data-panel="sidebar"]').dblclick(); await page.locator('#open-agent').click();
+  await page.evaluate(() => { document.getElementById('diag-count').hidden = true; document.getElementById('agent-count').hidden = true; });
+  checks.push('all tab labels and counters fit at the actual 240px minimum; folding preserves their layout');
 
   const inspector = await rect(page, '#inspector'), tools = await rect(page, '#dock');
   assert.ok(inspector && inspector.bottom <= tools.y - 4 && inspector.bottom >= tools.y - 16 && inspector.right <= tools.right + 1 && inspector.right >= tools.right - 4, 'the inspector sits just above the tools, attached to the bottom right');

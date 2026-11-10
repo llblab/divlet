@@ -537,6 +537,7 @@ try {
       const hints = [...document.querySelectorAll('#agent .ask-hint .hint-unit')].map(node => node.textContent);
       const label = document.querySelector('#open-history .tool-label'), badge = document.querySelector('#diag-count');
       const bubbles = [...document.querySelectorAll('.bubble')];
+      const labelRect = label?.getBoundingClientRect(), badgeRect = badge?.getBoundingClientRect();
       return {
         width: Math.round(panel.getBoundingClientRect().width),
         overflow: panel.scrollWidth - panel.clientWidth,
@@ -546,7 +547,7 @@ try {
         placeholder: input?.placeholder || '',
         hints,
         badgeVisible: !!badge && !badge.hidden && badge.getBoundingClientRect().width > 0,
-        badgeGap: badge && !badge.hidden && label ? Math.round(badge.getBoundingClientRect().left - label.getBoundingClientRect().right) : null,
+        badgeOverlap: badge && !badge.hidden && labelRect ? Math.min(labelRect.right, badgeRect.right) - Math.max(labelRect.left, badgeRect.left) > 1 && Math.min(labelRect.bottom, badgeRect.bottom) - Math.max(labelRect.top, badgeRect.top) > 1 : false,
         labelClipped: label ? label.scrollWidth > label.clientWidth + 1 : false,
       };
     });
@@ -557,10 +558,8 @@ try {
     assert.equal(narrow.aboutTitle, `${long} › #nav`, 'the whole label is on hover');
     assert.equal(narrow.placeholder, 'Ask the agent…', 'the placeholder fits the panel');
     assert.deepEqual(narrow.hints, ['↵ send'], `one key hint, not three (${narrow.hints.join(' | ')})`);
-    if (narrow.badgeVisible) {
-      assert.ok(narrow.badgeGap >= 0, `the count sits beside the label, never on it (gap ${narrow.badgeGap})`);
-      assert.ok(!narrow.labelClipped || narrow.badgeGap >= 0, 'a squeezed label ellipsizes rather than overlapping the count');
-    }
+    assert.equal(narrow.labelClipped, false, 'the whole tab label stays readable');
+    if (narrow.badgeVisible) assert.equal(narrow.badgeOverlap, false, 'the count never covers the label');
     await page.evaluate(() => localStorage.removeItem('divlet:width:sidebar'));
     await runtime.patch({ documentId: 'welcome', expectedVersion: runtime.read({ view: 'frame', documentId: 'welcome' }).version, actor: 'user', patch: { name: 'A space for ideas' } });
     runtime.setAgent({ connected: false });

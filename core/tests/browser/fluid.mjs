@@ -100,9 +100,29 @@ try {
     for (const [name, open] of Object.entries(surfaces)) {
       await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
       await open(); await page.waitForTimeout(250);
+      if (['layers', 'history', 'agent'].includes(name)) {
+        const density = await page.evaluate(async size => { const sidebar = await import('./lib/sidebar.js'), width = document.querySelector('#sidebar').getBoundingClientRect().width / (size / 100); return { expected: width < 265 ? 'tiny' : width < 320 ? 'narrow' : 'wide', actual: document.documentElement.dataset.sidebar, helper: sidebar.widthSize() }; }, size);
+        assert.equal(density.actual, density.expected, 'sidebar density uses interface pixels rather than scaled screen pixels');
+        assert.equal(density.helper, density.expected);
+      }
       const bad = await audit(`${width}px@${size}% ${name}`);
       assert.deepEqual(bad, [], bad.join('\n'));
+      await page.evaluate(() => { for (const [id, count] of [['diag-count', '1234'], ['agent-count', '99+']]) { const n = document.getElementById(id); n.hidden = false; n.textContent = count; } });
+      const tabIssues = await page.evaluate(() => [...document.querySelectorAll('#side-tabs .tab')].flatMap(tab => {
+        const box = tab.getBoundingClientRect(), label = tab.querySelector('.tool-label');
+        return [...tab.querySelectorAll('.icon, .tool-label, .badge:not([hidden])')].some(n => { const r = n.getBoundingClientRect(); return r.left < box.left - 1 || r.right > box.right + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1; }) || label.scrollWidth > label.clientWidth + 1 ? [label.textContent] : [];
+      }));
+      assert.deepEqual(tabIssues, [], `whole tab labels at ${width}px/${size}% ${name}`);
       if (name === 'agent') {
+        for (const mode of ['board', 'node']) {
+          const contextGap = await page.evaluate(async mode => {
+            const m = await import('./lib/store.js'); m.selectArtboards(mode === 'board' ? [] : ['welcome']); if (mode === 'node') m.selectNodes('welcome', ['nav']);
+            const scope = document.querySelector('.ask-scope'), box = scope.getBoundingClientRect(), input = document.querySelector('.ask-input').getBoundingClientRect();
+            const end = Math.max(...[...scope.querySelectorAll('span')].map(n => n.getBoundingClientRect().bottom));
+            return { contained: end <= box.bottom + 1, gap: (input.top - end) / (box.width / scope.offsetWidth) };
+          }, mode);
+          assert.ok(contextGap.contained && contextGap.gap >= 4, `${mode} context stays above the input at ${width}px/${size}%: ${JSON.stringify(contextGap)}`);
+        }
         const activity = await page.evaluate(() => {
           const card = document.querySelector('.agent-status'), stop = card.querySelector('.ask-stop'), time = card.querySelector('time'), text = card.querySelector('.agent-status-text');
           const grid = getComputedStyle(card), position = getComputedStyle(stop), b = card.getBoundingClientRect(), s = stop.getBoundingClientRect(), t = text.getBoundingClientRect(), clock = time.getBoundingClientRect();
@@ -121,6 +141,7 @@ try {
   checks.push('inspector, layers, history, agent, shortcuts and palette never overflow sideways at 390px, 390px/200% and 820px; keys, counts, times and tags are never clipped');
   checks.push('numeric fields show their whole current/default values for element and artboard inspection, including at 200% UI size');
   checks.push('long agent activity uses a 5×3 grid with a readable timer and Stop in the bottom-right corner, including phone/200%');
+  checks.push('tab labels, icons and counters fit open/folded; whole-board and node context text stays separate from the prompt, including phone/200%');
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'passed', checks }, null, 2));
 } finally { await browser?.close(); await runtime.close(); await rm(cwd, { recursive: true, force: true }); }

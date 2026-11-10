@@ -91,9 +91,9 @@ function paintHistory() {
 
 /* The corner: panels on the left of the search, the project indicator that turns into Back. */
 $('#status-dot').append(icon('divlet'));
-$('#open-layers').prepend(icon('layers'));
-$('#open-history').prepend(icon('clock'));
-$('#open-agent').prepend(icon('sparkle'));
+$('#open-layers .tab-mark').prepend(icon('layers'));
+$('#open-history .tab-mark').prepend(icon('clock'));
+$('#open-agent .tab-mark').prepend(icon('sparkle'));
 $('#open-layers').addEventListener('click', () => sidebar.toggle('layers'));
 $('#open-history').addEventListener('click', () => sidebar.toggle('activity'));
 $('#open-agent').addEventListener('click', () => sidebar.toggle('agent'));

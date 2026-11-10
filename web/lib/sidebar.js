@@ -1,4 +1,4 @@
-import { $ } from './util.js';
+import { $, uiScale } from './util.js';
 import { emit } from './store.js';
 
 /* The left sidebar hosts three panes: Layers, History (changes only) and Agent (the conversation with Pi).
@@ -12,7 +12,7 @@ let current = 'layers';
 
 export const tab = () => current;
 export const isOpen = name => !panel.hidden && (!name || current === name);
-export const widthSize = () => (panel.hidden ? 'wide' : panel.getBoundingClientRect().width < 265 ? 'tiny' : panel.getBoundingClientRect().width < 320 ? 'narrow' : 'wide');
+export const widthSize = () => (panel.hidden ? 'wide' : panel.getBoundingClientRect().width / uiScale() < 265 ? 'tiny' : panel.getBoundingClientRect().width / uiScale() < 320 ? 'narrow' : 'wide');
 
 export function show(name = current) {
   current = name;
@@ -52,7 +52,8 @@ new MutationObserver(paintPanels).observe(panel, { attributes: true, attributeFi
 if (inspector) new MutationObserver(paintPanels).observe(inspector, { attributes: true, attributeFilter: ['hidden'] });
 
 function measure() {
-  const width = panel.hidden ? 0 : panel.getBoundingClientRect().width;
+  // Density thresholds are interface pixels, not the scaled screen pixels returned by the rectangle.
+  const width = panel.hidden ? 0 : panel.getBoundingClientRect().width / uiScale();
   // The sidebar's own floor is 240px (resize.js), so the steps live inside that range: tiny 240–264, narrow 265–319.
   const size = width && width < 265 ? 'tiny' : width && width < 320 ? 'narrow' : 'wide';
   if (document.documentElement.dataset.sidebar !== size) {
