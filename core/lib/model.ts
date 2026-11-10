@@ -17,6 +17,8 @@ export type Metadata = { [key: string]: Json };
 export type Style = Record<string, string>;
 /** Override declarations may delete a property with null. */
 export type StyleOverrides = Record<string, string | null>;
+/** Ordered CSS contracts; the admitted Style fields remain maps until the versioned cutover. */
+export type { CssDeclaration, CssDeclarationOperation } from './declarations.ts';
 /** HTML attributes of one element. */
 export type Attrs = Record<string, string>;
 export type NodeId = string;

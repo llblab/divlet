@@ -84,6 +84,6 @@ Core model, validation and generic registries depend on public capability contra
 
 ## Stabilization boundary
 
-This contract does not prescribe new persisted field names, a dependency-profile schema, an override-conflict algorithm or a plugin migration API. Those choices need explicit compatibility decisions and regressions before the corresponding format promise is frozen. The wire schema version, content revisions and rendering dependencies are separate concerns; a stable JSON shape alone does not guarantee a stable rendering environment.
+This architectural contract leaves persisted field names, dependency profiles, override-conflict algorithms and migration APIs to the [approved format profile](format.md#approved-first-release-profile). That profile is approved for implementation, not already delivered or frozen; its compatibility decisions still require implementation evidence and final freeze approval. The wire schema version, content revisions and rendering dependencies are separate concerns; a stable JSON shape alone does not guarantee a stable rendering environment.
 
 **The model defines what is edited. Editor state defines what is being worked on. The browser determines how it is laid out and painted. Plugins extend ways of working without replacing these roles.**

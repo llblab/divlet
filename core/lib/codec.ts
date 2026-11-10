@@ -8,6 +8,7 @@
  */
 import { parse, parseFragment } from 'parse5';
 import postcss from 'postcss';
+import { serializeDeclarations } from './declarations.ts';
 import { validateDocument, DivletError, VOID_TAGS, LIMITS, documentLimits, supportsTag } from './model.ts';
 import type { DocumentModel, ElementNode, Limits, Node, NodeId } from './model.ts';
 
@@ -85,7 +86,7 @@ export function encodeHtml(input: unknown, { compiledCss = '', parts, instances,
     if (ref) attrs.push(`data-divlet-ref="${escapeAttribute(ref)}"`);
     for (const [key, value] of Object.entries(node.attrs)) attrs.push(`${key}="${escapeAttribute(value)}"`);
     if (node.className) attrs.push(`class="${escapeAttribute(node.className)}"`);
-    const style = Object.entries(node.style).map(([property, value]) => `${property}:${value}`).join(';');
+    const style = serializeDeclarations(Object.entries(node.style));
     if (style) attrs.push(`style="${escapeAttribute(style)}"`);
     const start = `<${node.tag} ${attrs.join(' ')}>`;
     if (VOID_TAGS.has(node.tag)) return start;
@@ -140,7 +141,7 @@ export function exportHtml(input: unknown, { nodeId, compiledCss = '', limits = 
     const attrs: string[] = [];
     for (const [key, value] of Object.entries(node.attrs)) attrs.push(`${key}="${escapeAttribute(value)}"`);
     if (node.className) attrs.push(`class="${escapeAttribute(node.className)}"`);
-    const style = Object.entries(node.style).map(([property, value]) => `${property}: ${value}`).join('; ');
+    const style = serializeDeclarations(Object.entries(node.style), true);
     if (style) attrs.push(`style="${escapeAttribute(style)}"`);
     return `<${node.tag}${attrs.length ? ' ' + attrs.join(' ') : ''}>`;
   }
@@ -245,7 +246,7 @@ export function renderFile(input: unknown, { compiledCss = '', parts, instances,
     if (ref) attrs.push(`data-divlet-ref="${escapeAttribute(ref)}"`);
     for (const [key, value] of Object.entries(node.attrs)) attrs.push(`${key}="${escapeAttribute(value)}"`);
     if (node.className) attrs.push(`class="${escapeAttribute(node.className)}"`);
-    const style = Object.entries(node.style).map(([property, value]) => `${property}:${value}`).join(';');
+    const style = serializeDeclarations(Object.entries(node.style));
     if (style) attrs.push(`style="${escapeAttribute(style)}"`);
     return `<${node.tag}${attrs.length ? ' ' + attrs.join(' ') : ''}`;
   };
