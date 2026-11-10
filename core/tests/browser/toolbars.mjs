@@ -671,6 +671,8 @@ try {
           if (!label || !value || !node.isConnected) return null;
           const b = node.getBoundingClientRect(), l = label.getBoundingClientRect(), v = value.getBoundingClientRect();
           return {
+            centred: Math.abs(l.top + l.height / 2 - b.top - b.height / 2) < 1 && Math.abs(v.top + v.height / 2 - b.top - b.height / 2) < 1,
+            hierarchy: getComputedStyle(label).color !== getComputedStyle(value).color && Number(getComputedStyle(label).fontWeight) > Number(getComputedStyle(value).fontWeight),
             sameLine: Math.abs(l.top - v.top) < 4, gap: Math.round(b.right - v.right), alignment: getComputedStyle(value).textAlign,
             clipped: value.scrollWidth > value.clientWidth + 1, labelLeft: Math.round(l.left - b.left),
           };
@@ -678,6 +680,8 @@ try {
         return measured && measured.alignment === 'right' ? measured : null;
       }, `the Layout selector is measured at ${width}px`);
       assert.equal(geom.alignment, 'right', `the value is right-aligned at ${width}px`);
+      assert.equal(geom.centred, true, `selector text is vertically centred at ${width}px`);
+      assert.equal(geom.hierarchy, true, 'the label has stronger colour and weight than the value');
       // Where the panel is wide enough to be read, the value stops before the caret; on a phone sheet only "does not stick out" is required.
       if (width >= 900) assert.ok(geom.gap >= 8 && geom.gap <= 26, `the value ends at the right edge, before the caret, at ${width}px (gap ${geom.gap})`);
       else assert.ok(geom.gap >= 0, `the value does not stick out of the selector at ${width}px (gap ${geom.gap})`);
@@ -687,7 +691,7 @@ try {
     }
     await page.setViewportSize({ width: 1500, height: 900 });
   }
-  checks.push('a collapsed selector puts the value right-aligned on the label\'s line');
+  checks.push('selector labels are visually stronger and both label/value are vertically centred, with right-aligned whole values');
 
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'passed', checks }, null, 2));

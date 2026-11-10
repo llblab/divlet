@@ -73,7 +73,7 @@ try {
   assert.equal(await frame.locator('body').evaluate(() => document.documentElement.scrollHeight), dim, 'the overlay never changes the page size');
   checks.push('pointing at a number lights its band and leaving restores the quiet default');
 
-  // All eight numbers are one size — no letter keys, no per-field hints — and they narrow together as the panel does.
+  // Eight independent targets share one size; quiet labels and M/P corner marks replace the linking legend.
   const sized = await page.evaluate(() => {
     const box = document.querySelector('#inspector .boxmodel');
     const widths = [...new Set([...box.querySelectorAll('.bm-field')].map(field => Math.round(field.getBoundingClientRect().width)))];
@@ -82,11 +82,19 @@ try {
       keys: box.querySelectorAll('.bm-field .vf-k').length,
       tips: [...box.querySelectorAll('.bm-field')].filter(field => field.querySelector('.vf-k')?.dataset.tip || field.dataset.tip).length,
       labels: [...box.querySelectorAll('.bm-field')].map(field => field.getAttribute('aria-label')),
+      sides: [...box.querySelectorAll('.bm-side')].map(node => node.textContent),
+      marks: [...box.querySelectorAll('.bm-mark')].map(node => node.textContent).sort(),
+      switches: box.querySelectorAll('button, .bm-legend').length,
+      height: box.getBoundingClientRect().height,
     };
   });
   assert.equal(sized.widths.length, 1, `one field size for all eight numbers (${sized.widths})`);
   assert.equal(sized.keys, 0, 'no letter keys: the square a number sits on says which side it is');
-  assert.equal(sized.tips, 0, 'and no per-field hints');
+  assert.equal(sized.tips, 0, 'side captions do not add tooltip noise');
+  assert.deepEqual(sized.sides, ['top', 'right', 'bottom', 'left', 'top', 'right', 'bottom', 'left']);
+  assert.deepEqual(sized.marks, ['M', 'P']);
+  assert.equal(sized.switches, 0, 'no linking switches or separate legend');
+  assert.ok(sized.height <= 144, `the complete compact widget is at most 144px high (${sized.height})`);
   assert.deepEqual(sized.labels, ['Margin top, px', 'Margin right, px', 'Margin bottom, px', 'Margin left, px', 'Padding top, px', 'Padding right, px', 'Padding bottom, px', 'Padding left, px'], 'the accessible name still says which side and unit');
 
   // A tight panel keeps the shape and the sizes: the model narrows as a whole rather than one square into the other.
@@ -106,14 +114,24 @@ try {
   assert.deepEqual(tight.clipped, [], 'and no value is cut off, even a word like auto');
   await page.evaluate(() => { document.querySelector('#inspector').style.width = ''; });
   await sleep(300);
-  checks.push('the eight numbers are one fixed size, without letter keys or hints, and they narrow together in a tight inspector');
+  checks.push('eight compact, equal targets retain nested geometry, quiet side labels and M/P corner marks without a linking legend');
 
-  await page.locator('#inspector button[aria-label^="Padding sides linked"]').click();
-  await page.locator('#inspector button[aria-label^="Padding sides linked"]').click();
-  assert.match(await page.locator('#inspector button[aria-label^="Padding sides linked"]').getAttribute('aria-label'), /all/);
-  await page.locator('#inspector [data-key="p-t"]').fill('8'); await page.keyboard.press('Enter');
-  await waitUntil(() => classes().includes('p-2') && !classes().some(name => /^p[trbl]-/.test(name)), 'linked padding writes the shortest class');
-  checks.push('linking sides edits all four at once with the shortest class');
+  const paddingValues = () => frame.locator('[data-divlet-id="nav"]').evaluate(node => {
+    const style = getComputedStyle(node);
+    return ['Top', 'Right', 'Bottom', 'Left'].map(side => parseFloat(style[`padding${side}`]));
+  });
+  const expectedPadding = await paddingValues();
+  for (const [index, side] of ['t', 'r', 'b', 'l'].entries()) {
+    expectedPadding[index] = 8;
+    await page.locator(`#inspector [data-key="p-${side}"]`).fill('8');
+    await page.keyboard.press('Enter');
+    await waitUntil(async () => JSON.stringify(await paddingValues()) === JSON.stringify(expectedPadding), `padding ${side} changes only its own side`);
+  }
+  await waitUntil(() => classes().includes('p-2') && !classes().some(name => /^p[trbl]-/.test(name)), 'independent equal values still normalize to the shortest class');
+  checks.push('each spacing input changes only its own side; equal values still normalize without any linking mode');
+  await page.locator('#inspector label[aria-label="Margin top, px"]').click({ position: { x: 12, y: 5 } });
+  assert.equal(await page.locator('#inspector [data-key="m-t"]').evaluate(node => document.activeElement === node), true, 'the side caption is part of the native input target');
+  await page.keyboard.press('Escape');
 
 
   // Direct manipulation: drag a side's pill on the canvas.

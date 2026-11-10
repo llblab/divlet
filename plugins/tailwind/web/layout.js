@@ -7,8 +7,6 @@ import { openMenu } from '../../lib/menu.js';
 import * as tw from './tw.js';
 
 const MIXED = Symbol('mixed');
-// How the four sides of a box move together; kept while the inspector redraws after each change.
-const linkMode = { padding: 'each', margin: 'each' };
 const same = values => (values.every(value => value === values[0]) ? values[0] : MIXED);
 
 const DISPLAY = [['block', 'Block'], ['flex', 'Flex'], ['grid', 'Grid'], ['inline', 'Inline'], ['inline-block', 'Inline block'], ['inline-flex', 'Inline flex'], ['inline-grid', 'Inline grid'], ['hidden', 'Hidden']];
@@ -458,37 +456,36 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
   }
   layout.append(textRow);
 
-  /* spacing: one nested box model — margin around padding around the content — with the same numbers the canvas shows.
-     Four fields sit on the outer square's edges (margin) and four on the inner square's (padding). The shape never changes with
-     the panel width; only the letter keys and the content label step out when the squares get tight. */
+  /* Eight independent fields: margin around padding, with quiet side labels and no linking modes. */
   const spacing = el('div', 'spacing-box');
   const model = el('div', 'boxmodel');
-  const sidesOf = (kind, side) => {
-    const mode = linkMode[kind];
-    return mode === 'all' ? ['t', 'r', 'b', 'l'] : mode === 'pairs' ? (side === 't' || side === 'b' ? ['t', 'b'] : ['l', 'r']) : [side];
-  };
-  // Eight numbers of one size: no letter keys (the square they sit on says which side they are) and no hover hints — the
-  // canvas band lights up on pointer or focus, which says it better than a tooltip. The accessible name keeps the side.
+  model.setAttribute('role', 'group');
+  model.setAttribute('aria-label', 'Spacing in pixels');
+  const sideNames = { t: 'top', r: 'right', b: 'bottom', l: 'left' };
   const spaceField = (kind, short, side) => {
     const token = value(cls => tw.sides(cls, kind)[side]);
     const node = field(`${short}-${side}`, '', token === MIXED ? MIXED : tw.display(token), next => {
-      const targets = sidesOf(kind, side);
-      run(cls => targets.reduce((acc, target) => tw.setSide(acc, kind, target, next), cls), `${kind} ${targets.length === 4 ? 'all sides' : targets.map(t => ({ t: 'top', r: 'right', b: 'bottom', l: 'left' })[t]).join('+')} ${next == null ? 'none' : tw.display(next)}`);
+      run(cls => tw.setSide(cls, kind, side, next), `${kind} ${sideNames[side]} ${next == null ? 'none' : tw.display(next)}`);
     }, { tip: '', placeholder: String(measured?.[kind]?.['trbl'.indexOf(side)] ?? 0), min: kind === 'padding' ? 0 : -1e4, parse: tw.fromInput });
     node.classList.add('bm-field');
-    node.setAttribute('aria-label', `${kind[0].toUpperCase()}${kind.slice(1)} ${({ t: 'top', r: 'right', b: 'bottom', l: 'left' })[side]}, px`);
+    const label = `${kind[0].toUpperCase()}${kind.slice(1)} ${sideNames[side]}, px`;
+    node.setAttribute('aria-label', label);
+    node.querySelector('input').setAttribute('aria-label', label);
     node.querySelector('.vf-k')?.remove();
-    // Pointing at a number lights the matching band on the canvas; leaving restores the quiet default.
-    const light = on => spacingFocus?.(on ? { kind, sides: sidesOf(kind, side) } : null);
+    const hint = el('span', 'bm-side', sideNames[side]);
+    hint.setAttribute('aria-hidden', 'true');
+    node.prepend(hint);
+    const light = on => spacingFocus?.(on ? { kind, sides: [side] } : null);
     node.addEventListener('pointerenter', () => light(true));
     node.addEventListener('pointerleave', () => { if (!node.contains(document.activeElement)) light(false); });
     node.addEventListener('focusin', () => light(true));
     node.addEventListener('focusout', () => light(false));
     return node;
   };
-  /** One square of the model: four fields on its edges around a centre (the next square, or the content). */
   const square = (kind, inner = null) => {
     const sq = el('div', `bm-sq bm-${kind}`);
+    sq.setAttribute('role', 'group');
+    sq.setAttribute('aria-label', kind === 'margin' ? 'Margin' : 'Padding');
     for (const side of ['t', 'r', 'b', 'l']) {
       const cell = el('div', `bm-cell bm-${side}`);
       cell.append(spaceField(kind, kind === 'margin' ? 'm' : 'p', side));
@@ -496,30 +493,14 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
     }
     const centre = el('div', 'bm-centre');
     centre.append(inner ?? el('div', 'bm-core', 'content'));
-    sq.append(centre);
+    const mark = el('span', 'bm-mark', kind === 'margin' ? 'M' : 'P');
+    mark.setAttribute('aria-hidden', 'true');
+    sq.append(centre, mark);
     return sq;
   };
-  // Legend: what the two tints mean, and each square's side linking (each / pairs / all).
-  const legendItem = (kind, title) => {
-    const item = el('div', 'bm-legend-item');
-    const link = el('button', 'bm-link', linkMode[kind]);
-    const name = el('span', `bm-legend-name bm-${kind}`, title);
-    link.type = 'button';
-    link.dataset.tip = `${title} sides: each / pairs (top+bottom, left+right) / all together`;
-    link.setAttribute('aria-label', `${title} sides linked: ${linkMode[kind]}. Change`);
-    link.addEventListener('click', () => {
-      linkMode[kind] = linkMode[kind] === 'each' ? 'pairs' : linkMode[kind] === 'pairs' ? 'all' : 'each';
-      link.textContent = linkMode[kind];
-      link.setAttribute('aria-label', `${title} sides linked: ${linkMode[kind]}. Change`);
-    });
-    item.append(name, link);
-    return item;
-  };
-  const legend = el('div', 'bm-legend');
-  // One unit for all eight numbers: the model is spacing, in px, and saying it once keeps the squares quiet.
-  legend.append(legendItem('margin', 'Margin'), legendItem('padding', 'Padding'), el('span', 'bm-unit', 'px'));
-  model.append(square('margin', square('padding')));
-  model.append(legend);
+  const unit = el('span', 'bm-unit', 'px');
+  unit.setAttribute('aria-hidden', 'true');
+  model.append(square('margin', square('padding')), unit);
   spacing.append(model);
 
   /* effects */

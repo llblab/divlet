@@ -40,6 +40,20 @@ try {
     }, label);
     await page.locator('#inspector [data-key="opacity"]').waitFor();
     assert.deepEqual(await readableNumbers(`${width}px@${size}% element`), []);
+    const spacingCollisions = await page.locator('#inspector .boxmodel').evaluate(model => {
+      const fields = [...model.querySelectorAll('.bm-field')].map(node => node.getBoundingClientRect());
+      const overlaps = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;
+      const bad = [];
+      for (let a = 0; a < fields.length; a++) for (let b = a + 1; b < fields.length; b++) if (overlaps(fields[a], fields[b])) bad.push(`fields ${a}/${b} overlap`);
+      for (const mark of model.querySelectorAll('.bm-mark')) {
+        const box = mark.getBoundingClientRect(), band = mark.parentElement.getBoundingClientRect();
+        if (box.left < band.left || box.right > band.right || box.top < band.top || box.bottom > band.bottom) bad.push(`${mark.textContent} leaves its band`);
+        if (fields.some(field => overlaps(box, field))) bad.push(`${mark.textContent} covers a field`);
+      }
+      for (const hint of model.querySelectorAll('.bm-side')) if (hint.scrollWidth > hint.clientWidth + 1) bad.push(`${hint.textContent} clips`);
+      return bad;
+    });
+    assert.deepEqual(spacingCollisions, [], `independent spacing targets and corner marks at ${width}px/${size}%`);
     await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', []));
     await page.locator('#inspector [data-key="width"]').waitFor();
     assert.deepEqual(await readableNumbers(`${width}px@${size}% artboard`), []);
