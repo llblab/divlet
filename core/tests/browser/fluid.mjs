@@ -14,7 +14,8 @@ const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-fluid-'));
 await cp(path.join(root, 'examples', 'studio'), cwd, { recursive: true });
 await legacyProject(path.join(cwd, 'project.divlet'), { demo: true });
 const runtime = await openRuntime({ cwd, watch: false });
-runtime.setAgent({ connected: true, busy: true, activity: 'Adding orange accents and replacing the hero mockup with a real historical screenshot' });
+const activityText = 'Adding orange accents and replacing the hero mockup with a real historical screenshot';
+runtime.setAgent({ connected: true, busy: true, activity: activityText });
 // The busy transition owns its initial timestamp; set the elapsed fixture only after that transition.
 runtime.setAgent({ since: new Date(Date.now() - 113000).toISOString() });
 const launch = { headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] };
@@ -23,8 +24,10 @@ const errors = [], checks = [];
 let browser;
 try {
   browser = await playwright.chromium.launch(launch);
-  for (const [width, size] of [[390, 100], [390, 200], [820, 100]]) {
-    const page = await (await browser.newContext({ viewport: { width, height: 800 } })).newPage();
+  for (const [width, size] of [[390, 100], [390, 200], [820, 100], [1500, 100]]) {
+    const context = await browser.newContext({ viewport: { width, height: 800 } });
+    if (width >= 820) await context.addInitScript(value => { if (window.top === window) localStorage.setItem('divlet:width:sidebar', String(value)); }, width === 820 ? 240 : 480);
+    const page = await context.newPage();
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(runtime.url); await page.waitForFunction(() => document.querySelectorAll('.artboard').length > 0);
     await page.evaluate(async size => { (await import('./lib/help.js')).setUiSize(size); const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav']); }, size);
@@ -134,6 +137,41 @@ try {
             clock: /^\d+:\d{2}$/.test(time.textContent) && time.scrollWidth <= time.clientWidth + 1 };
         });
         assert.deepEqual(activity, { grid: 'grid', columns: 5, rows: 3, column: '5', row: '3', corner: true, separate: true, reachable: true, clock: true }, `activity grid at ${width}px/${size}%`);
+        const panelWidth = await page.locator('#sidebar').evaluate(node => node.getBoundingClientRect().width);
+        await page.locator('#open-agent').click();
+        await page.locator('#agent-status-dock > .agent-status').waitFor();
+        const floating = async label => {
+          await page.waitForFunction(() => {
+            if (!document.documentElement.classList.contains('w720')) return true;
+            return document.querySelector('#inspector').getBoundingClientRect().bottom <= document.querySelector('.agent-status').getBoundingClientRect().top + 1;
+          });
+          const result = await page.evaluate(panelWidth => {
+            const card = document.querySelector('.agent-status'), tabs = document.querySelector('#side-tabs'), stop = card.querySelector('.ask-stop'), text = card.querySelector('.agent-status-text');
+            const b = card.getBoundingClientRect(), t = tabs.getBoundingClientRect(), s = stop.getBoundingClientRect(), scale = Number.parseFloat(document.documentElement.style.getPropertyValue('--ui')) || 1;
+            const hit = document.elementFromPoint(s.x + s.width / 2, s.y + s.height / 2);
+            return {
+              width: Math.abs(b.width - panelWidth) < 1 && Math.abs(b.width - t.width) < 1 && Math.abs(b.left - t.left) < 1,
+              above: b.bottom <= t.top && t.top - b.bottom <= 10 * scale,
+              viewport: b.top >= 0 && b.left >= 0 && b.right <= innerWidth + 1 && b.bottom <= innerHeight,
+              stop: s.top >= b.top && s.bottom <= b.bottom && s.left >= b.left && s.right <= b.right && !!hit?.closest('.ask-stop'),
+              one: document.querySelectorAll('.agent-status').length === 1 && document.querySelectorAll('.ask-stop').length === 1,
+              wrap: text.scrollWidth <= text.clientWidth + 1,
+            };
+          }, panelWidth);
+          assert.deepEqual(result, { width: true, above: true, viewport: true, stop: true, one: true, wrap: true }, `${label}: floating activity at ${width}px/${size}%`);
+        };
+        await floating('normal');
+        await page.evaluate(async () => (await import('./lib/canvas.js')).openExpanded('welcome'));
+        assert.equal(await page.locator('#sidebar-foot').isVisible(), false, 'expanded browsing hides the whole footer, including activity');
+        await page.evaluate(async () => (await import('./lib/canvas.js')).closeExpanded());
+        await floating('return from expanded');
+        runtime.setAgent({ activity: 'processing_'.repeat(500) });
+        await page.waitForFunction(() => document.querySelector('.agent-status-text').textContent.includes('processing_'));
+        await floating('long unbroken status');
+        const textOverflow = await page.locator('.agent-status-text').evaluate(node => ({ text: node.textContent.length, scroll: node.scrollHeight, client: node.clientHeight, card: node.parentElement.getBoundingClientRect().height, dock: node.parentElement.parentElement.getBoundingClientRect().height }));
+        assert.ok(textOverflow.scroll > textOverflow.client, `long activity scrolls inside the bounded plaque, not over Stop or the tabs: ${JSON.stringify(textOverflow)}`);
+        runtime.setAgent({ activity: activityText });
+        await page.locator('#open-agent').click();
       }
     }
     await page.close();
@@ -142,6 +180,7 @@ try {
   checks.push('numeric fields show their whole current/default values for element and artboard inspection, including at 200% UI size');
   checks.push('long agent activity uses a 5×3 grid with a readable timer and Stop in the bottom-right corner, including phone/200%');
   checks.push('tab labels, icons and counters fit open/folded; whole-board and node context text stays separate from the prompt, including phone/200%');
+  checks.push('folded activity matches the remembered sidebar width above unmoved tabs, with one reachable Stop, bounded long-text scrolling and phone inspector clearance at 100/200%');
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'passed', checks }, null, 2));
 } finally { await browser?.close(); await runtime.close(); await rm(cwd, { recursive: true, force: true }); }

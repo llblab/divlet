@@ -156,7 +156,6 @@ function paintStatus() {
   paintSuggest();
   paintSession();
   const state = agent();
-  stopButton.hidden = !state.busy;
   send.querySelector('span').textContent = state.busy ? 'Queue' : 'Send';
   send.dataset.tip = state.busy ? `The agent is working — this runs right after · ${keys('Enter')}` : `Send to the agent · ${keys('Enter')}`;
   send.disabled = sending || !available() || !input.value.trim();
@@ -217,6 +216,7 @@ export function toggle(open = !isOpen(), { text, fromFrame = false } = {}) {
 
 /** The pane was shown or folded, by this module or by its tab. */
 on('sidebar', ({ open, tab }) => {
+  placeStatus();
   const now = open && tab === 'agent';
   if (now) { paintStatus(); grow(); chat.render(); }
   emit('ask-open', now);
@@ -301,7 +301,15 @@ input.addEventListener('keydown', event => {
 });
 panel.addEventListener('keydown', event => { if (event.key === 'Escape') { event.stopPropagation(); toggle(false); } });
 
-/* ---- what the agent is doing: one plaque right above the composer, and a sweep across its tab ---- */
+/* ---- one activity plaque: above the composer, or above the tabs when the sidebar folds ---- */
+function placeStatus() {
+  const floating = !!agent().busy && !sidebar.isOpen();
+  const parent = floating ? $('#agent-status-dock') : panel;
+  if (status.parentElement === parent) return;
+  const focused = status.contains(document.activeElement) ? document.activeElement : null;
+  parent.insertBefore(status, floating ? null : composer);
+  if (focused instanceof HTMLElement && (floating || isOpen())) focused.focus({ preventScroll: true });
+}
 function elapsed() {
   const since = agent().since ? Date.parse(agent().since) : NaN;
   if (!Number.isFinite(since)) return '';
@@ -313,6 +321,8 @@ function paintChip() {
   const state = agent();
   if (!state.busy) stopping = false;
   status.hidden = !state.busy;
+  stopButton.hidden = !state.busy;
+  placeStatus();
   status.classList.toggle('stopping', stopping);
   document.body.classList.toggle('agent-busy', !!state.busy);
   $('#open-agent').setAttribute('aria-busy', String(!!state.busy));

@@ -62,6 +62,12 @@ function measure() {
   }
 }
 new ResizeObserver(measure).observe(panel);
+// The folded activity plaque belongs to the tab footer; phone sheets/breadcrumbs stay above its real height.
+const footer = $('#sidebar-foot');
+new ResizeObserver(() => {
+  const extra = Math.max(0, footer.offsetHeight - $('#side-tabs').offsetHeight);
+  document.documentElement.style.setProperty('--agent-float-h', `${extra}px`);
+}).observe(footer);
 
 /** Toggle a pane: opening it, switching to it, or folding the sidebar when it is already showing. */
 export function toggle(name) {

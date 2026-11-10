@@ -181,7 +181,8 @@ kbd { flex: none; white-space: nowrap; font: 600 11px var(--mono); color: var(--
 :is([data-panels="left"], [data-panels="right"], [data-panels="both"]) .pill { background: var(--solid); backdrop-filter: none; }
 /* The tab row is as wide as the sidebar whether the sidebar is open or folded, and its tabs share that width equally: opening
    the sidebar then changes only the surface behind the labels, never where a label sits. */
-.side-tabs { position: fixed; z-index: 65; left: var(--edge); bottom: max(var(--edge), env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 6px; width: min(var(--sidebar-w, 300px), calc(var(--vw) - 2 * var(--edge))); max-width: calc(var(--vw) - 2 * var(--edge)); border: 1px solid transparent; border-top: 0; border-bottom: 0; container: sidebar-tabs / inline-size; }
+.sidebar-foot { position: fixed; z-index: 65; left: var(--edge); bottom: max(var(--edge), env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; width: min(var(--sidebar-w, 300px), calc(var(--vw) - 2 * var(--edge))); max-width: calc(var(--vw) - 2 * var(--edge)); }
+.side-tabs { display: flex; align-items: center; gap: 6px; min-width: 0; border: 1px solid transparent; border-top: 0; border-bottom: 0; container: sidebar-tabs / inline-size; }
 .side-tabs .tab { flex: 1 1 0; }
 /* Opening the sidebar changes the surroundings of the tabs, never their boxes: the row keeps its height, padding and gap, so
    the labels stay exactly where they were and only the surface behind them (and the pill borders) changes. */
@@ -705,7 +706,11 @@ html.w440 .shortcut-group dd { text-align: left; padding-bottom: 5px; white-spac
 .ask-send:disabled { opacity: var(--disabled); cursor: default; transform: none; }
 
 /* ---- the Agent tab: conversation above, composer below ---------------------- */
-/* The one place that says what the agent is doing: right above the composer, so the eye that is about to type sees it. */
+/* The same plaque lives above the composer or, when folded, in the tab footer. */
+.agent-status-dock { display: flex; flex-direction: column; min-height: 0; max-height: calc(var(--vh) * 0.4); }
+.agent-status-dock:empty { display: none; }
+.agent-status-dock > .agent-status { margin: 0; min-height: 0; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) max-content; border: 1px solid var(--hair); border-radius: var(--radius); background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--solid); box-shadow: var(--shadow); }
+.agent-status-dock .agent-status-text { align-self: stretch; min-height: 0; overflow-y: auto; }
 .agent-status { display: grid; grid-template-columns: 12px repeat(3, minmax(0, 1fr)) max-content; grid-template-rows: auto auto max-content; gap: 4px 6px; align-items: start; margin: 0 8px 6px; padding: 7px 12px; border-radius: var(--radius-inner); background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 500; }
 .agent-status[hidden] { display: none; }
 .agent-status > .spinner { grid-column: 1; grid-row: 1; margin-top: 3px; }
@@ -803,18 +808,19 @@ html[data-sidebar="tiny"] .chat-list { padding: 0 1px; }
    Only one big surface is shown at a time. */
 html.w720 { --edge: 8px; }
 html.w720 .brand { right: var(--edge); max-width: none; justify-content: space-between; }
-html.w720 .side-tabs { right: var(--edge); width: auto; max-width: none; }
+html.w720 .sidebar-foot { right: var(--edge); width: auto; max-width: none; }
 html.w720 .side-tabs .tab { flex: 1 1 0; }
-html.w720 body.has-sidebar .side-tabs { width: auto; bottom: max(var(--edge), env(safe-area-inset-bottom)); }
+html.w720 body.has-sidebar .sidebar-foot { bottom: max(var(--edge), env(safe-area-inset-bottom)); }
 html.w720 .panel.left { right: var(--edge); width: auto; }
 html.w720 .dock { bottom: max(var(--edge), env(safe-area-inset-bottom)); right: var(--edge); }
-html.w720 .side-tabs { bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + 8px); }
-html.w720 .crumbs-bar { bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + var(--chrome-h) + 12px); }
-html.w720 .panel.right { left: var(--edge); right: var(--edge); width: auto; bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + var(--chrome-h) + 16px); max-height: calc(var(--vh) * 0.5); }
+html.w720 .sidebar-foot { bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + 8px); }
+html.w720 .crumbs-bar { bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + var(--chrome-h) + 12px + var(--agent-float-h, 0px)); }
+html.w720 .panel.right { left: var(--edge); right: var(--edge); width: auto; bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + var(--chrome-h) + 16px + var(--agent-float-h, 0px)); max-height: calc(var(--vh) * 0.5); }
+html.w720 body.agent-busy:not(.has-sidebar) .panel.right { max-height: min(calc(var(--vh) * 0.5), calc(var(--vh) - var(--dock-h, var(--chrome-h)) - var(--chrome-h) - 2 * var(--edge) - var(--brand-h) - 24px - var(--agent-float-h, 0px))); }
 html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { display: none; }
       html.w440 .search-pill-text, html.w440 .search-pill kbd { display: none; } html.w440 .search-pill { padding: 0 9px; }
 /* A full-screen page owns the screen: only the Back pill and the page title stay. */
-body.is-expanded .brand, body.is-expanded .side-tabs, body.is-expanded .panel, body.is-expanded .dock, body.is-expanded .crumbs-bar { display: none; }
+body.is-expanded .brand, body.is-expanded .sidebar-foot, body.is-expanded .panel, body.is-expanded .dock, body.is-expanded .crumbs-bar { display: none; }
 /* Phones: the dock keeps tools, zoom, undo and settings; the rest is in Ctrl K and the menus. */ html.w420 .dock .zoom-step { display: none; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
 

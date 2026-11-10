@@ -109,7 +109,12 @@ try {
       runtime.say({ text: 'A reply delivered while the conversation was folded.' }); await messages(30);
       await page.evaluate(async () => (await import('./lib/sidebar.js')).show('agent')); await bottom();
       await page.evaluate(async () => { const chat = await import('./lib/chat.js'); chat.focus(Number(document.querySelector('.chat-list .bubble').dataset.seq)); });
-      await page.waitForFunction(() => { const list = document.querySelector('.chat-list'), box = list.getBoundingClientRect(), first = list.firstElementChild.getBoundingClientRect(); return first.top >= box.top - 1 && first.bottom <= box.bottom + 1; });
+      try {
+        await page.waitForFunction(() => { const list = document.querySelector('.chat-list'), box = list.getBoundingClientRect(), first = list.firstElementChild.getBoundingClientRect(); return first.top >= box.top - 1 && first.bottom <= box.bottom + 1; });
+      } catch (error) {
+        console.error(JSON.stringify({ width, size, focus: await list.evaluate(node => ({ scroll: node.scrollTop, total: node.scrollHeight, client: node.clientHeight, list: node.getBoundingClientRect().toJSON(), first: node.firstElementChild.getBoundingClientRect().toJSON(), active: document.activeElement?.outerHTML.slice(0, 180), panelScroll: document.querySelector('#sidebar').scrollTop })) }));
+        throw error;
+      }
       const focusedTop = await list.evaluate(n => n.scrollTop);
       runtime.say({ text: 'An explicitly focused old message must remain in view.' }); await messages(31);
       assert.ok(Math.abs(await list.evaluate(n => n.scrollTop) - focusedTop) <= 1, 'explicit message focus overrides following');

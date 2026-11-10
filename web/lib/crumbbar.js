@@ -1,6 +1,6 @@
 // The path of the selection, always bottom centre between the left column and the toolbar. When that span is narrow the path
 // wraps onto more lines; on a phone the sidebars simply sit on top of it.
-import { $, el } from './util.js';
+import { $, el, uiScale } from './util.js';
 import { store, on } from './store.js';
 import { pathInto, pathKey } from './crumbs.js';
 
@@ -23,9 +23,11 @@ function context() {
 /** Fit the bar between the tabs and the toolbar; with no room at all it hides rather than overlap them. */
 function place() {
   if (bar.hidden) return;
-  const sameRow = Math.abs((tabs.offsetTop + tabs.offsetHeight) - (dock.offsetTop + dock.offsetHeight)) < 24;
-  const left = (sameRow ? tabs.offsetLeft + tabs.offsetWidth : 0) + 10;
-  const width = dock.offsetLeft - 10 - left;
+  // The tabs live in the sidebar footer; compare viewport rectangles, not offsets from different parents.
+  const a = tabs.getBoundingClientRect(), b = dock.getBoundingClientRect(), scale = uiScale();
+  const sameRow = Math.abs(a.bottom - b.bottom) / scale < 24;
+  const left = (sameRow ? a.right / scale : 0) + 10;
+  const width = b.left / scale - 10 - left;
   bar.style.left = `${left}px`;
   bar.style.width = `${Math.max(0, width)}px`;
   bar.classList.toggle('cramped', width < MIN_WIDTH);
