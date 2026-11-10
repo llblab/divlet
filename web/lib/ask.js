@@ -31,7 +31,7 @@ input.spellcheck = true;
 input.dataset.key = 'ask';
 input.setAttribute('aria-label', 'Request for the agent');
 const hint = el('span', 'ask-hint');
-const stopButton = button('stop', 'Stop Pi', () => stop(), 'mini ask-stop');
+const stopButton = button('stop', 'Stop the agent', () => stop(), 'mini ask-stop');
 const send = el('button', 'cta ask-send');
 send.type = 'button';
 send.id = 'ask-send';
@@ -42,7 +42,7 @@ status.setAttribute('role', 'status');
 status.hidden = true;
 const statusText = el('span', 'agent-status-text');
 const statusTime = el('time', 'agent-status-time');
-status.append(el('span', 'spinner'), statusText, statusTime, el('span', 'grow'), stopButton);
+status.append(el('span', 'spinner'), statusText, statusTime, stopButton);
 const foot = el('div', 'ask-foot');
 /* Two chips, no labels: the session that answers this board — model and thinking level — when the host can change them. An MCP
    client can only answer prompts, so there the chips are simply absent; nothing here is guessed or stored in the project. */
@@ -300,8 +300,6 @@ input.addEventListener('keydown', event => {
 panel.addEventListener('keydown', event => { if (event.key === 'Escape') { event.stopPropagation(); toggle(false); } });
 
 /* ---- what the agent is doing: one plaque right above the composer, and a sweep across its tab ---- */
-stopButton.dataset.tip = 'Stop the agent';
-
 function elapsed() {
   const since = agent().since ? Date.parse(agent().since) : NaN;
   if (!Number.isFinite(since)) return '';

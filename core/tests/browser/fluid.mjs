@@ -14,7 +14,9 @@ const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-fluid-'));
 await cp(path.join(root, 'examples', 'studio'), cwd, { recursive: true });
 await legacyProject(path.join(cwd, 'project.divlet'), { demo: true });
 const runtime = await openRuntime({ cwd, watch: false });
-runtime.setAgent({ connected: true });
+runtime.setAgent({ connected: true, busy: true, activity: 'Adding orange accents and replacing the hero mockup with a real historical screenshot' });
+// The busy transition owns its initial timestamp; set the elapsed fixture only after that transition.
+runtime.setAgent({ since: new Date(Date.now() - 113000).toISOString() });
 const launch = { headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] };
 if (process.env.PI_DIVLET_CHROMIUM_EXECUTABLE) launch.executablePath = process.env.PI_DIVLET_CHROMIUM_EXECUTABLE;
 const errors = [], checks = [];
@@ -100,11 +102,25 @@ try {
       await open(); await page.waitForTimeout(250);
       const bad = await audit(`${width}px@${size}% ${name}`);
       assert.deepEqual(bad, [], bad.join('\n'));
+      if (name === 'agent') {
+        const activity = await page.evaluate(() => {
+          const card = document.querySelector('.agent-status'), stop = card.querySelector('.ask-stop'), time = card.querySelector('time'), text = card.querySelector('.agent-status-text');
+          const grid = getComputedStyle(card), position = getComputedStyle(stop), b = card.getBoundingClientRect(), s = stop.getBoundingClientRect(), t = text.getBoundingClientRect(), clock = time.getBoundingClientRect();
+          const scale = b.width / card.offsetWidth, panel = document.querySelector('#sidebar').getBoundingClientRect();
+          return { grid: grid.display, columns: grid.gridTemplateColumns.split(' ').length, rows: grid.gridTemplateRows.split(' ').length, column: position.gridColumnStart, row: position.gridRowStart,
+            corner: Math.abs(b.right - s.right - parseFloat(grid.paddingRight) * scale) < 1.5 && Math.abs(b.bottom - s.bottom - parseFloat(grid.paddingBottom) * scale) < 1.5,
+            separate: t.bottom <= s.top + 1 && clock.right <= s.left + 1,
+            reachable: s.top >= panel.top && s.bottom <= panel.bottom,
+            clock: /^\d+:\d{2}$/.test(time.textContent) && time.scrollWidth <= time.clientWidth + 1 };
+        });
+        assert.deepEqual(activity, { grid: 'grid', columns: 5, rows: 3, column: '5', row: '3', corner: true, separate: true, reachable: true, clock: true }, `activity grid at ${width}px/${size}%`);
+      }
     }
     await page.close();
   }
   checks.push('inspector, layers, history, agent, shortcuts and palette never overflow sideways at 390px, 390px/200% and 820px; keys, counts, times and tags are never clipped');
   checks.push('numeric fields show their whole current/default values for element and artboard inspection, including at 200% UI size');
+  checks.push('long agent activity uses a 5×3 grid with a readable timer and Stop in the bottom-right corner, including phone/200%');
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'passed', checks }, null, 2));
 } finally { await browser?.close(); await runtime.close(); await rm(cwd, { recursive: true, force: true }); }

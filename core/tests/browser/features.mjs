@@ -155,7 +155,9 @@ try {
   // One busy place, above the box; the tab shows the work as a sweep over its own label instead of a spinner that shifts it.
   const busyUi = await page.evaluate(() => {
     const plaque = document.querySelector('#agent .agent-status'), composer = document.querySelector('#agent .agent-composer'), tab = document.querySelector('#open-agent');
+    const grid = getComputedStyle(plaque), stop = plaque.querySelector('.ask-stop'), position = getComputedStyle(stop);
     return {
+      grid: { display: grid.display, columns: grid.gridTemplateColumns.split(' ').length, rows: grid.gridTemplateRows.split(' ').length, stopColumn: position.gridColumnStart, stopRow: position.gridRowStart },
       gap: Math.round(composer.getBoundingClientRect().top - plaque.getBoundingClientRect().bottom),
       spinner: document.querySelectorAll('#agent-busy, #agent .agent-status .spinner').length,
       sweep: getComputedStyle(tab).animationName,
@@ -164,6 +166,7 @@ try {
       label: document.querySelector('#open-agent .tool-label').textContent,
     };
   });
+  assert.deepEqual(busyUi.grid, { display: 'grid', columns: 5, rows: 3, stopColumn: '5', stopRow: '3' }, 'the activity plaque is a 5×3 grid with Stop in its bottom-right cell');
   assert.ok(busyUi.gap >= 0 && busyUi.gap <= 12, `the plaque sits right above the composer (${busyUi.gap}px)`);
   assert.equal(busyUi.spinner, 1, 'the only spinner is the plaque\'s own');
   assert.equal(busyUi.sweep, 'tab-sweep', 'the tab carries a sweeping highlight');
@@ -171,7 +174,8 @@ try {
   assert.equal(busyUi.label, 'Agent', 'and the tab label is unchanged');
   assert.equal(/Pi is|syncing/.test(busyUi.hint), false, `the hint no longer repeats the busy state (${busyUi.hint})`);
   assert.equal(await page.locator('#ask-send').textContent(), 'Queue');
-  await page.locator('#agent .ask-stop').click();
+  await page.getByRole('button', { name: 'Stop the agent', exact: true }).focus();
+  await page.keyboard.press('Enter');
   await waitUntil(() => stops === 1, 'stop from the Agent tab');
   await waitUntil(() => page.locator('#agent .agent-status-text').textContent().then(text => text.includes('stopping')), 'the status shows that Pi is stopping');
   runtime.say({ text: 'Done — the hero is **warmer** now.\nAnything else?', seq: asks[0].seq });
