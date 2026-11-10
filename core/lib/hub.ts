@@ -36,7 +36,7 @@ const PAGE = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>divlet · projects</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 20 20%27%3E%3Cpath d=%27M8 4.5 2.5 10 8 15.5M10.5 4.5H12L17.5 10 12 15.5h-1.5Z%27 fill=%27none%27 stroke=%27%235b5bf0%27 stroke-width=%271.5%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%20color%3D%22%235b5bf0%22%20stroke%3D%22currentColor%22%20stroke-width%3D%221.5%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M8%204.5%202.5%2010%208%2015.5%22%20fill%3D%22none%22%2F%3E%3Cpath%20d%3D%22M10.5%204.5H12L17.5%2010%2012%2015.5h-1.5Z%22%20fill%3D%22currentColor%22%20stroke%3D%22none%22%2F%3E%3C%2Fsvg%3E">
 <script>try { const t = localStorage.getItem('divlet:theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch {}</script>
 <link rel="stylesheet" href="./board.css">
 <style>
@@ -44,7 +44,7 @@ const PAGE = `<!doctype html>
   main { max-width: 880px; margin: 0 auto; padding: 56px 20px 80px; }
   header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 22px; }
   h1 { margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: 22px; font-weight: 650; letter-spacing: -.01em; }
-  h1 svg { width: 26px; height: 26px; fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  h1 svg { width: 26px; height: 26px; fill: none; color: var(--accent); stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   .where { font: 12px var(--mono); color: var(--muted); white-space: normal; overflow-wrap: anywhere; min-width: 0; }
   .bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
   .bar input { flex: 1 1 180px; min-width: 0; height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: var(--field); color: var(--ink); outline: 0; }
@@ -83,7 +83,7 @@ const PAGE = `<!doctype html>
 </head>
 <body>
 <main>
-  <header><h1><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4.5 2.5 10 8 15.5"/><path d="M10.5 4.5H12L17.5 10 12 15.5h-1.5Z"/></svg>divlet</h1><span class="where" id="where"></span></header>
+  <header><h1><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4.5 2.5 10 8 15.5" fill="none"/><path d="M10.5 4.5H12L17.5 10 12 15.5h-1.5Z" fill="currentColor" stroke="none"/></svg>divlet</h1><span class="where" id="where"></span></header>
   <form class="bar" id="bar" autocomplete="off">
     <input id="q" type="text" placeholder="Search, or name a new project" aria-label="Search projects or name a new one" autofocus>
     <button class="go" id="make" type="submit">New project</button>

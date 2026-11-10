@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
     <meta name="color-scheme" content="light dark">
     <title>divlet</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 20 20%27%3E%3Cpath d=%27M8 4.5 2.5 10 8 15.5M10.5 4.5H12L17.5 10 12 15.5h-1.5Z%27 fill=%27none%27 stroke=%27%235b5bf0%27 stroke-width=%271.5%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%20color%3D%22%235b5bf0%22%20stroke%3D%22currentColor%22%20stroke-width%3D%221.5%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M8%204.5%202.5%2010%208%2015.5%22%20fill%3D%22none%22%2F%3E%3Cpath%20d%3D%22M10.5%204.5H12L17.5%2010%2012%2015.5h-1.5Z%22%20fill%3D%22currentColor%22%20stroke%3D%22none%22%2F%3E%3C%2Fsvg%3E">
     <script>try { const theme = localStorage.getItem('divlet:theme'); if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme; const ui = Number(localStorage.getItem('divlet:ui')); if (ui >= 1 && ui <= 2) document.documentElement.style.setProperty('--ui', String(ui)); } catch {}
       // Layouts react to the width the interface really has: the window divided by the interface size.
       const fit = () => { const w = innerWidth / (Number.parseFloat(document.documentElement.style.getPropertyValue('--ui')) || 1); for (const t of [720, 560, 440, 420]) document.documentElement.classList.toggle('w' + t, w <= t); };
@@ -20,7 +20,7 @@
       <div id="hover-badge" class="hover-badge" aria-hidden="true" hidden></div>
       <div id="marquee" class="marquee" hidden></div>
       <div id="empty" class="empty" hidden>
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4.5 2.5 10 8 15.5"/><path d="M10.5 4.5H12L17.5 10 12 15.5h-1.5Z"/></svg>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4.5 2.5 10 8 15.5" fill="none"/><path d="M10.5 4.5H12L17.5 10 12 15.5h-1.5Z" fill="currentColor" stroke="none"/></svg>
         <p>An empty canvas</p>
         <button id="empty-new" class="cta" type="button">New artboard <kbd>N</kbd></button>
         <span class="hint">or ask Pi to design something</span>

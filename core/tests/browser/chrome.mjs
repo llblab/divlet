@@ -46,6 +46,15 @@ try {
 
   /* ---- desktop ------------------------------------------------------------ */
   const page = await open(1400, 860);
+  for (const selector of ['#status-dot svg', '#empty svg']) {
+    const paint = await page.locator(selector).evaluate(svg => {
+      const [bracket, wedge] = svg.querySelectorAll('path'), a = getComputedStyle(bracket), b = getComputedStyle(wedge);
+      return { count: svg.querySelectorAll('path').length, outline: a.fill === 'none' && a.stroke !== 'none', filled: b.fill !== 'none' && b.stroke === 'none', sameColour: a.stroke === b.fill };
+    });
+    assert.deepEqual(paint, { count: 2, outline: true, filled: true, sameColour: true }, `${selector}: one outlined bracket and a solid D, in the same inherited colour`);
+  }
+  assert.equal(await page.locator('#status-dot svg path').nth(1).evaluate(path => path.isPointInFill(new DOMPoint(13, 10))), true, 'the D interior is really painted, not just outlined');
+  checks.push('the divlet mark pairs an outlined bracket and filled D/play wedge with one inherited colour, including the empty-state mark');
   await select(page);
   const brand = await rect(page, '#brand'), tabs = await rect(page, '#side-tabs'), dock = await rect(page, '#dock');
   assert.ok(brand && tabs && dock);

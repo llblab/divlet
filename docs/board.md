@@ -2,7 +2,7 @@
 
 [Back to the project README](../README.md) · [Agent integration](agents.md) · [Project format](format.md)
 
-The board displays real HTML in each artboard. Use the canvas for direct edits, Layers for structure, History for accepted changes and the inspector for properties.
+The board displays real HTML in each artboard. Use the canvas for direct edits, Layers for structure, History for accepted changes and the inspector for properties. The divlet mark pairs an open angle bracket with a filled angular D/play wedge, sharing 45° diagonals; the pen-nib silhouette nods to the project's earlier name, NIB.
 
 ## Canvas, selection and panels
 

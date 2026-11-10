@@ -157,7 +157,7 @@ kbd { flex: none; white-space: nowrap; font: 600 11px var(--mono); color: var(--
 .artboard.expanded .ab-body { width: 100% !important; height: 100% !important; transform: none !important; border-radius: 0; }
 
 .empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--muted); }
-.empty svg { width: 44px; height: 44px; fill: none; stroke: var(--faint); stroke-width: .9; stroke-linejoin: round; stroke-linecap: round; margin-bottom: 4px; }
+.empty svg { width: 44px; height: 44px; fill: none; color: var(--faint); stroke: currentColor; stroke-width: .9; stroke-linejoin: round; stroke-linecap: round; margin-bottom: 4px; }
 .empty p { margin: 0; font-size: 14px; color: var(--ink); }
 .empty .hint { color: var(--muted); font-size: 12px; }
 .cta { display: inline-flex; align-items: center; gap: 10px; height: 34px; padding: 0 8px 0 14px; border: 0; border-radius: 10px; background: var(--accent); color: var(--on-accent); font-weight: 600; box-shadow: var(--shadow); transition: transform .12s, background .12s; }

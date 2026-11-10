@@ -59,7 +59,7 @@ a { color: inherit; }
 /* ---- top bar ------------------------------------------------------------------------------------ */
 .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 56px; }
 .mark { display: inline-flex; align-items: center; gap: 8px; font-weight: 640; letter-spacing: -.01em; text-decoration: none; }
-.mark svg { width: 24px; height: 24px; fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.mark svg { width: 24px; height: 24px; fill: none; color: var(--accent); stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
 .top nav { display: flex; flex-wrap: wrap; gap: 4px; }
 .top nav a { padding: 6px 10px; border-radius: 9px; color: var(--muted); font-size: 13.5px; text-decoration: none; }
 .top nav a:hover { background: var(--panel); color: var(--ink); box-shadow: var(--shadow); }
