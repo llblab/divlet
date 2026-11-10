@@ -3,7 +3,13 @@
 // instead of drifting into plausible prose.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, stat, mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import { parse } from 'parse5';
+import { createDemoDocument, validateDocument, applyDocumentPatch } from '../lib/model.ts';
+import { operationPatch } from '../lib/ops.ts';
+import { exportHtml } from '../lib/codec.ts';
+import { buildStatic } from '../lib/static.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import YAML from 'yaml';
@@ -80,6 +86,43 @@ test('every error code and document it sends the agent to exists', async () => {
     assert.ok(await exists(path.join(root, 'docs', doc)), `docs/${doc} exists`);
     const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
     assert.ok(pkg.files.includes('docs'), 'and ships with the package the skill belongs to');
+  }
+});
+
+test('meaningful navigation is the default and its examples reach real portable targets', async t => {
+  const navigation = source.split('### Meaningful navigation')[1]?.split('## 4.')[0];
+  assert.ok(navigation, 'navigation belongs in the working loop, not only optional deeper reading');
+  for (const rule of ['by default', 'no destination', 'attrs.id', 'Play', 'placeholder', 'instances']) assert.ok(navigation.includes(rule), `the navigation rule covers ${rule}`);
+  const examples = JSON.parse(/```json\n([\s\S]*?)\n```/.exec(navigation)[1]);
+  const frame = id => validateDocument({ ...createDemoDocument(), id, name: id, rootId: 'root', tokens: {}, css: '', metadata: {}, nodes: { root: { id: 'root', type: 'element', tag: 'main', children: [] } } });
+  const insert = (doc, specs) => applyDocumentPatch(doc, operationPatch(doc, { type: 'insert', parentId: 'root', spec: specs }).patch);
+  const home = insert(frame('home'), [examples.pageLink, examples.sectionLink, examples.sectionTarget]);
+  const pricing = insert(frame('pricing'), [examples.pageTarget]);
+  assert.notEqual(examples.sectionTarget.id, examples.sectionTarget.attrs.id, 'a DOM anchor is not the internal node ID');
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'divlet-skill-links-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const built = await buildStatic({ projectDir: directory, frames: new Map([[home.id, exportHtml(home)], [pricing.id, exportHtml(pricing)]]) });
+  const pages = new Map();
+  for (const name of ['home.html', 'pricing.html']) {
+    const ids = new Map(), hrefs = [];
+    const visit = node => {
+      const attrs = Object.fromEntries((node.attrs ?? []).map(attr => [attr.name, attr.value]));
+      if (attrs.id) ids.set(attrs.id, (ids.get(attrs.id) ?? 0) + 1);
+      if (node.tagName === 'a' && attrs.href !== undefined) hrefs.push(attrs.href);
+      for (const child of node.childNodes ?? []) visit(child);
+    };
+    visit(parse(built.files.get(name)));
+    pages.set(name, { ids, hrefs });
+  }
+  assert.equal(pages.get('home.html').hrefs.length, 2);
+  for (const href of pages.get('home.html').hrefs) {
+    assert.ok(href && href !== '#', 'examples never teach empty or top-of-page placeholders');
+    const target = new URL(href, 'https://example.test/deployed/site/home.html');
+    assert.equal(target.origin, 'https://example.test');
+    assert.ok(target.pathname.startsWith('/deployed/site/'), 'navigation stays portable beneath a deployment prefix');
+    const page = pages.get(path.posix.basename(target.pathname));
+    assert.ok(page, `the generated page exists for ${href}`);
+    assert.equal(page.ids.get(decodeURIComponent(target.hash.slice(1))), 1, `the DOM fragment exists exactly once for ${href}`);
   }
 });
 

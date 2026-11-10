@@ -81,6 +81,34 @@ that is already open.
 5. Several widths are one frame with responsive classes, not several frames. Check by patching `artboard.width` (390, 768,
    1280, 1440) and reading `view:preview` again.
 
+### Meaningful navigation
+
+Build meaningful navigation **by default** when the requested page/site implies it, even if the user only described its look.
+Connect actual site pages and useful sections; do not confuse separate pages with responsive variants or library frames.
+Create the intended destinations first. Use an `a` for navigation, including a CTA styled as a button; a `button` is for a real
+non-navigation action. If there is **no destination**, omit the link: use non-interactive content or a clearly unavailable
+control, rather than inventing a route, external URL, email address or backend behavior. No placeholder `href="#"`, empty
+`href` or `javascript:` navigation. A real back-to-top link needs a real named top target too.
+
+Use the actual frame ID from a project read, not its display name: frame `pricing` becomes `pricing.html`, optionally with a
+fragment. URL-encode the frame ID as a path segment; a leading `./` avoids treating a colon in an ID as a URL scheme. A local
+`#features` needs a unique target `attrs.id: "features"` in that page — the internal node ID is not a DOM anchor. For a
+Markdown site, use existing routes from `read_divlet view:site`, not invented paths. These are insert-spec examples:
+
+```json
+{
+  "pageLink": { "tag": "a", "attrs": { "href": "pricing.html#plans" }, "text": "See plans" },
+  "sectionLink": { "tag": "a", "attrs": { "href": "#features" }, "text": "Features" },
+  "sectionTarget": { "id": "features-section", "tag": "section", "attrs": { "id": "features" }, "text": "Our features" },
+  "pageTarget": { "id": "plans-section", "tag": "section", "attrs": { "id": "plans" }, "text": "Choose a plan" }
+}
+```
+
+Before finishing, inspect link/CTA attributes, including component instances, and confirm each destination and fragment in
+its consuming page. Check actual navigation in Play/expanded view and portable output when available; geometry alone cannot
+prove a link works. Say what was not tested. If preview and export differ, report the product failure; never persist a board
+URL, authentication token or generated-cache path as a workaround.
+
 ## 4. A request that comes from the board
 
 A request typed on the board reaches you as one prompt block, then the request itself after a blank line:
