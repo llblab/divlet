@@ -20,7 +20,7 @@ The format does not standardize editor selection, hover, panels, viewport naviga
 
 **Freeze boundary:** the supported compatibility range, migration policy, numeric equivalence, treatment of lexical JSON duplicate members and the status of current operational limits still need an explicit decision. An object-based validator cannot prove that the original JSON text had unique member names. This candidate does not promise byte-preserving JSON serialization or support for future schema versions.
 
-The implementation currently parses JSON numbers as JavaScript binary64 values. A lexical `9007199254740993` is already `9007199254740992` before model validation; `1e-400` becomes zero at the same stage. Metadata `-0` survives admission but `JSON.stringify` writes positive zero. Parse-time rounding must not be misreported as corruption by the project writer. The smallest recommended profile is finite binary64 values with equivalent signed zeros, using application-defined strings for precision-sensitive values; exact lexical/decimal preservation would require a different admission representation. This is a recommendation for approval, not a newly frozen numeric promise.
+The implementation currently parses JSON numbers as JavaScript binary64 values. A lexical `9007199254740993` is already `9007199254740992` before model validation; `1e-400` becomes zero at the same stage. Metadata `-0` survives admission but `JSON.stringify` writes positive zero. Parse-time rounding must not be misreported as corruption by the project writer. The smallest recommended profile is finite binary64 values with equivalent signed zeros, using application-defined strings for precision-sensitive values; exact lexical/decimal preservation would require a different admission representation. This is a recommendation for approval, not a newly frozen numeric promise. A complete [proposed first-release profile](#proposed-first-release-profile) below makes the related CSS, identity, dependency and migration choices reviewable.
 
 ## Project file
 
@@ -129,11 +129,13 @@ Internal node IDs, DOM `attrs.id` and instance occurrence addresses are distinct
 
 Currently, an expanded frame's tokens are project tokens followed by frame tokens, with the frame's value winning on the same name. Its CSS is project CSS followed by frame CSS. This describes those two levels, not inheritance of CSS from a referenced component's source frame.
 
+Projection currently emits tokens as unlayered `:root` declarations and wraps joined authored CSS in `@layer components`, with a theme/base/components/utilities order prelude, even without an engine. A Chromium probe with a blue token and a later authored red `:root` rule renders blue; emitting the same declarations as ordinary CSS renders red. Codec round trips strip/recreate the wrapper, so they do not establish native cascade equivalence. Inline `style` objects have a separate ordering issue: `padding-left:20px` followed by `padding:10px` renders 10px left padding, while reversing their object members renders 20px; current deep comparison considers the models equal. Both persisted-meaning choices need resolution before freeze.
+
 CSS must parse and must not contain a closing style tag, executable CSS, `@import` or build directives such as `@plugin`, `@config`, `@source`, `@tailwind` and `@reference`. Ordinary responsive/state rules remain CSS. A plugin may interpret token namespaces and compile utilities, but it does not define the native meaning of a CSS variable or class attribute.
 
 Resources are authored references in attributes, inline declarations and stylesheets; local references resolve from their authored source location, not from a generated `_assets` path. Local filesystem access, bounded resource reads, link refusal and portable bundling are enforced by resource/output planning. Saving a project does not grant an arbitrary HTTP filesystem route. External resources and installed fonts are not promised to be immutable.
 
-**Freeze boundary:** necessary rendering dependencies must be represented and checked rather than guessed from class spelling or an existing cache. No dependency-profile fields are invented by this candidate; WEB-3 owns that schema/compatibility decision. Missing engines and engine disable behavior must not silently change a dependent project's appearance.
+**Freeze boundary:** necessary rendering dependencies must be represented and checked rather than guessed from class spelling or an existing cache. The current schema admits no dependency-profile fields; WEB-3 owns implementation of an approved schema/compatibility decision. The proposed extension below is not current admission. Missing engines and engine disable behavior must not silently change a dependent project's appearance.
 
 ## Metadata and operational limits
 
@@ -170,7 +172,7 @@ The core admits external `.html`/`.htm` pages directly into this format without 
 
 `npm run test:format` runs the candidate baseline from a source checkout: four accepted JSON inputs and 20 rejected cases under `core/tests/fixtures/format/`, explicit normalization expectations, semantic project read/write checks, component-address behavior and the complete example/tag profiles in this document. The corpus is plain JSON, not a second validator. Error codes identify this implementation's refusal boundaries; they do not prescribe another implementation's diagnostic wording. Every accepted frame's expanded static HTML projection also round-trips; this is not reverse editing of a managed component projection. The model/component suites cover rejected root and misplaced table roles, valid row instances and table text; the codec suite checks admitted roots and simple parent/child trees across the supported HTML tags, with positive table controls and a guard against achieving fidelity by dropping tags.
 
-Existing model, component, codec, output and native HTML suites provide further implementation evidence, not a declaration of complete standard conformance. The baseline does not prove resource closure, every operational limit, rendering dependencies or unresolved component policies. The preparation gate in [BACKLOG.md](../BACKLOG.md) owns the remaining assessment.
+Existing model, component, codec, output and native HTML suites provide further implementation evidence, not a declaration of complete standard conformance. The baseline does not prove resource closure, every operational limit, rendering dependencies or unresolved component policies. The preparation gate in [BACKLOG.md](../BACKLOG.md) owns the remaining decisions and approval.
 
 ### Reader-boundary witnesses
 
@@ -187,9 +189,97 @@ The same baseline checks that metadata remains opaque/extensible, non-JSON API v
 
 The independent assessment of `6435d97` produced the six concrete numeric/component/context/budget counterexamples documented in their owning sections above. Two reviewer lenses supplied usable reports and a verifier separately reproduced the findings; the final judge assessed synthesis quality, not the repository. This is evidence for the stated boundaries, not whole-format or publication approval. The paired reader audit remains relational: simultaneous rejection can satisfy agreement, so explicit accepted/rejected expectations must accompany it.
 
-- **Persisted design gates:** numeric/compatibility rules, component scope/conflicts/DOM references (WEB-4), and necessary rendering dependencies (WEB-3) must be selected before their meaning is frozen. The current `prepareFrame` compiles class candidates through the active engine; the no-engine compiler returns empty CSS. The project reader has no enforced dependency profile. A cache or class spelling is not a reliable declaration of that dependency, and this assessment does not invent its fields.
-- **Native style editing (WEB-1):** `styles` is an editing input, not a stored node field. The existing `style`/CSS representation can express the native result; a fallback/cascade repair is not by itself a reason to redesign the wire shape.
+- **Persisted design gates:** numeric/compatibility rules, CSS emission/declaration ordering (the WEB-1 format sub-boundary), component scope/conflicts/DOM references (WEB-4), and necessary rendering dependencies (WEB-3) must be selected before their meaning is frozen. The current `prepareFrame` compiles class candidates through the active engine; the no-engine compiler returns empty CSS. The project reader has no enforced dependency profile. A cache or class spelling is not a reliable declaration of that dependency, and this assessment does not invent its fields.
+- **Native style editing (WEB-1):** `styles` is an editing input, not a stored node field. Fallback/cascade editing repair is not by itself a reason to redesign the wire shape. Authored CSS emission and inline declaration ordering are separate persisted-meaning questions, evidenced above; they cannot all be dismissed as editor-only work.
 - **Composition and foreign conversion (WEB-2):** choosing concrete providers outside generic registries and emitting ordinary CSS from PEN are implementation boundaries. Their completion is not automatically a prerequisite for freezing every native field.
 - **Managed HTML editing (WEB-5):** the editor feature can be staged independently only if its identity/provenance needs fit the chosen model. A later design that needs different persisted identities, resource meaning or dependency fields must reopen that decision before freeze; an ordinary codec round trip does not prove it is solved.
 
 The canonical backlog owns the remaining policy preparation and approval gates; this document records their semantic rationale, not a second task list. Actual freeze needs an explicit approved candidate, resolved persisted-semantics blockers and passing evidence for that candidate. Publication, tagging and deployment require separate authorization.
+
+## Proposed first-release profile
+
+**Unapproved design proposal, not current admission.** The following is one recommended package for an implementation decision, not authorization to freeze or publish. Current project schema 2 / standalone frame schema 1 remain unchanged. Read-only probes against `9a3a11e` reproduced the remaining order/scope/ID/numeric/dependency witnesses and the two Chromium CSS counterexamples below.
+
+### Value and compatibility rules
+
+Use finite binary64 numbers, treating signed zeros as equivalent and normalizing decoded numeric zero to positive zero. Large-integer rounding and underflow occur during binary64 decoding; precision-sensitive application values use strings. Keep opaque metadata strings unchanged, including their existing JSON/UTF-16 contents. Object member order is insignificant; arrays and authored CSS text retain order. Refuse duplicate JSON member names, including escape-equivalent spellings such as `"a"` and `"\u0061"`, at the native text-decoding boundary before object validation loses that evidence. Object-only APIs cannot attest the spelling of their caller's original JSON text.
+
+Keep identifier grammar, field types and geometry bounds explicit. Counts, depth, byte/text/metadata budgets remain declared implementation capacities, not document-selected privileges or a promise that every reader accepts arbitrarily large projects. The reference implementation retains its documented limits and uniform metadata budget. A capacity refusal must be explicit and non-destructive, never truncate content. Unknown structural fields and unsupported schemas remain refusals; safe application extension data stays under metadata.
+
+### Native CSS and ordered inline declarations
+
+Emit merged tokens as ordinary `:root` declarations, then project CSS followed by consuming-frame CSS, then any declared provider's compiled stylesheet. Preserve authored CSS verbatim: neither the core nor a provider implicitly moves it into another cascade layer. A provider may emit its own versioned layers; authors wanting component-layer priority write that layer explicitly. Consequently, unlayered authored CSS can beat layered utilities under normal browser rules. Style normalization must retain native declarations or refuse when equivalence is not established; enabling a compiler is not permission to rewrite the cascade.
+
+Replace literal element `style` maps with **ordered declaration pairs**, e.g. `[["padding-left","20px"],["padding","10px"]]`. Each pair contains a validated property and string value; repeated properties are allowed for ordered CSS fallbacks. Absence/null defaults to an empty list. Swapping these pairs deliberately changes left padding from 10px to 20px; sorting unrelated JSON object members does not. Existing executable-content restrictions still apply.
+
+Keep overrides partial rather than replacing a component's entire inline block: `Override.style` becomes an ordered sequence of property operations, with a string setting a property and null removing it. A set replaces all matching declarations with one at the first matching position, or appends when absent; a remove deletes all matches. Ordinary property names match case-insensitively; custom properties remain case-sensitive. Remove-then-set explicitly moves a property to the end. This preserves existing unique-property merge behavior while making ordering explicit. The `styles` declarative editing input remains a property map, not a newly stored node field.
+
+The alternatives have real costs: retaining ordered JSON objects avoids the shape change but requires order-preserving parsers and order-aware equality everywhere; sorting style-map keys is simpler but changes existing inline CSS and cannot retain every declaration sequence. Ordered pairs make the necessary order native to JSON and carry repeated fallbacks without a hidden second representation.
+
+### Overrides and component context
+
+Within one instance's unordered `descendants` map, resolve every address and nested-root alias to its effective occurrence before applying writes. Coalesce identical normalized writes; refuse different writes to the same effective destination, including element `text` versus its text child's `content`, and metadata replacement/deletion of an ancestor another write modifies. Disjoint fields and metadata leaves remain composable. An ordered style-operation block is one destination: competing blocks for the same occurrence must be consolidated under one address, not concatenated in member order. Reordering the map must not change text, generated text-part identity or provenance.
+
+The cloned definition and its nested-instance overrides form lower layers; an enclosing instance's overrides apply after them. This fixed structural precedence is not a conflict between unordered peers. Preserve the existing distinction that a ref's own metadata overlays the expanded root by top-level key, retaining literal null values; descendant metadata patches instead merge recursively and use null deletion.
+
+Select **consumer CSS/token scope**: clone subtree declarations and class references, but do not import the source frame's stylesheet or token map. Project CSS/tokens and the consuming frame provide the context. A component that needs shared definitions puts them at project level. Source-scope styling would need additional cascade/collision rules; blind concatenation is rejected.
+
+### DOM occurrence references
+
+Keep authored IDs and ID references literal in the consuming document, not implicitly relative to a component. Require nonempty DOM IDs to be unique across each final expanded/composed page, including inline SVG and visible definitions; separate iframes may reuse an ID. Do not rename IDs on read or silently detach instances. Authors/importers can supply explicit per-occurrence ID and reference overrides. In particular, foreign conversion that creates reusable SVG definitions may need matching occurrence overrides before the candidate can be admitted.
+
+Diagnose known missing local ID references after expansion/composition; do not claim complete CSS-selector/reference closure. Browser evidence must cover valid `for`, ARIA ID lists and SVG fragments as well as duplicate refusal. Automatic namespace rebasing is deferred: it would need a complete reference/provenance contract, not just a string prefix.
+
+### Explicit rendering requirements
+
+Add one mandatory project-level `requires` object. `{}` means native HTML/CSS only, even when an installed engine recognizes a class such as `p-4`. The only initial optional member is `styleEngine: { id, version }`; unknown requirement/descriptor fields are refused. The ID uses the existing safe-identifier grammar; version is an exact, case-sensitive, nonempty printable ASCII token of at most 128 characters, not a semver range. Providers advertise that renderer compatibility identity and must change it when effective compiler/configuration/dependency semantics change; an npm package version alone need not identify them sufficiently.
+
+A structural reader retains a valid unknown requirement without loading a provider. Preparing/rebuilding requires the declared identity and compilation capability, with no fallback to the first installed engine, guessed class meanings or an old cache. Missing/mismatched providers refuse the rebuild while preserving accepted state and authored bytes. IDs/versions never authorize package installation, executable loading from project paths or network fetches. Disabling a required engine needs an explicitly validated native-CSS conversion, or refusal without mutation.
+
+This keeps compact utility source with derived compiled CSS. The alternative is explicit materialization of all necessary utility CSS as canonical native source, avoiding the requirement field but changing authoring/source ownership and increasing source size. Silently freezing cached compiler output into authored CSS is not that conversion.
+
+### Proposed envelopes and migration
+
+Recommend project **schema 3** and standalone frame **schema 2**, because a required dependency declaration and ordered style data are real wire changes, not cosmetic first-release renumbering. Stored frames still omit their standalone envelope marker. Content revision counters retain their existing separate meaning.
+
+This illustrates the proposed native profile; **the current reader refuses it**:
+
+```json
+{
+  "schemaVersion": 3,
+  "requires": {},
+  "frames": [
+    {
+      "id": "inline",
+      "name": "Inline",
+      "version": 1,
+      "artboard": { "x": 0, "y": 0, "width": 390, "height": 400 },
+      "rootId": "root",
+      "nodes": {
+        "root": {
+          "id": "root",
+          "type": "element",
+          "tag": "main",
+          "style": [["padding-left", "20px"], ["padding", "10px"]]
+        }
+      }
+    }
+  ]
+}
+```
+
+A compiler-dependent project would instead declare, for example, `"requires":{"styleEngine":{"id":"tailwind","version":"EXAMPLE-EXACT-RENDERER"}}`. That version is illustrative, not an installed-provider claim.
+
+A frozen reader supports these exact envelopes, not hypothetical future versions. Treat current schema-2 projects as pre-release inputs requiring explicit migration, not silent reinterpretation as plain CSS. Preserve original bytes; produce an approved sibling copy with a fresh owned output destination. Preserve existing map declaration order when converting to lists and preserve existing override operation order. Choose the actual rendering profile explicitly. To retain the old appearance, make the old implicit CSS layer wrappers/order explicit in authored CSS; adopting native cascade instead is a visible choice. Conflicting overrides, duplicate IDs and lexical ambiguities require diagnosis/owner correction rather than guessed repairs. Opening alone must neither migrate nor overwrite.
+
+### Implementation owners and approval evidence
+
+This proposal adds no implementation evidence merely by being written. Before an exact candidate can be frozen:
+
+- **Value/reader owners — `model.ts`, `project.ts` and native text decoding:** zero normalization, overflow refusal, string preservation, escape-equivalent duplicate-key refusal and unsupported-schema refusal; retain reader-boundary regressions.
+- **WEB-1 CSS boundary — model/codec/render and their style consumers:** ordered declarations/patches, repeated fallbacks and order-aware equality; Chromium must distinguish 10px/20px declaration orders and give red for a later unlayered red root rule over a blue token. Explicit legacy layer conversion must preserve the old blue result. Native emitters/export must agree; not every style-editor feature is a freeze prerequisite.
+- **WEB-4 expansion/identity:** reversed conflicting text/alias maps refuse in either order; non-conflicting writes compose; style blocks have explicit order; consumer scope is intentional; IDs remain unique and references/selection/provenance survive valid instances. Include importer-created SVG occurrence cases.
+- **WEB-3 requirements — project/settings types, the public engine contract, renderer and runtime:** pure CSS rebuilds with no provider and ignores available utility compilers; missing/version-mismatched required providers and refused disables preserve source/history/output. Deleting the cache must not hide a missing dependency. Provider matching belongs in rendering, not the pure data validator.
+- **Native migration/output owners:** explicit schema-2 copies preserve declared CSS order/cascade, resource bases and output isolation; no implicit source overwrite, metadata erasure or ambiguity repair. This is an implementation obligation if the proposed transition is approved, not an existing migration command.
+
+**Approval requested:** accept or revise this profile and authorize its scoped implementation. That would not approve a compatibility freeze: final approval still requires the implemented exact candidate and its passing evidence. Publication remains separate.
