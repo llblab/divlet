@@ -243,6 +243,8 @@ try {
       await inspectorPage.waitForFunction(() => document.querySelectorAll('.artboard').length > 0);
       await inspectorPage.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav']); });
       await inspectorPage.waitForSelector('#inspector [data-section="layout"] details.fold > summary');
+      await inspectorPage.waitForSelector('#inspector [data-section="measured"]');
+      assert.equal(await inspectorPage.locator('#inspector').evaluate(node => node.lastElementChild?.dataset.section), 'measured', 'read-only geometry/overflow follows every editing section, including metadata');
     };
     await selectSubject();
     const inspector = inspectorPage.locator('#inspector');
@@ -292,6 +294,9 @@ try {
         };
       });
       assert.deepEqual(geometry, { fits: true, inside: true, reachable: true, focused: true, tabs: 0 }, `vertical inspector at ${width}px/${size}%`);
+      await inspector.locator('[data-section="measured"]').scrollIntoViewIfNeeded();
+      const footer = await inspector.evaluate(node => { const measured = node.querySelector('[data-section="measured"]'), box = node.getBoundingClientRect(), rect = measured.getBoundingClientRect(); return { last: node.lastElementChild === measured, visible: rect.top >= box.top - 1 && rect.bottom <= box.bottom + 1, labels: [...measured.querySelectorAll('.value > i')].map(n => n.textContent) }; });
+      assert.deepEqual(footer, { last: true, visible: true, labels: ['X', 'Y', 'W', 'H'] }, `measured footer at ${width}px/${size}%`);
     }
     assert.equal(runtime.info().project.version, version, 'disclosures, scrolling and UI size are not project edits');
     await inspectorContext.close();

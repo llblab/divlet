@@ -652,6 +652,7 @@ function nodeView(doc, model, nodeIds) {
     view.push(section('attrs', details('Attributes', attributesEditor(node, (attrs, label) => refreshed(commit(doc.id, { nodes: { [node.id]: { attrs } } }, { label: `${label} on ${node.id}` }))), true, Object.keys(node.attrs).length)));
     view.push(section('style', details('Inline style', kvEditor(doc.id, node, 'style'), Object.keys(node.style).length > 0, Object.keys(node.style).length)));
   }
+  view.push(section('node-meta', details('Metadata', metadataField('node-metadata', node.metadata, next => quiet(commit(doc.id, { nodes: { [node.id]: { metadata: next } } }, { label: `edit metadata of ${node.id}` }))), false, Object.keys(node.metadata || {}).length)));
   const observed = store.observations.get(doc.id);
   const measured = observed?.nodes.find(item => item.id === node.id);
   if (measured && observed.render === doc.render) {
@@ -665,7 +666,6 @@ function nodeView(doc, model, nodeIds) {
     if (measured.overflowX || measured.overflowY) { const flag = el('span', 'value warn', 'overflow'); flag.dataset.tip = `Content overflows ${[measured.overflowX && 'horizontally', measured.overflowY && 'vertically'].filter(Boolean).join(' and ')}`; values.append(flag); }
     view.push(section('measured', values));
   }
-  view.push(section('node-meta', details('Metadata', metadataField('node-metadata', node.metadata, next => quiet(commit(doc.id, { nodes: { [node.id]: { metadata: next } } }, { label: `edit metadata of ${node.id}` }))), false, Object.keys(node.metadata || {}).length)));
   return view;
 }
 

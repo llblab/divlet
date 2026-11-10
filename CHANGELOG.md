@@ -8,6 +8,7 @@ This is the first release in preparation. No version has been published.
 
 ### Added
 
+- **Measured geometry closes the element inspector.** The read-only X/Y/W/H and overflow block now follows Metadata and every editing section, without changing measurement admission or field behavior. Chromium checks final DOM/visual order, reload persistence and bottom-of-panel reachability at desktop, tablet, phone and 200%.
 - **Tooltip copy wraps instead of being cut to one line.** Plain hints and diagnostic headings retain their text, including unbroken references; the width respects the scaled viewport and vertical placement clamps after measuring multiline height. Chromium checks hover/keyboard display and edge/centre placement at desktop, phone and 200%. Diagnostic code excerpts retain their existing height budget.
 - **Send stays at the Agent footer's bottom-right corner.** Removed the preceding flex spacer and gave the action its own trailing auto margin, bottom alignment and non-shrinking size, so wrapped model/thinking controls or key hints cannot leave it on the left. Chromium covers Send/Queue, enabled/disabled/disconnected states, real 240px resizing and phone/200% without overlapping controls.
 - **Output-folder picker names appear once.** Removed the extra raw text inserted before each folder icon; the row keeps one label and one accessible name. Chromium now rejects duplicated row text and navigates nested folders by exact button names while retaining relative-path saving and output-ownership checks.
