@@ -185,7 +185,7 @@ function render() {
       head.append(up, el('code', 'settings-picker-path', info.directory || info.path || where));
       const list = el('div', 'settings-picker-list');
       for (const dir of info.dirs ?? []) {
-        const row = el('button', 'dir', dir.name);
+        const row = el('button', 'dir');
         row.type = 'button';
         row.append(icon('folder'), el('span', 'dir-name', dir.name));
         row.addEventListener('click', () => openPicker(dir.file || `${info.directory}/${dir.name}`));

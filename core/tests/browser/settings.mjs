@@ -85,8 +85,11 @@ const waitUntil = async (check, label, timeout = 8000) => {
   await mkdir(path.join(cwd, 'designs', 'tokens'), { recursive: true });
   await button('Choose the output folder').click();
   await page.locator('#help .settings-picker').waitFor();
-  await page.locator('#help .settings-picker-list .dir', { hasText: 'designs' }).click();
-  await page.locator('#help .settings-picker-list .dir', { hasText: 'tokens' }).click();
+  await page.locator('#help .settings-picker-list .dir', { hasText: 'designs' }).waitFor();
+  const repeatedNames = await page.locator('#help .settings-picker-list .dir').evaluateAll(rows => rows.filter(row => row.textContent !== row.querySelector('.dir-name')?.textContent).map(row => row.textContent));
+  assert.deepEqual(repeatedNames, [], 'folder rows contain one name, not a raw duplicate before the icon');
+  await page.locator('#help .settings-picker-list').getByRole('button', { name: 'designs', exact: true }).click();
+  await page.locator('#help .settings-picker-list').getByRole('button', { name: 'tokens', exact: true }).click();
   await page.locator('#help .settings-picker button', { hasText: 'Use this folder' }).click();
   await waitUntil(async () => (await input.inputValue()) === 'designs/tokens', 'the picked folder arrives as a relative path');
   await input.press('Enter');
