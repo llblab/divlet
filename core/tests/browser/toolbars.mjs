@@ -785,13 +785,26 @@ try {
   checks.push('no chrome text is clipped at 1280 and 390px wide, at 100% and 200% interface size');
   checks.push('tooltip copy and diagnostic headings wrap whole, including unbroken references, with hover/keyboard activation and viewport-safe placement at edges and 200% size');
 
-  // A collapsed selector: the label sits on the left and the current value is right-aligned, on the label's own baseline.
+  // Labels, multiline values and carets share the vertical centre, including at the actual inspector minimum.
   {
+    await runtime.patch({ documentId: 'welcome', expectedVersion: runtime.read({ view: 'frame', documentId: 'welcome' }).version, patch: { nodes: { nav: { className: 'inline-block relative' } } } });
+    await page.evaluate(async () => (await import('./lib/sidebar.js')).close());
     await select(['welcome']);
     await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', ['nav']));
-    await page.waitForSelector('#inspector [data-section="layout"] .pick .pick-v');
-    for (const width of [1280, 900, 390]) {
+    await page.waitForFunction(() => document.querySelector('#inspector [data-key="pick:Display"] .pick-v')?.textContent === 'Inline block');
+    const grip = page.locator('.resize-handle[data-panel="inspector"]'), edge = await grip.boundingBox();
+    const current = Number(await grip.getAttribute('aria-valuenow'));
+    await page.mouse.move(edge.x + 4, edge.y + edge.height / 2); await page.mouse.down();
+    await page.mouse.move(edge.x + 4 + current - 280, edge.y + edge.height / 2, { steps: 6 }); await page.mouse.up();
+    await waitUntil(async () => Math.abs(await width('#inspector') - 280) < 1, 'selectors are measured at the real 280px inspector floor');
+    for (const [width, size] of [[1280, 100], [900, 100], [390, 100], [390, 200]]) {
       await page.setViewportSize({ width, height: 900 });
+      await page.evaluate(async size => (await import('./lib/help.js')).setUiSize(size), size);
+      if (width === 900) {
+        const box = await grip.boundingBox(), now = Number(await grip.getAttribute('aria-valuenow'));
+        await page.mouse.move(box.x + 4, box.y + box.height / 2); await page.mouse.down();
+        await page.mouse.move(box.x + 4 + now - 320, box.y + box.height / 2, { steps: 6 }); await page.mouse.up();
+      }
       await waitUntil(async () => (await page.locator('#inspector .pick').count()) > 0, 'the inspector keeps a selector');
       const pick = page.locator('#inspector [data-section="layout"] .pick').first();
       // The inspector may replace the panel between two reads: wait for an attached selector, then measure it.
@@ -800,11 +813,17 @@ try {
           const label = node.querySelector('.pick-k'), value = node.querySelector('.pick-v');
           if (!label || !value || !node.isConnected) return null;
           const b = node.getBoundingClientRect(), l = label.getBoundingClientRect(), v = value.getBoundingClientRect();
+          if (!b.width || !b.height || !node.offsetWidth) return null;
+          const scale = b.width / node.offsetWidth;
+          const centred = [...node.parentElement.querySelectorAll('.pick')].every(pick => {
+            const box = pick.getBoundingClientRect();
+            return [...pick.querySelectorAll('.pick-k, .pick-v, .pick-caret')].every(child => { const r = child.getBoundingClientRect(); return Math.abs(r.top + r.height / 2 - box.top - box.height / 2) < 1; });
+          });
           return {
-            centred: Math.abs(l.top + l.height / 2 - b.top - b.height / 2) < 1 && Math.abs(v.top + v.height / 2 - b.top - b.height / 2) < 1,
+            centred, peerSingleLine: node.parentElement.lastElementChild.querySelector('.pick-v').getBoundingClientRect().height / scale <= 20,
             hierarchy: getComputedStyle(label).color !== getComputedStyle(value).color && Number(getComputedStyle(label).fontWeight) > Number(getComputedStyle(value).fontWeight),
-            sameLine: Math.abs(l.top - v.top) < 4, gap: Math.round(b.right - v.right), alignment: getComputedStyle(value).textAlign,
-            clipped: value.scrollWidth > value.clientWidth + 1, labelLeft: Math.round(l.left - b.left),
+            multiline: v.height / scale > 20, gap: Math.round((b.right - v.right) / scale), alignment: getComputedStyle(value).textAlign,
+            clipped: value.scrollWidth > value.clientWidth + 1, labelLeft: Math.round((l.left - b.left) / scale),
           };
         }).catch(() => null);
         return measured && measured.alignment === 'right' ? measured : null;
@@ -817,8 +836,10 @@ try {
       else assert.ok(geom.gap >= 0, `the value does not stick out of the selector at ${width}px (gap ${geom.gap})`);
       assert.ok(geom.labelLeft <= 12, `the label sits at the left edge at ${width}px (${geom.labelLeft})`);
       assert.equal(geom.clipped, false, `the value is shown whole at ${width}px`);
-      if (width >= 900) assert.equal(geom.sameLine, true, `the value stays on the label's line at ${width}px`);
+      if (width >= 900) assert.equal(geom.multiline, true, 'Inline block really wraps at narrow widths without shifting the label off centre');
+      if (width === 900) assert.equal(geom.peerSingleLine, true, 'the neighbouring single-line Position stays centred in the same taller row');
     }
+    await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(100));
     await page.setViewportSize({ width: 1500, height: 900 });
   }
   checks.push('selector labels are visually stronger and both label/value are vertically centred, with right-aligned whole values');

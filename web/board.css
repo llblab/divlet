@@ -355,10 +355,10 @@ body.is-expanded .resize-handle, body:has(.scrim:not([hidden])) .resize-handle {
 .geometry-grid, .box3, .box4, .layout-box > .grid2, .appearance-box > .grid2 { --control-min: 120px; }
 /* layout, spacing, effects: small controls that write Tailwind classes */
 .layout-box, .spacing-box { display: grid; gap: 8px; }
-.pick { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-width: 0; min-height: 30px; padding: 6px 22px 6px 9px; line-height: 18px; border: 0; border-radius: var(--radius-inner); background: var(--field); color: var(--ink); text-align: left; }
+.pick { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2px 6px; min-width: 0; min-height: 30px; padding: 6px 22px 6px 9px; line-height: 18px; border: 0; border-radius: var(--radius-inner); background: var(--field); color: var(--ink); text-align: left; }
 .pick:hover { background: var(--field-hover); }
-.pick-k { flex: none; font-size: 11px; font-weight: 600; color: var(--ink); }
-.pick-v { flex: 1 1 auto; min-width: 0; text-align: right; white-space: normal; overflow-wrap: break-word; color: var(--muted); font: 11.5px/18px var(--mono); }
+.pick-k { font-size: 11px; font-weight: 600; color: var(--ink); }
+.pick-v { min-width: 0; text-align: right; white-space: normal; overflow-wrap: break-word; color: var(--muted); font: 11.5px/18px var(--mono); }
 .pick-caret { position: absolute; right: 7px; top: calc(50% - 5px); width: 10px; height: 10px; color: var(--muted); transform: rotate(90deg); }
 .variant-dot { position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); pointer-events: none; }
 .flow-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; }
