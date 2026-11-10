@@ -84,13 +84,13 @@ function paintSession() {
     chips.push(chip(current, `Thinking level · ${current}`, controls.thinking.options.map(level => ({ id: level, label: level })), current, item => post_('api/agent/settings', { thinking: item.id })));
   }
   sessionChips.replaceChildren(...chips);
-  // The selectors replace the key hints rather than stacking under them: the footer keeps one line either way.
+  // The selectors replace the key hints rather than stacking under them; Send keeps the trailing bottom corner if they wrap.
   sessionChips.hidden = chips.length === 0;
   hint.hidden = chips.length > 0;
 }
 // One slot, two occupants: a host that can change the session shows the two selectors where the key hints would be; a host that
 // cannot (MCP) shows the hints. Pi users are assumed to know the shortcuts; the selectors carry their own tips.
-foot.append(sessionChips, hint, el('span', 'grow'), send);
+foot.append(sessionChips, hint, send);
 const scope = el('div', 'ask-scope');
 scope.id = 'ask-context';
 input.setAttribute('aria-describedby', scope.id);

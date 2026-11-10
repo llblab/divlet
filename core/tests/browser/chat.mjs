@@ -35,6 +35,29 @@ try {
         node.scrollTop = top;
       }), value);
 
+      const sendCorner = async label => {
+        const geometry = await page.locator('.ask-foot').evaluate(foot => {
+          const send = foot.querySelector('.ask-send'), box = foot.getBoundingClientRect(), button = send.getBoundingClientRect();
+          const overlaps = [...foot.querySelectorAll('.agent-chip, .ask-hint')].filter(n => n.getClientRects().length).some(n => { const r = n.getBoundingClientRect(); return Math.min(r.right, button.right) - Math.max(r.left, button.left) > 1 && Math.min(r.bottom, button.bottom) - Math.max(r.top, button.top) > 1; });
+          return { right: Math.abs(box.right - button.right) <= 1, bottom: Math.abs(box.bottom - button.bottom) <= 1, overlaps, count: foot.querySelectorAll('.ask-send').length };
+        });
+        assert.deepEqual(geometry, { right: true, bottom: true, overlaps: false, count: 1 }, `${label}: Send stays at the footer's bottom-right at ${width}px/${size}%`);
+      };
+      const footerModes = async () => {
+        for (const controls of [null, { model: { value: 'example', options: [{ id: 'example', label: 'Example longer model' }] }, thinking: { value: 'high', options: ['low', 'high'] } }]) {
+          runtime.setAgent({ controls });
+          await page.waitForFunction(shown => document.querySelector('.agent-session').hidden === !shown, !!controls);
+          await sendCorner(controls ? 'model selectors, disabled' : 'key hints, disabled');
+          await input.fill('Draft'); await sendCorner('enabled');
+          runtime.setAgent({ busy: true }); await page.waitForFunction(() => document.querySelector('.ask-send').textContent === 'Queue'); await sendCorner('Queue');
+          runtime.setAgent({ busy: false }); await page.waitForFunction(() => document.querySelector('.ask-send').textContent === 'Send');
+          await input.fill('');
+        }
+        runtime.setAgent({ connected: false, controls: null }); await input.waitFor({ state: 'visible' });
+        await page.waitForFunction(() => document.querySelector('.ask-input').disabled); await sendCorner('disconnected');
+        runtime.setAgent({ connected: true }); await page.waitForFunction(() => !document.querySelector('.ask-input').disabled);
+      };
+      await footerModes();
       await input.fill('First message.'); await input.press('Enter');
       await messages(1);
       await page.waitForFunction(() => document.querySelector('.ask-suggest').hidden);
@@ -72,6 +95,7 @@ try {
         await page.mouse.move(edge.x + 4, edge.y + edge.height / 2); await page.mouse.down();
         await page.mouse.move(edge.x - 100, edge.y + edge.height / 2, { steps: 6 }); await page.mouse.up();
         await page.waitForFunction(previousWidth => document.querySelector('.chat-list').clientWidth < previousWidth, previousWidth); await bottom();
+        await footerModes(); await bottom();
       }
       const height = await list.evaluate(n => n.clientHeight);
       await input.fill('A multiline draft\nSecond line\nThird line\nFourth line');
@@ -96,7 +120,7 @@ try {
       assert.ok(Math.abs(await list.evaluate(n => n.scrollTop) - middle) <= 1, 'folding and reopening preserves an older reading position');
       await input.fill('Continue at the newest message.'); await input.press('Enter'); await messages(33); await bottom();
       runtime.say({ text: 'Sending a new request explicitly resumes following.' }); await messages(34); await bottom();
-      checks.push(`${width}px/${size}%: short stack at bottom, chronological overflow with reachable history, follow/read/resume, fixed composer, multiline/status resize, reopen and explicit focus`);
+      checks.push(`${width}px/${size}%: short stack at bottom, chronological overflow with reachable history, follow/read/resume, fixed composer, multiline/status resize, reopen, explicit focus and bottom-right Send/Queue across host states`);
     } finally { await context?.close(); await runtime?.close(); await rm(cwd, { recursive: true, force: true }); }
   }
   assert.deepEqual(errors, []);
