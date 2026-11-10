@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { readProject, writeProject, expandFrame } from '../lib/project.ts';
-import { HTML_TAGS, SVG_TAGS } from '../lib/model.ts';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { readProject, writeProject, expandFrame, validateSettings } from '../lib/project.ts';
+import { HTML_TAGS, SVG_TAGS, validateMetadata, validateDocument } from '../lib/model.ts';
 import { encodeHtml, decodeHtml } from '../lib/codec.ts';
 import { styleEngine, setStyleEngines } from '../lib/engine.ts';
 
@@ -66,4 +68,56 @@ test('the candidate JSON example and documented tag profiles match executable ad
   const profiles = [...specification.matchAll(/```text\n([\s\S]*?)\n```/g)].slice(0, 2).map(match => new Set(match[1].trim().split(/\s+/)));
   assert.deepEqual(profiles[0], HTML_TAGS);
   assert.deepEqual(profiles[1], SVG_TAGS);
+});
+
+test('project and frame names share string normalization without changing project error codes', async () => {
+  const frame = (await readJson('web.divlet')).frames[0];
+  for (const name of ['', '  Heading\r\nwith space  ', '😀'.repeat(256)]) {
+    const expected = name.replace(/\r\n?/g, '\n');
+    assert.equal(validateSettings({ name }).name, expected);
+    assert.equal(validateDocument({ ...frame, schemaVersion: 1, name }).name, expected);
+  }
+  for (const name of [12, {}, 'a'.repeat(513), 'NUL\0', '\ud800']) {
+    assert.throws(() => validateSettings({ name }), { code: 'INVALID_PROJECT' });
+    assert.throws(() => validateDocument({ ...frame, schemaVersion: 1, name }), { code: 'INVALID_DOCUMENT' });
+  }
+});
+
+test('metadata stays arbitrary inert JSON rather than becoming an application schema or rendered text', async () => {
+  const metadata = {
+    futureApplication: { onClick: 'not an event handler', schema: 7, values: [null, true, 0.125, { unknown: 'retained' }] },
+    markup: '</script><script>not executed</script>',
+    opaqueText: '\0\ud800\r\n',
+  };
+  const frame = (await readJson('web.divlet')).frames[0];
+  const project = readProject({ schemaVersion: 2, metadata, frames: [{ ...frame, metadata }] });
+  const restored = readProject(JSON.parse(writeProject(project.settings, project.frames)));
+  assert.deepEqual(restored.settings.metadata, metadata);
+  assert.deepEqual(restored.frames[0].metadata, metadata);
+  assert.deepEqual(decodeHtml(encodeHtml(restored.frames[0])).metadata, metadata);
+});
+
+test('metadata rejects non-JSON and unsafe values before serialization can erase or coerce them', () => {
+  const cyclic = {};
+  cyclic.self = cyclic;
+  const invalid = [NaN, Infinity, -Infinity, undefined, 1n, Symbol('not JSON'), () => {}, new Date(), new Map(), cyclic];
+  for (const value of invalid) {
+    assert.throws(() => validateMetadata({ value }, 'metadata'), { code: 'INVALID_DOCUMENT' });
+    assert.throws(() => validateSettings({ metadata: { value } }), { code: 'INVALID_DOCUMENT' });
+  }
+  for (const key of ['__proto__', 'constructor', 'prototype']) {
+    const metadata = { nested: JSON.parse(`{\"${key}\":true}`) };
+    assert.throws(() => validateMetadata(metadata, 'metadata'), { code: 'INVALID_DOCUMENT' });
+    assert.throws(() => validateSettings({ metadata }), { code: 'INVALID_DOCUMENT' });
+  }
+});
+
+test('the reader audit is a regression gate for every retained boundary witness', () => {
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL('./format-audit.mjs', import.meta.url))], { encoding: 'utf8' });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const report = JSON.parse(result.stdout);
+  assert.equal(report.status, 'passed');
+  assert.equal(report.blocked, 0);
+  assert.ok(report.checks.length > 0 && report.checks.every(check => check.status === 'passed'));
 });

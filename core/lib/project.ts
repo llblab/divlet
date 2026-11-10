@@ -10,7 +10,7 @@
 import path from 'node:path';
 import {
   DivletError, validateDocument, SOURCE_LIMITS, LIMITS, PROJECTION_LIMITS, documentLimits, validateTokens, validateCss,
-  validateMetadata, merge, REF,
+  validateMetadata, string, merge, REF,
 } from './model.ts';
 import type { Attrs, DocumentModel, Limits, Metadata, Node, NodeId, Override, Style } from './model.ts';
 
@@ -62,8 +62,9 @@ export function storedFrame(document: DocumentModel): Omit<DocumentModel, 'schem
 export function validateSettings(source: unknown = {}): ProjectSettings {
   if (!isObject(source)) fail('INVALID_PROJECT', 'Project settings must be an object');
   const input = source;
-  const name = input.name ?? 'Untitled project';
-  if (typeof name !== 'string' || name.length > 512) fail('INVALID_PROJECT', 'Project name must be a string of at most 512 characters');
+  let name: string;
+  try { name = string(input.name ?? 'Untitled project', 'Project name', 512); }
+  catch (error) { const cause = error as DivletError; fail('INVALID_PROJECT', cause.message, cause.details); }
   const version = input.version ?? 1;
   if (!Number.isSafeInteger(version) || version < 1) fail('INVALID_PROJECT', 'Project version must be a positive integer');
   const outputDir = input.outputDir ?? null;

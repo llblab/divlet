@@ -32,7 +32,7 @@ export interface Override {
   tag?: string;
   className?: string;
   style?: StyleOverrides;
-  attrs?: Attrs;
+  attrs?: Record<string, string | null>;
   metadata?: Metadata;
   /** The instance's single text child. */
   text?: string;
@@ -171,6 +171,7 @@ export function validateCss(css: unknown, limits: Limits = LIMITS): string {
 
 export function metadata(value: unknown, label: string): Metadata {
   const record = object(value, label);
+  json(record, label);
   if (JSON.stringify(record).length > 65536) fail(`${label} exceeds 64 KiB`);
   return structuredClone(record) as Metadata;
 }

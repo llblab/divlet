@@ -62,7 +62,7 @@
     "demo:pen": "node ./adapters/cli/index.js ./examples/pen/field-notes.pen",
     "pretest": "tsc --noEmit",
     "test": "node --test",
-    "test:format": "node --test core/tests/format.test.js",
+    "test:format": "node --test core/tests/format.test.js core/tests/format-types.test.ts",
     "test:format:audit": "node core/tests/format-audit.mjs",
     "test:browser": "node core/tests/browser/run.mjs",
     "test:responsive": "node core/tests/browser/responsive.mjs",

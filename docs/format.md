@@ -52,7 +52,7 @@ This is a complete valid source example, not JSON with placeholder comments:
 | --- | --- |
 | `schemaVersion` | Required; exactly 2. |
 | `frames` | Required array, including an empty array. Frame IDs must be unique in the project. Array order is retained. |
-| `name` | String of at most 512 UTF-16 code units; omitted or null currently defaults to `Untitled project`. |
+| `name` | Well-formed string, at most 512 UTF-16 code units, normalized to LF; omitted/null defaults to `Untitled project`. |
 | `version` | Positive safe integer; omitted or null defaults to 1. |
 | `tokens` | CSS custom-property map; omitted or null defaults to `{}`. |
 | `css` | Authored CSS string; omitted or null defaults to `""`. |
@@ -61,13 +61,13 @@ This is a complete valid source example, not JSON with placeholder comments:
 
 The source filename/path identifies the project to the editor; the envelope has no stored project `id`. `outputDir` is an output location, not a base URL for authored resources. Its current settings validator rejects absolute paths, backslashes, control characters, blank values and drive prefixes. Output ownership and collision checks apply in addition; a relative string is not permission to overwrite a directory.
 
-**Freeze boundary:** project name/metadata validation is not identical to frame validation. Their normalization, safe-key and representability rules must be reconciled or explicitly specified before freeze; do not infer identical validation just because the fields have the same names.
+Project and frame names share the same character, length and LF-normalization rules. Their presence/default rules remain contextual: project settings supply an omitted/null name, while a frame requires one. Project, frame and node metadata share the safe JSON validator described below; a project-level payload is not an escape hatch around that profile.
 
 ## Frame document
 
-A stored frame has `{ id, name, version, artboard, rootId, tokens, css, metadata, nodes }`. `id`, `name`, `version`, `artboard`, `rootId` and `nodes` are required. Tokens, CSS and metadata default as in the project. Frame names pass the model's well-formed-string and line-ending normalization; the project-name caveat above remains relevant.
+A stored frame has `{ id, name, version, artboard, rootId, tokens, css, metadata, nodes }`. `id`, `name`, `version`, `artboard`, `rootId` and `nodes` are required. Tokens, CSS and metadata default as in the project. Frame names pass the same well-formed-string and line-ending normalization as project names.
 
-Identifiers match `[A-Za-z][A-Za-z0-9_.:-]{0,95}`: 1–96 ASCII characters, starting with a letter. A frame ID is unique in its project. A node ID is unique in its frame; another frame may use the same node ID. Every node map key must equal that node's `id`.
+Identifiers match `[A-Za-z][A-Za-z0-9_.:-]{0,95}`: 1–96 ASCII characters, starting with a letter. A frame ID is unique in its project. A node ID is unique in its frame; another frame may use the same node ID. Every node map key must equal that node's `id`. Reserved safe-JSON object member names are not usable node-map keys, even when they match the identifier grammar; a frame ID is a string value rather than such a key.
 
 `artboard` contains exactly `x`, `y`, `width` and `height`, all finite numbers in CSS pixels; fractions are allowed. The current reader accepts width/height from 1 through 16384 and coordinates whose absolute values are at most 10000000. This is authored board geometry, not browser-measured child layout.
 
@@ -129,7 +129,9 @@ Resources are authored references in attributes, inline declarations and stylesh
 
 ## Metadata and operational limits
 
-Metadata is the extension point, not permission to add executable node kinds or bypass validation. A writer must retain supported application data through semantic read/write operations. Import provenance under `metadata.import` records source information; it is not an instruction to overwrite or merge a source file. Project/frame metadata validation differences remain a freeze blocker, not an extension mechanism.
+Metadata is the extension point, not permission to add executable node kinds or bypass validation. It admits arbitrary application-defined objects, arrays and JSON scalar values within the safe profile, without an application-specific field schema. Numbers must be finite; functions, undefined values, bigint, symbols, non-JSON objects and cycles are not accepted. Object member names `__proto__`, `constructor` and `prototype` are reserved throughout the safe JSON profile. Other application keys remain extensible; an `onClick` key inside metadata is data, not an HTML event handler.
+
+Metadata strings are opaque JSON data, not rendered text: the name/text normalization rules must not silently rewrite their contents. A writer must retain supported application data through semantic read/write operations. Import provenance under `metadata.import` records source information; it is not an instruction to overwrite or merge a source file. All metadata admission uses the shared validator before serialization can erase or coerce an unsupported value. Numeric precision and signed-zero semantics still belong to the compatibility/profile assessment; finite-number admission alone is not a complete numeric-interchange policy.
 
 Current implementation budgets are caller-owned profiles, not metadata-selected privileges: normal frame validation uses 2000 nodes, depth 64 and a 2 MiB serialized input budget; common text/CSS fields have field-specific limits, metadata objects have a 64 KiB serialized-length check, and the project admits at most 200 frames. File-loading and projection paths have separate budgets, including a 32 MiB source-read limit and larger trusted projection profiles. These are implementation admission limits until the compatibility/profile decision is made; this candidate does not claim one capacity for every API or resource.
 
@@ -162,11 +164,13 @@ Existing model, component, codec, output and native HTML suites provide further 
 
 ### Reader-boundary witnesses
 
-`npm run test:format:audit` is a separate freeze-preparation check, not part of the green baseline. It reports JSON and exits 1 while its invariants remain unresolved. Inputs and precise unblockers are retained in `core/tests/fixtures/format/reader-boundaries.json`; the audit compares project settings with a valid standalone frame without changing either reader. Policy differences require a deliberate decision, not an automatic promise that the fields must become identical.
+`npm run test:format:audit` emits the paired project/frame reader report; the format baseline now runs it as a regression gate. Inputs and diagnostic unblockers are retained in `core/tests/fixtures/format/reader-boundaries.json`. It exits 1 if a retained invariant regresses. Passing these witnesses does not establish complete format conformance or settle the remaining freeze decisions.
 
-- **`metadata-number-overflow` — Data loss:** JSON metadata `{"value":1e400}` is admitted at project level as a non-finite number, then saved as `null`; frame admission refuses it. Accepted project data does not survive semantic read/write. Rejecting an unrepresentable number or choosing an explicit lossless representation is required; silently rewriting it is not a compatibility policy.
-- **`metadata-safe-keys` — Policy decision:** project metadata admits an own `__proto__` key that frame metadata rejects. Safe-key and extension rules need an explicit boundary.
-- **`name-line-endings` — Policy decision:** the project name preserves CRLF while a frame name normalizes it to LF. The different normalization must be reconciled or deliberately specified.
-- **`name-unpaired-surrogate` — Policy decision:** the project name admits an unpaired surrogate that a frame name rejects. Rendered-name representability needs a consistent or explicitly justified policy.
+- **`metadata-number-overflow`:** metadata `{"value":1e400}` is refused by both readers before serialization can replace it with `null`.
+- **`metadata-safe-keys`:** both readers reject unsafe object member names in metadata.
+- **`name-line-endings`:** both readers normalize CRLF/CR names to LF without trimming other whitespace.
+- **`name-unpaired-surrogate`:** both readers reject unrepresentable names. Project-name failures keep the implementation's `INVALID_PROJECT` code; frame-name failures use `INVALID_DOCUMENT`.
+
+The same baseline checks that metadata remains opaque/extensible, non-JSON API values are rejected, and public override types admit null attribute deletions while literal element attributes remain strings. Runtime regressions verify that invalid metadata cannot replace accepted source/output/state and that invalid authored bytes remain available for correction.
 
 Actual freeze needs an explicit approved candidate, resolved persisted-semantics blockers and passing evidence for that candidate. Editor implementation tasks are not automatically format blockers: they block freeze only where their unresolved design would change persisted meaning, identity or necessary rendering dependencies. Publication, tagging and deployment require separate authorization.

@@ -14,8 +14,8 @@
 
 Run these from a source checkout:
 
-- `npm run test:format`: Green baseline for portable accepted/rejected JSON examples, normalization, project read/write stability, component addresses, plain CSS with no engine and the specification's example/tag lists. It is included in the unit suite, but is not full standard conformance or a managed-HTML reverse-editing test.
-- `npm run test:format:audit`: Separate reader-boundary report. It exits 1 while data-loss or field-policy witnesses remain unresolved; this is intentional freeze-gate evidence, not a test that locks the inconsistent behavior in place. Its JSON identifies the input, the two readers' admission outcomes, project read/write stability and the exact unblocker. Runtime/I/O errors still fail rather than appearing as policy findings.
+- `npm run test:format`: Baseline for portable accepted/rejected JSON examples, normalization, project read/write stability, component addresses, plain CSS with no engine, the specification's example/tag lists and nullable override types. It also runs the reader audit as a regression gate. Type assertions are checked by `npm run typecheck`/`npm test`; Node's TypeScript stripping alone does not type-check them. This is not full standard conformance or a managed-HTML reverse-editing test.
+- `npm run test:format:audit`: Standalone reader-boundary report. Its JSON identifies each input, the two readers' admission outcomes, project read/write stability and an unblocker when a retained invariant fails. It exits 0 on success or 1 on regression; runtime/I/O errors still fail rather than appearing as policy findings.
 
 Fixtures live in `core/tests/fixtures/format/`; the audit uses raw JSON value strings so numeric overflow is not erased by fixture serialization. These source-checkout tests are not installed package APIs. See [the candidate's evidence boundary](format.md#evidence-and-freeze-boundary).
 

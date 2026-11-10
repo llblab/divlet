@@ -97,6 +97,31 @@ test('external edits of project.divlet are accepted as logged, undoable file cha
   assert.deepEqual(runtime.info().project.tokens, {});
 });
 
+test('non-finite project metadata cannot replace accepted source, output or state', async t => {
+  const { runtime, project } = await fixture(t);
+  await runtime.create({ document: document() });
+  const before = await fs.readFile(project, 'utf8');
+  const preview = runtime.render('example');
+  const accepted = structuredClone(runtime.info().project);
+  const entry = runtime.info().documents[0];
+  const output = await fs.readFile(entry.htmlPath, 'utf8');
+  await assert.rejects(runtime.patchProject({ expectedVersion: accepted.version, patch: { metadata: { value: Infinity } } }), { code: 'INVALID_DOCUMENT' });
+  assert.equal(await fs.readFile(project, 'utf8'), before);
+  const invalid = JSON.stringify({ ...JSON.parse(before), metadata: { value: '__format_overflow_witness__' } }).replace('"__format_overflow_witness__"', '1e400');
+  await fs.writeFile(project, invalid);
+  await runtime.scan();
+  assert.equal(runtime.info().diagnostics[0].code, 'INVALID_DOCUMENT');
+  assert.deepEqual(runtime.info().project.metadata, accepted.metadata);
+  assert.equal(runtime.info().project.version, accepted.version);
+  assert.deepEqual(runtime.render('example'), preview);
+  assert.equal(await fs.readFile(entry.htmlPath, 'utf8'), output);
+  await assert.rejects(runtime.patchProject({ expectedVersion: accepted.version, patch: { name: 'Would overwrite' } }), { code: 'EXTERNAL_PENDING' });
+  assert.equal(await fs.readFile(project, 'utf8'), invalid);
+  await fs.writeFile(project, before);
+  await runtime.scan();
+  assert.equal(runtime.info().diagnostics.length, 0);
+});
+
 test('an invalid project.divlet keeps the last good state, blocks writes and recovers when fixed', async t => {
   const { runtime, project } = await fixture(t);
   await runtime.create({ document: document() });
