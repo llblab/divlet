@@ -570,6 +570,26 @@ try {
   }
   checks.push('a dragged-narrow sidebar adapts: no overflow, one-line context, short placeholder and hints');
 
+  // Warm user bubbles are independent of the work/error accents in automatic and explicitly selected themes.
+  const originalTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  for (const [theme, system, expected] of [[null, 'light', 'rgb(243, 232, 213)'], [null, 'dark', 'rgb(60, 51, 36)'], ['light', 'dark', 'rgb(243, 232, 213)'], ['dark', 'light', 'rgb(60, 51, 36)']]) {
+    await page.emulateMedia({ colorScheme: system });
+    await page.evaluate(theme => { if (theme) document.documentElement.dataset.theme = theme; else document.documentElement.removeAttribute('data-theme'); }, theme);
+    const palette = await page.locator('#agent .bubble.from-user').first().evaluate(bubble => {
+      const rgb = color => color.match(/[\d.]+/g).map(Number);
+      const lum = color => { const [r, g, b] = rgb(color).map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); return .2126 * r + .7152 * g + .0722 * b; };
+      const background = getComputedStyle(bubble).backgroundColor, bg = lum(background);
+      const ratios = ['.rich', '.bubble-head b', 'time'].map(selector => { const fg = lum(getComputedStyle(bubble.querySelector(selector)).color); return (Math.max(fg, bg) + .05) / (Math.min(fg, bg) + .05); });
+      return { background, ratios, agent: getComputedStyle(document.querySelector('.bubble.from-agent')).backgroundColor };
+    });
+    assert.equal(palette.background, expected, `warm user bubble for ${theme || 'auto'}/${system}`);
+    assert.notEqual(palette.agent, palette.background, 'agent replies retain their distinct neutral surface');
+    assert.ok(palette.ratios.every(ratio => ratio >= 4.5), `body, author and timestamp meet AA: ${JSON.stringify(palette.ratios)}`);
+  }
+  await page.emulateMedia({ colorScheme: null });
+  await page.evaluate(theme => { if (theme) document.documentElement.dataset.theme = theme; else document.documentElement.removeAttribute('data-theme'); }, originalTheme);
+  checks.push('user chat bubbles are warm sand/amber, distinct from replies, with AA text contrast in automatic and explicit light/dark themes');
+
   // A long arbitrary class is shown whole: it wraps inside its chip.
   await page.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav']); });
   await page.waitForSelector('#inspector .cls-input');

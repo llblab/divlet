@@ -745,7 +745,7 @@ html[data-sidebar="tiny"] .chat-list { padding: 0 1px; }
 /* ---- history: conversation and collapsed steps ---------------------------- */
 .times { margin-left: 6px; padding: 0 5px; border-radius: 5px; background: var(--field-hover); color: var(--muted); font: 600 10.5px/16px var(--mono); }
 .bubble { display: grid; gap: 4px; margin: 4px 0 6px; padding: 8px 10px 9px; border-radius: var(--radius-inner); background: var(--field); }
-.bubble.from-user { margin-left: 18px; background: var(--accent-soft); }
+.bubble.from-user { margin-left: 18px; background: light-dark(#f3e8d5, #3c3324); }
 .bubble.from-agent { margin-right: 10px; border: 1px solid var(--hair); background: var(--solid); }
 .bubble.flash { animation: glow 1.2s var(--ease); }
 @keyframes glow { 0% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 3px transparent; } }
