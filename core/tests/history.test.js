@@ -468,6 +468,165 @@ test('invalid or unavailable history step counts refuse without consuming any st
   assert.deepEqual([runtime.undoStack, runtime.redoStack], stacks);
 });
 
+test('guarded state points navigate grouped edits as one atomic traversal and retain forward return', async t => {
+  const { runtime, id } = await fixture(t);
+  const initial = runtime.readHistory().timeline;
+  assert.equal(initial.points.length, 1);
+  const base = initial.current, name = runtime.settings.name, text = runtime.getEntry(id).document.nodes['title-text'].content;
+  const group = runtime.newGroup();
+  await runtime.patch({ documentId: id, expectedVersion: 1, group, label: 'Grouped move', patch: { artboard: { x: 400 } } });
+  const partial = runtime.readHistory().timeline.current;
+  await runtime.patch({ documentId: id, expectedVersion: 2, group, label: '', patch: { artboard: { x: 700 } } });
+  assert.equal(runtime.readTimeline().points.at(-1).label, 'Grouped move', 'endpoint captions follow the actual merged stack label');
+  await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { name: 'Point target' } });
+  await runtime.patch({ documentId: id, expectedVersion: 3, patch: { nodes: { 'title-text': { content: 'After edits' } } } });
+  const timeline = runtime.readHistory().timeline, ids = timeline.points.map(point => point.id);
+  assert.equal(ids.length, 4, 'one drag/group is one endpoint, not each live partial');
+  assert.ok(!ids.includes(partial));
+  assert.equal(runtime.info().history.pointId, timeline.current);
+  let writes = 0;
+  const persist = runtime.persist.bind(runtime);
+  runtime.persist = (...args) => { writes++; return persist(...args); };
+  const revision = runtime.revision;
+  const result = await runtime.navigateHistory({ pointId: base, expectedPoint: timeline.current });
+  assert.equal(result.changed, true); assert.equal(result.pointId, base);
+  assert.equal(runtime.revision, revision + 1); assert.equal(writes, 1);
+  assert.equal(runtime.getEntry(id).document.artboard.x, 80);
+  assert.equal(runtime.getEntry(id).document.nodes['title-text'].content, text); assert.equal(runtime.settings.name, name);
+  assert.deepEqual(runtime.readHistory().timeline.points.map(point => point.id), ids);
+  assert.equal(runtime.readHistory().timeline.index, 0);
+  const unchanged = runtime.readHistory();
+  assert.equal((await runtime.navigateHistory({ pointId: base, expectedPoint: base })).changed, false);
+  assert.equal(writes, 1); assert.equal(runtime.revision, revision + 1); assert.deepEqual(runtime.readHistory(), unchanged);
+  await runtime.navigateHistory({ pointId: timeline.current, expectedPoint: base });
+  assert.equal(writes, 2); assert.equal(runtime.settings.name, 'Point target');
+  assert.equal(runtime.getEntry(id).document.artboard.x, 700);
+  assert.equal(runtime.getEntry(id).document.nodes['title-text'].content, 'After edits');
+  assert.deepEqual(runtime.readHistory().timeline.points.map(point => point.id), ids);
+  await runtime.undo({ documentId: id });
+  assert.equal(runtime.readTimeline().current, ids.at(-2), 'a scoped replay of the newest whole group stays linear');
+  await runtime.redo({ documentId: id });
+  assert.equal(runtime.readTimeline().current, timeline.current);
+});
+
+test('point authority moves even when a net-equal group emits no replay audit diff', async t => {
+  const { runtime, id } = await fixture(t);
+  const base = runtime.readTimeline().current, group = runtime.newGroup();
+  await runtime.patch({ documentId: id, expectedVersion: 1, group, patch: { artboard: { x: 400 } } });
+  await runtime.patch({ documentId: id, expectedVersion: 2, group, patch: { artboard: { x: 80 } } });
+  const target = runtime.readTimeline().current, seq = runtime.seq;
+  await runtime.navigateHistory({ pointId: base, expectedPoint: target });
+  assert.equal(runtime.seq, seq, 'no authored diff is invented merely to move a history cursor');
+  assert.equal(runtime.historyHead().pointId, base);
+  await runtime.navigateHistory({ pointId: target, expectedPoint: base });
+  assert.equal(runtime.seq, seq); assert.equal(runtime.historyHead().pointId, target);
+  assert.equal(runtime.getEntry(id).document.artboard.x, 80);
+});
+
+test('point navigation rejects stale frontiers, discarded branches and queued stale heads without writing', async t => {
+  const { runtime, id } = await fixture(t);
+  const base = runtime.readTimeline().current, group = runtime.newGroup();
+  await runtime.patch({ documentId: id, expectedVersion: 1, group, patch: { artboard: { x: 400 } } });
+  const partial = runtime.readTimeline().current;
+  await runtime.patch({ documentId: id, expectedVersion: 2, group, patch: { artboard: { x: 700 } } });
+  const head = runtime.readTimeline().current, source = await fs.readFile(runtime.projectPath), history = runtime.readHistory();
+  await assert.rejects(() => runtime.navigateHistory({ pointId: base, expectedPoint: partial }), { code: 'HISTORY_CONFLICT' });
+  await assert.rejects(() => runtime.navigateHistory({ pointId: partial, expectedPoint: head }), { code: 'HISTORY_POINT_UNAVAILABLE' });
+  for (const query of [undefined, null, 1, {}, { pointId: 1, expectedPoint: head }, { pointId: head, expectedPoint: null }]) await assert.rejects(() => runtime.navigateHistory(query), { code: 'INVALID_QUERY' });
+  assert.deepEqual(await fs.readFile(runtime.projectPath), source); assert.deepEqual(runtime.readHistory(), history);
+  runtime.say({ text: 'An observation is not a new state point.' }); runtime.setAgent({ connected: true });
+  assert.equal(runtime.readTimeline().current, head, 'audit and host activity do not move the content cursor');
+  await runtime.undo();
+  await runtime.patch({ documentId: id, expectedVersion: runtime.getEntry(id).document.version, patch: { name: 'New branch' } });
+  const branch = runtime.readTimeline().current;
+  await assert.rejects(() => runtime.navigateHistory({ pointId: head, expectedPoint: branch }), { code: 'HISTORY_POINT_UNAVAILABLE' });
+  const revision = runtime.revision;
+  const pending = runtime.patch({ documentId: id, expectedVersion: runtime.getEntry(id).document.version, patch: { artboard: { x: 999 } } });
+  await assert.rejects(() => runtime.navigateHistory({ pointId: base, expectedPoint: branch }), { code: 'HISTORY_CONFLICT' });
+  await pending;
+  assert.equal(runtime.revision, revision + 1); assert.equal(runtime.getEntry(id).document.artboard.x, 999);
+});
+
+test('non-top selective replay and untracked acceptance preserve legacy stacks but cut advertised endpoints', async t => {
+  const { runtime, id } = await fixture(t);
+  const base = runtime.readTimeline().current;
+  await runtime.patch({ documentId: id, expectedVersion: 1, patch: { artboard: { x: 400 } } });
+  await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { name: 'Keep settings' } });
+  const old = runtime.readTimeline().points.map(point => point.id);
+  await runtime.undo({ documentId: id });
+  let timeline = runtime.readTimeline();
+  assert.equal(timeline.boundary, 'nonlinear'); assert.equal(timeline.points.length, 1);
+  assert.equal(timeline.pastLimited, true); assert.equal(timeline.futureLimited, true);
+  assert.equal(runtime.undoStack.length, 1); assert.equal(runtime.redoStack.length, 1);
+  await assert.rejects(() => runtime.navigateHistory({ pointId: base, expectedPoint: timeline.current }), { code: 'HISTORY_POINT_UNAVAILABLE' });
+  await runtime.redo({ documentId: id });
+  assert.equal(runtime.getEntry(id).document.artboard.x, 400); assert.equal(runtime.settings.name, 'Keep settings');
+  assert.ok(!old.includes(runtime.readTimeline().current), 'a nonlinear round trip does not guess identity from content or audit sequences');
+  await runtime.patch({ documentId: id, expectedVersion: runtime.getEntry(id).document.version, patch: { name: 'Fresh step' } });
+  assert.equal(runtime.readTimeline().points.length, 2);
+  await runtime.patch({ documentId: id, expectedVersion: runtime.getEntry(id).document.version, patch: { artboard: { y: 900 } }, undoable: false });
+  timeline = runtime.readTimeline();
+  assert.equal(timeline.boundary, 'untracked'); assert.equal(timeline.points.length, 1);
+  const depth = runtime.undoStack.length;
+  await runtime.undo();
+  assert.equal(runtime.undoStack.length, depth - 1);
+  assert.equal(runtime.getEntry(id).document.artboard.y, 900, 'legacy selective field matching still preserves unrelated changes');
+  assert.equal(runtime.readTimeline().boundary, 'nonlinear');
+});
+
+test('state-point traversal retains order/lifecycle and preserves endpoint authority on persistence refusal', async t => {
+  const { runtime } = await fixture(t);
+  for (const name of ['Alpha', 'Beta']) await runtime.createArtboard({ name });
+  const base = runtime.readTimeline().current, original = [...runtime.documents.keys()];
+  const project = JSON.parse(await fs.readFile(runtime.projectPath, 'utf8'));
+  project.frames = [project.frames[2], { ...structuredClone(project.frames[1]), id: 'extra', name: 'Extra' }, project.frames[0]];
+  await fs.writeFile(runtime.projectPath, JSON.stringify(project)); await runtime.scan();
+  const target = runtime.readTimeline().current, order = [...runtime.documents.keys()];
+  const history = runtime.readHistory(), stacks = structuredClone([runtime.undoStack, runtime.redoStack]), source = await fs.readFile(runtime.projectPath);
+  const persist = runtime.persist;
+  runtime.persist = async () => { throw new Error('Point publication refused'); };
+  try { await assert.rejects(() => runtime.navigateHistory({ pointId: base, expectedPoint: target }), /Point publication refused/); }
+  finally { runtime.persist = persist; }
+  assert.deepEqual(runtime.readHistory(), history); assert.deepEqual([runtime.undoStack, runtime.redoStack], stacks);
+  assert.deepEqual(await fs.readFile(runtime.projectPath), source); assert.deepEqual([...runtime.documents.keys()], order);
+  await runtime.navigateHistory({ pointId: base, expectedPoint: target }); assert.deepEqual([...runtime.documents.keys()], original);
+  await runtime.navigateHistory({ pointId: target, expectedPoint: base }); assert.deepEqual([...runtime.documents.keys()], order);
+  await runtime.adopt(runtime.settings, [...runtime.documents.values()].map(entry => entry.document));
+  assert.equal(runtime.readTimeline().boundary, 'untracked', 'whole-source replacement cannot leave old endpoints advertised');
+  await assert.rejects(() => runtime.navigateHistory({ pointId: base, expectedPoint: runtime.readTimeline().current }), { code: 'HISTORY_POINT_UNAVAILABLE' });
+});
+
+test('retained point navigation is bounded by the existing 200 groups, independently of audit filtering', async t => {
+  const { runtime, id } = await fixture(t);
+  const base = runtime.readTimeline().current;
+  for (let index = 0; index < 202; index++) await runtime.patch({ documentId: id, expectedVersion: runtime.getEntry(id).document.version, patch: { artboard: { x: 1000 + index } } });
+  const timeline = runtime.readHistory({ limit: 1, actor: 'file' }).timeline;
+  assert.equal(timeline.points.length, 201); assert.equal(timeline.index, 200); assert.equal(timeline.boundary, 'retained');
+  assert.ok(!timeline.points.some(point => point.id === base));
+  await assert.rejects(() => runtime.navigateHistory({ pointId: base, expectedPoint: timeline.current }), { code: 'HISTORY_POINT_UNAVAILABLE' });
+  await runtime.navigateHistory({ pointId: timeline.points[0].id, expectedPoint: timeline.current });
+  assert.equal(runtime.getEntry(id).document.artboard.x, 1001);
+  assert.equal(runtime.readTimeline().index, 0);
+});
+
+test('point reads survive client reload but not a runtime restart or source serialization', async () => {
+  const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-points-'));
+  let first, second;
+  try {
+    await legacyProject(path.join(cwd, 'project.divlet'), { demo: true });
+    first = await openRuntime({ cwd, watch: false });
+    const read = async () => (await (await fetch(first.url + 'api/history')).json()).timeline;
+    const initial = await read(); assert.deepEqual(await read(), initial);
+    await first.patch({ documentId: 'welcome', expectedVersion: 1, patch: { name: 'Before restart' } });
+    const previous = first.readTimeline();
+    assert.ok(!(await fs.readFile(first.projectPath, 'utf8')).includes(previous.current), 'state point IDs are not authored project fields');
+    await first.close(); second = await openRuntime({ cwd, watch: false });
+    const next = second.readTimeline();
+    assert.equal(next.points.length, 1); assert.equal(next.boundary, 'opened'); assert.notEqual(next.current, previous.current);
+    await assert.rejects(() => second.navigateHistory({ pointId: previous.current, expectedPoint: next.current }), { code: 'HISTORY_POINT_UNAVAILABLE' });
+  } finally { await first?.close(); await second?.close(); await fs.rm(cwd, { recursive: true, force: true }); }
+});
+
 test('HTTP mutation endpoints act as the user and stream change events', async t => {
   const { runtime, id } = await fixture(t);
   const url = runtime.url;

@@ -13,6 +13,7 @@ import { registerBoard, unregisterBoard } from './boards.ts';
 import { buildSite } from './site.ts';
 import { diffDocuments, diffValue, matchesPatch, summarizeChange, touchedNodeIds } from './diff.ts';
 import { operationPatch } from './ops.ts';
+import { HistoryLine } from './history.ts';
 import { expandPath, inspectPath, initProject, resolveProject, isProjectFile } from './projects.ts';
 import { OutputStore, safeDirectory } from './output.ts';
 import { buildStatic, readResourceBytes, normalizeExternalFiles } from './static.js';
@@ -107,6 +108,7 @@ function assertExpectedRender(expected, entry) {
  * Source-relative assets and preview URLs do not depend on the output directory.
  */
 export class DivletRuntime extends EventEmitter {
+  #historyLine;
   /** `file` selects one project; directory convenience defaults to project.divlet. */
   constructor({ cwd, dir, file, watch = true, externalFiles = [] }) {
     super();
@@ -142,6 +144,7 @@ export class DivletRuntime extends EventEmitter {
     this.seq = 0;
     this.undoStack = [];
     this.redoStack = [];
+    this.#historyLine = new HistoryLine(() => randomBytes(12).toString('hex'));
     this.groupCounter = 0;
     this.agent = { connected: false, busy: false, activity: null, since: null, queued: 0 };
     this.host = null; // set by whoever started the board: { open(path) → { url } }, so the board can open other projects
@@ -179,7 +182,7 @@ export class DivletRuntime extends EventEmitter {
   }
 
   historyHead() {
-    return { seq: this.seq, canUndo: this.undoStack.length > 0, canRedo: this.redoStack.length > 0, undoLabel: this.undoStack.at(-1)?.label ?? null, redoLabel: this.redoStack.at(-1)?.label ?? null };
+    return { seq: this.seq, pointId: this.#historyLine.currentId, canUndo: this.undoStack.length > 0, canRedo: this.redoStack.length > 0, undoLabel: this.undoStack.at(-1)?.label ?? null, redoLabel: this.redoStack.at(-1)?.label ?? null };
   }
 
   readHistory({ since = 0, limit = 50, documentId, actor } = {}) {
@@ -187,16 +190,21 @@ export class DivletRuntime extends EventEmitter {
     let changes = this.history.filter(change => change.seq > since && (!documentId || change.documentId === documentId) && (!actor || change.actor === actor));
     const truncated = changes.length > limit;
     changes = changes.slice(-limit);
-    return { ...this.historyHead(), truncated, changes: structuredClone(changes) };
+    return { ...this.historyHead(), timeline: this.readTimeline(), truncated, changes: structuredClone(changes) };
   }
 
-  pushUndo(entry) {
+  readTimeline() { return this.#historyLine.snapshot(this.undoStack, this.redoStack); }
+
+  pushUndo(entry, { seq = this.seq, firstSeq = seq } = {}) {
     const top = this.undoStack.at(-1);
+    const merged = !!entry.group && top?.group === entry.group;
     // One gesture that commits while it runs keeps one undo step; its label describes the committed state it ended in.
-    if (entry.group && top?.group === entry.group) { top.items.push(...entry.items); if (entry.label) top.label = entry.label; }
+    if (merged) { top.items.push(...entry.items); if (entry.label) top.label = entry.label; }
     else this.undoStack.push(entry);
     if (this.undoStack.length > UNDO_LIMIT) this.undoStack.shift();
     this.redoStack.length = 0;
+    const accepted = merged ? top : entry;
+    this.#historyLine.accept(accepted, { seq, firstSeq, label: accepted.label }, merged);
   }
 
   enqueue(task) {
@@ -710,6 +718,7 @@ export class DivletRuntime extends EventEmitter {
     await this.persist(next, { settings, write: stale, generation });
     this.settings = settings;
     this.documents = next;
+    this.#historyLine.reset({ seq: null, label: this.adopted ? 'Project replaced' : 'Opened project', boundary: this.adopted ? 'untracked' : 'opened' });
     this.adopted = true;
     this.revision++;
     await this.refreshSite();
@@ -834,6 +843,7 @@ await this.importProject(project.settings, project.frames, hash);
     for (const id of removed) { this.observations.delete(id); this.selection = { ...this.selection, ids: this.selection.ids.filter(item => item !== id), revision: this.selection.revision + 1 }; }
     await this.refreshSite();
     const group = this.newGroup();
+    const firstSeq = this.seq + 1;
     const items = [];
     if (settingsChanged) {
       this.record({ actor: 'file', kind: 'external', documentId: null, name: nextSettings.name, group, label: 'project.divlet edit', text: `project ${SETTINGS_FIELDS.filter(key => !isDeepStrictEqual(previousSettings[key], nextSettings[key])).join(', ')}` });
@@ -864,7 +874,7 @@ await this.importProject(project.settings, project.frames, hash);
       this.record({ actor: 'file', kind: 'external', documentId: null, group, label: 'project.divlet edit', text: 'frame order changed' });
       items.push({ type: 'order', inverse: before, forward: after });
     }
-    if (items.length) this.pushUndo({ group, label: 'edit of project.divlet', items });
+    if (items.length) this.pushUndo({ group, label: 'edit of project.divlet', items }, { firstSeq });
     this.publish();
   }
 
@@ -960,7 +970,8 @@ await this.importProject(project.settings, project.frames, hash);
     const entry = next.get(id);
     const count = Object.keys(entry.document.nodes).length;
     const change = this.record({ actor, kind, documentId: id, toVersion: entry.document.version, group, label, to: entry.document, from: { ...entry.document, nodes: {} }, text: text ?? `${kind === 'create' ? 'created' : 'restored'} “${entry.document.name}” · ${count} node${count === 1 ? '' : 's'}` });
-    if (undoable) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `create ${entry.document.name}`, items: [{ type: 'create', documentId: id, index: next.size - 1, document: structuredClone(entry.document) }] });
+    if (undoable) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `create ${entry.document.name}`, items: [{ type: 'create', documentId: id, index: next.size - 1, document: structuredClone(entry.document) }] }, { seq: change.seq });
+    else this.#historyLine.reset({ seq: change.seq, label: change.summary });
     this.publish();
     return { documentId: id, version: entry.document.version, render: entry.render, revision: this.revision, seq: change.seq, saved: true };
   }
@@ -984,7 +995,8 @@ await this.importProject(project.settings, project.frames, hash);
     this.revision++;
     await this.refreshSite();
     const change = this.record({ actor, kind, documentId, name: entry.document.name, fromVersion: entry.document.version, group, label, from: entry.document, to: { ...entry.document, nodes: {} }, text: `removed “${entry.document.name}” (its files are in divlet/.trash)` });
-    if (undoable) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `delete ${entry.document.name}`, items: [{ type: 'delete', documentId, index, document: structuredClone(entry.document) }] });
+    if (undoable) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `delete ${entry.document.name}`, items: [{ type: 'delete', documentId, index, document: structuredClone(entry.document) }] }, { seq: change.seq });
+    else this.#historyLine.reset({ seq: change.seq, label: change.summary });
     this.publish();
     return { documentId, seq: change.seq, revision: this.revision };
   }
@@ -1019,8 +1031,8 @@ await this.importProject(project.settings, project.frames, hash);
     await this.refreshSite();
     const change = this.record({ actor, kind, documentId, fromVersion: previous.document.version, toVersion: entry.document.version, group, label, from: previous.document, to: entry.document });
     if (undoable && change.summary !== 'no change') {
-      this.pushUndo({ group: group ?? this.newGroup(), label: label ?? change.summary, items: [{ type: 'patch', documentId, inverse: diffDocuments(entry.document, previous.document), forward: diffDocuments(previous.document, entry.document) }] });
-    }
+      this.pushUndo({ group: group ?? this.newGroup(), label: label ?? change.summary, items: [{ type: 'patch', documentId, inverse: diffDocuments(entry.document, previous.document), forward: diffDocuments(previous.document, entry.document) }] }, { seq: change.seq });
+    } else this.#historyLine.reset({ seq: change.seq, label: change.summary });
     this.publish();
     const nodeIds = new Set([...Object.keys(previous.document.nodes), ...Object.keys(entry.document.nodes)]);
     const changedNodeIds = [...nodeIds].filter(id => !isDeepStrictEqual(previous.document.nodes[id], entry.document.nodes[id]));
@@ -1049,7 +1061,8 @@ await this.importProject(project.settings, project.frames, hash);
     await this.refreshSite();
     const fields = SETTINGS_FIELDS.filter(key => !isDeepStrictEqual(previous[key], settings[key]));
     const change = this.record({ actor, kind, documentId: null, name: settings.name, group, label, text: fields.length ? `project ${fields.join(', ')}` : 'no change' });
-    if (undoable && fields.length) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `project ${fields.join(', ')}`, items: [{ type: 'project', inverse: settingsPatch(settings, previous), forward: settingsPatch(previous, settings) }] });
+    if (undoable && fields.length) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `project ${fields.join(', ')}`, items: [{ type: 'project', inverse: settingsPatch(settings, previous), forward: settingsPatch(previous, settings) }] }, { seq: change.seq });
+    else if (fields.length) this.#historyLine.reset({ seq: change.seq, label: change.summary });
     this.publish();
     const warnings = styleWarnings({ css: patch && Object.hasOwn(patch, 'css') ? [previous.css, settings.css] : null, where: 'Project css' });
     return { project: true, version: settings.version, revision: this.revision, seq: change.seq, summary: change.summary, saved: true, ...(warnings.length ? { warnings } : {}) };
@@ -1211,22 +1224,46 @@ await this.importProject(project.settings, project.frames, hash);
     }
   }
 
-  _step(from, to, direction, { documentId, actor = 'user', steps = 1 } = {}) {
+  _step(from, to, direction, options = {}) {
+    return this.enqueue(() => this._replay(from, to, direction, options));
+  }
+
+  async _replay(from, to, direction, { documentId, actor = 'user', steps = 1 } = {}) {
+    if (!Number.isInteger(steps) || steps < 1 || steps > UNDO_LIMIT) fail('INVALID_QUERY', `steps must be an integer from 1 to ${UNDO_LIMIT}.`);
+    const indexes = [];
+    for (let i = from.length - 1; i >= 0 && indexes.length < steps; i--) if (!documentId || from[i].items.some(item => item.documentId === documentId || item.documentIds?.includes(documentId))) indexes.push(i);
+    if (indexes.length < steps) fail('NOTHING_TO_UNDO', steps === 1 ? `Nothing to ${direction}.` : `Not enough history to ${direction} ${steps} steps.`);
+    const entries = indexes.map(index => from[index]);
+    const label = steps === 1 ? entries[0].label : `${direction} ${steps} steps`;
+    const seq = this.seq;
+    // _applyEntry reverses an undo's items; compose chronological entries so it reverses the whole traversal once.
+    const ordered = direction === 'undo' ? [...entries].reverse() : entries;
+    await this._applyEntry({ label, items: ordered.flatMap(entry => entry.items) }, direction, actor);
+    // Stacks and point identity change only after the complete candidate has validated and persisted.
+    for (const index of indexes) from.splice(index, 1);
+    to.push(...entries);
+    this.#historyLine.move(entries, direction, { seq: this.seq > seq ? this.seq : null, firstSeq: this.seq > seq ? seq + 1 : null, label });
+    this.publish();
+    return { ...this.historyHead(), label };
+  }
+
+  /**
+   * Navigate only the proven current segment, under the same queue and single-candidate replay as Undo/Redo.
+   * @param {import('./history.ts').HistoryNavigation} options
+   */
+  navigateHistory(options) {
     return this.enqueue(async () => {
-      if (!Number.isInteger(steps) || steps < 1 || steps > UNDO_LIMIT) fail('INVALID_QUERY', `steps must be an integer from 1 to ${UNDO_LIMIT}.`);
-      const indexes = [];
-      for (let i = from.length - 1; i >= 0 && indexes.length < steps; i--) if (!documentId || from[i].items.some(item => item.documentId === documentId || item.documentIds?.includes(documentId))) indexes.push(i);
-      if (indexes.length < steps) fail('NOTHING_TO_UNDO', steps === 1 ? `Nothing to ${direction}.` : `Not enough history to ${direction} ${steps} steps.`);
-      const entries = indexes.map(index => from[index]);
-      const label = steps === 1 ? entries[0].label : `${direction} ${steps} steps`;
-      // _applyEntry reverses an undo's items; compose chronological entries so it reverses the whole traversal once.
-      const ordered = direction === 'undo' ? [...entries].reverse() : entries;
-      await this._applyEntry({ label, items: ordered.flatMap(entry => entry.items) }, direction, actor);
-      // Stack authority changes only after the complete candidate has validated and persisted.
-      for (const index of indexes) from.splice(index, 1);
-      to.push(...entries);
-      this.publish();
-      return { ...this.historyHead(), label };
+      const { pointId, expectedPoint, actor = 'user' } = options ?? {};
+      if (typeof pointId !== 'string' || !pointId || typeof expectedPoint !== 'string' || !expectedPoint) fail('INVALID_QUERY', 'pointId and expectedPoint must be nonempty state point IDs.');
+      const timeline = this.readTimeline();
+      if (expectedPoint !== timeline.current) fail('HISTORY_CONFLICT', 'History changed since it was read. Read the current timeline before navigating.');
+      const index = timeline.points.findIndex(point => point.id === pointId);
+      if (index < 0) fail('HISTORY_POINT_UNAVAILABLE', 'That state point is no longer on the retained current history segment.');
+      const delta = index - timeline.index;
+      if (!delta) return { ...this.historyHead(), changed: false };
+      const direction = delta < 0 ? 'undo' : 'redo';
+      const from = delta < 0 ? this.undoStack : this.redoStack, to = delta < 0 ? this.redoStack : this.undoStack;
+      return { ...await this._replay(from, to, direction, { actor, steps: Math.abs(delta) }), changed: true };
     });
   }
 
