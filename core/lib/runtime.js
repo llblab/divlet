@@ -845,15 +845,24 @@ await this.importProject(project.settings, project.frames, hash);
       this.record({ actor: 'file', kind: 'external', documentId: id, fromVersion: from.version, toVersion: to.version, group, label: 'project.divlet edit', from, to });
       items.push({ type: 'patch', documentId: id, inverse: diffDocuments(to, from), forward: diffDocuments(from, to) });
     }
+    const previousOrder = [...previous.keys()], nextOrder = [...next.keys()];
+    const previousIndex = new Map(previousOrder.map((id, index) => [id, index]));
+    const nextIndex = new Map(nextOrder.map((id, index) => [id, index]));
+    // Remove from the end, then insert at final positions: reverse replay restores original positions from the start.
+    for (const id of [...removed].reverse()) {
+      const from = previous.get(id).document;
+      this.record({ actor: 'file', kind: 'delete', documentId: id, name: from.name, fromVersion: from.version, group, from, to: { ...from, nodes: {} }, text: `frame removed “${from.name}”` });
+      items.push({ type: 'delete', documentId: id, index: previousIndex.get(id), document: structuredClone(from) });
+    }
     for (const id of created) {
       const to = next.get(id).document;
       this.record({ actor: 'file', kind: 'create', documentId: id, toVersion: to.version, group, from: { ...to, nodes: {} }, to, text: `new frame “${to.name}” · ${Object.keys(to.nodes).length} nodes` });
-      items.push({ type: 'create', documentId: id, document: structuredClone(to) });
+      items.push({ type: 'create', documentId: id, index: nextIndex.get(id), document: structuredClone(to) });
     }
-    for (const id of removed) {
-      const from = previous.get(id).document;
-      this.record({ actor: 'file', kind: 'delete', documentId: id, name: from.name, fromVersion: from.version, group, from, to: { ...from, nodes: {} }, text: `frame removed “${from.name}”` });
-      items.push({ type: 'delete', documentId: id, document: structuredClone(from) });
+    const before = previousOrder.filter(id => next.has(id)), after = nextOrder.filter(id => previous.has(id));
+    if (!isDeepStrictEqual(before, after)) {
+      this.record({ actor: 'file', kind: 'external', documentId: null, group, label: 'project.divlet edit', text: 'frame order changed' });
+      items.push({ type: 'order', inverse: before, forward: after });
     }
     if (items.length) this.pushUndo({ group, label: 'edit of project.divlet', items });
     this.publish();
@@ -951,7 +960,7 @@ await this.importProject(project.settings, project.frames, hash);
     const entry = next.get(id);
     const count = Object.keys(entry.document.nodes).length;
     const change = this.record({ actor, kind, documentId: id, toVersion: entry.document.version, group, label, to: entry.document, from: { ...entry.document, nodes: {} }, text: text ?? `${kind === 'create' ? 'created' : 'restored'} “${entry.document.name}” · ${count} node${count === 1 ? '' : 's'}` });
-    if (undoable) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `create ${entry.document.name}`, items: [{ type: 'create', documentId: id, document: structuredClone(entry.document) }] });
+    if (undoable) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `create ${entry.document.name}`, items: [{ type: 'create', documentId: id, index: next.size - 1, document: structuredClone(entry.document) }] });
     this.publish();
     return { documentId: id, version: entry.document.version, render: entry.render, revision: this.revision, seq: change.seq, saved: true };
   }
@@ -963,6 +972,7 @@ await this.importProject(project.settings, project.frames, hash);
     assertExpectedVersion(expectedVersion, entry.document);
     const users = this.usedBy(documentId);
     if (users.length) fail('COMPONENT_IN_USE', `“${entry.document.name}” has components used by ${users.join(', ')}. Detach or replace those instances first.`, { usedBy: users });
+    const index = [...this.documents.keys()].indexOf(documentId);
     const next = new Map(this.documents);
     next.delete(documentId);
     await this.persist(next, { removed: [entry] });
@@ -974,7 +984,7 @@ await this.importProject(project.settings, project.frames, hash);
     this.revision++;
     await this.refreshSite();
     const change = this.record({ actor, kind, documentId, name: entry.document.name, fromVersion: entry.document.version, group, label, from: entry.document, to: { ...entry.document, nodes: {} }, text: `removed “${entry.document.name}” (its files are in divlet/.trash)` });
-    if (undoable) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `delete ${entry.document.name}`, items: [{ type: 'delete', documentId, document: structuredClone(entry.document) }] });
+    if (undoable) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `delete ${entry.document.name}`, items: [{ type: 'delete', documentId, index, document: structuredClone(entry.document) }] });
     this.publish();
     return { documentId, seq: change.seq, revision: this.revision };
   }
@@ -1129,7 +1139,7 @@ await this.importProject(project.settings, project.frames, hash);
     const items = undoing ? [...entry.items].reverse() : entry.items;
     const previous = this.documents;
     const previousSettings = this.settings;
-    const frames = new Map([...previous].map(([id, item]) => [id, item.document]));
+    let frames = new Map([...previous].map(([id, item]) => [id, item.document]));
     let settings = previousSettings;
     let prepared;
     try {
@@ -1143,13 +1153,22 @@ await this.importProject(project.settings, project.frames, hash);
         } else if (item.type === 'project') {
           if (!matchesPatch({ ...settings, outputDir: settings.outputDir ?? undefined }, expected, change)) fail('CANNOT_UNDO', 'Later changes touched the same project fields.');
           settings = patchSettings(settings, change);
+        } else if (item.type === 'order') {
+          const members = new Set(expected);
+          if (!isDeepStrictEqual([...frames.keys()].filter(id => members.has(id)), expected)) fail('CANNOT_UNDO', 'Later changes touched the same frame order.');
+          let index = 0;
+          // Reorder only this step's frames; unrelated later frames retain their slots and content.
+          const ids = [...frames.keys()].map(id => members.has(id) ? change[index++] : id);
+          frames = new Map(ids.map(id => [id, frames.get(id)]));
         } else if ((item.type === 'create') === undoing) {
           const current = frames.get(item.documentId);
           if (!current || !sameDocument(current, item.document)) fail('CANNOT_UNDO', `Frame ${item.documentId} has changed since this step.`);
           frames.delete(item.documentId);
         } else {
           if (frames.has(item.documentId)) fail('CANNOT_UNDO', `Frame ${item.documentId} already exists.`);
-          frames.set(item.documentId, item.document);
+          const ordered = [...frames];
+          ordered.splice(item.index ?? ordered.length, 0, [item.documentId, item.document]);
+          frames = new Map(ordered);
         }
       }
       for (const [id, frame] of frames) {
@@ -1177,6 +1196,8 @@ await this.importProject(project.settings, project.frames, hash);
     await this.refreshSite();
     const group = this.newGroup();
     const meta = { actor, group, kind: direction, label: entry.label };
+    const beforeOrder = [...previous.keys()].filter(id => next.has(id)), afterOrder = [...next.keys()].filter(id => previous.has(id));
+    if (!isDeepStrictEqual(beforeOrder, afterOrder)) this.record({ ...meta, documentId: null, text: 'frame order changed' });
     if (!sameSettings(previousSettings, settings)) this.record({ ...meta, documentId: null, name: settings.name, text: `project ${SETTINGS_FIELDS.filter(key => !isDeepStrictEqual(previousSettings[key], settings[key])).join(', ')}` });
     for (const [id, current] of next) {
       const from = previous.get(id)?.document;

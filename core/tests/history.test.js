@@ -197,6 +197,27 @@ test('artboards can be created, duplicated and deleted with undo', async t => {
   assert.equal(runtime.info().documents.some(doc => doc.id === 'phone'), true);
 });
 
+test('frame lifecycle replay restores authored order, including grouped deletion and multi-step return', async t => {
+  const { runtime, id } = await fixture(t);
+  for (const name of ['Alpha', 'Beta', 'Gamma']) await runtime.createArtboard({ name });
+  const order = () => [...runtime.documents.keys()];
+  const original = order();
+  await runtime.removeDocument({ documentId: 'alpha' });
+  await runtime.undo();
+  assert.deepEqual(order(), original, 'restoring a middle frame must not append it');
+  await runtime.redo(); await runtime.undo();
+  assert.deepEqual(order(), original);
+  const group = runtime.newGroup();
+  for (const documentId of [id, 'beta']) await runtime.removeDocument({ documentId, group });
+  await runtime.undo();
+  assert.deepEqual(order(), original, 'reverse group replay restores each original position');
+  await runtime.redo();
+  await runtime.createArtboard({ name: 'Later' });
+  await runtime.undo({ steps: 2 });
+  assert.deepEqual(order(), original, 'a lifecycle traversal accepts the exact original order');
+  assert.deepEqual(JSON.parse(await fs.readFile(runtime.projectPath, 'utf8')).frames.map(frame => frame.id), original);
+});
+
 test('structured edit operations log the acting user', async t => {
   const { runtime, id } = await fixture(t);
   const result = await runtime.edit({ documentId: id, expectedVersion: 1, op: { type: 'duplicate', id: 'card-one' }, actor: 'user' });
@@ -222,6 +243,86 @@ test('external file edits appear in the log as file changes and can be undone', 
   await runtime.undo();
   assert.notEqual(runtime.read({ view: 'document', documentId: id }).nodes['title-text'].content, 'Edited by hand');
   validateDocument(runtime.read({ view: 'document', documentId: id }));
+});
+
+test('external frame-order-only edits are one undoable project change', async t => {
+  const { runtime } = await fixture(t);
+  for (const name of ['Alpha', 'Beta', 'Gamma']) await runtime.createArtboard({ name });
+  const before = [...runtime.documents.keys()], depth = runtime.undoStack.length;
+  const project = JSON.parse(await fs.readFile(runtime.projectPath, 'utf8'));
+  project.frames.reverse();
+  await fs.writeFile(runtime.projectPath, JSON.stringify(project)); await runtime.scan();
+  assert.deepEqual([...runtime.documents.keys()], [...before].reverse());
+  assert.equal(runtime.undoStack.length, depth + 1, 'frame order is not just an untracked source rewrite');
+  assert.match(runtime.readHistory().changes.at(-1).summary, /frame order/);
+  await runtime.undo(); assert.deepEqual([...runtime.documents.keys()], before);
+  assert.equal(runtime.readHistory().changes.at(-1).kind, 'undo');
+  await runtime.redo(); assert.deepEqual([...runtime.documents.keys()], [...before].reverse());
+  assert.equal(runtime.readHistory().changes.at(-1).kind, 'redo');
+  assert.deepEqual(JSON.parse(await fs.readFile(runtime.projectPath, 'utf8')).frames.map(frame => frame.id), [...before].reverse());
+});
+
+test('external lifecycle, reorder, content and settings replay together without disturbing an unrelated later frame', async t => {
+  const { runtime, id } = await fixture(t);
+  for (const name of ['Alpha', 'Beta', 'Gamma']) await runtime.createArtboard({ name });
+  const before = [...runtime.documents.values()].map(entry => structuredClone(entry.document)), name = runtime.settings.name;
+  const project = JSON.parse(await fs.readFile(runtime.projectPath, 'utf8'));
+  const extra = { ...structuredClone(project.frames[1]), id: 'extra', name: 'Extra' };
+  project.frames = [project.frames[3], extra, project.frames[0]];
+  project.frames[2].nodes['title-text'].content = 'External title'; project.name = 'External settings';
+  const after = project.frames.map(frame => frame.id);
+  await fs.writeFile(runtime.projectPath, JSON.stringify(project)); await runtime.scan();
+  assert.deepEqual([...runtime.documents.keys()], after);
+  await runtime.undo();
+  assert.deepEqual([...runtime.documents.keys()], before.map(frame => frame.id));
+  assert.deepEqual([...runtime.documents.values()].map(entry => strip(entry.document)), before.map(strip));
+  assert.equal(runtime.settings.name, name);
+  await runtime.redo();
+  assert.deepEqual([...runtime.documents.keys()], after);
+  assert.equal(runtime.read({ view: 'document', documentId: id }).nodes['title-text'].content, 'External title');
+  assert.equal(runtime.settings.name, 'External settings');
+  await runtime.createArtboard({ name: 'Later' });
+  await runtime.undo({ documentId: id });
+  assert.deepEqual([...runtime.documents.keys()], [...before.map(frame => frame.id), 'later']);
+  assert.equal(runtime.settings.name, name);
+  assert.deepEqual(JSON.parse(await fs.readFile(runtime.projectPath, 'utf8')).frames.map(frame => frame.id), [...before.map(frame => frame.id), 'later']);
+});
+
+test('external membership/order replay covers head/tail deletion, replacement and empty projects', async t => {
+  const { runtime } = await fixture(t);
+  for (const name of ['Alpha', 'Beta', 'Gamma']) await runtime.createArtboard({ name });
+  const before = [...runtime.documents.keys()], source = JSON.parse(await fs.readFile(runtime.projectPath, 'utf8'));
+  const frames = new Map(source.frames.map(frame => [frame.id, frame]));
+  for (const id of ['extra', 'second']) frames.set(id, { ...structuredClone(source.frames[1]), id, name: id });
+  for (const target of [['gamma', 'extra', 'welcome'], ['gamma', 'extra'], ['extra', 'gamma'], ['extra', 'second'], []]) {
+    const project = JSON.parse(await fs.readFile(runtime.projectPath, 'utf8'));
+    project.frames = target.map(id => frames.get(id));
+    await fs.writeFile(runtime.projectPath, JSON.stringify(project)); await runtime.scan();
+    assert.deepEqual([...runtime.documents.keys()], target);
+    await runtime.undo(); assert.deepEqual([...runtime.documents.keys()], before, `undo ${JSON.stringify(target)}`);
+    await runtime.redo(); assert.deepEqual([...runtime.documents.keys()], target, `redo ${JSON.stringify(target)}`);
+    await runtime.undo(); assert.deepEqual([...runtime.documents.keys()], before);
+  }
+});
+
+test('overlapping later frame order refuses replay without changing accepted state or stacks', async t => {
+  for (const direction of ['undo', 'redo']) {
+    const { runtime, id } = await fixture(t);
+    for (const name of ['Alpha', 'Beta']) await runtime.createArtboard({ name });
+    const project = JSON.parse(await fs.readFile(runtime.projectPath, 'utf8'));
+    project.frames.reverse();
+    await fs.writeFile(runtime.projectPath, JSON.stringify(project)); await runtime.scan();
+    if (direction === 'redo') await runtime.undo();
+    const entries = [...runtime.documents.values()].map(entry => entry.document);
+    await runtime.adopt(runtime.settings, [entries[1], entries[0], entries[2]]);
+    const before = runtime.info(), history = runtime.readHistory(), stacks = structuredClone([runtime.undoStack, runtime.redoStack]);
+    const source = await fs.readFile(runtime.projectPath), output = await fs.readFile(runtime.getEntry(id).htmlPath);
+    await assert.rejects(() => runtime[direction](), { code: 'CANNOT_UNDO' }, `${direction} refuses conflicting frame order`);
+    assert.deepEqual(runtime.info(), before); assert.deepEqual(runtime.readHistory(), history);
+    assert.deepEqual([runtime.undoStack, runtime.redoStack], stacks);
+    assert.deepEqual(await fs.readFile(runtime.projectPath), source);
+    assert.deepEqual(await fs.readFile(runtime.getEntry(id).htmlPath), output);
+  }
 });
 
 test('multi-step history replays dependent edits in order with one accepted commit', async t => {
