@@ -658,9 +658,9 @@ try {
   }
   checks.push('a dragged-narrow sidebar adapts: no overflow, one-line context, short placeholder and hints');
 
-  // Warm user bubbles are independent of the work/error accents in automatic and explicitly selected themes.
+  // Blue user bubbles are independent of the work/error accents in automatic and explicitly selected themes.
   const originalTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
-  for (const [theme, system, expected] of [[null, 'light', 'rgb(243, 232, 213)'], [null, 'dark', 'rgb(60, 51, 36)'], ['light', 'dark', 'rgb(243, 232, 213)'], ['dark', 'light', 'rgb(60, 51, 36)']]) {
+  for (const [theme, system, expected] of [[null, 'light', 'rgb(228, 237, 248)'], [null, 'dark', 'rgb(24, 43, 69)'], ['light', 'dark', 'rgb(228, 237, 248)'], ['dark', 'light', 'rgb(24, 43, 69)']]) {
     await page.emulateMedia({ colorScheme: system });
     await page.evaluate(theme => { if (theme) document.documentElement.dataset.theme = theme; else document.documentElement.removeAttribute('data-theme'); }, theme);
     const palette = await page.locator('#agent .bubble.from-user').first().evaluate(bubble => {
@@ -670,13 +670,13 @@ try {
       const ratios = ['.rich', '.bubble-head b', 'time'].map(selector => { const fg = lum(getComputedStyle(bubble.querySelector(selector)).color); return (Math.max(fg, bg) + .05) / (Math.min(fg, bg) + .05); });
       return { background, ratios, agent: getComputedStyle(document.querySelector('.bubble.from-agent')).backgroundColor };
     });
-    assert.equal(palette.background, expected, `warm user bubble for ${theme || 'auto'}/${system}`);
+    assert.equal(palette.background, expected, `blue user bubble for ${theme || 'auto'}/${system}`);
     assert.notEqual(palette.agent, palette.background, 'agent replies retain their distinct neutral surface');
     assert.ok(palette.ratios.every(ratio => ratio >= 4.5), `body, author and timestamp meet AA: ${JSON.stringify(palette.ratios)}`);
   }
   await page.emulateMedia({ colorScheme: null });
   await page.evaluate(theme => { if (theme) document.documentElement.dataset.theme = theme; else document.documentElement.removeAttribute('data-theme'); }, originalTheme);
-  checks.push('user chat bubbles are warm sand/amber, distinct from replies, with AA text contrast in automatic and explicit light/dark themes');
+  checks.push('user chat bubbles are cool blue/navy, distinct from replies, with AA text contrast in automatic and explicit light/dark themes');
 
   // A long arbitrary class is shown whole: it wraps inside its chip.
   await page.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav']); });
@@ -801,9 +801,11 @@ try {
       await page.setViewportSize({ width, height: 900 });
       await page.evaluate(async size => (await import('./lib/help.js')).setUiSize(size), size);
       if (width === 900) {
+        await waitUntil(() => grip.evaluate(node => Math.abs(node.getBoundingClientRect().left - document.querySelector('#inspector').getBoundingClientRect().left + 4) < 1), 'the resize grip follows the changed viewport before dragging');
         const box = await grip.boundingBox(), now = Number(await grip.getAttribute('aria-valuenow'));
         await page.mouse.move(box.x + 4, box.y + box.height / 2); await page.mouse.down();
         await page.mouse.move(box.x + 4 + now - 320, box.y + box.height / 2, { steps: 6 }); await page.mouse.up();
+        await waitUntil(() => page.locator('#inspector').evaluate(node => Math.abs(node.getBoundingClientRect().width - 320) < 1), 'the mixed-height selector row really has 320px');
       }
       await waitUntil(async () => (await page.locator('#inspector .pick').count()) > 0, 'the inspector keeps a selector');
       const pick = page.locator('#inspector [data-section="layout"] .pick').first();
