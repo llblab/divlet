@@ -55,6 +55,90 @@ try {
   assert.equal(await page.evaluate(() => localStorage.getItem('divlet:width:inspector')), null, 'a click without a drag stores nothing');
   checks.push('only a real drag makes the inspector width the user\'s own');
 
+  // Explicit panel preferences outrank auto sizing; constraints change rendering, never the saved choice.
+  {
+    const context = await browser.newContext({ viewport: { width: 1500, height: 900 } });
+    const memory = await context.newPage();
+    memory.on('pageerror', error => errors.push(error.message));
+    const prepare = async () => {
+      await memory.waitForFunction(() => document.querySelectorAll('.artboard').length > 0);
+      await memory.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); (await import('./lib/sidebar.js')).show('layers'); });
+      await memory.locator('.resize-handle[data-panel="sidebar"]').waitFor();
+      await memory.locator('.resize-handle[data-panel="inspector"]').waitFor();
+    };
+    const saved = key => memory.evaluate(key => localStorage.getItem(`divlet:width:${key}`), key);
+    const size = key => memory.locator(key === 'sidebar' ? '#sidebar' : '#inspector').evaluate(node => node.getBoundingClientRect().width);
+    const drag = async (key, target, cancel = false) => {
+      const grip = memory.locator(`.resize-handle[data-panel="${key}"]`), box = await grip.boundingBox();
+      const from = Number(await grip.getAttribute('aria-valuenow')), x = box.x + 4, y = box.y + box.height / 2;
+      await grip.evaluate(node => node.addEventListener('pointerdown', event => { node.dataset.testPointer = String(event.pointerId); }, { once: true }));
+      await memory.mouse.move(x, y); await memory.mouse.down();
+      await memory.mouse.move(x + (target - from) * (key === 'sidebar' ? 1 : -1), y, { steps: 6 });
+      if (cancel === 'pointercancel') {
+        const before = await saved(key);
+        await grip.press('ArrowRight');
+        assert.equal(await saved(key), before, 'keys cannot persist an unfinished pointer preview');
+      }
+      if (cancel) {
+        const other = Number(await grip.getAttribute('data-test-pointer')) + 100;
+        await grip.dispatchEvent('pointerup', { pointerId: other, isPrimary: false });
+        assert.equal(await grip.evaluate(node => node.classList.contains('dragging')), true, 'another pointer cannot complete the primary resize');
+      }
+      if (cancel === 'Escape') await memory.keyboard.press('Escape');
+      else if (cancel === 'blur') await memory.evaluate(() => window.dispatchEvent(new Event('blur')));
+      else if (cancel) await grip.dispatchEvent(cancel, { pointerId: Number(await grip.getAttribute('data-test-pointer')) });
+      await memory.mouse.up();
+    };
+    await memory.goto(runtime.info().url); await prepare();
+    const revision = runtime.revision;
+    for (const [key, wanted] of [['sidebar', 432], ['inspector', 608]]) {
+      await drag(key, wanted);
+      assert.equal(await saved(key), String(wanted), `${key} records the chosen logical width`);
+      for (const cancel of ['pointercancel', 'lostpointercapture', 'Escape', 'blur']) {
+        await drag(key, wanted + 16, cancel);
+        assert.equal(await saved(key), String(wanted), `${cancel} cannot overwrite primary preference`);
+        await waitUntil(async () => Math.abs(await size(key) - wanted) < 1, 'cancellation restores preferred width');
+      }
+    }
+    await memory.reload(); await prepare();
+    for (const [key, wanted] of [['sidebar', 432], ['inspector', 608]]) await waitUntil(async () => Math.abs(await size(key) - wanted) < 1, `${key} survives reload (stored ${await saved(key)})`);
+    await memory.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', ['nav']));
+    for (const [key, wanted] of [['sidebar', 432], ['inspector', 608]]) assert.ok(Math.abs(await size(key) - wanted) < 1, 'selection/toolbar changes never replace a chosen width');
+    for (const [viewport, ui] of [[725, 100], [390, 100], [1280, 200], [1500, 125], [1500, 100]]) {
+      await memory.setViewportSize({ width: viewport, height: 900 });
+      await memory.evaluate(async ui => (await import('./lib/help.js')).setUiSize(ui), ui);
+      await memory.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      if (viewport !== 1500) assert.ok(await memory.evaluate(() => Number.parseFloat(document.documentElement.style.getPropertyValue('--inspector-w')) < 608), 'narrow rendering really constrains the inspector');
+      assert.equal(await saved('sidebar'), '432'); assert.equal(await saved('inspector'), '608');
+      if (ui === 125) for (const [key, wanted] of [['sidebar', 432], ['inspector', 608]]) {
+        await waitUntil(async () => Math.abs(await size(key) / 1.25 - wanted) < 1, 'stored widths are logical interface pixels');
+        await waitUntil(async () => await memory.locator(`.resize-handle[data-panel="${key}"]`).getAttribute('aria-valuenow') === String(wanted), 'separator values use the same logical units as their bounds');
+      }
+    }
+    for (const [key, wanted] of [['sidebar', 432], ['inspector', 608]]) await waitUntil(async () => Math.abs(await size(key) - wanted) < 1, `${key}: wide/100% restores the original choice after clamping/sheet layout`);
+    const sibling = await context.newPage(); await sibling.goto(runtime.info().url);
+    await sibling.evaluate(() => localStorage.setItem('divlet:width:sidebar', '448'));
+    await waitUntil(async () => Math.abs(await size('sidebar') - 448) < 1, 'same-origin storage updates are authoritative in an already open tab');
+    for (const invalid of ['Infinity', '-1', 'not a number']) {
+      await sibling.evaluate(value => localStorage.setItem('divlet:width:sidebar', value), invalid);
+      await waitUntil(async () => Math.abs(await size('sidebar') - 300) < 1, 'invalid stored values cannot mask the default');
+    }
+    await sibling.close();
+    for (const key of ['sidebar', 'inspector']) { await memory.locator(`.resize-handle[data-panel="${key}"]`).dblclick(); assert.equal(await saved(key), null, 'explicit reset clears the preference'); }
+    // An unavailable persistence layer must not also lose the current session's explicit width on resize.
+    await memory.evaluate(() => { Storage.prototype.setItem = () => { throw new DOMException('Storage disabled', 'QuotaExceededError'); }; });
+    const keyboard = memory.locator('.resize-handle[data-panel="inspector"]');
+    await keyboard.focus(); await keyboard.press('Shift+ArrowLeft');
+    const sessionWidth = await size('inspector');
+    await memory.setViewportSize({ width: 1400, height: 900 });
+    await waitUntil(async () => Math.abs(await size('inspector') - sessionWidth) < 1, 'blocked writes still retain the preference for this session');
+    assert.equal(await saved('inspector'), null, 'blocked storage cannot be presented as a durable save');
+    assert.equal(runtime.revision, revision, 'panel preferences never become project content');
+    await context.close();
+    await select(['welcome']);
+  }
+  checks.push('both panel widths persist independently across reload, selection, viewport/zoom constraints and same-origin tabs; cancelled drags preserve the choice and explicit reset alone clears it');
+
   // The action bar: every action in one row, the rest in a dynamic dropdown.
   const total = await page.locator('#inspector .smart-bar .tool:not(.more)').count();
   assert.ok(total >= 8, 'every artboard action has a button');
