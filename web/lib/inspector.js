@@ -210,124 +210,7 @@ function details(summary, content, open = false, count) {
   const head = el('summary', '', summary);
   if (count) head.append(el('span', 'fold-count', String(count)));
   node.append(head, content);
-  node.dataset.title = summary;
   return node;
-}
-
-/* ---- fold tabs: jump to a fold, and set the folds' own priority by dragging ----------------------- */
-const FOLD_ORDER_KEY = 'divlet:inspector-order';
-/** The order the user dragged the folds into (a UI preference, so it lives per user, not in the project file). */
-const readFoldOrder = () => {
-  try { const value = JSON.parse(localStorage.getItem(FOLD_ORDER_KEY) || '[]'); return Array.isArray(value) ? value.filter(name => typeof name === 'string') : []; } catch { return []; }
-};
-const writeFoldOrder = order => { try { localStorage.setItem(FOLD_ORDER_KEY, JSON.stringify(order)); } catch {} };
-let activeFold = null;
-
-/**
- * Folds in the user's order. Only the folds move: the other sections (the class editor, attributes…) keep their own slots, so
- * setting priorities never pushes the fields the user edits most out of place.
- */
-function orderedSections(sections) {
-  const order = readFoldOrder();
-  if (!order.length) return sections;
-  const positions = sections.flatMap((node, index) => (node.dataset.title ? [index] : []));
-  const ranked = positions
-    .map((index, at) => ({ node: sections[index], original: at }))
-    .sort((a, b) => {
-      const ra = order.indexOf(a.node.dataset.section), rb = order.indexOf(b.node.dataset.section);
-      return (ra < 0 ? order.length + a.original : ra) - (rb < 0 ? order.length + b.original : rb);
-    })
-    .map(item => item.node);
-  const out = [...sections];
-  positions.forEach((index, at) => { out[index] = ranked[at]; });
-  return out;
-}
-
-/**
- * One tab per fold above the sections: a click opens that fold and scrolls to it, dragging a tab changes the folds' order (and
- * remembers it), and Alt + ← → moves the focused tab. The right panel is long, so this is how the user sets its priorities.
- */
-function foldTabs(sections, rerender) {
-  const named = sections.filter(node => node.dataset.section && node.dataset.title);
-  if (named.length < 2) return null;
-  const bar = el('div', 'fold-tabs');
-  bar.setAttribute('role', 'tablist');
-  bar.setAttribute('aria-label', 'Inspector sections');
-  const tabs = new Map();
-  for (const node of named) {
-    const tab = el('button', 'fold-tab', node.dataset.title);
-    tab.type = 'button';
-    tab.draggable = false;
-    tab.dataset.fold = node.dataset.section;
-    tab.setAttribute('role', 'tab');
-    tab.setAttribute('aria-selected', String(activeFold === node.dataset.section));
-    tab.classList.toggle('on', activeFold === node.dataset.section);
-    tab.dataset.tip = `${node.dataset.title} · drag to set the order · Alt ← → moves it`;
-    tab.addEventListener('click', () => {
-      activeFold = node.dataset.section;
-      node.querySelector('details.fold')?.setAttribute('open', '');
-      node.scrollIntoView({ block: 'start', behavior: 'smooth' });
-      for (const [name, other] of tabs) { other.classList.toggle('on', name === activeFold); other.setAttribute('aria-selected', String(name === activeFold)); }
-    });
-    tab.addEventListener('keydown', event => {
-      if (!event.altKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
-      event.preventDefault();
-      const order = [...bar.children].map(child => child.dataset.fold);
-      const at = order.indexOf(tab.dataset.fold);
-      const to = Math.max(0, Math.min(order.length - 1, at + (event.key === 'ArrowRight' ? 1 : -1)));
-      if (to === at) return;
-      order.splice(to, 0, ...order.splice(at, 1));
-      writeFoldOrder(order);
-      rerender();
-      bar.querySelector(`[data-fold="${CSS.escape(tab.dataset.fold)}"]`)?.focus();
-    });
-    tabs.set(node.dataset.section, tab);
-    bar.append(tab);
-  }
-  // Dragging a tab moves the fold it names: the pointer takes the tab to a new slot, a line marks where it will land, and the
-  // order is saved on release. Pointer events, not native drag and drop, so a finger does it too.
-  let drag = null;
-  const slotAt = x => {
-    const slots = [...bar.children].map(child => { const box = child.getBoundingClientRect(); return { name: child.dataset.fold, middle: box.left + box.width / 2 }; });
-    return slots.find(slot => x < slot.middle)?.name ?? slots.at(-1)?.name ?? null;
-  };
-  const clearDrop = () => { for (const child of bar.children) child.classList.remove('drop'); };
-  const move = event => {
-    if (!drag) return;
-    if (!drag.moved) {
-      if (Math.abs(event.clientX - drag.x) < 5) return;
-      drag.moved = true;
-      drag.tab.classList.add('dragging');
-    }
-    event.preventDefault();
-    const over = slotAt(event.clientX);
-    for (const child of bar.children) child.classList.toggle('drop', child.dataset.fold === over && over !== drag.name);
-  };
-  const finish = () => {
-    document.removeEventListener('pointermove', move, true);
-    document.removeEventListener('pointerup', finish, true);
-    document.removeEventListener('pointercancel', finish, true);
-    if (!drag) return;
-    const moved = drag.moved, name = drag.name;
-    const target = [...bar.children].find(child => child.classList.contains('drop'))?.dataset.fold;
-    drag.tab.classList.remove('dragging');
-    clearDrop();
-    drag = null;
-    if (!moved || !target || target === name) return;
-    const order = [...bar.children].map(child => child.dataset.fold).filter(item => item !== name);
-    order.splice(order.indexOf(target), 0, name);
-    writeFoldOrder(order);
-    rerender();
-  };
-  bar.addEventListener('pointerdown', event => {
-    const tab = event.target.closest('.fold-tab');
-    if (!tab || event.button !== 0) return;
-    drag = { tab, name: tab.dataset.fold, x: event.clientX, moved: false };
-    document.addEventListener('pointermove', move, true);
-    document.addEventListener('pointerup', finish, true);
-    document.addEventListener('pointercancel', finish, true);
-  });
-  return bar;
 }
 
 function swatch(value, label, onPick, fallback = 'plain') {
@@ -680,14 +563,7 @@ function panelFolds(kind, doc, nodes, parent) {
     spacingFocus: focus => postToFrame(doc.id, { type: 'divlet:spacing-focus', focus }),
     measuredBox: nodeId => measuredBox(doc.id, nodeId),
   };
-  const built = panelSections(kind, ctx).map(({ name, title, content }) => {
-    const node = section(name, title ? details(title, content, true) : content);
-    if (title) node.dataset.title = title;
-    return node;
-  });
-  const sections = orderedSections(built);
-  const tabs = foldTabs(sections, () => render({ force: true }));
-  return tabs ? [tabs, ...sections] : sections;
+  return panelSections(kind, ctx).map(({ name, title, content }) => section(name, title ? details(title, content, true) : content));
 }
 
 function idField(doc, node) {

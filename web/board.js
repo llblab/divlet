@@ -318,7 +318,7 @@ window.addEventListener('keydown', event => {
   const target = event.target;
   if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target?.isContentEditable) return;
   if (event.code === 'Space' || (event.repeat && /^(Delete|Backspace|Enter)$/.test(event.key))) return;
-  if ((event.key === 'Enter' || event.key === ' ') && target instanceof HTMLButtonElement) return;
+  if ((event.key === 'Enter' || event.key === ' ') && target?.closest?.('button, summary, a[href]')) return;
   handleKey(event);
 });
 

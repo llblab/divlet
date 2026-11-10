@@ -349,16 +349,6 @@ body.is-expanded .resize-handle, body:has(.scrim:not([hidden])) .resize-handle {
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); gap: 6px; }
 /* layout, spacing, effects: small controls that write Tailwind classes */
 .layout-box, .spacing-box { display: grid; gap: 8px; }
-/* Inspector fold tabs: one per fold; a click jumps, dragging sets the folds' order. The row belongs to the panel's band but
-   not to its content flow: it floats inset from the panel's edges and stays put while the sections scroll underneath, so the
-   sections of a long inspector are always one click away. `scroll-margin-top` below keeps a jumped-to fold clear of it. */
-.fold-tabs { position: sticky; top: 6px; z-index: 3; display: flex; flex-wrap: wrap; gap: 4px; margin: 0 -2px; padding: 4px; border-radius: var(--radius-inner); background: color-mix(in srgb, var(--solid) 96%, transparent); backdrop-filter: blur(12px); box-shadow: 0 10px 18px -14px rgba(20, 18, 25, .5), inset 0 0 0 1px var(--hair); }
-#inspector section.group, #inspector .panel-head { scroll-margin-top: 42px; }
-.fold-tab { flex: 0 0 auto; height: 24px; padding: 0 9px; border: 1px solid var(--hair); border-radius: var(--radius-small); background: var(--field); color: var(--muted); font-size: 11.5px; white-space: nowrap; touch-action: none; }
-.fold-tab:hover { background: var(--field-hover); color: var(--ink); }
-.fold-tab.on { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
-.fold-tab.dragging { opacity: .55; cursor: grabbing; }
-.fold-tab.drop { box-shadow: inset 2px 0 0 var(--accent); }
 .pick { position: relative; display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; min-width: 0; min-height: 30px; padding: 4px 22px 4px 9px; border: 0; border-radius: var(--radius-inner); background: var(--field); color: var(--ink); text-align: left; }
 .pick:hover { background: var(--field-hover); }
 .pick-k { flex: none; font-size: 11px; color: var(--muted); }

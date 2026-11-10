@@ -30,6 +30,7 @@ The renderer requirement seam has a separate focused gate: `node --test core/tes
 ## Conventions
 
 - Assert actual state (project file, model, accepted version), not only that a request returned.
+- Inspector ergonomics: `node core/tests/browser/toolbars.mjs && node core/tests/browser/fluid.mjs` checks one vertical flow with no duplicate section tabs, stale order-preference isolation, remembered native disclosures, Space/Enter activation without stealing canvas pan, and reachable/unclipped content at desktop, tablet, phone and 200% interface size. It retains toolbar resizing/overflow, focus-ring, contrast and touch-target checks; this is not a complete per-section design audit.
 - Layout contracts are tested with geometry at 390 px, 390 px at 200% interface size and 820 px (`core/tests/browser/fluid.mjs` holds the 200% case; `chrome.mjs` holds the wide and phone layouts without it); errors and statuses must not move controls (`launcher-errors.mjs`, `projects.mjs`).
 - Importer plugins keep their tests beside them; a plugin's tests must pass without any other plugin installed.
 - Screenshots go to the ignored `artifacts/` directory.

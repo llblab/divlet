@@ -232,117 +232,71 @@ try {
   }
   checks.push('one design contract: three radii, one focus ring, one disabled step, one height per control family');
 
-  // Inspector fold tabs: a click jumps to a fold; dragging a tab sets the folds' own order and remembers it (a UI preference),
-  // while the sections that are not folds (the class editor, attributes) keep their slots. This runs in a page of its own: the
-  // long-lived suite page has had many pointer gestures, and a synthetic drag there occasionally loses its move stream.
+  // One vertical inspector: native disclosures are the only section controls. Old tab-order preferences are inert.
   {
-    const tabsContext = await browser.newContext({ viewport: { width: 1400, height: 900 }, hasTouch: true });
-    const tabsPage = await tabsContext.newPage();
-    await tabsPage.goto(runtime.info().url);
-    await tabsPage.waitForFunction(() => document.querySelectorAll('.artboard').length > 0);
-    await tabsPage.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav']); });
-    await tabsPage.waitForSelector('#inspector .fold-tab');
-    const tabNames = () => tabsPage.evaluate(() => [...document.querySelectorAll('#inspector .fold-tab')].map(node => node.textContent));
-    const groupOrder = () => tabsPage.evaluate(() => [...document.querySelectorAll('#inspector section.group')].map(node => node.dataset.section));
-
-    assert.deepEqual(await tabNames(), ['Layout', 'Spacing', 'Effects', 'Appearance'], 'one tab per fold, in the plugin\'s order');
-    assert.equal(await tabsPage.evaluate(() => document.querySelectorAll('#inspector .fold-tab[role="tab"]').length), 4);
-
-    const dragTab = async () => {
-      // Drag with the tab row at the top of the panel (a jump scrolls it away, so the click-jump is checked afterwards).
-      await tabsPage.evaluate(() => { document.querySelector('#inspector').scrollTop = 0; });
-      await sleep(120);
-      const boxes = await waitUntil(async () => {
-        const first = await tabsPage.locator('#inspector .fold-tab', { hasText: 'Appearance' }).boundingBox();
-        const second = await tabsPage.locator('#inspector .fold-tab', { hasText: 'Layout' }).boundingBox();
-        return first && second ? { first, second } : null;
-      }, 'the fold tabs are on screen for the drag');
-      const fromTab = boxes.first, toTab = boxes.second;
-      await tabsPage.mouse.move(fromTab.x + fromTab.width / 2, fromTab.y + fromTab.height / 2);
-      await tabsPage.mouse.down();
-      await tabsPage.mouse.move(toTab.x + 4, toTab.y + toTab.height / 2, { steps: 6 });
-      await sleep(120);
-      await tabsPage.mouse.up();
-      await sleep(120);
-      return tabsPage.evaluate(() => localStorage.getItem('divlet:inspector-order'));
+    const inspectorContext = await browser.newContext({ viewport: { width: 1400, height: 900 }, hasTouch: true });
+    const inspectorPage = await inspectorContext.newPage();
+    inspectorPage.on('pageerror', error => errors.push(error.message));
+    await inspectorPage.addInitScript(() => { if (window === window.top) localStorage.setItem('divlet:inspector-order', '["appearance","effects","spacing","layout"]'); });
+    await inspectorPage.goto(runtime.info().url);
+    const selectSubject = async () => {
+      await inspectorPage.waitForFunction(() => document.querySelectorAll('.artboard').length > 0);
+      await inspectorPage.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav']); });
+      await inspectorPage.waitForSelector('#inspector [data-section="layout"] details.fold > summary');
     };
-    assert.match((await dragTab()) || '', /appearance/, 'dragging the Appearance tab writes the new order');
-    await waitUntil(async () => (await tabNames())[0] === 'Appearance', 'dragging a tab moves its fold to the front');
-    const order = await groupOrder();
-    assert.ok(order.indexOf('appearance') < order.indexOf('layout'), `the folds follow the tabs (${order.join(', ')})`);
-    assert.ok(order.indexOf('classes') < order.indexOf('appearance'), 'the class editor keeps its slot');
-    assert.deepEqual(JSON.parse(await tabsPage.evaluate(() => localStorage.getItem('divlet:inspector-order'))), ['appearance', 'layout', 'spacing', 'effects']);
+    await selectSubject();
+    const inspector = inspectorPage.locator('#inspector');
+    const layout = inspector.locator('[data-section="layout"] details.fold');
+    const order = () => inspectorPage.evaluate(() => [...document.querySelectorAll('#inspector section.group')].map(node => node.dataset.section));
+    assert.equal(await inspector.locator('.fold-tabs, .fold-tab, [role="tablist"], [role="tab"]').count(), 0, 'no duplicate section-navigation strip');
+    assert.deepEqual((await order()).filter(name => ['layout', 'spacing', 'effects', 'appearance'].includes(name)), ['layout', 'spacing', 'effects', 'appearance'], 'stable plugin order ignores a stale drag-order preference');
+    assert.deepEqual((await order()).slice(0, 2), ['head', 'classes'], 'identity and direct class editing stay first');
+    const version = runtime.info().project.version;
 
-    await tabsPage.reload();
-    await tabsPage.waitForFunction(() => document.querySelectorAll('.artboard').length > 0);
-    await tabsPage.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav']); });
-    await tabsPage.waitForSelector('#inspector .fold-tab');
-    assert.deepEqual(await tabNames(), ['Appearance', 'Layout', 'Spacing', 'Effects'], 'the order survives a reload');
-    assert.deepEqual((await groupOrder()).slice(0, 4), ['head', 'classes', 'appearance', 'layout'], 'and the DOM follows it, with the class editor in its own slot');
+    await layout.locator('summary').focus();
+    await inspectorPage.keyboard.press('Space');
+    await waitUntil(() => layout.evaluate(node => !node.open), 'Space collapses the native disclosure');
+    assert.equal(await inspectorPage.locator('#viewport').evaluate(node => node.classList.contains('space-ready')), false, 'disclosure activation does not arm canvas panning');
+    await waitUntil(() => inspectorPage.evaluate(() => JSON.parse(localStorage.getItem('divlet:folds')).Layout === false), 'the collapsed preference is remembered');
+    await inspectorPage.reload();
+    await selectSubject();
+    assert.equal(await layout.evaluate(node => node.open), false, 'the disclosure state survives reload without a tab bar');
+    await layout.locator('summary').focus();
+    await inspectorPage.keyboard.press('Enter');
+    await waitUntil(() => layout.evaluate(node => node.open), 'Enter expands the native disclosure');
+    await inspector.locator('button.tag').focus();
+    await inspectorPage.keyboard.press('Space');
+    await inspectorPage.locator('.menu [role="menuitemradio"]').first().waitFor();
+    assert.equal(await inspectorPage.locator('#viewport').evaluate(node => node.classList.contains('space-ready')), false, 'Space activates the native button rather than canvas pan');
+    await inspectorPage.keyboard.press('Escape');
+    await inspectorPage.locator('#viewport').focus();
+    await inspectorPage.keyboard.down('Space');
+    assert.equal(await inspectorPage.locator('#viewport').evaluate(node => node.classList.contains('space-ready')), true, 'Space still arms panning on the canvas');
+    await inspectorPage.keyboard.up('Space');
 
-    // The row belongs to the panel's band but not to its content flow: it floats inset from the panel's edges and stays put
-    // while the sections scroll under it, so a jump never hides the way back.
-    const placed = await tabsPage.evaluate(() => {
-      const panel = document.querySelector('#inspector').getBoundingClientRect();
-      const bar = document.querySelector('#inspector .fold-tabs').getBoundingClientRect();
-      return { position: getComputedStyle(document.querySelector('#inspector .fold-tabs')).position, insetLeft: Math.round(bar.x - panel.x), insetRight: Math.round((panel.x + panel.width) - (bar.x + bar.width)), inside: bar.x > panel.x && bar.x + bar.width < panel.x + panel.width };
-    });
-    assert.equal(placed.position, 'sticky', 'the row floats over the sections instead of scrolling away with them');
-    assert.ok(placed.inside && placed.insetLeft >= 4 && placed.insetRight >= 4, `and it is inset from the panel's edges (${placed.insetLeft}/${placed.insetRight})`);
-
-    // A click jumps to a fold and marks its tab; the row is still where it was afterwards.
-    const before = await tabsPage.locator('#inspector .fold-tabs').boundingBox();
-    await tabsPage.locator('#inspector .fold-tab', { hasText: 'Appearance' }).click();
-    const jumped = await tabsPage.evaluate(() => ({
-      on: document.querySelector('#inspector .fold-tab.on')?.textContent,
-      open: document.querySelector('#inspector section[data-section="appearance"] details.fold')?.open,
-      barVisible: (() => { const bar = document.querySelector('#inspector .fold-tabs').getBoundingClientRect(); const panel = document.querySelector('#inspector').getBoundingClientRect(); return bar.top >= panel.top - 1 && bar.bottom <= panel.bottom + 1; })(),
-      titleClear: (() => { const bar = document.querySelector('#inspector .fold-tabs').getBoundingClientRect(); const head = document.querySelector('#inspector section[data-section="appearance"]')?.getBoundingClientRect(); return !head || head.top >= bar.bottom - 2; })(),
-    }));
-    assert.deepEqual({ on: jumped.on, open: jumped.open }, { on: 'Appearance', open: true }, 'a click opens that fold and marks its tab');
-    assert.equal(jumped.barVisible, true, 'the row stays inside the panel after the jump');
-    assert.equal(jumped.titleClear, true, 'and the fold it jumped to lands below it, not under it');
-    assert.ok(Math.abs((await tabsPage.locator('#inspector .fold-tabs').boundingBox()).y - before.y) < 2, 'without moving');
-
-    // The keyboard does the same, for a user without a drag.
-    await tabsPage.locator('#inspector .fold-tab').first().focus();
-    await tabsPage.keyboard.press('Alt+ArrowRight');
-    await waitUntil(async () => (await tabNames())[0] === 'Layout', 'Alt+→ moves the focused tab one place right');
-    assert.deepEqual(JSON.parse(await tabsPage.evaluate(() => localStorage.getItem('divlet:inspector-order'))), ['layout', 'appearance', 'spacing', 'effects']);
-
-    // A finger reorders too: the tabs take pointer events, and `touch-action: none` keeps the panel from scrolling instead.
-    {
-      await tabsPage.evaluate(() => { localStorage.removeItem('divlet:inspector-order'); document.querySelector('#inspector').scrollTop = 0; });
-      await tabsPage.reload();
-      await tabsPage.waitForFunction(() => document.querySelectorAll('.artboard').length > 0);
-      await tabsPage.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav']); });
-      await tabsPage.waitForSelector('#inspector .fold-tab');
-      await tabsPage.evaluate(() => { document.querySelector('#inspector').scrollTop = 0; });
-      const boxes = await waitUntil(async () => {
-        const first = await tabsPage.locator('#inspector .fold-tab', { hasText: 'Appearance' }).boundingBox();
-        const second = await tabsPage.locator('#inspector .fold-tab', { hasText: 'Layout' }).boundingBox();
-        return first && second ? { first, second } : null;
-      }, 'the fold tabs are on screen for the touch drag');
-      const touchFrom = boxes.first, touchTo = boxes.second;
-      const cdp = await tabsContext.newCDPSession(tabsPage);
-      const x0 = touchFrom.x + touchFrom.width / 2, y0 = touchFrom.y + touchFrom.height / 2;
-      const x1 = touchTo.x + 6, y1 = touchTo.y + touchTo.height / 2;
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x0, y: y0 }] });
-      for (let step = 1; step <= 8; step++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x0 + (x1 - x0) * step / 8, y: y0 + (y1 - y0) * step / 8 }] });
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-      await waitUntil(async () => (await tabNames())[0] === 'Appearance', 'a finger drags a tab too');
-      await cdp.detach();
+    for (const [width, size] of [[1400, 100], [820, 100], [390, 100], [390, 200]]) {
+      await inspectorPage.setViewportSize({ width, height: 900 });
+      await inspectorPage.evaluate(async size => (await import('./lib/help.js')).setUiSize(size), size);
+      const last = inspector.locator('[data-section="node-meta"] summary');
+      await last.focus();
+      await last.scrollIntoViewIfNeeded();
+      const geometry = await inspector.evaluate(node => {
+        const box = node.getBoundingClientRect();
+        const summary = node.querySelector('[data-section="node-meta"] summary').getBoundingClientRect();
+        return {
+          fits: node.scrollWidth <= node.clientWidth + 1,
+          inside: box.left >= -1 && box.right <= innerWidth + 1,
+          reachable: summary.top >= box.top - 1 && summary.bottom <= box.bottom + 1,
+          focused: document.activeElement === node.querySelector('[data-section="node-meta"] summary'),
+          tabs: node.querySelectorAll('[role="tab"], [role="tablist"]').length,
+        };
+      });
+      assert.deepEqual(geometry, { fits: true, inside: true, reachable: true, focused: true, tabs: 0 }, `vertical inspector at ${width}px/${size}%`);
     }
-
-    await tabsPage.evaluate(() => localStorage.removeItem('divlet:inspector-order'));
-    await tabsPage.reload();
-    await tabsPage.waitForFunction(() => document.querySelectorAll('.artboard').length > 0);
-    await tabsPage.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav']); });
-    await tabsPage.waitForSelector('#inspector .fold-tab');
-    assert.deepEqual(await tabNames(), ['Layout', 'Spacing', 'Effects', 'Appearance'], 'clearing the preference restores the default order');
-    await tabsContext.close();
+    assert.equal(runtime.info().project.version, version, 'disclosures, scrolling and UI size are not project edits');
+    await inspectorContext.close();
   }
-  checks.push('inspector fold tabs jump to a fold and set the folds\' order by drag or Alt+←/→, remembered per user');
+  checks.push('the inspector has one stable vertical flow, no section tabs, remembered native keyboard disclosures and reachable content at desktop, tablet, phone and 200% size');
 
   // Opening a sidebar over the selected artboard brings it back into the clear part of the canvas.
   await page.evaluate(async () => { (await import('./lib/sidebar.js')).close(); (await import('./lib/store.js')).selectArtboards(['welcome']); const c = await import('./lib/canvas.js'); c.setCamera({ x: 30, y: 120, k: 0.5 }); });

@@ -1481,7 +1481,7 @@ window.addEventListener('wheel', event => { if ((event.ctrlKey || event.metaKey)
 
 window.addEventListener('keydown', event => {
   if (event.key === 'Escape' && cancelGesture()) { event.preventDefault(); event.stopImmediatePropagation(); return; }
-  if (event.code === 'Space' && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target.isContentEditable) && !store.expanded) {
+  if (event.code === 'Space' && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target.isContentEditable || event.target.closest?.('button, summary, select, a[href]')) && !store.expanded) {
     spaceDown = true;
     viewport.classList.add('space-ready');
     event.preventDefault();
