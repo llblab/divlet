@@ -37,6 +37,11 @@ export const validationCases = [
   { name: 'cyclic input has bounded domain refusal', run: api => { const value = {}; value.self = value; api.json(value); }, expected: rejected('value is too deeply nested') },
 ];
 
+export const utf8BudgetCases = [
+  ['empty', '', 0], ['ASCII', 'abc', 3], ['two-byte', 'é', 2], ['three-byte', '字', 3], ['surrogate pair', '😀', 4],
+  ['lone high surrogate', '\ud800', 3], ['lone low surrogate', '\udfff', 3], ['mixed', 'a字😀\ud800', 11], ['long mixed', 'a😀字é'.repeat(1000), 10000],
+].flatMap(([name, text, bytes]) => (bytes < 20 ? Array.from({ length: bytes + 2 }, (_, max) => max) : [bytes - 1, bytes, bytes + 1]).map(max => ({ name: `${name} within ${max} UTF-8 bytes`, text, max, expected: bytes <= max })));
+
 export function captureValidation(api, run) {
   try { return accepted(run(api)); }
   catch (error) {

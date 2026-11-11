@@ -1,13 +1,15 @@
 # Browser runtime, offline demo and agent connectivity
 
-**Status: incremental implementation, not a completed browser runtime or a frozen API.** Shared JSON/text admission primitives run in Node and native browser ESM; full frame validation and the current board still require their Node closure. This note separates the portable semantic kernel direction, static-hosted demo and browser-agent transports. Implementation proceeds through bounded validated slices, not a wholesale runtime rewrite or a new release prerequisite. [BACKLOG.md](../BACKLOG.md) owns remaining work. The [web-native contract](web-native.md) remains the semantic authority.
+**Status: incremental implementation, not a completed browser runtime or a frozen API.** Shared standalone-frame validation, ordinary patches and inspection now execute in native browser ESM as well as Node. The board, full-project/component/resource handling and persistence still require their Node host. This note separates the portable semantic kernel direction, static-hosted demo and browser-agent transports. Implementation proceeds through bounded validated slices, not a wholesale runtime rewrite or a new release prerequisite. [BACKLOG.md](../BACKLOG.md) owns remaining work. The [web-native contract](web-native.md) remains the semantic authority.
 
 ## Current evidence
 
 - Generated project pages already work on ordinary static hosting. That does not mean the editor can run without its host.
 - `web/board.js` bootstraps through `api/project` and an `EventSource` at `events`; `web/lib/store.js` sends edits and model reads through HTTP. Copying `web/` to Pages would leave those dependencies unresolved.
-- `core/lib/validation.ts` owns the shared error class and JSON/object/key/text admission primitives without runtime imports, providers or Node globals. `model.ts` imports/re-exports those same bindings for existing consumers. This slice does not include CSS parsing, document-byte budgets or full model validation.
-- The remaining semantic and host closures are not yet separated: `core/lib/model.ts` uses `Buffer` and imports the engine; `project.ts` imports `node:path`; `codec.ts` uses `Buffer`; `engine.ts` selects the concrete Tailwind plugin, which imports Node APIs. The new asset decoder also uses `node:util` and `Buffer`. Browser compatibility cannot be inferred from TypeScript compilation.
+- `core/lib/validation.ts` owns shared domain errors, JSON/object/key/text checks and bounded UTF-8 budget admission without runtime imports or Node globals. Existing model-facing error/function identities remain shared.
+- `model.ts` binds style lowering through `model-styles.ts`, which retains the existing eager Node engine. The package's standard browser file mapping swaps only that port for `browser-styles.ts`, an explicit `NO_STYLE_ENGINE` refusal. Browser validation/native `style` maps do not imply Tailwind compilation or declarative `styles` lowering. No new public subpath or serialized capability field is introduced.
+- CSS admission uses the same PostCSS grammar parser with source-map interpretation disabled. Browser bundling respects PostCSS's own optional-feature browser mappings; it adds no Node-global polyfill or alternate validator. `scripts/browser-model.mjs` owns the source/installed verification build profile and guards against concrete engine/writer/Tailwind inputs and external imports. It returns bytes in memory, not a shipped standalone browser SDK artifact.
+- Remaining host closures include `project.ts` (`node:path`), `codec.ts` (`Buffer`), concrete provider bootstrap and the new asset decoder (`node:util`/`Buffer`). Browser compatibility cannot be inferred from TypeScript compilation.
 - The current style/provider, component and format-transition gaps remain relevant. An offline fork must not silently establish different cascade, override, resource or renderer rules.
 
 ## Recommended boundary: portable semantics, explicit hosts
@@ -64,7 +66,7 @@ A bridge must pair an exact origin, document, project and session through explic
 
 ## Evidence required before changing product claims
 
-- A browser dependency audit and shared validation/patch vectors demonstrate that the selected kernel slice loads without Node built-ins, filesystem access or concrete provider bootstrap; matching refusals and size/Unicode budgets matter as much as successful edits.
+- Extend the proven standalone-frame browser closure as project/session operations are admitted; retain shared validation, candidate/refusal and size/Unicode vectors and no host/bootstrap leakage. Source-profile native-browser execution and installed-profile bundling/Node smoke are distinct checks, not proof of installed browser execution or universal browser compatibility.
 - A real static-server test loads the chosen demo path with no `api/*` or SSE backend, missing-asset rescue or hidden Node process. Test repository prefixes, clean first load, subsequent offline reload, cache updates, accurate capabilities and bounded startup cost.
 - Offline mutation proof covers candidate acceptance/refusal, undo/redo, local persistence failure, download/reopen and two-tab ownership. Missing renderer requirements must diagnose/read-only rather than silently return empty styling.
 - A browser-agent experiment distinguishes WebMCP tool registration/execution from a conventional external MCP transport. An actual client must call a tool, receive a refusal and cancel work; feature detection alone is insufficient.

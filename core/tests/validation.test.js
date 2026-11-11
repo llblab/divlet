@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as validation from '../lib/validation.ts';
 import * as model from '../lib/model.ts';
-import { captureValidation, validationCases } from './fixtures/validation.js';
+import { captureValidation, validationCases, utf8BudgetCases } from './fixtures/validation.js';
 
 test('the model preserves the shared validation exports and domain error identity', () => {
   for (const name of ['DivletError', 'fail', 'object', 'string', 'keys', 'json']) assert.equal(model[name], validation[name], name);
@@ -11,4 +11,9 @@ test('the model preserves the shared validation exports and domain error identit
 
 for (const { name, run, expected } of validationCases) test(`portable admission: ${name}`, () => {
   for (const api of [validation, model]) assert.deepEqual(captureValidation(api, run), expected);
+});
+
+for (const { name, text, max, expected } of utf8BudgetCases) test(name, () => {
+  assert.equal(Buffer.byteLength(text, 'utf8') <= max, expected, 'independent Node byte-length oracle');
+  assert.equal(validation.withinUtf8Budget(text, max), expected);
 });

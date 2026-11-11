@@ -6,9 +6,10 @@
  * they return is the accepted model. Their internals work on unchecked records — that is the boundary, and it is the only place
  * allowed to trust nothing.
  */
-import { applyStyles } from './engine.ts';
-import postcss from 'postcss';
-import { DivletError, fail, object, string, keys, json } from './validation.ts';
+import { applyStyles } from './model-styles.ts';
+import postcssParse from 'postcss/lib/parse';
+import type postcss from 'postcss';
+import { DivletError, fail, object, string, keys, json, withinUtf8Budget } from './validation.ts';
 export { DivletError, fail, object, string, keys, json } from './validation.ts';
 
 /** A JSON value as it may be stored in metadata, overrides and tokens. */
@@ -122,12 +123,15 @@ const at = <T>(record: Record<string, T>, key: string): T => record[key] as T;
 
 export const SOURCE_LIMITS: Readonly<SourceLimits> = Object.freeze({ bytes: 32 * 1024 * 1024, nodes: 10000, depth: 64, roots: 200 });
 
+// Admission parses CSS grammar only; source-map comments never load/decode auxiliary inputs.
+const parseCss = (text: string): postcss.Root => postcssParse(text, { map: false }) as postcss.Root;
+
 export function validateCss(css: unknown, limits: Limits = LIMITS): string {
   let text = string(css, 'css', documentLimits(limits) === LIMITS ? LIMITS.text : limits.bytes);
   text = text.replace(/\r\n?/g, '\n');
   if (/<\/style/i.test(text)) fail('CSS cannot contain a closing style tag');
   let ast: postcss.Root;
-  try { ast = postcss.parse(text); } catch (error) { throw new DivletError('INVALID_CSS', (error as { reason?: string; message: string }).reason || (error as Error).message); }
+  try { ast = parseCss(text); } catch (error) { throw new DivletError('INVALID_CSS', (error as { reason?: string; message: string }).reason || (error as Error).message); }
   ast.walkAtRules(rule => {
     if (/^(import|plugin|config|source|tailwind|reference)$/i.test(rule.name)) fail(`Unsupported CSS build directive: @${rule.name}`, undefined, 'UNSUPPORTED_CSS');
   });
@@ -166,7 +170,7 @@ export function validStyle(input: unknown, id: string, nullable = false): Style 
     if (value === null && nullable) continue;
     string(value, `${id}.style.${property}`, 16384);
     validateCss(`a{${property}:${value}}`);
-    const stylesheet = postcss.parse(`a{${property}:${value}}`);
+    const stylesheet = parseCss(`a{${property}:${value}}`);
     const parsed = stylesheet.first as postcss.Rule;
     const declaration = parsed.nodes[0] as postcss.Declaration | undefined;
     if (stylesheet.nodes.length !== 1 || parsed.nodes.length !== 1 || declaration?.type !== 'decl' || declaration.prop !== property) fail(`CSS value escapes its declaration: ${property}`);
@@ -219,7 +223,7 @@ export function validateDocument(input: unknown, { limits = LIMITS }: { limits?:
   documentLimits(limits);
   const raw = object(input, 'document');
   json(raw, 'document');
-  if (Buffer.byteLength(JSON.stringify(raw)) > limits.bytes) fail(`Document exceeds ${limits.bytes / 1024 / 1024} MiB`);
+  if (!withinUtf8Budget(JSON.stringify(raw), limits.bytes)) fail(`Document exceeds ${limits.bytes / 1024 / 1024} MiB`);
   keys(raw, DOC_KEYS, 'document');
   if (raw.schemaVersion !== 1) fail('schemaVersion must be 1');
   if (typeof raw.id !== 'string' || !ID.test(raw.id)) fail('Document id must be a safe identifier');
@@ -336,7 +340,7 @@ export function validateTokens(input: unknown): Record<string, string> {
     if (!TOKEN.test(name)) fail(`Invalid token name: ${name}. Tokens are CSS custom properties such as --accent.`);
     string(value, `token ${name}`, 16384);
     validateCss(`:root{${name}:${value}}`);
-    const stylesheet = postcss.parse(`:root{${name}:${value}}`);
+    const stylesheet = parseCss(`:root{${name}:${value}}`);
     const declarations = (stylesheet.first as postcss.Rule).nodes;
     const declaration = declarations[0] as postcss.Declaration | undefined;
     if (stylesheet.nodes.length !== 1 || declarations.length !== 1 || declaration?.type !== 'decl' || declaration.prop !== name) fail(`Token value escapes its declaration: ${name}`);

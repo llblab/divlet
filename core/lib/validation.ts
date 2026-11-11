@@ -34,6 +34,14 @@ export function string(value: unknown, label: string, max = 65536): string {
   return value.replace(/\r\n?/g, '\n');
 }
 
+/** Test a caller-owned UTF-8 budget without allocating more than budget + 1 encoded bytes. */
+export function withinUtf8Budget(value: string, maxBytes: number): boolean {
+  if (value.length > maxBytes) return false;
+  const output = new Uint8Array(Math.min(value.length * 3, maxBytes + 1));
+  const { read, written } = new TextEncoder().encodeInto(value, output);
+  return read === value.length && written <= maxBytes;
+}
+
 export function keys(value: Unchecked, allowed: ReadonlySet<string>, label: string): void {
   for (const key of Object.keys(value)) if (!allowed.has(key)) fail(`Unsupported ${label} field: ${key}`);
 }

@@ -25,6 +25,14 @@ test('divlet is the shared product library, not a host or command package', asyn
   assert.ok(pkg.workspaces.includes('.'), 'source adapters can resolve the product workspace without a registry release');
 });
 
+test('browser mapping replaces only the model style port and names real source bindings', async () => {
+  assert.deepEqual(pkg.browser, {
+    './core/lib/model-styles.ts': './core/lib/browser-styles.ts',
+    './dist/core/lib/model-styles.js': './dist/core/lib/browser-styles.js',
+  });
+  for (const file of [Object.keys(pkg.browser)[0], Object.values(pkg.browser)[0]]) assert.ok(await exists(path.join(root, file)), file);
+});
+
 for (const name of ['cli', 'mcp', 'pi']) test(`@divlet/${name} owns its adapter, release version and installed entry`, async () => {
   const directory = path.join(root, 'packages', name);
   const adapter = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'));

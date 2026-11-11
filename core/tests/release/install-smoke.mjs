@@ -8,6 +8,7 @@ import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { bundleBrowserModel } from '../../../scripts/browser-model.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const work = await mkdtemp(path.join(os.tmpdir(), 'divlet-release-'));
@@ -22,6 +23,14 @@ try {
   await mkdir(path.join(target, 'landing-example'));
   await writeFile(path.join(target, 'package.json'), '{"name":"try","private":true,"type":"module"}');
   execFileSync('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline', path.join(work, packed.filename)], { cwd: target, stdio: 'pipe' });
+
+  // A real consumer selects the compiled browser binding without checkout sources or a provider bootstrap.
+  const browserBundle = await bundleBrowserModel(target);
+  assert.ok(browserBundle.inputs.some(file => /core\/lib\/browser-styles\.js$/.test(file)), 'the installed browser port is shipped and selected');
+  const browserModel = await import(`data:text/javascript;base64,${Buffer.from(browserBundle.code).toString('base64')}`);
+  const browserFrame = browserModel.createDemoDocument();
+  assert.equal(browserModel.validateDocument(browserFrame).schemaVersion, 1);
+  assert.throws(() => browserModel.applyDocumentPatch(browserFrame, { nodes: { root: { styles: { color: 'red' } } } }), { code: 'NO_STYLE_ENGINE' });
 
   // Installed paths are the published build: `dist/` holds the compiled JavaScript the package exports.
   assert.equal(packed.files.some(file => /^dist\/(?:packages|adapters)\//.test(file.path)), false, 'the product contains no adapter implementations');
@@ -173,5 +182,5 @@ try {
     assert.deepEqual(await handlers.get('resources_discover')(), { skillPaths: [path.dirname(skill)] });
   `);
   execFileSync(process.execPath, ['pi-smoke.mjs'], { cwd: target, stdio: 'pipe' });
-  console.log(JSON.stringify({ status: 'passed', files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, pluginTypes: true, mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
+  console.log(JSON.stringify({ status: 'passed', files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, pluginTypes: true, browserModelBundle: true, mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
 } finally { await rm(work, { recursive: true, force: true }); }
