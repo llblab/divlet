@@ -1,6 +1,7 @@
 import { $, el, icon, button, clamp, keys, shortcutKey, uiScale } from './lib/util.js';
 import { store, on, emit, documents, descriptor, apiUrl, request, receiveState, setConnection, selectArtboards, selectNodes, undo, redo, toast } from './lib/store.js';
 import * as canvas from './lib/canvas.js';
+import { readSession } from './lib/host.js';
 import './lib/inspector.js';
 import { loadClientPlugins } from './lib/panels.js';
 import * as layers from './lib/layers.js';
@@ -344,18 +345,24 @@ on('connection', value => {
 });
 
 // Plugins' client modules register their inspector panels before the first project state is shown.
-const bootstrap = request('api/project').then(async info => { await loadClientPlugins(info.clientPlugins, apiUrl); return info; });
-const stream = new EventSource(apiUrl('events'));
-stream.addEventListener('open', () => { setConnection('connected'); activity.loadRecent(); });
-stream.addEventListener('state', event => {
-  bootstrap.catch(() => {}).then(() => {
-    try { receiveState(JSON.parse(event.data)); setConnection('connected'); }
-    catch { toast('Received an invalid project update. The current preview is retained.'); }
-  });
-});
-stream.addEventListener('change', event => {
+const bootstrap = readSession.readState().then(async info => { await loadClientPlugins(info.clientPlugins, apiUrl); return info; });
+const stopWatching = readSession.subscribe(event => {
+  if (event.type === 'connection') {
+    setConnection(event.status);
+    if (event.status === 'connected') activity.loadRecent();
+    return;
+  }
+  if (event.type === 'state' || event.type === 'invalid-state') {
+    bootstrap.catch(() => {}).then(() => {
+      try {
+        if (event.type === 'invalid-state') throw new Error('Invalid project update');
+        receiveState(event.value); setConnection('connected');
+      } catch { toast('Received an invalid project update. The current preview is retained.'); }
+    });
+    return;
+  }
   try {
-    const change = JSON.parse(event.data);
+    const change = event.value;
     activity.pushChange(change);
     emit('change', change);
     const entry = entries.get(change.documentId);
@@ -363,7 +370,6 @@ stream.addEventListener('change', event => {
     if (entry && change.actor !== 'user') { entry.el.classList.add('touched'); setTimeout(() => entry.el.classList.remove('touched'), 1800); }
   } catch { /* ignore malformed change */ }
 });
-stream.addEventListener('error', () => setConnection('offline'));
 bootstrap.then(info => { receiveState(info); project.checkImport(); }).catch(error => {
   $('#loading').hidden = true;
   setConnection('offline');
@@ -378,7 +384,7 @@ on('state', () => {
   document.title = name ? `${name} · divlet` : 'divlet';
 });
 on('state', () => { if (!document.activeElement || document.activeElement === document.body) viewport.focus({ preventScroll: true }); });
-window.addEventListener('pagehide', () => { stream.close(); canvas.disposeCanvas(); });
+window.addEventListener('pagehide', () => { stopWatching(); canvas.disposeCanvas(); });
 window.addEventListener('pageshow', event => { if (event.persisted) location.reload(); });
 
 /* ---- hints ---------------------------------------------------------------- */

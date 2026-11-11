@@ -5,7 +5,7 @@
 ## Current evidence
 
 - Generated project pages already work on ordinary static hosting. That does not mean the editor can run without its host.
-- `web/board.js` bootstraps through `api/project` and an `EventSource` at `events`; `web/lib/store.js` sends edits and model reads through HTTP. Copying `web/` to Pages would leave those dependencies unresolved.
+- Board bootstrap, state/change subscriptions and cached frame reads now use `BoardReadSession`. `web/lib/host.js` still composes the native HTTP/SSE adapter; edits, auxiliary reads, preview resources and other startup work still use native routes. Copying `web/` to Pages would leave those dependencies unresolved.
 - `core/lib/validation.ts` owns shared domain errors, JSON/object/key/text checks and bounded UTF-8 budget admission without runtime imports or Node globals. Existing model-facing error/function identities remain shared.
 - `model.ts` binds style lowering through `model-styles.ts`, which retains the existing eager Node engine. The package's standard browser file mapping swaps only that port for `browser-styles.ts`, an explicit `NO_STYLE_ENGINE` refusal. Browser validation/native `style` maps do not imply Tailwind compilation or declarative `styles` lowering. No new public subpath or serialized capability field is introduced.
 - CSS admission uses the same PostCSS grammar parser with source-map interpretation disabled. Browser bundling respects PostCSS's own optional-feature browser mappings; it adds no Node-global polyfill or alternate validator. `scripts/browser-model.mjs` owns the source/installed verification build profile and guards against concrete engine/writer/Tailwind inputs and external imports. It returns bytes in memory, not a shipped standalone browser SDK artifact.
@@ -31,6 +31,16 @@ Hosts own persistence, publication, subscriptions, permissions and transport. In
 A Web Worker can isolate expensive pure work from UI rendering. A Service Worker serves a different role: offline loading, cache updates and local resource responses. Neither worker choice supplies filesystem authority. Do not make an immortal Service Worker the sole owner of accepted project state, or put a permanent fake HTTP server between the UI and an in-browser kernel merely to preserve every existing route string.
 
 Do not select a new package name or folder hierarchy before the dependency boundary earns it. Preserve current public standalone-entry/provider behavior while extracting a browser-safe entry; WEB-2 already records why root-only provider registration would break that behavior. Avoid blanket Node polyfills as a substitute for separating filesystem/compiler composition from semantic code.
+
+## Read-session boundary
+
+`core/lib/board-session.ts` owns the transport-free read port: `readState`, `readFrame` and `subscribe`, whose returned function ends that subscription. Events distinguish state/change payloads, host connection status and malformed state transport data. Payloads are `unknown`, not automatically accepted models; consumers retain their admission/cache/state guards. This is separate from the agent-host `Session` in `contract.ts` and grants no write, raw-route, upload or persistence authority.
+
+`createSnapshotReadSession` clones host-provided state/frame data and every read/event result, freezes the capability object and prevents queued state delivery after immediate or reentrant unsubscribe. Constructing a snapshot does not validate a project or make private metadata publishable: the composition/publisher must curate and admit the input first. The same snapshot properties run in Node and actual browser ESM without HTTP.
+
+The native client composes its JSON transport and HTTP/SSE reader in `web/lib/host.js`. The store keeps version/render-aware cache admission and the board keeps plugin-bootstrap ordering, reconnect feedback and change handling. JSON error projection and dynamic global-fetch instrumentation remain intact; native `EventSource` owns reconnects. `tsconfig.web.json` checks the three new transport/composition modules against DOM libraries without Node ambient types, not the whole frontend.
+
+This is not yet a host-replaceable offline board: remaining auxiliary requests and mutation affordances require explicit host capabilities and semantic read ports or absence, not synthetic HTTP routing.
 
 ## Useful modes
 

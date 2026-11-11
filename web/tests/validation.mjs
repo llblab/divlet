@@ -19,6 +19,8 @@ const files = new Map([
   [`${prefix}cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/validation.js', import.meta.url), 'utf8')]],
   [`${prefix}model.js`, ['text/javascript', bundle.code]],
   [`${prefix}frames.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/frame-portability.js', import.meta.url), 'utf8')]],
+  [`${prefix}read-session.js`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/board-session.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}session-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/board-session.js', import.meta.url), 'utf8')]],
 ]);
 const requests = [];
 const server = http.createServer((request, response) => {
@@ -40,7 +42,13 @@ try {
       import(new URL('validation.js', location.href).href), import(new URL('cases.js', location.href).href),
       import(new URL('model.js', location.href).href), import(new URL('frames.js', location.href).href),
     ]);
+    const [{ createSnapshotReadSession }, { snapshotCases }] = await Promise.all([
+      import(new URL('read-session.js', location.href).href), import(new URL('session-cases.js', location.href).href),
+    ]);
+    const sessions = [];
+    for (const { name, run, expected } of snapshotCases) sessions.push({ name, actual: await run(createSnapshotReadSession), expected });
     return {
+      sessions,
       nodeGlobals: ['Buffer', 'process', 'require'].filter(name => name in globalThis),
       cases: validationCases.map(({ name, run, expected }) => ({ name, actual: captureValidation(api, run), expected })),
       bytes: utf8BudgetCases.map(({ name, text, max, expected }) => ({ name, actual: api.withinUtf8Budget(text, max), expected })),
@@ -50,12 +58,12 @@ try {
   });
   assert.deepEqual(result.nodeGlobals, [], 'no Node globals/polyfills supply the kernel');
   assert.ok(result.cases.length > 25, 'the shared acceptance/refusal regions are exercised');
-  for (const { name, actual, expected } of [...result.cases, ...result.bytes]) assert.deepEqual(actual, expected, name);
+  for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.sessions]) assert.deepEqual(actual, expected, name);
   assert.deepEqual(result.frames, expectedFrames, 'the same full-frame validation, patch and inspection semantics run in Node and browser');
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame witnesses in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.sessions.length} snapshot-session witnesses in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

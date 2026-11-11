@@ -1,7 +1,6 @@
 import { clamp } from './util.js';
-
-export const base = new URL('./', location.href);
-export const apiUrl = path => new URL(path, base).href;
+import { post, readSession } from './host.js';
+export { base, apiUrl, request, post } from './host.js';
 
 const listeners = new Map();
 export const on = (name, fn) => { (listeners.get(name) || listeners.set(name, new Set()).get(name)).add(fn); return () => listeners.get(name).delete(fn); };
@@ -23,14 +22,6 @@ export const store = {
 
 export const documents = () => (store.state?.documents || []).filter(doc => !store.leaving.has(doc.id));
 export const descriptor = id => documents().find(doc => doc.id === id);
-
-export async function request(path, options = {}) {
-  const response = await fetch(apiUrl(path), { ...options, headers: { 'Content-Type': 'application/json', ...options.headers } });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw Object.assign(new Error(body.message || body.error?.message || body.error || `Request failed (${response.status})`), { code: body.error, details: body.details, status: response.status });
-  return body;
-}
-export const post = (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) });
 
 /** Short notice. `action` adds one button; `sticky` keeps it until replaced or dismissed with `toast.clear(id)`. */
 export function toast(message, action, { sticky = false, id } = {}) { emit('toast', { message, action, sticky, id }); }
@@ -98,7 +89,7 @@ export async function loadModel(id) {
   const render = descriptor(id)?.render;
   const key = `${id}@${version}:${render}`;
   if (!loading.has(key)) {
-    loading.set(key, request(`api/documents/${encodeURIComponent(id)}`).then(model => {
+    loading.set(key, readSession.readFrame(id).then(model => {
       if (descriptor(id)?.version !== version || descriptor(id)?.render !== render) return loadModel(id);
       if (model.version === version) {
         modelRenders.set(model, render);

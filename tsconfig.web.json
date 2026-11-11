@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["es2024", "dom"],
+    "types": [],
+    "checkJs": true
+  },
+  "include": ["web/lib/http.js", "web/lib/http-session.js", "web/lib/host.js"],
+  "exclude": ["node_modules", "**/dist/**"]
+}

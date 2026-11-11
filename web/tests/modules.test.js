@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const WEB = path.join(root, 'web');
@@ -21,7 +22,7 @@ const walk = async directory => {
   return files;
 };
 const exists = async file => { try { return (await stat(file)).isFile(); } catch { return false; } };
-const relative = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s*)['"](\.[^'"]+)['"]/g;
+const relativeImports = source => ts.preProcessFile(source, true, true).importedFiles.map(file => file.fileName).filter(name => name.startsWith('.'));
 
 /** Every production client module: `web/` without its tests, plus each plugin's client directory. */
 const clientModules = async () => {
@@ -33,6 +34,19 @@ const clientModules = async () => {
   }
   return modules;
 };
+
+test('module discovery follows runtime imports/re-exports but not JSDoc or quoted import text', () => {
+  const source = `
+    /** @typedef {import('./contract.ts').Value} Value */
+    // import './comment.ts';
+    const text = 'from "./quoted.ts"';
+    import { one } from './one.js';
+    export { two } from './two.js';
+    export * from './three.js';
+    void import('./later.js');
+  `;
+  assert.deepEqual(relativeImports(source), ['./one.js', './two.js', './three.js', './later.js']);
+});
 
 test('browser test entries keep their local imports and npm suite coverage after relocation', async () => {
   const directory = path.join(WEB, 'tests');
@@ -54,7 +68,7 @@ test('every browser module imports a file that exists, and never TypeScript', as
   const broken = [];
   for (const file of modules) {
     const source = await readFile(file, 'utf8');
-    for (const [, specifier] of source.matchAll(relative)) {
+    for (const specifier of relativeImports(source)) {
       const where = path.relative(root, file);
       if (specifier.endsWith('.ts')) { broken.push(`${where} → ${specifier} (the browser cannot load TypeScript)`); continue; }
       if (await exists(path.resolve(path.dirname(file), specifier))) continue;
@@ -71,7 +85,7 @@ test('browser module dependencies are acyclic, including literal lazy imports', 
   const modules = await clientModules(), graph = new Map();
   for (const file of modules) {
     const dependencies = [];
-    for (const [, specifier] of (await readFile(file, 'utf8')).matchAll(relative)) {
+    for (const specifier of relativeImports(await readFile(file, 'utf8'))) {
       const direct = path.resolve(path.dirname(file), specifier);
       const target = await exists(direct) ? direct : path.join(WEB, specifier.replace(/^(\.\.\/)+/, ''));
       if (modules.includes(target)) dependencies.push(target);

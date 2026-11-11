@@ -121,6 +121,8 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | --- | --- |
 | `core/lib/model.ts` | Native document/node vocabulary, validation, limits and patches. |
 | `core/lib/validation.ts` | Host-free JSON/text/UTF-8 checks and the shared domain error. |
+| `core/lib/board-session.ts` | Opaque read-side session contract and immutable snapshot reader; no writer authority. |
+| `web/lib/host.js`, `http-session.js`, `http.js` | Native host binding, HTTP/SSE read adapter and JSON transport. |
 | `core/lib/model-styles.ts`, `browser-styles.ts` | Node lowering binding and explicit absent browser capability. |
 | `core/lib/project.ts` | Project settings/read/write and component expansion/listing. |
 | `core/lib/codec.ts` | Strict native model ↔ HTML codec and `renderFile`. |
