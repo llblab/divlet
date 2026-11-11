@@ -729,6 +729,7 @@ export function previewBridge(documentId, initialVersion, bridgeToken, readOnly 
       send({ type: 'divlet:context', clientX: data.x, clientY: data.y });
     }
     if (data.type === 'divlet:hover') setHover(typeof data.nodeId === 'string' ? byId(data.nodeId) : null);
+    if (data.type === 'divlet:scroll-to' && typeof data.fragment === 'string' && data.fragment.length <= 2048) scrollToFragment(data.fragment);
     if (data.type === 'divlet:flash' && Array.isArray(data.nodeIds)) flash(data.nodeIds);
     if (data.type === 'divlet:work' && Array.isArray(data.nodeIds)) { workIds = data.nodeIds.filter(id => typeof id === 'string').slice(0, 100); applyWork(); }
     if (data.type === 'divlet:update' && data.documentId === documentId && Number.isInteger(data.version) && data.version > version && typeof data.html === 'string' && data.html.length <= 8 * 1024 * 1024) {
@@ -748,19 +749,26 @@ export function previewBridge(documentId, initialVersion, bridgeToken, readOnly 
     choose(element, event.shiftKey || event.metaKey || event.ctrlKey);
   }, true);
 
-  // Play: the page behaves normally. Its `<base>` points at the project files, so a same-page `#fragment` would leave for
-  // `files/#fragment` (a 404). The canonical href stays as authored; the click scrolls to the target the way a browser would.
-  document.addEventListener('click', event => {
-    if (mode === 'inspect' || event.defaultPrevented || event.button !== 0 || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return;
-    const link = event.target.closest?.('a[href], area[href]');
-    const href = link?.getAttribute('href');
-    if (!href || href[0] !== '#' || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
-    event.preventDefault();
-    let name = href.slice(1);
+  // Play: the page behaves normally. Its `<base>` points at the project files, so a link would leave for `files/…` (a 404). The
+  // canonical href stays as authored. A same-page `#fragment` scrolls here the way a browser would; a link to another page is
+  // reported to the board, which owns the artboards and decides what reaching a sibling frame means.
+  const scrollToFragment = fragment => {
+    let name = String(fragment).replace(/^#/, '');
     try { name = decodeURIComponent(name); } catch { /* an undecodable fragment is matched as written */ }
     const target = name && (document.getElementById(name) || document.getElementsByName(name)[0]);
     if (target) target.scrollIntoView();
     else if (name === '' || name.toLowerCase() === 'top') window.scrollTo(0, 0);
+  };
+  document.addEventListener('click', event => {
+    if (mode === 'inspect' || event.defaultPrevented || event.button !== 0 || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return;
+    const link = event.target.closest?.('a[href], area[href]');
+    const href = link?.getAttribute('href');
+    if (!href || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
+    if (href[0] === '#') { event.preventDefault(); scrollToFragment(href); return; }
+    // A scheme or a network-path reference is not a page of this project; leave it to the browser and its CSP.
+    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href) || href.length > 2048) return;
+    event.preventDefault();
+    send({ type: 'divlet:link', href });
   });
 
   document.addEventListener('contextmenu', event => {

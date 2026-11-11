@@ -820,12 +820,33 @@ window.addEventListener('message', event => {
   }
 });
 
+/**
+ * Play: a link in one artboard names a page of the project. When that page is another artboard's, reveal it, select it and
+ * take its page to the fragment (a plain page link lands at the top, like a navigation would). The frames stay loaded; nothing
+ * is swapped, and a link to no artboard does nothing rather than leave for a missing file.
+ */
+function followLink(entry, href) {
+  const base = entry.doc.viewUrl;
+  if (!base) return;
+  const page = url => { try { return url.origin + decodeURIComponent(url.pathname); } catch { return url.origin + url.pathname; } };
+  let target;
+  try { target = new URL(href, new URL(base, location.href)); } catch { return; }
+  const destination = [...entries.values()].find(item => item.doc.viewUrl && page(new URL(item.doc.viewUrl, location.href)) === page(target));
+  if (!destination) return;
+  const id = destination.doc.id;
+  if (id !== entry.doc.id) { selectArtboards([id]); reveal(id); }
+  const message = { type: 'divlet:scroll-to', fragment: target.hash };
+  if (destination.port && destination.loaded) destination.port.postMessage(message);
+  else destination.pendingScroll = message;
+}
+
 function handlePreviewMessage(entry, data) {
   if (!data || typeof data !== 'object') return;
   if (store.expanded?.entry === entry) {
     if (data.type === 'divlet:escape') closeExpanded();
     return;
   }
+  if (data.type === 'divlet:link' && typeof data.href === 'string' && data.href.length <= 2048) { followLink(entry, data.href); return; }
   if (data.type === 'divlet:wheel' && Number.isFinite(data.deltaY)) {
     const frame = entry.iframe.getBoundingClientRect();
     const px = frame.left + (Number(data.clientX) || 0) * camera.k;
@@ -933,6 +954,7 @@ function handlePreviewMessage(entry, data) {
     syncNodeSelection(entry);
     syncWork(entry);
     if (entry.pendingFlash && entry.pendingFlash.version <= data.version) { postToFrame(entry.doc.id, { type: 'divlet:flash', nodeIds: entry.pendingFlash.nodeIds }); entry.pendingFlash = null; }
+    if (entry.pendingScroll) { entry.port?.postMessage(entry.pendingScroll); entry.pendingScroll = null; }
     deliverEdit(entry);
     updateFrame(entry);
   } else if (data.type === 'divlet:observations') {
