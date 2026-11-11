@@ -744,7 +744,8 @@ html.w440 .shortcut-group dd { text-align: left; padding-bottom: 5px; white-spac
 .agent-status-dock { display: flex; flex-direction: column; min-height: 0; max-height: calc(var(--vh) * 0.4); }
 .agent-status-dock:empty { display: none; }
 .agent-status-dock > .agent-status { margin: 0; min-height: 0; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) max-content; border: 1px solid var(--hair); border-radius: var(--radius); background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--solid); box-shadow: var(--shadow); }
-.agent-status-dock .agent-status-text { align-self: stretch; min-height: 0; overflow-y: auto; }
+.agent-status-dock .agent-status-text { grid-column: 1 / -1; align-self: stretch; min-height: 0; overflow-y: auto; }
+.agent-status-dock .agent-status > .spinner { grid-row: 3; align-self: center; margin-top: 0; }
 .agent-status { display: grid; grid-template-columns: 12px repeat(3, minmax(0, 1fr)) max-content; grid-template-rows: auto auto max-content; gap: 4px 6px; align-items: start; margin: 0 8px 6px; padding: 7px 12px; border-radius: var(--radius-inner); background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 500; }
 .agent-status[hidden] { display: none; }
 .agent-status > .spinner { grid-column: 1; grid-row: 1; margin-top: 3px; }
