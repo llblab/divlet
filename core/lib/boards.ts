@@ -8,7 +8,9 @@
  *
  * The registry is one small JSON file per project, named by the hash of the absolute project path, in a per-user state
  * directory. An entry carries the board URL (which contains its access token, so only the same user and only a reader of this
- * directory can use it) and the owner's pid; an entry whose process is gone is stale and is removed on read.
+ * directory can use it) and the owner's pid; an entry whose process is gone is stale and is removed on read. A registry file
+ * that another account owns is never trusted: it could hand this process a URL (and token) of that account's choosing, so a
+ * foreign-owned entry is ignored and left alone, not read, attached to or deleted.
  */
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
@@ -36,6 +38,14 @@ const stateDir = (): string => process.env.PI_DIVLET_STATE_DIR || path.join(os.h
 const entryFile = async (projectFile: string): Promise<string> => {
   const key = createHash('sha256').update(path.resolve(projectFile)).digest('hex').slice(0, 24);
   return path.join(stateDir(), `${key}.json`);
+};
+
+/** True when the registry file belongs to the current account (always true where the platform has no uids, or for root). */
+const ownedByUser = async (file: string): Promise<boolean> => {
+  if (typeof process.getuid !== 'function') return true;
+  const uid = process.getuid();
+  if (uid === 0) return true;
+  try { return (await fs.lstat(file)).uid === uid; } catch { return false; }
 };
 
 const alive = (pid: unknown): boolean => {
@@ -72,6 +82,7 @@ export async function unregisterBoard({ file, url }: { file: string; url: string
 export async function findBoard(projectFile: string): Promise<BoardEntry | null> {
   const target = await entryFile(projectFile);
   let entry: Partial<BoardEntry>;
+  if (!await ownedByUser(target)) return null;
   try { entry = JSON.parse(await fs.readFile(target, 'utf8')) as Partial<BoardEntry>; } catch { return null; }
   if (!entry || typeof entry.url !== 'string' || !alive(entry.pid)) { await fs.rm(target, { force: true }).catch(() => {}); return null; }
   if (entry.file !== path.resolve(projectFile)) return null;
@@ -86,6 +97,7 @@ export async function listBoards(): Promise<BoardEntry[]> {
   for (const name of names) {
     if (!name.endsWith('.json')) continue;
     const file = path.join(stateDir(), name);
+    if (!await ownedByUser(file)) continue;
     try {
       const entry = JSON.parse(await fs.readFile(file, 'utf8')) as BoardEntry;
       if (alive(entry?.pid)) out.push(entry); else await fs.rm(file, { force: true });

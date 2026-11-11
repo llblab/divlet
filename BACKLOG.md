@@ -78,7 +78,7 @@ Complete the remaining migration under `strict` + `erasableSyntaxOnly`, preservi
 
 ## P2 — hardening
 
-- [ ] **MCP REGISTRY — Scope the board registry to the user who owns it.** `core/lib/boards.ts` stores each board as a file in `~/.divlet/boards/` (`0600` in a `0700` directory) holding the board URL, which carries its access token — i.e. full access to that board's local API. On a machine where several accounts share a home directory (or `PI_DIVLET_STATE_DIR` points at a shared path) one account could attach to another's board. Compare the entry's owner uid with `process.getuid()` on read, or move the registry to a per-uid unix socket, and keep the stale-owner cleanup. Deliberately deferred: single-user local machines are the supported case today.
+- [ ] **MCP REGISTRY — Finish scoping the board registry to its user.** Reads now ignore (and never delete) a registry file owned by another uid, so a shared home or a shared `PI_DIVLET_STATE_DIR` can no longer hand this process another account's board URL and token. Still open: the registry *directory* itself is not checked (another account that owns it could still replace entries it also owns, which the reader now rejects, but could make writes fail), and a per-uid socket would remove the shared-directory question entirely. Deliberately deferred: single-user local machines remain the supported case.
 
 ## Gated
 
