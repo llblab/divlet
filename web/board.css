@@ -219,6 +219,7 @@ body.has-sidebar .tab { border-color: transparent; border-radius: var(--radius-i
 .tab .tool-label { flex: none; line-height: 16px; }
 /* The tabs own their density, even while the pane is folded. Icons/counts share the top line instead of clipping names. */
 @container sidebar-tabs (max-width: 340px) {
+  .tab { flex-direction: column; gap: 0; padding: 0 2px; }
   .tab-mark { height: 14px; }
   .tab .icon { width: 13px; height: 13px; }
 }
