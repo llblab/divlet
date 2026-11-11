@@ -737,7 +737,33 @@ try {
       await waitUntil(async () => reads >= 2 && await stateRow(pointB).count() === 1 && (await stateRow(pointA).getAttribute('aria-current').catch(() => null)) === 'step', `a stale ${captureAtStart ? 'A-future' : 'B'} snapshot earns a fresh timeline read`);
     } finally { allowCapture(); allowDelivery(); await page.unroute('**/api/history?limit=100', historyRoute); }
   }
-  check('history: guarded states, forward return, keyboard/focus, branching, point-only/ABA refresh, phone/200%, read-only audit and old-owner compatibility');
+  for (const failure of ['http', 'missing-timeline']) {
+    let releaseRead, reads = 0;
+    const gate = new Promise(resolve => { releaseRead = resolve; });
+    const refuseRead = async route => {
+      if (++reads > 1) return route.continue();
+      await gate;
+      await route.fulfill({ status: failure === 'http' ? 400 : 200, contentType: 'application/json', body: JSON.stringify(failure === 'http' ? { message: 'Synthetic history read refusal' } : { navigation: true, changes: [] }) });
+    };
+    await page.route('**/api/history?limit=100', refuseRead);
+    try {
+      await page.evaluate(async () => { void (await import('./lib/activity.js')).loadRecent(); });
+      await waitUntil(() => reads === 1, 'the history failure response is held');
+      await runtime.patch({ documentId: 'mobile', expectedVersion: doc('mobile').version, patch: { metadata: { historyReadFailure: failure } } });
+      const changedPoint = runtime.historyHead().pointId;
+      await waitUntil(() => page.evaluate(async point => (await import('./lib/store.js')).store.state.history.pointId === point, changedPoint), 'the held read is stale before refusal');
+      releaseRead();
+      await waitUntil(async () => (await page.locator('#activity .history-feedback').innerText()).includes(failure === 'http' ? 'Synthetic history read refusal' : 'did not supply a navigable timeline'), 'read refusal is visible after controls');
+      assert.equal(await page.locator('#activity [data-history-point]').count(), 0, 'a failed stale read cannot expose old actionable addresses');
+      await sleep(400);
+      assert.equal(reads, 1, 'failed or missing timelines do not automatically retry over the bounded observation window');
+      await page.locator('#open-history').click(); await page.locator('#open-history').click();
+      await waitUntil(async () => (await stateRow(changedPoint).getAttribute('aria-current').catch(() => null)) === 'step', 'reopening recovers a fresh timeline');
+      assert.equal(reads, 2, 'reopen performs one successful recovery read');
+      assert.equal(await page.locator('#activity .history-feedback').innerText(), '');
+    } finally { releaseRead(); await page.unroute('**/api/history?limit=100', refuseRead); }
+  }
+  check('history: guarded states, forward return, keyboard/focus, branching, point-only/ABA refresh, bounded failed-read recovery, phone/200%, read-only audit and old-owner compatibility');
 
   /* ---- resize snapping to device widths --------------------------------- */
   await showAll();

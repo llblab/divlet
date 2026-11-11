@@ -14,12 +14,12 @@ const KIND = { undo: 'Undo', redo: 'Redo', create: 'New', delete: 'Removed', ext
 const CHAT = new Set(['ask', 'reply']);
 let focusSeq = null;
 let unread = 0;
-let timeline = null, timelineProject = null;
+let timelineRead = null;
 // Server point IDs may recur after Undo; each observed transition invalidates in-flight snapshots, including A → B → A.
-let observedHead = '', stateGeneration = 0, requestedGeneration = -1, timelineGeneration = -1;
+let observedHead = '', stateGeneration = 0, requestedGeneration = -1;
 let reading = false, readAgain = false, navigating = null, readError = '', navigationError = '', auditOpen = false, restorePoint = null;
 const supportsNavigation = () => store.state?.history?.navigation === true;
-const timelineReady = () => supportsNavigation() && timelineGeneration === stateGeneration && timelineProject === store.state?.projectId && timeline?.current === store.state?.history?.pointId;
+const timelineReady = () => supportsNavigation() && timelineRead?.generation === stateGeneration && timelineRead.projectId === store.state?.projectId && timelineRead.timeline?.current === store.state?.history?.pointId;
 
 export const isOpen = () => sidebar.isOpen('activity');
 export function toggle(force) {
@@ -54,10 +54,8 @@ export async function loadRecent() {
     const result = await request('api/history?limit=100');
     if (project && project !== store.state?.projectId) return;
     store.recent = [...new Map([...result.changes, ...store.recent].map(change => [change.seq, change])).values()].sort((a, b) => a.seq - b.seq).slice(-300);
-    timeline = result.navigation === true && Array.isArray(result.timeline?.points) ? result.timeline : null;
-    timelineProject = store.state?.projectId;
-    timelineGeneration = generation;
-    readError = supportsNavigation() && !timeline ? 'This board did not supply a navigable timeline.' : '';
+    timelineRead = { projectId: store.state?.projectId, generation, timeline: result.navigation === true && Array.isArray(result.timeline?.points) ? result.timeline : null };
+    readError = supportsNavigation() && !timelineRead.timeline ? 'This board did not supply a navigable timeline.' : '';
   } catch (error) { readError = `History could not be read: ${error.message}. Reopen History to retry.`; }
   finally {
     reading = false;
@@ -180,7 +178,7 @@ async function navigate(pointId, expectedPoint) {
   finally { navigating = null; await loadRecent(); render(); }
 }
 
-function stateRow(point, index) {
+function stateRow(point, index, timeline) {
   const current = point.id === timeline.current;
   const future = index > timeline.index;
   const line = el('button', `change history-state${current ? ' is-current' : ''}${future ? ' is-future' : ''}`);
@@ -240,7 +238,8 @@ export function render() {
     states.setAttribute('role', 'group'); states.setAttribute('aria-label', 'Project states'); states.tabIndex = -1;
     states.append(el('div', 'caption history-caption', 'Project states'));
     if (timelineReady()) {
-      for (let i = timeline.points.length - 1; i >= 0; i--) states.append(stateRow(timeline.points[i], i));
+      const timeline = timelineRead.timeline;
+      for (let i = timeline.points.length - 1; i >= 0; i--) states.append(stateRow(timeline.points[i], i, timeline));
       const limited = timeline.pastLimited || timeline.futureLimited ? ' Some legacy Undo/Redo entries lie outside this connected timeline.' : '';
       states.append(el('p', 'history-boundary', (BOUNDARY[timeline.boundary] || BOUNDARY.retained) + limited));
     } else states.append(el('div', 'quiet', readError ? 'Project states are unavailable.' : 'Reading the current project states…'));
