@@ -17,7 +17,7 @@ export interface BoardApi extends BoardRuntime {
   projectDir: string;
   projectPath: string;
   diagnostics: { has(path: string): boolean };
-  staticFiles: Map<string, string | Buffer> | null;
+  readonly publicFiles: ReadonlyMap<string, string | Buffer> | null;
   info(): any;
   read(query: Record<string, unknown>): any;
   render(documentId: string): any;
@@ -96,6 +96,14 @@ function siteBridge(initialVersion: number, eventsUrl: string, boardUrl: string)
     });
     addEventListener('pagehide', () => events.close(), { once: true });
   }
+}
+
+/** Read-only public pages never receive an editor channel or capability; only Escape returns to the owning canvas. */
+function browseBridge(): void {
+  if (typeof parent === 'undefined' || parent === globalThis) return;
+  addEventListener('keydown', (event: any) => {
+    if (event.key === 'Escape') parent.postMessage({ type: 'divlet:escape' }, '*');
+  });
 }
 
 function sitePath(pathname: string): string {
@@ -255,11 +263,21 @@ export async function startServer(runtime: BoardApi, { port = 0 }: { port?: numb
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': `default-src 'none'; img-src 'self' data: https:; style-src 'unsafe-inline'; font-src 'self' data: https:; script-src 'nonce-${nonce}'; connect-src 'none'; base-uri 'self'; form-action 'none'`, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' });
         return res.end(html);
       }
-      if (req.method === 'GET' && route.startsWith('build/_assets/')) {
+      if (req.method === 'GET' && route.startsWith('build/')) {
         const name = route.slice('build/'.length);
-        const contents = runtime.staticFiles?.get(name);
+        const contents = runtime.publicFiles?.get(name);
         if (contents === undefined) return json(res, 404, { error: 'NOT_FOUND' });
-        res.writeHead(200, { 'Content-Type': MIME[path.extname(name).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data: https:" });
+        const extension = path.extname(name).toLowerCase();
+        if (extension === '.html' || extension === '.htm') {
+          const nonce = randomBytes(18).toString('base64');
+          const source = contents.toString(), helper = `<script nonce="${nonce}">;(${browseBridge.toString()})();</script>`;
+          // Anchor at the document boundary, not a body-like string in authored CSS, comments or scripts.
+          const closing = /<\/body>(\s*<\/html>\s*)$/i;
+          const html = closing.test(source) ? source.replace(closing, `${helper}</body>$1`) : source + helper;
+          res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': `sandbox allow-scripts; default-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data: https:; script-src 'nonce-${nonce}'; connect-src 'none'; base-uri 'none'; form-action 'none'` });
+          return res.end(html);
+        }
+        res.writeHead(200, { 'Content-Type': MIME[extension] || 'application/octet-stream', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data: https:" });
         return res.end(contents);
       }
       if (req.method === 'GET' && route.startsWith('files/')) {

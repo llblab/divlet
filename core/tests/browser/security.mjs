@@ -40,6 +40,8 @@ try {
   const live = () => page.waitForFunction(() => document.querySelector('.artboard[data-artboard-id="welcome"]')?.dataset.status === 'live');
   await page.goto(runtime.url);
   await live();
+  const previousCapability = new URL(await page.locator('iframe[data-document-id="welcome"]').getAttribute('src')).searchParams.get('bridge');
+  assert.ok(previousCapability);
   await page.locator('#viewport').focus();
   await page.keyboard.press('p');
   const navigation = page.waitForEvent('framenavigated', { predicate: frame => frame.url() === externalUrl });
@@ -51,11 +53,20 @@ try {
   assert.equal(runtime.read({ view: 'frame', documentId: 'welcome' }).nodes['title-text'].content, before, 'window messages cannot edit the project');
   assert.equal(await foreign.evaluate(() => document.referrer), '', 'the preview capability is not sent as a referrer');
   await page.evaluate(async () => (await import('./lib/canvas.js')).openExpanded('welcome'));
+  await foreign.waitForURL(runtime.info().site.url);
+  await foreign.locator('[data-divlet-id="cta"]').click();
+  await foreign.waitForURL(externalUrl);
+  await foreign.waitForFunction(() => Array.isArray(window.received));
+  await foreign.evaluate(token => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = event => received.push(event.data);
+    parent.postMessage({ type: 'divlet:connect', bridgeToken: token }, '*', [channel.port2]);
+  }, previousCapability);
   await foreign.evaluate(() => parent.postMessage({ type: 'divlet:site-ready' }, '*'));
   const version = runtime.read({ view: 'frame', documentId: 'welcome' }).version;
   await runtime.patch({ documentId: 'welcome', expectedVersion: version, patch: { name: 'Trusted change' } });
   await page.waitForTimeout(250);
-  const leaked = await foreign.evaluate(() => received.filter(message => ['divlet:update', 'divlet:select', 'divlet:work'].includes(message?.type) || (message?.site && Object.keys(message.site).some(key => key !== 'version'))));
+  const leaked = await foreign.evaluate(() => received.filter(message => ['divlet:update', 'divlet:select', 'divlet:work', 'divlet:writable', 'divlet:inspect'].includes(message?.type) || (message?.site && Object.keys(message.site).some(key => key !== 'version'))));
   assert.deepEqual(leaked, [], 'model updates and selection stay on the old document-bound port');
   await page.locator('#expanded-back').click();
   await live();
@@ -67,7 +78,7 @@ try {
     const doc = await fetch('api/documents/welcome').then(response => response.json());
     return doc.nodes['title-text'].content === 'Trusted edit after reset';
   });
-  console.log(JSON.stringify({ status: 'passed', checks: ['forged window edits and fake channel handshakes rejected', 'preview capability not leaked in referrers', 'model, selection and site capabilities not delivered to a navigated page', 'trusted editing works after remount'] }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', checks: ['forged window edits and fake channel handshakes rejected', 'pre-view capability replay rejected after navigation', 'preview capability not leaked in referrers', 'model, selection and site capabilities not delivered to a navigated page', 'trusted editing works after remount'] }, null, 2));
 } finally {
   await browser?.close();
   await runtime?.close();

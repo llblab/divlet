@@ -22,7 +22,7 @@ The existing Landing workflow verifies source/cache freshness in a sandbox, then
 
 Publication adds `.nojekyll` so GitHub serves `_assets/`, plus `.landing-hash` as the branch's fingerprint record. It does not patch the page or compile a second implementation. A metadata-only regeneration with identical public bytes produces no deployment commit. Serve Pages from the `gh-pages` branch root; configuration, remote synchronization and an actual deployment still need maintainer authorization. Preparing this project does not push or deploy it.
 
-The source currently uses the working project-2/frame-1 format, including explicit optional `head.description` and `head.icon`. It will follow the general explicit migration-copy rules when the approved format transition is implemented; no schema freeze is implied. Static-host navigation is tested. The existing preview `<base>` fragment-navigation limitation is tracked separately; a portable export does not prove Play-mode navigation.
+The source currently uses the working project-2/frame-1 format, including explicit optional `head.description` and `head.icon`. It will follow the general explicit migration-copy rules when the approved format transition is implemented; no schema freeze is implied. Static-host navigation is tested; expanded viewing opens the prepared page directly. The separate scaled-canvas Play preview still has a tracked `<base>` fragment-navigation limitation; a portable export does not prove that editor-preview path.
 
 ## Other scenarios
 

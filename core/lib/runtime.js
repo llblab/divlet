@@ -119,6 +119,7 @@ export class DivletRuntime extends EventEmitter {
     this.output = new OutputStore(this.projectPath);
     this.externalFiles = Object.freeze(normalizeExternalFiles(this.projectDir, externalFiles));
     this.staticFiles = null;
+    this.publicFiles = null;
     this.staticSources = new Map();
     this.pendingGeneration = null;
     this.watchEnabled = watch;
@@ -258,6 +259,7 @@ export class DivletRuntime extends EventEmitter {
       instances: Object.values(document.nodes).filter(node => node.type === 'ref').length,
       uses: entry.uses, usedBy: this.usedBy(document.id),
       modelPath: this.projectPath, sourcePath: this.projectPath, htmlPath: entry.htmlPath, metaPath: entry.metaPath,
+      viewUrl: this.url + 'build/' + encodeURIComponent(path.basename(entry.htmlPath)),
     };
   }
 
@@ -610,6 +612,8 @@ export class DivletRuntime extends EventEmitter {
       const fileHtml = String(generation.files.get(path.basename(entry.htmlPath)));
       if (entry.fileHtml !== fileHtml) entries.set(id, { ...entry, fileHtml });
     }
+    // Preserve the static owner's public graph before adding editor-only sidecars to the disk publication plan.
+    const publicFiles = new Map(generation.files);
     for (const entry of entries.values()) generation.files.set(path.basename(entry.metaPath), this.metaOf(entry, entries));
     for (const [route, page] of candidate.site?.pages ?? []) {
       const directory = route.split('/').filter(Boolean).map(part => decodeURIComponent(part)).join('/');
@@ -618,7 +622,7 @@ export class DivletRuntime extends EventEmitter {
       const entry = { document: page.document, htmlPath, fileHtml: generation.files.get(name), uses: page.uses ?? [] };
       generation.files.set(name.slice(0, -5) + '.meta.json', JSON.stringify({ ...JSON.parse(this.metaOf(entry, entries)), route, templateId: candidate.site.config.templateId }, null, 2) + '\n');
     }
-    return { ...generation, ...candidate };
+    return { ...generation, publicFiles, ...candidate };
   }
 
   async obsoleteOutputs(files, output = this.output) {
@@ -648,6 +652,7 @@ export class DivletRuntime extends EventEmitter {
     for (const key of this.diagnostics.keys()) if (key.startsWith('static:')) this.diagnostics.delete(key);
     for (const warning of generation.warnings) this.diagnostics.set(`static:${warning.path}`, { ...warning, at: new Date().toISOString() });
     this.staticFiles = generation.files;
+    this.publicFiles = generation.publicFiles;
     this.staticSources = generation.sources;
     this.diagnostics.delete('outputs');
   }

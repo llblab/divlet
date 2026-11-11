@@ -40,7 +40,7 @@ The conversation stacks from the bottom, immediately above the composer/activity
 
 ## Expanded view
 
-A page expanded with `E` shows only its name at the top center; the entire label is a return button (`Esc` does the same). Drag the button anywhere, or use `Alt` + arrow keys while it is focused, to inspect the page underneath. Dragging does not exit expanded view; clicking does. The button stays within the viewport. The DIVLET corner indicator and other panels are hidden in this mode, with their state preserved.
+A page expanded with `E` immediately opens the prepared, read-only page with working links and fragments. Expanding a Markdown site's template opens its actual home/content route, not placeholders followed by a second “Open site” step. Other frames open their own public page even when the project also has a site. Only the page's name stays at the top center; the entire label is a return button (`Esc` does the same). Drag the button anywhere, or use `Alt` + arrow keys while it is focused, to inspect the page underneath. Dragging does not exit expanded view; clicking does. The button stays within the viewport. The DIVLET corner indicator and other panels are hidden in this mode, with their state preserved. Navigation stays in the same browsing iframe; it has no editor channel. Returning restores the previous mode/camera and a fresh authenticated preview of the latest accepted source. Temporary form values in the browsing page are not authored edits. The separate scaled-canvas Play tool still uses the editor preview; its known source-resource-base navigation limitation is tracked in the backlog.
 
 ## Open and save from the browser
 

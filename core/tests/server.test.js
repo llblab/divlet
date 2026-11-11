@@ -36,6 +36,37 @@ test('HTTP serves authenticated project/render/preview and exposes the increment
   assert.equal(previewResponse.headers.get('referrer-policy'), 'no-referrer');
 });
 
+test('frame browsing serves the prepared public page without editor authority or a resource base', async t => {
+  const { runtime, url, id } = await fixture(t);
+  await runtime.patch({ documentId: id, expectedVersion: 1, patch: { css: '.browse-close::after { content: "</body>"; }' } });
+  const source = await fs.readFile(runtime.projectPath);
+  const view = runtime.info().documents.find(frame => frame.id === id).viewUrl;
+  assert.equal(typeof view, 'string', 'the source owner provides the exact public frame URL');
+  const response = await fetch(view);
+  assert.equal(response.status, 200);
+  const html = await response.text(), policy = response.headers.get('content-security-policy');
+  assert.doesNotMatch(html, /<base\b|function previewBridge|divlet:connect|divlet:update|divlet-metadata/);
+  assert.match(html, /divlet:escape/);
+  assert.ok(html.indexOf('divlet:escape') > html.lastIndexOf('</style>'), 'a literal closing-body string in authored CSS cannot swallow the Escape helper');
+  assert.match(policy, /sandbox allow-scripts/);
+  assert.match(policy, /script-src 'nonce-/);
+  assert.match(policy, /connect-src 'none'/);
+  assert.match(policy, /base-uri 'none'/);
+  assert.match(policy, /form-action 'none'/);
+  assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+  const manifest = JSON.parse(await fs.readFile(path.join(runtime.outputDir, '.divlet-build.json'), 'utf8'));
+  const privateFiles = Object.keys(manifest.files).filter(name => name.endsWith('.meta.json'));
+  assert.ok(privateFiles.length > 0, 'the refusal witnesses are actual generated files, not guessed missing names');
+  for (const name of privateFiles) assert.ok((await fs.readFile(path.join(runtime.outputDir, name))).length > 0);
+  const metadataPath = path.join(runtime.outputDir, privateFiles[0]);
+  const metadata = await fs.readFile(metadataPath);
+  await fs.unlink(metadataPath);
+  await runtime.scanOutputs();
+  assert.deepEqual(await fs.readFile(metadataPath), metadata, 'the full private publication plan still repairs missing sidecars');
+  for (const name of [...privateFiles, '.divlet-build.json', '.trash/old.html', 'unknown.html']) assert.equal((await fetch(url + 'build/' + name)).status, 404, `${name} is not a public artifact`);
+  assert.deepEqual(await fs.readFile(runtime.projectPath), source, 'view URLs and browsing do not become authored content');
+});
+
 test('selection and observations validate IDs, origin and document versions', async t => {
   const { runtime, url, id } = await fixture(t);
   const post = (route, payload, extra = {}) => fetch(url + route, { method: 'POST', headers: { 'content-type': 'application/json', ...extra }, body: JSON.stringify(payload) });

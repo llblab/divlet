@@ -112,7 +112,6 @@ $('#empty-new').addEventListener('click', () => actions.newArtboard());
 
 /* ---- site link ------------------------------------------------------------ */
 siteLink.append(icon('site'));
-$('#expanded-open-site').append(icon('site'));
 
 on('state', state => {
   $('#loading').hidden = true;
@@ -125,7 +124,6 @@ on('state', state => {
     if (!doc) canvas.closeExpanded({ reset: false });
     else {
       $('#expanded-title').textContent = doc.name || doc.id;
-      $('#expanded-open-site').hidden = !state.site;
       if (state.site) store.expanded.entry.iframe?.contentWindow.postMessage({ type: 'divlet:site-state', site: { version: state.site.version } }, '*');
     }
   }

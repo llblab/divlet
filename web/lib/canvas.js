@@ -703,12 +703,20 @@ export function openExpanded(documentId, focusTarget) {
   mount(entry);
   entry.iframe.style.width = '';
   entry.iframe.style.height = '';
-  entry.port?.postMessage({ type: 'divlet:inspect', enabled: false });
+  const site = store.state?.site;
+  const viewUrl = site?.templateId === documentId ? site.url : entry.doc.viewUrl;
+  if (viewUrl) {
+    // Browsing is a public document, not an editable preview with links that need a second mode switch.
+    entry.port?.close();
+    entry.port = null;
+    entry.bridgeToken = crypto.randomUUID();
+    entry.loaded = false;
+    entry.iframe.src = viewUrl;
+  } else entry.port?.postMessage({ type: 'divlet:inspect', enabled: false });
   const overlay = $('#expanded-preview');
   overlay.hidden = false;
   overlay.setAttribute('aria-owns', entry.iframe.id);
   $('#expanded-title').textContent = entry.doc.name || entry.doc.id;
-  $('#expanded-open-site').hidden = !store.state?.site;
   setChromeInert(true, entry);
   document.body.classList.add('is-expanded');
   $('#expanded-back').focus({ preventScroll: true });
@@ -760,14 +768,6 @@ export function closeExpanded({ reset = true } = {}) {
   scheduleFrames();
   emit('expanded', false);
 }
-
-$('#expanded-open-site').addEventListener('click', () => {
-  const expanded = store.expanded;
-  if (!expanded || !store.state?.site) return;
-  cancelDelivery(expanded.entry);
-  expanded.entry.loaded = false;
-  expanded.entry.iframe.src = store.state.site.url;
-});
 
 /* ---- observations from frames --------------------------------------------- */
 const validFiles = files => (Array.isArray(files) ? files.filter(file => file instanceof File && file.type.startsWith('image/')).slice(0, 12) : []);
