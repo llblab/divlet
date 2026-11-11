@@ -65,7 +65,7 @@ npx -y --package=divlet divlet-mcp --cwd /absolute/path/to/workspace
 
 In an MCP configuration, use `"command": "npx"` and `"args": ["-y", "--package=divlet", "divlet-mcp", "--cwd", "/absolute/path/to/workspace"]`. Pin the package version for shared configurations; see [npm publication](publishing.md).
 
-After both `divlet` and its thin host wrapper `pi-divlet` are published, Pi users can run `pi install npm:pi-divlet`. The wrapper re-exports `divlet/pi`; it does not contain a second adapter implementation.
+After both `divlet` and its [thin host wrapper `pi-divlet`](../packages/pi-divlet/README.md) are published, Pi users can run `pi install npm:pi-divlet`. The wrapper re-exports `divlet/pi`; it does not contain a second adapter implementation.
 
 For other hosts, copy or link `skills/divlet/` into the host's skills directory, globally or per project, and register the MCP server separately. Installing a skill alone does not register tools. The [workflow skill](../skills/divlet/SKILL.md) explains the model, component recipes and the read → edit → verify loop.
 

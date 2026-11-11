@@ -10,14 +10,15 @@ This guide describes the current implementation. The accepted [web-native core c
 core/        the Divlet core: index.js (public API — the package's `.`), lib/, tests/
 web/         the web client (a peer of core: plugins may act on both): `board.js` entry, `index.html`, `board.css`, modules by domain in `web/lib/`
 plugins/     importers/exporters/style engines, one package each (index.js, lib/, tests/)
-adapters/    host adapters, one package each: `pi/` (the Pi extension and its skill), `mcp/` (the MCP stdio server) and `cli/` (the standalone CLI)
-packages/    host packaging that is published on its own: `pi-divlet` is the Pi manifest plus a re-export of `divlet/pi`
-examples/    example projects (studio, a Markdown site, a PEN file)
+adapters/    host packages: pi/ (Pi extension), mcp/ (MCP stdio server), cli/ (standalone CLI)
+packages/    thin host-publication wrappers; pi-divlet re-exports divlet/pi
+skills/      the portable product workflow in skills/divlet/, independent of any host
+examples/    canonical native landing, studio, Markdown site and PEN scenarios
 ```
 
 ## Entry points
 
-The root package says what it is: `.` is the library (`core/index.js` — `openRuntime`, `launch`, `makeHost`, `startServer`,
+The root package says what it is: `.` is the library (source `core/index.js`, published as `dist/core/index.js` — `openRuntime`, `launch`, `makeHost`, `startServer`,
 `resolveOpenFile`), the bins are `divlet` (CLI) and `divlet-mcp` (MCP server), and every other surface is a named subpath
 (`./runtime`, `./contract`, `./model`, `./project`, `./codec`, `./boards`, `./plugins`, `./engine`, `./pi`). A host manifest field
 points at that host's adapter entry — `pi.extensions` is `dist/adapters/pi/index.js`, not a root shim — and the host's own package
@@ -27,9 +28,9 @@ hosts are a CLI and an MCP server.
 
 ## Core and plugins
 
-The **core** is three things, connected and inseparable: (1) the **format**, a flexible web-oriented JSON description of a Divlet project (`core/lib/model.ts`, `core/lib/project.js`; see [format](format.md)); (2) the **codec** between that format and HTML (`core/lib/codec.js`, `core/lib/render.js`); (3) the **web editor with its own server** (`core/lib/runtime.js`, `core/lib/server.js`, `core/lib/hub.js`, `web/`). The core knows exactly one project format and speaks plain HTML/CSS. `core/lib/html-import.ts` owns admission of external HTML, distinct from strict codec decoding and managed-cache reconciliation.
+The core connects one native format, HTML admission/projection and a local browser editor. It does not delegate document meaning to interchangeable plugins. The [module map](#modules) locates the current source owners; external HTML admission is distinct from strict codec decoding and managed-cache reconciliation.
 
-Everything else attaches to the core as a **plugin**. Tailwind is one: `plugins/tailwind/` is a style engine (the declaration ↔ class codec `lib/styles.js`, local compilation and class explanation/suggestion `lib/styling.js`) reached through the seam `core/lib/engine.js`, and it contributes the inspector's class editor and Layout / Spacing / Effects folds on the client (`plugins/tailwind/web/`, registered through `web/lib/panels.js`; the server lists the active plugins' client modules as `clientPlugins` in the project info and serves them at `plugins/<id>/<file>`). Importers and exporters are the other plugin kind:
+Optional capabilities attach as plugins. Tailwind supplies the declaration ↔ class codec, compilation and class explanation/suggestion, plus the inspector's class/layout/spacing/effects panels. Client panels register through `web/lib/panels.js`; the server advertises `clientPlugins` and serves modules at `plugins/<id>/<file>`. Importers/exporters translate foreign formats, not the native model.
 
 Plugin contracts are **types, not prose**. `core/lib/plugins.ts` exports `Importer` and `Exporter` (what a format plugin must provide), `core/lib/engine.ts` exports `StyleEngine` (what a style engine must provide), and `core/lib/contract.ts` exports the capability schema (`Schema`, `Tool`, `ToolParameters`, `Session`) that an adapter renders. Each is a real exported type with a declaration in the published package, so a plugin author writes `import type { Importer } from 'divlet/plugins'` and the compiler — not a reviewer — says whether the descriptor fits: `npm run typecheck` includes every `.ts` under `core/`, `adapters/` and `plugins/`, and `npm run build` emits `dist/**/*.d.ts`. A JavaScript plugin still works: the registry (`registerImporter`, `registerStyleEngine`, `registerExporter`) is the one place that promises a descriptor satisfies its contract, which is why that promise is written down as a cast there and nowhere else.
 
@@ -41,13 +42,11 @@ Foreign formats are **importer plugins** under `plugins/<id>/`. Their contract a
 
 Native HTML admission lives in `core/lib/html-import.ts`. A static page opened by path becomes a one-frame project beside it; scripts, event handlers, comments, stylesheet links and frames are dropped and counted in its provenance. The source dispatcher in `core/lib/import.ts` handles explicit opening, re-import and dropped-page providers without registering HTML as a plugin. HTML remains explicit-path input, never a project offered by folder listings. `core/tests/html-import.test.js` covers that boundary, including plain-CSS admission without an engine and non-overwriting publication.
 
-Two deliberate limits (maintainer decisions, 2026-11-08): the **exporter** contract (`registerExporter`, `exportAs` in `core/lib/plugins.js`) ships without an exporter until a concrete consumer and format exist (per-frame HTML downloads are the board's own route, not an exporter); and a changed `.pen` is never merged into an edited project: the board notices it and **Import again** creates a new sibling project (`<name>-2.divlet`), leaving the current project and the source untouched.
-
-The browser's `web/lib/actions.js` is a command facade, not a dependency of clipboard internals. `web/lib/artboards.js` owns frame creation, duplication and deletion, including grouping, component-safe deletion order, selection/reveal and failure/Undo feedback. The facade re-exports the same functions; `clip.js` calls that lower owner directly. Deletion captures target names, versions and component users before optimistic hiding removes them from the visible-descriptor lookup. Pending targets become dependency-ordered attempts and then accepted results; success count/name derive from those accepted results, not requested-first assumptions. Refused frames are shown again and retain their version guards against concurrent edits. Already-hidden or absent targets are ignored rather than becoming unguarded overlapping requests, and each command hides only its captured targets. Immediate toast Undo uses existing global Undo for accepted deletions; it is not a command-pinned inverse when other edits intervene. Literal local imports (including lazy imports and plugin client modules) are checked for existence and cycles by `core/tests/web-modules.test.js`.
+Two deliberate limits (maintainer decisions, 2026-11-08): the **exporter** contract (`registerExporter`, `exportAs` in `core/lib/plugins.ts`) ships without an exporter until a concrete consumer and format exist (per-frame HTML downloads are the board's own route, not an exporter); and a changed `.pen` is never merged into an edited project: the board notices it and **Import again** creates a new sibling project (`<name>-2.divlet`), leaving the current project and the source untouched.
 
 ## One capability contract
 
-`core/lib/contract.js` owns the product's operations: the tool list (names, titles, descriptions), their parameters in a small
+`core/lib/contract.ts` owns the product's operations: the tool list (names, titles, descriptions), their parameters in a small
 host-neutral schema form, the shared result shaping (frames rather than documents, compact project views, large-frame outlines)
 and `createSession`, which resolves a project to the board that owns it. Hosts translate the representation only — the Pi
 adapter renders the parameters as TypeBox and wraps results in Pi's tool envelope, `adapters/mcp/` renders the same parameters as
@@ -83,7 +82,7 @@ See [editable examples](../examples/README.md) for commands and file sets. Publi
 ## Project ownership
 
 A board (one runtime with its HTTP server) is the single writer of its project file and holds the accepted state, revisions,
-selection and diagnostics. When a board starts it registers itself in `~/.divlet/boards/<hash>.json` (`core/lib/boards.js`:
+selection and diagnostics. When a board starts it registers itself in `~/.divlet/boards/<hash>.json` (`core/lib/boards.ts`:
 absolute file, board URL with its access token, owning pid); a client that opens the same project file finds that entry, checks
 the owner is alive, and attaches instead of opening a second writer. Attached calls run on the owner through the token-scoped
 `api/tool` route, which speaks the same contract. A client that attached may close at any time without touching the board; when
@@ -114,17 +113,33 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 
 | Module | Responsibility |
 | --- | --- |
-| `core/lib/model.ts` | Document/node validation and limits, patches (`applyDocumentPatch`, including `styles`). |
-| `core/lib/project.js` | Project settings, project read/write, components (`expandFrame`, `listComponents`). |
-| `core/lib/codec.js`, `core/lib/render.js` | Model ↔ HTML (`encodeHtml`, `decodeHtml`, `renderFile`), frame preparation, Tailwind compilation hooks. |
-| `core/lib/engine.js` | The style-engine seam; the Tailwind plugin (`plugins/tailwind/`) provides compilation and the declaration ↔ utility codec. |
-| `core/lib/ops.js` | Structural operations (insert, move, wrap, …) on frames. |
-| `core/lib/runtime.js` | The project runtime: accepted state, queue, history, persistence, watching, assets. |
-| `core/lib/history.ts` | Session point identity and linear stack lineage; no replay or persistence. |
-| `core/lib/output.js`, `core/lib/static.js` | Generated-file ownership, collision checks, portable builds. |
-| `core/lib/server.js`, `core/lib/hub.js`, `core/lib/launch.js`, `core/lib/projects.js` | HTTP boundary, the launcher, opening paths, project discovery and creation. |
-| `adapters/pi/lib/extension.js`, `adapters/cli/index.js` | The Pi extension (tools `open/read/patch/edit/frame/undo/mark_divlet`) and the CLI. |
-| `web/` | The board: canvas, panels, inspector, palette. |
+| `core/lib/model.ts` | Native document/node vocabulary, validation, limits and patches. |
+| `core/lib/project.ts` | Project settings/read/write and component expansion/listing. |
+| `core/lib/codec.ts` | Strict native model ↔ HTML codec and `renderFile`. |
+| `core/lib/html-import.ts` | Loss-aware external HTML admission, separate from the strict codec. |
+| `core/lib/render.ts` | Frame preparation and utility-compilation hooks. |
+| `core/lib/engine.ts` | Optional style-engine contract, registry and capability dispatch. |
+| `core/lib/plugins.ts` | Importer/exporter contracts and registry. |
+| `core/lib/import.ts` | Bounded source dispatch and exclusive conversion publication. |
+| `core/lib/ops.ts` | Structural frame operations: insert, move, wrap and related edits. |
+| `core/lib/runtime.js` | Accepted state, writer queue, replay, persistence, watching and assets. |
+| `core/lib/history.ts` | Session point identity/lineage, not replay or persistence. |
+| `core/lib/contract.ts` | Host-neutral operations, schemas, result shaping and sessions. |
+| `core/lib/output.ts` | Generated-file provenance, collision checks and safe publication. |
+| `core/lib/static.js` | Portable static build/resource closure. |
+| `core/lib/server.ts` | Token-scoped board HTTP and preview boundary. |
+| `core/lib/boards.ts` | Live-owner registry and attached-client transport. |
+| `core/lib/projects.ts` | Project discovery and creation. |
+| `core/lib/launch.ts` | Opening/composition for projects and collections. |
+| `core/lib/hub.ts` | Collection launcher and its local HTTP surface. |
+| `adapters/pi/lib/extension.js` | Pi tools, session bridge and board conversation. |
+| `adapters/mcp/lib/server.js` | MCP stdio representation and sampling bridge. |
+| `adapters/cli/index.js` | Standalone command entry. |
+| `web/` | Native ES-module board, canvas, panels, inspector and palette. |
+
+## Browser command ownership
+
+The browser's `web/lib/actions.js` is a command facade, not a dependency of clipboard internals. `web/lib/artboards.js` owns frame creation, duplication and deletion, including grouping, component-safe deletion order, selection/reveal and failure/Undo feedback. The facade re-exports the same functions; `clip.js` calls that lower owner directly. Deletion captures target names, versions and component users before optimistic hiding removes them from the visible-descriptor lookup. Pending targets become dependency-ordered attempts and then accepted results; success count/name derive from those accepted results, not requested-first assumptions. Refused frames are shown again and retain their version guards against concurrent edits. Already-hidden or absent targets are ignored rather than becoming unguarded overlapping requests, and each command hides only its captured targets. Immediate toast Undo uses existing global Undo for accepted deletions; it is not a command-pinned inverse when other edits intervene. Literal local imports (including lazy imports and plugin client modules) are checked for existence and cycles by `core/tests/web-modules.test.js`.
 
 ## Frames in the browser
 
@@ -132,7 +147,7 @@ Every artboard keeps one iframe for the lifetime of its frame. The browser decid
 
 Expanded viewing is a reader surface, not an extra editor-interaction flag. A frame descriptor supplies an ephemeral `viewUrl` for its exact owned output filename; the site's template instead opens its existing routed content URL automatically. The client retires the editor port and rotates its capability before that navigation. The token-scoped `build/` route serves only the accepted public-file map, captured before editor sidecars are added to the complete disk-publication/repair plan; it never serves arbitrary filesystem paths or those sidecars. HTML carries only a nonce-authorized Escape helper, with opaque sandboxing, no connections/base/forms and no referrer; it receives no model channel. Closing retains the existing ghost/fresh authenticated-preview reset. Site live updates still forward only a version to the opaque page. This does not change scaled-canvas Play or make a matching navigated WindowProxy an editing authority.
 
-At far zoom a picture stands in for the live page, taken in the browser: once a page has rendered, the board asks its bridge (`divlet:capture`) and the bridge serializes the page into an SVG `foreignObject` with images and CSS `url()` resources inlined through CORS-enabled image loads (no `fetch`, so the preview CSP stays closed), rasterizes it and sends a WebP blob over the private port. One picture is taken at a time while the browser is idle; blobs are kept per frame and render. Nothing is stored on disk or requested from the server, so there is no loading state when zooming out. `web/canvas.js` shows the picture instead of the live page when a frame is drawn narrower than 260 px (`.artboard.lod`; the iframe stays loaded but is not painted) and zooms to a frame when its thumbnail is clicked. Web fonts that are not installed on the machine are not embedded (the picture falls back to system fonts).
+At far zoom a picture stands in for the live page, taken in the browser: once a page has rendered, the board asks its bridge (`divlet:capture`) and the bridge serializes the page into an SVG `foreignObject` with images and CSS `url()` resources inlined through CORS-enabled image loads (no `fetch`, so the preview CSP stays closed), rasterizes it and sends a WebP blob over the private port. One picture is taken at a time while the browser is idle; blobs are kept per frame and render. Nothing is stored on disk or requested from the server, so there is no loading state when zooming out. `web/lib/canvas.js` shows the picture instead of the live page when a frame is drawn narrower than 260 px (`.artboard.lod`; the iframe stays loaded but is not painted) and zooms to a frame when its thumbnail is clicked. Web fonts that are not installed on the machine are not embedded (the picture falls back to system fonts).
 
 ## Trust boundaries
 
