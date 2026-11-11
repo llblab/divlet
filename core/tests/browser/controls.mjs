@@ -638,14 +638,106 @@ try {
   check('layers: search, rename, collapse, arrows, drag-and-drop, context menu, collapsing the root');
 
   /* ---- history ------------------------------------------------------------ */
+  let hiddenHistoryReads = 0;
+  const countHiddenRead = request => { if (request.method() === 'GET' && request.url().includes('/api/history?')) hiddenHistoryReads++; };
+  page.on('request', countHiddenRead);
+  await runtime.patch({ documentId: 'mobile', expectedVersion: doc('mobile').version, patch: { metadata: { historyProbe: true } } });
+  const hiddenPoint = runtime.historyHead().pointId;
+  await waitUntil(() => page.evaluate(async point => (await import('./lib/store.js')).store.state.history.pointId === point, hiddenPoint), 'closed History still receives the lightweight state head');
+  assert.equal(hiddenHistoryReads, 0, 'hidden History does not fetch a full timeline for each edit');
+  page.off('request', countHiddenRead);
   await page.locator('#open-history').click();
   await page.locator('#activity .change').first().waitFor();
   assert.equal(await page.locator('#activity .chip, #activity [data-filter]').count(), 0, 'History has no author filters: it lists every change, the conversation is in the Agent tab');
   assert.ok(await page.locator('#activity .change.actor-user').count() > 0);
+  const historyBase = runtime.historyHead().pointId, mobileBeforeHistory = doc('mobile').name;
   await runtime.patch({ documentId: 'mobile', expectedVersion: doc('mobile').version, patch: { name: 'Mobile by Pi' }, actor: 'agent', label: 'rename mobile' });
-  await page.locator('#activity .change.actor-agent', { hasText: 'rename mobile' }).click();
-  await waitUntil(() => runtime.info().selection.ids[0] === 'mobile', 'history row focuses its artboard');
-  check('history: every change in one list, focusing a change');
+  const historyFuture = runtime.historyHead().pointId;
+  const stateRow = point => page.locator(`#activity [data-history-point="${point}"]`);
+  await waitUntil(async () => (await stateRow(historyFuture).getAttribute('aria-current').catch(() => null)) === 'step', 'the state row follows the owner point');
+  assert.equal(await page.locator('#activity .history-log button.change').count(), 0, 'activity rows are not disguised historical addresses');
+  await stateRow(historyBase).click();
+  await waitUntil(() => doc('mobile').name === mobileBeforeHistory && runtime.historyHead().pointId === historyBase, 'a row restores the project after that grouped state');
+  await waitUntil(async () => await stateRow(historyFuture).count() === 1, 'the retained forward state remains visible');
+  await stateRow(historyFuture).focus();
+  await stateRow(historyFuture).press('Enter');
+  await waitUntil(() => doc('mobile').name === 'Mobile by Pi' && runtime.historyHead().pointId === historyFuture, 'keyboard restores the forward state');
+  await waitUntil(() => page.evaluate(point => document.activeElement?.dataset.historyPoint === point, historyFuture), 'point focus survives state refresh');
+  await stateRow(historyBase).click();
+  await waitUntil(() => runtime.historyHead().pointId === historyBase, 'return before branching');
+  await runtime.patch({ documentId: 'mobile', expectedVersion: doc('mobile').version, patch: { name: 'Mobile by Pi' }, actor: 'agent', label: 'rename mobile branch' });
+  const branch = runtime.historyHead().pointId;
+  await waitUntil(async () => (await stateRow(branch).getAttribute('aria-current').catch(() => null)) === 'step', 'new branch is current');
+  assert.equal(await stateRow(historyFuture).count(), 0, 'discarded future states disappear, rather than remaining selectable audit rows');
+  const equalBase = branch, xBeforeEqual = doc('mobile').artboard.x;
+  await runtime.patch({ documentId: 'mobile', expectedVersion: doc('mobile').version, patch: { artboard: { x: xBeforeEqual + 1 } }, group: 'history-ui-equal' });
+  await runtime.patch({ documentId: 'mobile', expectedVersion: doc('mobile').version, patch: { artboard: { x: xBeforeEqual } }, group: 'history-ui-equal' });
+  const equalPoint = runtime.historyHead().pointId;
+  await waitUntil(async () => (await stateRow(equalPoint).getAttribute('aria-current').catch(() => null)) === 'step', 'net-equal group has a state endpoint');
+  const equalSeq = runtime.seq;
+  await stateRow(equalBase).click();
+  await waitUntil(async () => (await stateRow(equalBase).getAttribute('aria-current').catch(() => null)) === 'step', 'UI refreshes the point without a new audit seq');
+  assert.equal(runtime.seq, equalSeq);
+  await page.locator('#activity .history-log summary').click();
+  assert.ok(await page.locator('#activity .change.actor-agent', { hasText: 'rename mobile' }).count() > 0, 'original and replay activity remains readable');
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(200));
+  await stateRow(equalPoint).focus();
+  await stateRow(equalPoint).press('Space');
+  await waitUntil(async () => (await stateRow(equalPoint).getAttribute('aria-current').catch(() => null)) === 'step', 'Space activates forward navigation at phone/200%');
+  const historyClipping = await page.locator('#activity .history-states').evaluate(states => [...states.querySelectorAll('.history-state, .msg, .sub, .history-tag')].filter(node => node.scrollWidth > node.clientWidth + 1).map(node => node.className));
+  assert.deepEqual(historyClipping, [], 'whole state labels and status values fit the narrow timeline');
+  await stateRow(equalPoint).press('End');
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.historyPoint), runtime.readTimeline().points[0].id, 'End reaches the oldest retained state');
+  await page.keyboard.press('Home');
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.historyPoint), equalPoint, 'Home reaches the newest state without editing the canvas');
+  await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(100));
+  await page.setViewportSize({ width: 1500, height: 960 });
+  let historyPosts = 0;
+  const countHistoryPost = request => { if (request.url().endsWith('/api/history/navigate')) historyPosts++; };
+  page.on('request', countHistoryPost);
+  const ownerHead = runtime.historyHead;
+  runtime.historyHead = function () { const { navigation, ...head } = ownerHead.call(this); return head; };
+  runtime.publish();
+  await waitUntil(async () => await page.locator('#activity [data-history-point]').count() === 0, 'an owner without the capability never gets replay controls');
+  await page.locator('#activity button.change.actor-agent', { hasText: 'rename mobile' }).first().click();
+  await waitUntil(() => runtime.info().selection.ids[0] === 'mobile', 'legacy owner rows still reveal current subjects');
+  assert.equal(historyPosts, 0, 'compatibility fallback never guesses an operation or creates another writer');
+  runtime.historyHead = ownerHead;
+  runtime.publish();
+  await waitUntil(async () => (await stateRow(equalPoint).getAttribute('aria-current').catch(() => null)) === 'step', 'capability return refreshes addresses even at the same point');
+  page.off('request', countHistoryPost);
+  // An A-started read may capture B, or an old A future, then arrive after the owner has returned to A.
+  for (const captureAtStart of [false, true]) {
+    let allowCapture, allowDelivery, sawRequest, capturedResponse, deliveredResponse, reads = 0;
+    const captureGate = new Promise(resolve => { allowCapture = resolve; });
+    const deliveryGate = new Promise(resolve => { allowDelivery = resolve; });
+    const requestSeen = new Promise(resolve => { sawRequest = resolve; });
+    const captured = new Promise(resolve => { capturedResponse = resolve; });
+    const delivered = new Promise(resolve => { deliveredResponse = resolve; });
+    const historyRoute = async route => {
+      if (++reads > 1) return route.continue();
+      sawRequest(); await captureGate;
+      const response = await route.fetch();
+      capturedResponse(); await deliveryGate;
+      await route.fulfill({ response }); deliveredResponse();
+    };
+    await page.route('**/api/history?limit=100', historyRoute);
+    try {
+      const pointA = runtime.historyHead().pointId;
+      await page.evaluate(async () => { void (await import('./lib/activity.js')).loadRecent(); });
+      await requestSeen;
+      if (captureAtStart) { allowCapture(); await captured; }
+      await runtime.patch({ documentId: 'mobile', expectedVersion: doc('mobile').version, patch: { metadata: { historyReadRace: true } } });
+      const pointB = runtime.historyHead().pointId;
+      if (!captureAtStart) { allowCapture(); await captured; }
+      await runtime.navigateHistory({ pointId: pointA, expectedPoint: pointB });
+      await waitUntil(() => page.evaluate(async point => (await import('./lib/store.js')).store.state.history.pointId === point, pointA), 'the owner returned to A before delivering the captured B response');
+      allowDelivery(); await delivered;
+      await waitUntil(async () => reads >= 2 && await stateRow(pointB).count() === 1 && (await stateRow(pointA).getAttribute('aria-current').catch(() => null)) === 'step', `a stale ${captureAtStart ? 'A-future' : 'B'} snapshot earns a fresh timeline read`);
+    } finally { allowCapture(); allowDelivery(); await page.unroute('**/api/history?limit=100', historyRoute); }
+  }
+  check('history: guarded states, forward return, keyboard/focus, branching, point-only/ABA refresh, phone/200%, read-only audit and old-owner compatibility');
 
   /* ---- resize snapping to device widths --------------------------------- */
   await showAll();

@@ -1,5 +1,5 @@
 import { $, el, icon, ago, pressGuard } from './util.js';
-import { store, on, request, documents, descriptor, selectArtboards, selectNodes, loadModel } from './store.js';
+import { store, on, request, post, documents, descriptor, selectArtboards, selectNodes, loadModel } from './store.js';
 import { reveal, flashNodes } from './canvas.js';
 import * as sidebar from './sidebar.js';
 import * as chat from './chat.js';
@@ -14,6 +14,12 @@ const KIND = { undo: 'Undo', redo: 'Redo', create: 'New', delete: 'Removed', ext
 const CHAT = new Set(['ask', 'reply']);
 let focusSeq = null;
 let unread = 0;
+let timeline = null, timelineProject = null;
+// Server point IDs may recur after Undo; each observed transition invalidates in-flight snapshots, including A → B → A.
+let observedHead = '', stateGeneration = 0, requestedGeneration = -1, timelineGeneration = -1;
+let reading = false, readAgain = false, navigating = null, readError = '', navigationError = '', auditOpen = false, restorePoint = null;
+const supportsNavigation = () => store.state?.history?.navigation === true;
+const timelineReady = () => supportsNavigation() && timelineGeneration === stateGeneration && timelineProject === store.state?.projectId && timeline?.current === store.state?.history?.pointId;
 
 export const isOpen = () => sidebar.isOpen('activity');
 export function toggle(force) {
@@ -39,10 +45,26 @@ export function paintStatus() {
 }
 
 export async function loadRecent() {
-  try { store.recent = (await request('api/history?limit=100')).changes; }
-  catch { /* the stream keeps it current */ }
-  render();
-  chat.render();
+  if (reading) { readAgain = true; return; }
+  reading = true;
+  const project = store.state?.projectId;
+  const generation = stateGeneration;
+  requestedGeneration = generation;
+  try {
+    const result = await request('api/history?limit=100');
+    if (project && project !== store.state?.projectId) return;
+    store.recent = [...new Map([...result.changes, ...store.recent].map(change => [change.seq, change])).values()].sort((a, b) => a.seq - b.seq).slice(-300);
+    timeline = result.navigation === true && Array.isArray(result.timeline?.points) ? result.timeline : null;
+    timelineProject = store.state?.projectId;
+    timelineGeneration = generation;
+    readError = supportsNavigation() && !timeline ? 'This board did not supply a navigable timeline.' : '';
+  } catch (error) { readError = `History could not be read: ${error.message}. Reopen History to retry.`; }
+  finally {
+    reading = false;
+    render();
+    chat.render();
+    if (readAgain) { readAgain = false; if (isOpen() && supportsNavigation() && !timelineReady() && !readError) void loadRecent(); }
+  }
 }
 
 export function pushChange(change) {
@@ -119,11 +141,11 @@ function collapse(changes) {
   return rows;
 }
 
-function changeRow(row) {
+function changeRow(row, readOnly = false) {
   const { change, count } = row;
   const [iconName, who] = ACTOR[change.actor] || ACTOR.system;
-  const line = el('button', `change actor-${change.actor} kind-${change.kind}`);
-  line.type = 'button';
+  const line = el(readOnly ? 'div' : 'button', `change actor-${change.actor} kind-${change.kind}${readOnly ? ' history-audit' : ''}`);
+  if (!readOnly) line.type = 'button';
   const kind = KIND[change.kind];
   const title = change.label && change.label !== change.summary ? change.label : change.summary;
   const text = el('div', 'text');
@@ -140,18 +162,70 @@ function changeRow(row) {
   line.append(icon(change.kind === 'undo' || change.kind === 'redo' ? change.kind : iconName), text, when);
   line.dataset.tip = count > 1 ? `${count} steps undone together · #${row.seqs[0]}–#${change.seq}` : `#${change.seq} · v${change.fromVersion ?? '—'} → v${change.toVersion ?? '—'}${change.touched?.length ? ` · ${change.touched.length} node${change.touched.length === 1 ? '' : 's'}` : ''}`;
   line.dataset.seq = String(change.seq);
-  line.disabled = ![...row.documents].some(id => descriptor(id));
-  line.addEventListener('click', () => focusChange({ ...change, touched: row.touched }, [...row.documents]));
+  if (!readOnly) {
+    line.disabled = ![...row.documents].some(id => descriptor(id));
+    line.dataset.tip += ' · Show affected elements in their current state';
+    line.addEventListener('click', () => focusChange({ ...change, touched: row.touched }, [...row.documents]));
+  }
   return line;
 }
 
-let pending = false;
+async function navigate(pointId, expectedPoint) {
+  if (navigating || !supportsNavigation() || store.connection !== 'connected' || pointId === expectedPoint) return;
+  navigating = pointId;
+  navigationError = '';
+  render();
+  try { await post('api/history/navigate', { pointId, expectedPoint }); }
+  catch (error) { navigationError = error.message; }
+  finally { navigating = null; await loadRecent(); render(); }
+}
+
+function stateRow(point, index) {
+  const current = point.id === timeline.current;
+  const future = index > timeline.index;
+  const line = el('button', `change history-state${current ? ' is-current' : ''}${future ? ' is-future' : ''}`);
+  line.type = 'button';
+  line.dataset.historyPoint = point.id;
+  line.setAttribute('aria-label', `${current ? 'Current' : 'Restore'} project state: ${point.label}`);
+  line.setAttribute('aria-disabled', String(current || !!navigating || store.connection !== 'connected'));
+  if (current) line.setAttribute('aria-current', 'step');
+  if (navigating === point.id) line.setAttribute('aria-busy', 'true');
+  const text = el('div', 'text');
+  text.append(el('div', 'msg', point.label));
+  const range = point.seq == null ? 'Session baseline' : point.firstSeq !== point.seq ? `Grouped edit · #${point.firstSeq}–#${point.seq}` : `After edit #${point.seq}`;
+  text.append(el('div', 'sub', range));
+  line.append(icon('clock'), text, el('span', 'history-tag', current ? 'Current' : future ? 'Ahead' : 'Restore'));
+  line.dataset.tip = current ? 'The project is at this state' : 'Restore the whole project after this grouped edit, including frame placement and project settings';
+  const expectedPoint = timeline.current;
+  line.addEventListener('click', () => navigate(point.id, expectedPoint));
+  line.addEventListener('keydown', event => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault(); event.stopPropagation();
+    const rows = [...panel.querySelectorAll('[data-history-point]')], at = rows.indexOf(line);
+    const target = event.key === 'Home' ? rows[0] : event.key === 'End' ? rows.at(-1) : rows[Math.max(0, Math.min(rows.length - 1, at + (event.key === 'ArrowDown' ? 1 : -1)))];
+    target?.focus();
+  });
+  return line;
+}
+
+const BOUNDARY = {
+  opened: 'Session history starts here. Restarting the board clears these state addresses.',
+  untracked: 'Earlier states cannot be reached across an untracked source change.',
+  nonlinear: 'Selective Undo/Redo separated this segment from earlier states.',
+  retained: 'Only the retained states are available.',
+};
+
+let pending = false, keyboardPress = false;
 const pressing = pressGuard(panel, () => { if (pending) render(); });
+panel.addEventListener('keydown', event => { if (['Enter', ' '].includes(event.key) && event.target.closest('[data-history-point]')) keyboardPress = true; }, true);
+const releaseKey = () => { if (!keyboardPress) return; keyboardPress = false; setTimeout(() => { if (pending) render(); }, 0); };
+window.addEventListener('keyup', releaseKey, true);
+window.addEventListener('blur', releaseKey);
 
 export function render() {
   paintStatus();
   if (!isOpen()) return;
-  if (pressing()) { pending = true; return; }
+  if (pressing() || keyboardPress) { pending = true; return; }
   pending = false;
   unread = 0;
   paintStatus();
@@ -160,18 +234,58 @@ export function render() {
   for (const item of groupDiagnostics(issues)) body.append(diagnosticRow(item));
   const changes = store.recent.filter(change => !CHAT.has(change.kind));
   const rows = collapse(changes).reverse();
-  if (!rows.length && !issues.length) body.append(el('div', 'quiet', 'No changes yet. Every edit by you, Pi or external files appears here; the conversation with Pi is in the Agent tab.'));
-  for (const row of rows) body.append(changeRow(row));
+  const supported = supportsNavigation();
+  if (supported) {
+    const states = el('div', 'history-states');
+    states.setAttribute('role', 'group'); states.setAttribute('aria-label', 'Project states'); states.tabIndex = -1;
+    states.append(el('div', 'caption history-caption', 'Project states'));
+    if (timelineReady()) {
+      for (let i = timeline.points.length - 1; i >= 0; i--) states.append(stateRow(timeline.points[i], i));
+      const limited = timeline.pastLimited || timeline.futureLimited ? ' Some legacy Undo/Redo entries lie outside this connected timeline.' : '';
+      states.append(el('p', 'history-boundary', (BOUNDARY[timeline.boundary] || BOUNDARY.retained) + limited));
+    } else states.append(el('div', 'quiet', readError ? 'Project states are unavailable.' : 'Reading the current project states…'));
+    body.append(states);
+    const audit = el('details', 'history-log');
+    audit.open = auditOpen;
+    audit.dataset.historyAudit = 'true';
+    audit.addEventListener('toggle', () => { if (audit.isConnected) auditOpen = audit.open; });
+    const summary = el('summary'); summary.append(icon('chevron'), el('span', 'text', 'Activity log'), el('span', 'value', String(rows.length)));
+    audit.append(summary, el('p', 'history-boundary', 'Read-only activity, not state addresses. The conversation is in Agent.'));
+    for (const row of rows) audit.append(changeRow(row, true));
+    body.append(audit);
+  } else {
+    body.append(el('p', 'history-boundary', 'This board does not advertise state navigation. Rows only show affected elements in their current state.'));
+    if (!rows.length && !issues.length) body.append(el('div', 'quiet', 'No changes yet. Every edit by you, Pi or external files appears here; the conversation with Pi is in the Agent tab.'));
+    for (const row of rows) body.append(changeRow(row));
+  }
   const foot = el('div', 'panel-foot');
   const revision = el('span', 'value');
   revision.append(el('i', '', 'rev'), document.createTextNode(String(store.state?.revision ?? 0)));
   const frames = el('span', 'value');
   frames.dataset.tip = 'Live previews / artboards';
   frames.append(el('i', '', 'live'), document.createTextNode($('#live-count').textContent));
-  foot.append(revision, frames);
+  if (supported) {
+    foot.classList.add('history-foot');
+    const feedback = el('div', 'history-feedback', navigationError || readError || (navigating ? 'Restoring the project…' : ''));
+    feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite');
+    feedback.classList.toggle('is-error', !!(navigationError || readError));
+    const counters = el('div', 'history-counters'); counters.append(revision, frames);
+    foot.append(feedback, counters);
+  } else foot.append(revision, frames);
   const scroll = panel.querySelector('.panel-body')?.scrollTop ?? 0;
+  const focused = panel.contains(document.activeElement) ? document.activeElement : null;
+  const focusedPoint = focused?.dataset.historyPoint;
+  if (focusedPoint) restorePoint = focusedPoint;
+  const mayRestorePoint = !!focusedPoint || restorePoint && (document.activeElement === document.body || document.activeElement?.matches('.history-states'));
+  if (!mayRestorePoint) restorePoint = null;
+  const focusedAudit = focused?.parentElement?.matches('.history-log');
   panel.replaceChildren(body, foot);
   body.scrollTop = scroll;
+  if (restorePoint && mayRestorePoint) {
+    const target = [...body.querySelectorAll('[data-history-point]')].find(node => node.dataset.historyPoint === restorePoint) ?? body.querySelector('[aria-current="step"]');
+    if (target) { target.focus({ preventScroll: true }); restorePoint = null; }
+    else body.querySelector('.history-states')?.focus({ preventScroll: true });
+  } else if (focusedAudit) body.querySelector('.history-log summary')?.focus({ preventScroll: true });
   if (focusSeq !== null) {
     const target = [...body.querySelectorAll('[data-seq]')].find(node => node.dataset.seq === String(focusSeq));
     focusSeq = null;
@@ -181,8 +295,16 @@ export function render() {
 
 on('focus-change', seq => { if (store.recent.some(change => change.seq === seq && CHAT.has(change.kind))) return; focusSeq = seq; render(); });
 
-on('state', render);
+on('state', () => {
+  const supported = supportsNavigation();
+  const head = JSON.stringify([store.state?.projectId, store.state?.history?.pointId, supported]);
+  if (head !== observedHead) { observedHead = head; stateGeneration++; }
+  if (isOpen() && supported && !timelineReady() && requestedGeneration !== stateGeneration) {
+    if (reading) readAgain = true; else void loadRecent();
+  }
+  render();
+});
 on('expanded', paintStatus);
 on('connection', render);
-on('sidebar', ({ open, tab }) => { if (open && tab === 'activity') render(); });
+on('sidebar', ({ open, tab }) => { if (open && tab === 'activity') { void loadRecent(); render(); } else restorePoint = null; });
 setInterval(() => { if (isOpen()) for (const node of panel.querySelectorAll('time.when')) node.textContent = ago(node.dateTime); }, 15000);

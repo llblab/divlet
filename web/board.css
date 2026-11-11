@@ -324,7 +324,7 @@ body.is-expanded .resize-handle, body:has(.scrim:not([hidden])) .resize-handle {
 /* activity */
 .filters { gap: 4px; padding: 6px 10px 6px; }
 .change, .diag { display: flex; align-items: flex-start; gap: 9px; width: 100%; padding: 7px 8px; border: 0; border-radius: var(--radius-inner); background: transparent; text-align: left; color: var(--ink); }
-.change:hover:not(:disabled) { background: var(--field); }
+button.change:hover:not(:disabled) { background: var(--field); }
 .change:disabled { opacity: var(--disabled-field); cursor: default; }
 .change .icon, .diag .icon { margin-top: 1px; color: var(--muted); }
 .change.actor-agent .icon { color: var(--accent); }
@@ -344,6 +344,25 @@ body.is-expanded .resize-handle, body:has(.scrim:not([hidden])) .resize-handle {
 .value.warn { color: var(--warn); }
 .link-button { flex: none; height: 24px; padding: 0 8px; border: 0; border-radius: var(--radius-small); background: var(--field-hover); color: var(--ink); font-weight: 500; }
 .link-button:hover { background: var(--accent-soft); color: var(--accent); }
+
+/* Addressable states and audit activity have different semantics, not two competing replay controls. */
+.history-state { position: relative; cursor: pointer; }
+.history-state.is-current { background: var(--accent-soft); }
+.history-state[aria-disabled="true"] { cursor: default; }
+.history-state[aria-busy="true"] { box-shadow: inset 0 -2px var(--accent); }
+.history-state .icon { flex: none; }
+.history-tag { flex: none; min-width: calc(7ch + 8px); padding: 2px 4px; border-radius: var(--radius-small); background: var(--field); color: var(--muted); font: 10px/16px var(--mono); text-align: center; white-space: nowrap; }
+.history-state.is-current .history-tag { color: var(--accent-ink); }
+.history-caption { padding: 7px 8px; }
+.history-boundary { margin: 6px 8px 10px; color: var(--muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
+.history-log { margin-top: 8px; border-radius: var(--radius-inner); background: var(--field); }
+.history-log > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; cursor: pointer; color: var(--muted); }
+.history-log[open] > summary .icon { transform: rotate(90deg); }
+#activity .sub { overflow: visible; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
+.history-foot { display: grid; gap: 4px; }
+.history-counters { display: flex; gap: 12px; flex-wrap: wrap; }
+.history-feedback { min-height: 2.8em; font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
+.history-feedback.is-error { color: var(--bad-ink); }
 
 /* inspector */
 .group { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; }
