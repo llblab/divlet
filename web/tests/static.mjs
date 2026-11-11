@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { legacyProject } from '../fixtures/legacy-project.js';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import http from 'node:http';
 import { chromium } from 'playwright';
-import { openRuntime } from '../../lib/runtime.js';
-import { decodeHtml } from '../../lib/codec.ts';
+import { openRuntime } from '../../core/lib/runtime.js';
+import { decodeHtml } from '../../core/lib/codec.ts';
 
 const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-static-browser-'));
 const source = path.join(directory, 'source');

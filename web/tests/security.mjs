@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { legacyProject } from '../fixtures/legacy-project.js';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import http from 'node:http';
 import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { openRuntime } from '../../lib/runtime.js';
+import { openRuntime } from '../../core/lib/runtime.js';
 
 const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-bridge-security-'));
 const forged = { type: 'divlet:text-edit', documentId: 'welcome', version: 999999, nodeId: 'title', content: 'Forged edit' };

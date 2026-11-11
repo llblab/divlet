@@ -4,8 +4,8 @@ import { mkdtemp, readFile, writeFile, unlink, symlink, rm } from 'node:fs/promi
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { legacyProject } from '../fixtures/legacy-project.js';
-import { openRuntime } from '../../lib/runtime.js';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
+import { openRuntime } from '../../core/lib/runtime.js';
 
 const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-history-browser-'));
 await legacyProject(path.join(cwd, 'project.divlet'), { demo: true });

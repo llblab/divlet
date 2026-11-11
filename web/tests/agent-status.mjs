@@ -5,7 +5,7 @@ import os from 'node:os';
 import { once } from 'node:events';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { openRuntime } from '../../lib/runtime.js';
+import { openRuntime } from '../../core/lib/runtime.js';
 
 const dir = await mkdtemp(path.join(os.tmpdir(), 'divlet-agent-status-'));
 const runtime = await openRuntime({ file: path.join(dir, 'project.divlet'), watch: false, createDemo: true });

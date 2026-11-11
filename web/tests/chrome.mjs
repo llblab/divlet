@@ -1,15 +1,15 @@
 // The interface chrome: one left column (logo + search, sidebar, tabs), a bottom-right toolbar with the inspector attached above it,
 // and the selection path in the bottom row between them — on a desktop window and on a phone.
 import assert from 'node:assert/strict';
-import { legacyProject } from '../fixtures/legacy-project.js';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import { cp, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { openRuntime } from '../../lib/runtime.js';
+import { openRuntime } from '../../core/lib/runtime.js';
 
 const playwright = await import('playwright');
-const root = fileURLToPath(new URL('../../../', import.meta.url));
+const root = fileURLToPath(new URL('../../', import.meta.url));
 const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-chrome-'));
 await cp(path.join(root, 'examples', 'studio'), cwd, { recursive: true });
 await legacyProject(path.join(cwd, 'project.divlet'), { demo: true });

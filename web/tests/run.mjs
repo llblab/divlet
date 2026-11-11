@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
-import { legacyProject } from '../fixtures/legacy-project.js';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import { mkdtemp, readFile, writeFile, rm, mkdir, copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { createRequire } from 'node:module';
-import { openRuntime } from '../../lib/runtime.js';
-import { validateDocument } from '../../lib/model.ts';
+import { openRuntime } from '../../core/lib/runtime.js';
+import { validateDocument } from '../../core/lib/model.ts';
 
 const require = createRequire(import.meta.url);
 let playwright;

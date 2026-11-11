@@ -1,14 +1,14 @@
 // Every control of the board, exercised in real Chromium and verified against the runtime model.
 import assert from 'node:assert/strict';
-import { legacyProject } from '../fixtures/legacy-project.js';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import { cp, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { openRuntime } from '../../lib/runtime.js';
+import { openRuntime } from '../../core/lib/runtime.js';
 
 const playwright = await import('playwright');
-const root = fileURLToPath(new URL('../../../', import.meta.url));
+const root = fileURLToPath(new URL('../../', import.meta.url));
 const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-controls-'));
 await cp(path.join(root, 'examples', 'studio'), cwd, { recursive: true });
 await legacyProject(path.join(cwd, 'project.divlet'), { demo: true });

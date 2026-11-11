@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { once } from 'node:events';
 import { chromium } from 'playwright';
-import { copyLanding } from '../../../scripts/landing-hash.mjs';
+import { copyLanding } from '../../scripts/landing-hash.mjs';
 
 const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-landing-browser-'));
 const files = new Set(await copyLanding(directory));

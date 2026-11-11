@@ -142,7 +142,7 @@ The [workflow skill](skills/divlet/SKILL.md) teaches the loop; the [tool guide](
 
 ## Development
 
-These checks run from the source checkout; tests are not shipped in the npm package.
+These checks run from the source checkout. Frontend unit and browser suites live in `web/tests/`; server/model unit suites live in `core/tests/`. Tests are neither served as client assets nor shipped in the npm package.
 
 ```bash
 npm test                      # Type checking and unit tests

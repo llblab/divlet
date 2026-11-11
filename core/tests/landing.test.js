@@ -148,7 +148,7 @@ test('CI verifies then copies the prepared public set without compiling a differ
   assert.equal(steps.find(step => step.uses?.startsWith('actions/setup-node@')).with['node-version'], 22);
   const contracts = steps.find(step => step.name === 'Test landing and resource contracts').run;
   assert.match(contracts, /npm run typecheck/);
-  for (const file of ['landing', 'icons', 'data-urls']) assert.ok(contracts.includes(`core/tests/${file}.test.js`));
+  for (const file of ['core/tests/landing.test.js', 'web/tests/icons.test.js', 'core/tests/data-urls.test.js']) assert.ok(contracts.includes(file));
   assert.ok(steps.some(step => String(step.run).includes('node scripts/landing-hash.mjs')));
   assert.match(publish.run, /node scripts\/landing-hash\.mjs --copy/);
   assert.match(publish.run, /test "\$copied_hash"/);

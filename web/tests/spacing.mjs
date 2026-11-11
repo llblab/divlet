@@ -1,15 +1,15 @@
 // Spacing: a quiet margin/padding overlay on the selection, and the box-model inspector that edits it.
 import assert from 'node:assert/strict';
-import { legacyProject } from '../fixtures/legacy-project.js';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import { cp, mkdtemp, rm, mkdir } from 'node:fs/promises';
-import { decodeHtml } from '../../lib/codec.ts';
+import { decodeHtml } from '../../core/lib/codec.ts';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { openRuntime } from '../../lib/runtime.js';
+import { openRuntime } from '../../core/lib/runtime.js';
 
 const playwright = await import('playwright');
-const root = fileURLToPath(new URL('../../../', import.meta.url));
+const root = fileURLToPath(new URL('../../', import.meta.url));
 const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-spacing-'));
 await cp(path.join(root, 'examples', 'studio'), cwd, { recursive: true });
 await legacyProject(path.join(cwd, 'project.divlet'), { demo: true });

@@ -4,8 +4,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { chromium } from 'playwright';
-import { legacyProject } from '../fixtures/legacy-project.js';
-import { openRuntime } from '../../lib/runtime.js';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
+import { openRuntime } from '../../core/lib/runtime.js';
 
 const launch = { headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] };
 if (process.env.PI_DIVLET_CHROMIUM_EXECUTABLE) launch.executablePath = process.env.PI_DIVLET_CHROMIUM_EXECUTABLE;

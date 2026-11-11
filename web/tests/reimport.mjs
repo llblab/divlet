@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveOpenFile } from '../../lib/import.ts';
-import { openRuntime } from '../../lib/runtime.js';
+import { resolveOpenFile } from '../../core/lib/import.ts';
+import { openRuntime } from '../../core/lib/runtime.js';
 
 const playwright = await import('playwright');
 const dir = await mkdtemp(path.join(os.tmpdir(), 'divlet-reimport-'));

@@ -14,7 +14,10 @@ await rm(dist, { recursive: true, force: true });
 execFileSync(tsc, ['-p', path.join(root, 'tsconfig.build.json')], { cwd: root, stdio: 'inherit' });
 
 // Assets the compiled code resolves relative to itself.
-for (const asset of ['web', 'skills']) await cp(path.join(root, asset), path.join(dist, asset), { recursive: true });
+for (const asset of ['web', 'skills']) await cp(path.join(root, asset), path.join(dist, asset), {
+  recursive: true,
+  filter: source => !path.relative(path.join(root, asset), source).split(path.sep).includes('tests'),
+});
 for (const plugin of await readdir(path.join(root, 'plugins'), { withFileTypes: true })) {
   if (!plugin.isDirectory()) continue;
   await cp(path.join(root, 'plugins', plugin.name, 'web'), path.join(dist, 'plugins', plugin.name, 'web'), { recursive: true }).catch(() => {});

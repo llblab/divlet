@@ -1,12 +1,12 @@
 // Server graph acceptance is not completion of a browser action's selection effect.
 import assert from 'node:assert/strict';
-import { legacyProject } from '../fixtures/legacy-project.js';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { openRuntime } from '../../lib/runtime.js';
-import { decodeHtml } from '../../lib/codec.ts';
+import { openRuntime } from '../../core/lib/runtime.js';
+import { decodeHtml } from '../../core/lib/codec.ts';
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-selection-completion-'));
 const browser = await chromium.launch({ headless: true, executablePath: process.env.PI_DIVLET_CHROMIUM_EXECUTABLE, args: ['--no-sandbox', '--disable-dev-shm-usage'] });

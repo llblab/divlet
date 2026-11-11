@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { legacyProject } from '../fixtures/legacy-project.js';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { openRuntime } from '../../lib/runtime.js';
-import { decodeHtml } from '../../lib/codec.ts';
+import { openRuntime } from '../../core/lib/runtime.js';
+import { decodeHtml } from '../../core/lib/codec.ts';
 
 const { chromium } = await import('playwright');
 const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-settings-'));

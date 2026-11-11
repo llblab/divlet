@@ -8,7 +8,7 @@ This guide describes the current implementation. The accepted [web-native core c
 
 ```text
 core/        the Divlet core: index.js (public API — the package's `.`), lib/, tests/
-web/         the web client (a peer of core: plugins may act on both): `board.js` entry, `index.html`, `board.css`, modules by domain in `web/lib/`
+web/         the web client (a peer of core: plugins may act on both): `board.js` entry, `index.html`, `board.css`, modules by domain in `web/lib/`, frontend unit/browser suites in `web/tests/`
 plugins/     importers/exporters/style engines, one package each (index.js, lib/, tests/)
 packages/    real adapters: cli/ (@divlet/cli), mcp/ (@divlet/mcp), pi/ (@divlet/pi); each owns implementation and tests
 skills/      the portable product workflow in skills/divlet/, independent of any host
@@ -21,6 +21,8 @@ The root package says what it is: `.` is the library (source `core/index.js`, pu
 `resolveOpenFile`), with named subpaths (`./runtime`, `./contract`, `./model`, `./project`, `./codec`, `./boards`, `./plugins`, `./engine`) and the shared `./skill` resource. The root has no bins, Pi manifest, Pi peer requirements or `./pi` export.
 
 The three adapter packages own their implementations and tests, consume public `divlet` and `divlet/contract` rather than core internals, and depend on the exact matching product version (`0.0.1` initially). Each publishes its own `dist/index.js` entry: `@divlet/cli` owns the `divlet` bin, `@divlet/mcp` owns `divlet-mcp`, and `@divlet/pi` owns `pi.extensions` and host dependencies. There is no wrapper layer. Pi resolves the portable workflow through `divlet/skill`.
+
+Frontend unit and Chromium acceptance suites live in `web/tests/`; server/model unit suites and their shared fixture builders remain in `core/tests/`. Tests use the core runtime as a fixture host, not as their ownership location. Build asset copying excludes tests, and the browser module graph covers only served production modules.
 
 The npm workspace includes `.`, `packages/*` and `plugins/*`. Development executes sources with the custom `divlet-source` export condition; `scripts/source.mjs` propagates it through `NODE_OPTIONS` to children. Root start, demo, test, Pi and MCP scripts use this runner. Focused source tests use `node scripts/source.mjs --test …`. `dist/` is publishing output only.
 
@@ -141,7 +143,7 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 
 ## Browser command ownership
 
-The browser's `web/lib/actions.js` is a command facade, not a dependency of clipboard internals. `web/lib/artboards.js` owns frame creation, duplication and deletion, including grouping, component-safe deletion order, selection/reveal and failure/Undo feedback. The facade re-exports the same functions; `clip.js` calls that lower owner directly. Deletion captures target names, versions and component users before optimistic hiding removes them from the visible-descriptor lookup. Pending targets become dependency-ordered attempts and then accepted results; success count/name derive from those accepted results, not requested-first assumptions. Refused frames are shown again and retain their version guards against concurrent edits. Already-hidden or absent targets are ignored rather than becoming unguarded overlapping requests, and each command hides only its captured targets. Immediate toast Undo uses existing global Undo for accepted deletions; it is not a command-pinned inverse when other edits intervene. Literal local imports (including lazy imports and plugin client modules) are checked for existence and cycles by `core/tests/web-modules.test.js`.
+The browser's `web/lib/actions.js` is a command facade, not a dependency of clipboard internals. `web/lib/artboards.js` owns frame creation, duplication and deletion, including grouping, component-safe deletion order, selection/reveal and failure/Undo feedback. The facade re-exports the same functions; `clip.js` calls that lower owner directly. Deletion captures target names, versions and component users before optimistic hiding removes them from the visible-descriptor lookup. Pending targets become dependency-ordered attempts and then accepted results; success count/name derive from those accepted results, not requested-first assumptions. Refused frames are shown again and retain their version guards against concurrent edits. Already-hidden or absent targets are ignored rather than becoming unguarded overlapping requests, and each command hides only its captured targets. Immediate toast Undo uses existing global Undo for accepted deletions; it is not a command-pinned inverse when other edits intervene. Literal local imports (including lazy imports and plugin client modules) are checked for existence and cycles by `web/tests/modules.test.js`.
 
 ## Frames in the browser
 

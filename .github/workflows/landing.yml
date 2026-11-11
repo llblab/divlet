@@ -12,7 +12,7 @@ on:
       - 'scripts/landing-*.mjs'
       - 'core/lib/**'
       - 'core/tests/landing.test.js'
-      - 'core/tests/icons.test.js'
+      - 'web/tests/icons.test.js'
       - 'core/tests/data-urls.test.js'
       - 'web/index.html'
       - 'web/lib/util.js'
@@ -56,7 +56,7 @@ jobs:
       - name: Test landing and resource contracts
         run: |
           npm run typecheck
-          node scripts/source.mjs --test core/tests/landing.test.js core/tests/icons.test.js core/tests/data-urls.test.js
+          node scripts/source.mjs --test core/tests/landing.test.js web/tests/icons.test.js core/tests/data-urls.test.js
 
       - name: Fingerprint the prepared public files
         id: landing

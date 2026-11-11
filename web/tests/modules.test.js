@@ -15,7 +15,7 @@ const walk = async directory => {
   const files = [];
   for (const entry of entries) {
     const full = path.join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...await walk(full));
+    if (entry.isDirectory()) { if (entry.name !== 'tests') files.push(...await walk(full)); }
     else files.push(full);
   }
   return files;
@@ -23,7 +23,7 @@ const walk = async directory => {
 const exists = async file => { try { return (await stat(file)).isFile(); } catch { return false; } };
 const relative = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s*)['"](\.[^'"]+)['"]/g;
 
-/** Every module the board's own client loads: `web/**` plus each plugin's client directory. */
+/** Every production client module: `web/` without its tests, plus each plugin's client directory. */
 const clientModules = async () => {
   const modules = (await walk(WEB)).filter(file => file.endsWith('.js'));
   for (const plugin of await readdir(path.join(root, 'plugins'), { withFileTypes: true })) {
@@ -33,6 +33,20 @@ const clientModules = async () => {
   }
   return modules;
 };
+
+test('browser test entries keep their local imports and npm suite coverage after relocation', async () => {
+  const directory = path.join(WEB, 'tests');
+  const entries = (await readdir(directory)).filter(name => name.endsWith('.mjs')).sort();
+  const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+  const scheduled = [...pkg.scripts['test:browser:all'].matchAll(/\bweb\/tests\/([\w-]+\.mjs)\b/g)].map(match => match[1]).sort();
+  assert.deepEqual(scheduled, entries, 'the browser battery includes every owned entry exactly once');
+  for (const name of entries) {
+    const source = await readFile(path.join(directory, name), 'utf8');
+    for (const [, specifier] of source.matchAll(/\bfrom\s*['"](\.[^'"]+)['"]/g)) {
+      assert.ok(await exists(path.resolve(directory, specifier)), `${name}: local Node import resolves: ${specifier}`);
+    }
+  }
+});
 
 test('every browser module imports a file that exists, and never TypeScript', async () => {
   const modules = await clientModules();

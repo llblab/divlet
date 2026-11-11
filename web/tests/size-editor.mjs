@@ -3,9 +3,9 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { legacyProject } from '../fixtures/legacy-project.js';
-import { openRuntime } from '../../lib/runtime.js';
-import { resolveOpenFile } from '../../lib/launch.ts';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
+import { openRuntime } from '../../core/lib/runtime.js';
+import { resolveOpenFile } from '../../core/lib/launch.ts';
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-size-editor-'));
 const browser = await chromium.launch({ headless: true, executablePath: process.env.PI_DIVLET_CHROMIUM_EXECUTABLE, args: ['--no-sandbox', '--disable-dev-shm-usage'] });

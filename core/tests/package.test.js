@@ -108,7 +108,7 @@ test('the npm package includes public entrypoints and a complete documentation l
   }
   assert.equal([...files].some(file => /^(?:dist\/)?(?:adapters|packages)\//.test(file)), false, 'adapter implementations do not ship in the core tarball');
   for (const file of files) {
-    assert.doesNotMatch(file, /^(?:node_modules|tests|artifacts|coverage|\.git|core\/tests|plugins\/[^/]+\/tests)(?:\/|$)/, `Development output must not ship: ${file}`);
+    assert.doesNotMatch(file, /(?:^|\/)(?:node_modules|tests?|artifacts|coverage|\.git)(?:\/|$)/, `Development output must not ship: ${file}`);
     assert.doesNotMatch(file, /(?:^|\/)(?:\.divlet|\.trash|\.cache|\.divlet-upload-[^/]+)(?:\/|$)|(?:^|\/)(?:\.divlet-build\.json|\.divlet-write\.lock|\.divlet-save-[^/]+)$/, `Managed build state must not ship: ${file}`);
     if (!file.endsWith('.md')) continue;
     const source = await readFile(path.join(root, file), 'utf8');

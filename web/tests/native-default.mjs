@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { openRuntime } from '../../lib/runtime.js';
+import { openRuntime } from '../../core/lib/runtime.js';
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-default-ui-')), runtimes = [], checks = [], errors = [];
 let browser;

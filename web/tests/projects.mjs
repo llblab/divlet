@@ -4,12 +4,12 @@ import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/pr
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { openRuntime } from '../../lib/runtime.js';
-import { launch, makeHost } from '../../lib/launch.ts';
+import { openRuntime } from '../../core/lib/runtime.js';
+import { launch, makeHost } from '../../core/lib/launch.ts';
 
 const playwright = await import('playwright');
 const root = await mkdtemp(path.join(os.tmpdir(), 'divlet-open-'));
-const examples = fileURLToPath(new URL('../../../examples/studio/', import.meta.url));
+const examples = fileURLToPath(new URL('../../examples/studio/', import.meta.url));
 await cp(examples, path.join(root, 'work', 'first'), { recursive: true });
 await mkdir(path.join(root, 'work', 'second'));
 await writeFile(path.join(root, 'work', 'second', 'project.divlet'), JSON.stringify({ schemaVersion: 1, name: 'Second project', version: 1, tokens: {}, css: '', metadata: {}, frames: [] }));

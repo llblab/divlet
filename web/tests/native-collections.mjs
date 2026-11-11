@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { launch, makeHost } from '../../lib/launch.ts';
-import { openRuntime } from '../../lib/runtime.js';
-import { importedName } from '../../lib/import.ts';
+import { launch, makeHost } from '../../core/lib/launch.ts';
+import { openRuntime } from '../../core/lib/runtime.js';
+import { importedName } from '../../core/lib/import.ts';
 
 const { chromium } = await import('playwright');
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-native-collections-ui-'));
@@ -61,8 +61,8 @@ try {
   await page.evaluate(() => { document.body.style.zoom = '1'; });
   await page.locator('#q').fill('alpha'); assert.equal(await page.locator('.card').count(), 1);
   await page.locator('#q').fill('');
-  await fs.mkdir(new URL('../../../artifacts/', import.meta.url), { recursive: true });
-  await page.screenshot({ path: new URL('../../../artifacts/native-collections.png', import.meta.url).pathname });
+  await fs.mkdir(new URL('../../artifacts/', import.meta.url), { recursive: true });
+  await page.screenshot({ path: new URL('../../artifacts/native-collections.png', import.meta.url).pathname });
   checks.push('existing name/path filter and chip semantics and keyboard operation survive light/dark 390/768/1280 layouts at 100/200% zoom with long labels');
 
   // Exact-file open is separate from advisory collection metadata; markers select no format track.

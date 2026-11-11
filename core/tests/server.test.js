@@ -31,6 +31,7 @@ test('HTTP serves authenticated project/render/preview and exposes the increment
   assert.equal(render.version, 1);
   assert.doesNotMatch(render.html, /function previewBridge/);
   assert.equal((await fetch(new URL('/api/project', url))).status, 404);
+  for (const file of ['tests/icons.test.js', 'tests/modules.test.js', 'tests/agent-status.mjs']) assert.equal((await fetch(url + file)).status, 404, `${file} is not a client asset`);
   const previewResponse = await fetch(url + `preview/${id}`);
   assert.match(previewResponse.headers.get('content-security-policy'), /script-src 'nonce-/);
   assert.equal(previewResponse.headers.get('referrer-policy'), 'no-referrer');
