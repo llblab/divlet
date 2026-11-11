@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { openRuntime } from '../lib/runtime.js';
 import { decodeHtml } from '../lib/codec.ts';
+import { DivletError } from '../lib/model.ts';
 
 async function setup(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-upload-')), runtimes = [];
@@ -18,6 +19,16 @@ const state = runtime => ({ settings: structuredClone(runtime.settings), source:
 const upload = (runtime, data = Buffer.from('image'), name = 'Photo.PNG') => runtime.saveAsset({ name, data });
 const noStages = async directory => assert.ok(!(await fs.readdir(directory)).some(name => name.startsWith('.divlet-upload-')));
 const isPayload = file => path.basename(String(file)) === 'image' && String(file).includes('.divlet-upload-');
+
+test('retired reuse remains a synchronous unsupported compatibility entry without effects or input inspection', async t => {
+  const f = await setup(t), runtime = await f.open(), before = state(runtime), source = await fs.readFile(runtime.projectPath), info = runtime.info();
+  const opaque = new Proxy({}, { get() { throw new Error('Retired input must not be read'); }, ownKeys() { throw new Error('Retired input must not be enumerated'); } });
+  assert.equal(typeof runtime.reuseImage, 'function', 'the previously emitted public method remains callable');
+  for (const input of [undefined, null, {}, opaque]) assert.throws(() => runtime.reuseImage(input), error => error instanceof DivletError && error.code === 'UNSUPPORTED_OPERATION' && /retired/.test(error.message) && !error.message.includes('_reuseImage'));
+  assert.deepEqual(state(runtime), before); assert.deepEqual(runtime.info(), info);
+  assert.deepEqual(await fs.readFile(runtime.projectPath), source);
+  await assert.rejects(fs.stat(f.directory), { code: 'ENOENT' });
+});
 
 test('uploads retain supported names, exact bytes and the 12 MiB boundary without changing accepted project state', async t => {
   const f = await setup(t), runtime = await f.open(), before = state(runtime), source = await fs.readFile(runtime.projectPath);

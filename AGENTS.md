@@ -67,6 +67,6 @@ divlet is a local browser layout board for agents. It edits validated static HTM
 
 1. Read this file, the relevant docs and any affected entrypoint before changing code. Consult the backlog when selecting open work.
 2. Trace the affected implementation, callers and tests. Prefer the smallest change at the owning boundary and a regression for the failure class.
-3. Run the smallest decisive tests first (`node --test`, `npm run test:browser:all`, `npm run test:pi`); see the [testing guide](docs/testing.md). Documentation-only changes need link checks, not a rerun of unaffected suites.
+3. Run the smallest decisive tests first (`node --test`, `npm run test:browser:all`, `npm run test:pi`); see the [testing guide](docs/testing.md). Documentation-only changes need source link checks; when shipped links change, also run `node --test core/tests/package.test.js` for the packed documentation graph, not unrelated runtime/browser suites.
 4. Reconcile documentation and backlog state; keep completed work out of the backlog and describe unresolved limitations honestly.
 5. Commit; report changed paths, checks actually run, remaining limitations and any external gate.

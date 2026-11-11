@@ -26,6 +26,8 @@ points at that host's adapter entry — `pi.extensions` is `dist/adapters/pi/ind
 There is no root `index.js`: an entry that meant "this package is a Pi extension" was the wrong shape for a product whose other
 hosts are a CLI and an MCP server.
 
+The emitted runtime class previously exposed `reuseImage()` even after its implementation retired. Its name/signature remain as a deprecated compatibility boundary, synchronously throwing `UNSUPPORTED_OPERATION` without inspecting input or touching state/files. It is not a recovery capability or a registered route/tool. `saveAsset()` publishes a new ordinary authored image, not a resumed reuse operation.
+
 ## Core and plugins
 
 The core connects one native format, HTML admission/projection and a local browser editor. It does not delegate document meaning to interchangeable plugins. The [module map](#modules) locates the current source owners; external HTML admission is distinct from strict codec decoding and managed-cache reconciliation.

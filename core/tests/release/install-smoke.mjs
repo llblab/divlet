@@ -4,7 +4,7 @@
 // published. Run it with `npm run test:release` before any release.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,11 +28,14 @@ try {
 
   await writeFile(path.join(target, 'smoke.mjs'), `
     import path from 'node:path';
+    import assert from 'node:assert/strict';
     import { openRuntime } from 'divlet';
     import { compileClasses, resolveStyleEngine, setStyleEngines } from 'divlet/engine';
     import { pathToFileURL } from 'node:url';
     const runtime = await openRuntime({ file: path.resolve('proj/project.divlet'), watch: false, createDemo: true });
     const info = runtime.info();
+    assert.throws(() => runtime.reuseImage({}), { code: 'UNSUPPORTED_OPERATION' });
+    assert.deepEqual(runtime.info(), info, 'retired compatibility entry leaves installed owner state unchanged');
     const served = async file => (await fetch(new URL(file, info.url))).status;
     const board = { frames: info.documents.length, index: await served('./'), board: await served('board.js'), lib: await served('lib/store.js'), panel: await served('plugins/tailwind/panel.js') };
     await runtime.close();
@@ -45,6 +48,9 @@ try {
     console.log(JSON.stringify({ ...board, renderer: renderer.version }));
     process.exit(0);
   `);
+  const runtimeTypes = await readFile(path.join(target, 'node_modules/divlet/dist/core/lib/runtime.d.ts'), 'utf8');
+  assert.match(runtimeTypes, /reuseImage\(input\?:\s*\{\s*\}\):\s*any;/, 'the previously emitted compatibility signature remains');
+  assert.match(runtimeTypes, /@deprecated Image reuse was retired/, 'the unsupported method is not advertised as a working feature');
   const result = JSON.parse(execFileSync(process.execPath, ['smoke.mjs'], { cwd: target, encoding: 'utf8' }).trim().split('\n').pop());
   const { renderer, ...board } = result;
   assert.deepEqual(board, { frames: 1, index: 200, board: 200, lib: 200, panel: 200 }, 'the installed package starts a board and serves it');

@@ -1560,16 +1560,13 @@ await this.importProject(project.settings, project.frames, hash);
   }
 
 
-
-  /** Explicit library-only new intent, not an upload retry. HTTP/browser/Pi adapters remain separate. */
-  reuseImage(input = {}) { return this._reuseImage(input); }
-
-
-
-
-
-
-
+  /**
+   * @deprecated Image reuse was retired; this compatibility entry always refuses.
+   * @returns {any} Keep the previously emitted signature; no value is returned.
+   */
+  reuseImage(input = {}) {
+    fail('UNSUPPORTED_OPERATION', 'Image reuse has been retired. saveAsset publishes a new image; it does not resume recovery.');
+  }
 
   /** Publish a new authored image without replacing another upload or a caller-owned file. */
   async saveAsset({ name, data, documentId }) {
