@@ -1,0 +1,254 @@
+{
+  "schemaVersion": 2,
+  "name": "Field notes · native",
+  "version": 1,
+  "tokens": {
+    "--color-ink": "#173f35",
+    "--color-muted": "#53695c",
+    "--color-paper": "#f7f5ec",
+    "--color-accent": "#c8e6c1",
+    "--space": "16px"
+  },
+  "css": "html,body{margin:0;padding:0;font-family:system-ui,sans-serif}\n*{box-sizing:border-box}",
+  "metadata": {
+    "import": {
+      "source": "field-notes.pen",
+      "format": "pen",
+      "sha256": "cf7ee0819ba955a51171a451b96405096f810b4b5daa995489df4246831bf901",
+      "bytes": 3001
+    }
+  },
+  "frames": [
+    {
+      "id": "stamp-reusable",
+      "name": "Stamp · reusable",
+      "version": 1,
+      "artboard": {
+        "x": 400,
+        "y": 0,
+        "width": 160,
+        "height": 28
+      },
+      "rootId": "p-1bc9f00c9658832bc6de",
+      "tokens": {},
+      "css": "",
+      "metadata": {},
+      "nodes": {
+        "p-fc7a104d6233e68020d9-text": {
+          "id": "p-fc7a104d6233e68020d9-text",
+          "type": "text",
+          "content": "NATIVE PEN",
+          "metadata": {}
+        },
+        "p-fc7a104d6233e68020d9": {
+          "id": "p-fc7a104d6233e68020d9",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "min-w-[0px] min-h-[0px] shrink-0 whitespace-pre-wrap text-[length:10px] font-[700] leading-[1.4] text-[color:var(--color-ink)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "p-fc7a104d6233e68020d9-text"
+          ]
+        },
+        "p-1bc9f00c9658832bc6de": {
+          "id": "p-1bc9f00c9658832bc6de",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "min-w-[0px] min-h-[0px] shrink-0 relative flex flex-col items-center justify-center w-[160px] h-[28px] rounded-[14px] bg-[var(--color-accent)]",
+          "style": {},
+          "metadata": {
+            "name": "Stamp · reusable"
+          },
+          "children": [
+            "p-fc7a104d6233e68020d9"
+          ],
+          "reusable": true
+        }
+      }
+    },
+    {
+      "id": "field-notes",
+      "name": "Field notes",
+      "version": 1,
+      "artboard": {
+        "x": 0,
+        "y": 0,
+        "width": 360,
+        "height": 620
+      },
+      "rootId": "p-9ec56998ae08f25b8057",
+      "tokens": {},
+      "css": "",
+      "metadata": {},
+      "nodes": {
+        "p-16565bdf7beb7f710bb2": {
+          "id": "p-16565bdf7beb7f710bb2",
+          "type": "ref",
+          "ref": "stamp-reusable/p-1bc9f00c9658832bc6de",
+          "descendants": {
+            "p-fc7a104d6233e68020d9-text": {
+              "content": "FIELD NOTES / 01"
+            }
+          },
+          "metadata": {
+            "name": "Stamp · reusable"
+          }
+        },
+        "p-9f26904afe6d666a34c1-text": {
+          "id": "p-9f26904afe6d666a34c1-text",
+          "type": "text",
+          "content": "Small source.\nLong journey.",
+          "metadata": {}
+        },
+        "p-9f26904afe6d666a34c1": {
+          "id": "p-9f26904afe6d666a34c1",
+          "type": "element",
+          "tag": "h1",
+          "attrs": {},
+          "className": "min-w-[0px] min-h-[0px] shrink-0 whitespace-pre-wrap w-full self-stretch h-[auto] text-[length:34px] font-[600] leading-[1.08] text-[color:var(--color-ink)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "p-9f26904afe6d666a34c1-text"
+          ]
+        },
+        "p-462b5037adc85c7b0340-text": {
+          "id": "p-462b5037adc85c7b0340-text",
+          "type": "text",
+          "content": "A native canvas with local artwork,\nshared details and a portable build.",
+          "metadata": {}
+        },
+        "p-462b5037adc85c7b0340": {
+          "id": "p-462b5037adc85c7b0340",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "min-w-[0px] min-h-[0px] shrink-0 whitespace-pre-wrap w-full self-stretch h-[auto] text-[length:14px] leading-[1.5] text-[color:var(--color-muted)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "p-462b5037adc85c7b0340-text"
+          ]
+        },
+        "p-c6d784d0910c55a8b06a": {
+          "id": "p-c6d784d0910c55a8b06a",
+          "type": "element",
+          "tag": "div",
+          "attrs": {
+            "role": "img",
+            "aria-label": "Geometric green hills and a warm sun, from a local SVG"
+          },
+          "className": "min-w-[0px] min-h-[0px] shrink-0 w-full self-stretch h-[168px] rounded-[16px] [background-image:url(\"assets/field.svg\")] [background-size:cover] [background-origin:padding-box] [background-position:center] [background-repeat:no-repeat]",
+          "style": {},
+          "metadata": {
+            "name": "Local landscape"
+          },
+          "children": []
+        },
+        "p-7c749c77122db0d144c9-text": {
+          "id": "p-7c749c77122db0d144c9-text",
+          "type": "text",
+          "content": "DESIGNED TO TRAVEL",
+          "metadata": {}
+        },
+        "p-7c749c77122db0d144c9": {
+          "id": "p-7c749c77122db0d144c9",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "min-w-[0px] min-h-[0px] shrink-0 whitespace-pre-wrap text-[length:10px] font-[700] leading-[1.4] text-[color:var(--color-ink)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "p-7c749c77122db0d144c9-text"
+          ]
+        },
+        "p-dd32b89897853409485c-text": {
+          "id": "p-dd32b89897853409485c-text",
+          "type": "text",
+          "content": "Edit one source. Keep the reference.\nTake the build anywhere.",
+          "metadata": {}
+        },
+        "p-dd32b89897853409485c": {
+          "id": "p-dd32b89897853409485c",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "min-w-[0px] min-h-[0px] shrink-0 whitespace-pre-wrap w-full self-stretch h-[auto] text-[length:14px] leading-[1.5] text-[color:var(--color-muted)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "p-dd32b89897853409485c-text"
+          ]
+        },
+        "p-bc3c1462edc0b742903b": {
+          "id": "p-bc3c1462edc0b742903b",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "min-w-[0px] min-h-[0px] shrink-0 relative flex flex-col gap-[8px] w-full self-stretch h-[auto]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "p-7c749c77122db0d144c9",
+            "p-dd32b89897853409485c"
+          ]
+        },
+        "p-1daa49124f19cb12c95f": {
+          "id": "p-1daa49124f19cb12c95f",
+          "type": "ref",
+          "ref": "stamp-reusable/p-1bc9f00c9658832bc6de",
+          "descendants": {
+            "p-fc7a104d6233e68020d9-text": {
+              "content": "LOCAL BY DESIGN"
+            }
+          },
+          "metadata": {
+            "name": "Stamp · reusable"
+          }
+        },
+        "p-97f8b93ff0ffa695d245-text": {
+          "id": "p-97f8b93ff0ffa695d245-text",
+          "type": "text",
+          "content": "No remote fonts. No outside grants.",
+          "metadata": {}
+        },
+        "p-97f8b93ff0ffa695d245": {
+          "id": "p-97f8b93ff0ffa695d245",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "min-w-[0px] min-h-[0px] shrink-0 whitespace-pre-wrap w-full self-stretch h-[auto] text-[length:11px] leading-[1.4] text-[color:var(--color-muted)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "p-97f8b93ff0ffa695d245-text"
+          ]
+        },
+        "p-9ec56998ae08f25b8057": {
+          "id": "p-9ec56998ae08f25b8057",
+          "type": "element",
+          "tag": "main",
+          "attrs": {},
+          "className": "min-w-[0px] min-h-[0px] shrink-0 relative flex flex-col gap-[var(--space)] p-[24px] w-[360px] h-[620px] bg-[var(--color-paper)]",
+          "style": {},
+          "metadata": {
+            "name": "Field notes"
+          },
+          "children": [
+            "p-16565bdf7beb7f710bb2",
+            "p-9f26904afe6d666a34c1",
+            "p-462b5037adc85c7b0340",
+            "p-c6d784d0910c55a8b06a",
+            "p-bc3c1462edc0b742903b",
+            "p-1daa49124f19cb12c95f",
+            "p-97f8b93ff0ffa695d245"
+          ]
+        }
+      }
+    }
+  ]
+}
