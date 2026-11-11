@@ -19,6 +19,10 @@ export type Style = Record<string, string>;
 export type StyleOverrides = Record<string, string | null>;
 /** Ordered CSS contracts; the admitted Style fields remain maps until the versioned cutover. */
 export type { CssDeclaration, CssDeclarationOperation } from './declarations.ts';
+/** Project-owned resource directories; leaves are canonical base64 Data URLs, not filesystem paths. */
+export interface AssetTree { [name: string]: string | AssetTree }
+/** A decoded resource for a prepared output candidate, never persisted as JSON. */
+export interface AssetFile { readonly mediaType: string; readonly bytes: Uint8Array }
 /** HTML attributes of one element. */
 export type Attrs = Record<string, string>;
 export type NodeId = string;

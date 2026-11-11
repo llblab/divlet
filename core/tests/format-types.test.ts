@@ -1,7 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { Attrs, Override, CssDeclaration, CssDeclarationOperation } from '../lib/model.ts';
+import type { AssetTree, AssetFile, Attrs, Override, CssDeclaration, CssDeclarationOperation } from '../lib/model.ts';
 import type { StyleEngine, StyleEngineRequirement, ResolvedStyleEngine } from '../lib/engine.ts';
+
+const assets: AssetTree = { brand: { logo: 'data:image/svg+xml;base64,AA==' } };
+const decodedAsset: AssetFile = { mediaType: 'image/png', bytes: new Uint8Array([1]) };
+// @ts-expect-error Directory leaves are Data URL strings, never arbitrary JSON scalars.
+const invalidAssets: AssetTree = { logo: 1 };
+// @ts-expect-error Serialized payloads are not decoded byte buffers.
+const bufferAssets: AssetTree = { logo: new Uint8Array([1]) };
+
+test('asset types separate hierarchical serialized resources from decoded output bytes', () => {
+  assert.equal(typeof (assets.brand as AssetTree).logo, 'string');
+  assert.equal(decodedAsset.bytes.byteLength, 1);
+});
 
 const removal: Override = { attrs: { title: null, 'aria-label': 'Buy' } };
 // @ts-expect-error Only override attributes admit null; persisted element attributes remain strings.
