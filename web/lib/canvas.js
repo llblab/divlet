@@ -889,9 +889,17 @@ function handlePreviewMessage(entry, data) {
     // Measurements belong to the render that produced them: an older render's report can arrive after a newer one and would
     // leave the inspector quoting numbers the page no longer has (a pill's radius after its class was removed).
     if (Number.isInteger(data.version) && data.version < entry.renderedVersion) return;
-    const box = data.box && typeof data.box.nodeId === 'string' && ['margin', 'padding'].every(key => Array.isArray(data.box[key]) && data.box[key].length === 4 && data.box[key].every(Number.isFinite)) ? data.box : null;
+    const source = data.box;
+    const sides = key => Array.isArray(source?.[key]) && source[key].length === 4 && source[key].every(Number.isFinite);
+    const box = typeof source?.nodeId === 'string' && sides('margin') && sides('padding') ? { nodeId: source.nodeId, margin: [...source.margin], padding: [...source.padding] } : null;
+    if (box) {
+      if (sides('border') && source.border.every(value => value >= 0)) box.border = [...source.border];
+      if (['static', 'relative', 'absolute', 'fixed', 'sticky'].includes(source.position)) box.position = source.position;
+      if (Array.isArray(source.inset) && source.inset.length === 4 && source.inset.every(value => typeof value === 'string' && value.length <= 64)) box.inset = [...source.inset];
+      if (source.content && ['width', 'height'].every(key => source.content[key] === null || Number.isFinite(source.content[key]) && source.content[key] >= 0)) box.content = { width: source.content.width, height: source.content.height };
+      if (source.colors && typeof source.colors === 'object') box.colors = Object.fromEntries(['background', 'color', 'radius', 'fontSize', 'borderColor'].filter(key => typeof source.colors[key] === 'string' && source.colors[key].length <= 64).map(key => [key, source.colors[key]]));
+    }
     const changed = JSON.stringify(box) !== JSON.stringify(entry.box ?? null);
-    if (box && data.box.colors && typeof data.box.colors === 'object') box.colors = Object.fromEntries(['background', 'color', 'radius', 'fontSize', 'borderColor'].filter(key => typeof data.box.colors[key] === 'string' && data.box.colors[key].length <= 64).map(key => [key, data.box.colors[key]]));
     entry.box = box;
     if (changed) emit('spacing-box', { documentId: entry.doc.id, nodeId: box?.nodeId ?? null });
   }
@@ -1274,7 +1282,7 @@ export function setEditHandles(enabled) {
   for (const entry of entries.values()) entry.port?.postMessage({ type: 'divlet:handles-enabled', enabled });
 }
 
-/** The margin and padding the page really has on a node (`{ margin: [t, r, b, l], padding: [...] }`), or null. */
+/** The page's measured CSS box (edges, offsets and untransformed content size), or null. */
 export function measuredBox(documentId, nodeId) {
   const box = entries.get(documentId)?.box;
   return box && box.nodeId === nodeId ? box : null;

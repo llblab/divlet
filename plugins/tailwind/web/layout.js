@@ -450,12 +450,6 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
     const current = where === MIXED ? { x: null, y: null } : JSON.parse(where);
     const row = el('div', 'flow-row');
     row.append(alignGrid('Pin to', current.x, current.y, (x, y) => run(cls => tw.setPin(cls, x, y), `pin ${y} ${x}`)));
-    const inset = el('div', 'box4');
-    for (const [side, tip] of [['t', 'Top'], ['r', 'Right'], ['b', 'Bottom'], ['l', 'Left']]) {
-      const token = value(cls => tw.sides(cls, 'inset')[side]);
-      inset.append(field(`inset-${side}`, tip, token === MIXED ? MIXED : tw.display(token), next => run(cls => tw.setSide(cls, 'inset', side, next), `${tip.toLowerCase()} ${next ?? 'auto'}`), { tip: `${tip} offset, px`, unit: 'px', placeholder: 'auto', parse: tw.fromInput }));
-    }
-    row.append(inset);
     layout.append(row);
   }
 
@@ -469,25 +463,22 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
   }
   layout.append(textRow);
 
-  /* Eight independent fields: margin around padding, with quiet side labels and no linking modes. */
+  /* One developer-tools-style box model; the existing margin/padding and offset editors live on their actual edges. */
   const spacing = el('div', 'spacing-box');
   const model = el('div', 'boxmodel');
   model.setAttribute('role', 'group');
-  model.setAttribute('aria-label', 'Spacing in pixels');
+  model.setAttribute('aria-label', 'CSS box model in pixels');
   const sideNames = { t: 'top', r: 'right', b: 'bottom', l: 'left' };
   const spaceField = (kind, short, side) => {
     const token = value(cls => tw.sides(cls, kind)[side]);
     const node = field(`${short}-${side}`, '', token === MIXED ? MIXED : tw.display(token), next => {
       run(cls => tw.setSide(cls, kind, side, next), `${kind} ${sideNames[side]} ${next == null ? 'none' : tw.display(next)}`);
-    }, { tip: '', placeholder: String(measured?.[kind]?.['trbl'.indexOf(side)] ?? 0), min: kind === 'padding' ? 0 : -1e4, parse: tw.fromInput });
+    }, { tip: '', placeholder: measured?.[kind] ? String(measured[kind]['trbl'.indexOf(side)]) : '—', min: kind === 'padding' ? 0 : -1e4, parse: tw.fromInput });
     node.classList.add('bm-field');
     const label = `${kind[0].toUpperCase()}${kind.slice(1)} ${sideNames[side]}, px`;
     node.setAttribute('aria-label', label);
     node.querySelector('input').setAttribute('aria-label', label);
     node.querySelector('.vf-k')?.remove();
-    const hint = el('span', 'bm-side', sideNames[side]);
-    hint.setAttribute('aria-hidden', 'true');
-    node.prepend(hint);
     const light = on => spacingFocus?.(on ? { kind, sides: [side] } : null);
     node.addEventListener('pointerenter', () => light(true));
     node.addEventListener('pointerleave', () => { if (!node.contains(document.activeElement)) light(false); });
@@ -495,25 +486,65 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
     node.addEventListener('focusout', () => light(false));
     return node;
   };
-  const square = (kind, inner = null) => {
+  const number = value => Number.isFinite(value) ? String(Math.round(value * 1000) / 1000) : '—';
+  const positionValue = position === MIXED ? MIXED : measured?.position ?? position ?? null;
+  const positioned = ['relative', 'absolute', 'fixed', 'sticky'].includes(positionValue);
+  const edge = (kind, side, index) => {
+    if (kind === 'margin' || kind === 'padding') return spaceField(kind, kind === 'margin' ? 'm' : 'p', side);
+    if (kind === 'position' && positioned) {
+      const token = value(cls => tw.sides(cls, 'inset')[side]);
+      const node = field(`inset-${side}`, '', token === MIXED ? MIXED : tw.display(token), next => run(cls => tw.setSide(cls, 'inset', side, next), `${sideNames[side]} ${next ?? 'auto'}`), { tip: `${sideNames[side][0].toUpperCase()}${sideNames[side].slice(1)} offset, px`, placeholder: measured?.inset?.[index]?.replace(/px$/, '') ?? 'auto', parse: tw.fromInput });
+      node.querySelector('.vf-k')?.remove();
+      node.classList.add('bm-offset');
+      return node;
+    }
+    const shown = kind === 'border' ? number(measured?.border?.[index]) : positionValue === MIXED || positionValue === null ? '—' : measured?.inset?.[index]?.replace(/px$/, '') ?? 'auto';
+    const node = el('span', 'bm-readout', shown);
+    node.setAttribute('aria-label', `${kind} ${sideNames[side]}: ${shown}${kind === 'border' ? ' px' : ''}`);
+    return node;
+  };
+  const square = (kind, inner) => {
     const sq = el('div', `bm-sq bm-${kind}`);
     sq.setAttribute('role', 'group');
-    sq.setAttribute('aria-label', kind === 'margin' ? 'Margin' : 'Padding');
-    for (const side of ['t', 'r', 'b', 'l']) {
+    sq.setAttribute('aria-label', kind[0].toUpperCase() + kind.slice(1));
+    sq.append(el('span', 'bm-caption', kind));
+    for (const [index, side] of ['t', 'r', 'b', 'l'].entries()) {
       const cell = el('div', `bm-cell bm-${side}`);
-      cell.append(spaceField(kind, kind === 'margin' ? 'm' : 'p', side));
+      cell.setAttribute('role', 'group');
+      cell.setAttribute('aria-label', `${kind} ${sideNames[side]}`);
+      cell.append(edge(kind, side, index));
       sq.append(cell);
     }
     const centre = el('div', 'bm-centre');
-    centre.append(inner ?? el('div', 'bm-core', 'content'));
-    const mark = el('span', 'bm-mark', kind === 'margin' ? 'M' : 'P');
-    mark.setAttribute('aria-hidden', 'true');
-    sq.append(centre, mark);
+    centre.append(inner);
+    sq.append(centre);
+    const fitValues = () => {
+      let expanded = false;
+      for (const cell of sq.querySelectorAll(':scope > .bm-cell')) {
+        const input = cell.querySelector('input');
+        const text = input ? input.value || input.placeholder : cell.textContent;
+        const length = text.length;
+        cell.style.setProperty('--bm-value-width', `calc(${length}ch + 2px)`);
+        if (length > 4) expanded = true;
+      }
+      sq.classList.toggle('bm-expanded-values', expanded);
+    };
+    for (const input of sq.querySelectorAll(':scope > .bm-cell input')) {
+      input.addEventListener('input', fitValues);
+      input.addEventListener('keydown', fitValues);
+      input.addEventListener('change', fitValues);
+    }
+    fitValues();
     return sq;
   };
+  const core = el('div', 'bm-core');
+  core.setAttribute('role', 'group');
+  const width = number(measured?.content?.width), height = number(measured?.content?.height);
+  core.setAttribute('aria-label', `Content size: ${width} by ${height} CSS px`);
+  core.append(el('span', 'bm-dimension', width), el('span', 'bm-times', '×'), el('span', 'bm-dimension', height));
   const unit = el('span', 'bm-unit', 'px');
   unit.setAttribute('aria-hidden', 'true');
-  model.append(square('margin', square('padding')), unit);
+  model.append(square('position', square('margin', square('border', square('padding', core)))), unit);
   spacing.append(model);
 
   /* effects */

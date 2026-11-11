@@ -1,7 +1,8 @@
 // Spacing: a quiet margin/padding overlay on the selection, and the box-model inspector that edits it.
 import assert from 'node:assert/strict';
 import { legacyProject } from '../fixtures/legacy-project.js';
-import { cp, mkdtemp, rm } from 'node:fs/promises';
+import { cp, mkdtemp, rm, mkdir } from 'node:fs/promises';
+import { decodeHtml } from '../../lib/codec.ts';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -35,15 +36,17 @@ try {
   const frame = page.locator('iframe[data-document-id="welcome"]').contentFrame();
   await page.waitForSelector('#inspector .boxmodel');
   assert.equal(await page.locator('#inspector .bm-field').count(), 8, 'one margin and one padding field per side');
-  // The model is nested, always: the margin square around the padding square around the content, each field on its own edge.
+  // Four nested bands match the developer-tools reference; editable spacing keeps its original edge semantics.
   const model = await page.evaluate(() => {
     const box = document.querySelector('#inspector .boxmodel');
     const rect = selector => { const node = box.querySelector(selector); const r = node?.getBoundingClientRect(); return r ? { x: r.x, y: r.y, w: r.width, h: r.height } : null; };
     const field = side => rect(`.bm-margin .bm-cell.bm-${side} .bm-field`);
-    return { outer: rect('.bm-sq.bm-margin'), inner: rect('.bm-sq.bm-padding'), core: rect('.bm-core'), margin: { t: field('t'), r: field('r'), b: field('b'), l: field('l') }, padding: Object.fromEntries(['t', 'r', 'b', 'l'].map(side => [side, rect(`.bm-sq.bm-padding .bm-cell.bm-${side} .bm-field`)])) };
+    return { position: rect('.bm-position'), outer: rect('.bm-sq.bm-margin'), border: rect('.bm-border'), inner: rect('.bm-sq.bm-padding'), core: rect('.bm-core'), margin: { t: field('t'), r: field('r'), b: field('b'), l: field('l') }, padding: Object.fromEntries(['t', 'r', 'b', 'l'].map(side => [side, rect(`.bm-sq.bm-padding .bm-cell.bm-${side} .bm-field`)])) };
   });
   const inside = (child, parent) => child.x > parent.x && child.y > parent.y && child.x + child.w < parent.x + parent.w && child.y + child.h < parent.y + parent.h;
-  assert.ok(inside(model.inner, model.outer), 'the padding square sits inside the margin square');
+  assert.ok(inside(model.outer, model.position), 'margin sits inside position');
+  assert.ok(inside(model.border, model.outer), 'border sits inside margin');
+  assert.ok(inside(model.inner, model.border), 'padding sits inside border');
   assert.ok(inside(model.core, model.inner), 'and the content inside the padding');
   for (const side of ['t', 'r', 'b', 'l']) {
     assert.ok(inside(model.padding[side], model.inner), `padding ${side} is on the inner square's edge`);
@@ -73,7 +76,7 @@ try {
   assert.equal(await frame.locator('body').evaluate(() => document.documentElement.scrollHeight), dim, 'the overlay never changes the page size');
   checks.push('pointing at a number lights its band and leaving restores the quiet default');
 
-  // Eight independent targets share one size; quiet labels and M/P corner marks replace the linking legend.
+  // The reference uses full layer names in the bands, not a separate legend or eight repeated side captions.
   const sized = await page.evaluate(() => {
     const box = document.querySelector('#inspector .boxmodel');
     const widths = [...new Set([...box.querySelectorAll('.bm-field')].map(field => Math.round(field.getBoundingClientRect().width)))];
@@ -82,8 +85,8 @@ try {
       keys: box.querySelectorAll('.bm-field .vf-k').length,
       tips: [...box.querySelectorAll('.bm-field')].filter(field => field.querySelector('.vf-k')?.dataset.tip || field.dataset.tip).length,
       labels: [...box.querySelectorAll('.bm-field')].map(field => field.getAttribute('aria-label')),
-      sides: [...box.querySelectorAll('.bm-side')].map(node => node.textContent),
-      marks: [...box.querySelectorAll('.bm-mark')].map(node => node.textContent).sort(),
+      captions: [...box.querySelectorAll('.bm-caption')].map(node => node.textContent),
+      border: box.querySelectorAll('.bm-border > .bm-cell .bm-readout').length,
       switches: box.querySelectorAll('button, .bm-legend').length,
       height: box.getBoundingClientRect().height,
     };
@@ -91,10 +94,10 @@ try {
   assert.equal(sized.widths.length, 1, `one field size for all eight numbers (${sized.widths})`);
   assert.equal(sized.keys, 0, 'no letter keys: the square a number sits on says which side it is');
   assert.equal(sized.tips, 0, 'side captions do not add tooltip noise');
-  assert.deepEqual(sized.sides, ['top', 'right', 'bottom', 'left', 'top', 'right', 'bottom', 'left']);
-  assert.deepEqual(sized.marks, ['M', 'P']);
+  assert.deepEqual(sized.captions, ['position', 'margin', 'border', 'padding']);
+  assert.equal(sized.border, 4, 'computed per-side borders are read-only, not a duplicate width editor');
   assert.equal(sized.switches, 0, 'no linking switches or separate legend');
-  assert.ok(sized.height <= 144, `the complete compact widget is at most 144px high (${sized.height})`);
+  assert.ok(sized.height <= 225, `the four-layer widget stays compact (${sized.height})`);
   assert.deepEqual(sized.labels, ['Margin top, px', 'Margin right, px', 'Margin bottom, px', 'Margin left, px', 'Padding top, px', 'Padding right, px', 'Padding bottom, px', 'Padding left, px'], 'the accessible name still says which side and unit');
 
   // A tight panel keeps the shape and the sizes: the model narrows as a whole rather than one square into the other.
@@ -114,7 +117,7 @@ try {
   assert.deepEqual(tight.clipped, [], 'and no value is cut off, even a word like auto');
   await page.evaluate(() => { document.querySelector('#inspector').style.width = ''; });
   await sleep(300);
-  checks.push('eight compact, equal targets retain nested geometry, quiet side labels and M/P corner marks without a linking legend');
+  checks.push('four named bands retain eight independent spacing editors without linking modes or duplicate border editors');
 
   const paddingValues = () => frame.locator('[data-divlet-id="nav"]').evaluate(node => {
     const style = getComputedStyle(node);
@@ -365,6 +368,115 @@ try {
 
   await page.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); });
   await waitUntil(async () => (await overlay.locator('> div').count()) === 0, 'selecting an artboard clears the overlay');
+  // The centre is the true CSS content box, not a transformed border-box rectangle or invented sample numbers.
+  const probe = decodeHtml('<main id="probe-root"><div id="box-probe" class="relative inset-0" style="box-sizing:border-box;width:75.328125px;height:44px;padding:4px;border:1px solid black;margin:0"></div><div id="box-other" class="relative inset-0 mt-3">Other</div></main>', { fallbackId: 'box-reference' });
+  await runtime.create({ document: probe });
+  await page.evaluate(async id => { const m = await import('./lib/store.js'); m.selectArtboards([id]); m.selectNodes(id, ['box-probe']); }, probe.id);
+  await page.mouse.move(5, 5);
+  const probeFrame = page.locator(`iframe[data-document-id="${probe.id}"]`).contentFrame();
+  await waitUntil(async () => /65\.328 by 34/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'actual fractional content dimensions');
+  assert.equal(await page.locator('#inspector [data-key="inset-t"]').count(), 1, 'offset has one home in the outer position band');
+  assert.equal(await page.locator('#inspector [data-section="layout"] [data-key="inset-t"]').count(), 0, 'no duplicate layout offset editor');
+  assert.deepEqual(await page.locator('#inspector .bm-border > .bm-cell').allTextContents(), ['1', '1', '1', '1']);
+  assert.equal(await page.locator('#inspector .bm-padding [data-key="p-t"]').getAttribute('placeholder'), '4');
+  await page.locator('#inspector [data-key="inset-t"]').fill('8');
+  await page.keyboard.press('Enter');
+  await waitUntil(() => runtime.read({ view: 'document', documentId: probe.id }).nodes['box-probe'].className.includes('top-2'), 'position edge edits the existing inset class path');
+  await page.mouse.move(5, 5);
+  await page.keyboard.press('Control+z');
+  await waitUntil(() => !runtime.read({ view: 'document', documentId: probe.id }).nodes['box-probe'].className.includes('top-2'), 'position edge edit remains undoable');
+  const patchProbe = async style => {
+    const current = runtime.read({ view: 'document', documentId: probe.id });
+    await runtime.patch({ documentId: probe.id, expectedVersion: current.version, patch: { nodes: { 'box-probe': { style } } } });
+  };
+  await patchProbe({ 'box-sizing': 'content-box', width: '65.328125px', height: '34px', transform: 'scale(1.5)', 'margin-top': '-6.5px', 'border-right-width': '3px' });
+  await waitUntil(async () => (await page.locator('#inspector .bm-border > .bm-r').innerText()) === '3', 'asymmetric computed border readback');
+  assert.match(await page.locator('#inspector .bm-core').getAttribute('aria-label'), /65\.328 by 34/, 'content-box and transforms do not inflate the content measurement');
+  assert.equal(await page.locator('#inspector [data-key="m-t"]').getAttribute('placeholder'), '-6.5', 'negative measured margins are not clamped to zero');
+  assert.ok(await probeFrame.locator('[data-divlet-id="box-probe"]').evaluate(node => node.getBoundingClientRect().width > 100));
+  await patchProbe({ display: 'none' });
+  await waitUntil(async () => /— by —/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'a hidden element has no fabricated content size');
+  await patchProbe({ display: null, 'box-sizing': 'border-box', width: '75.328125px', height: '44px', transform: null, 'margin-top': null, 'border-right-width': null });
+  await waitUntil(async () => /65\.328 by 34/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'measurement recovers after showing the element');
+  await mkdir('artifacts', { recursive: true });
+  for (const [width, size, theme] of [[1280, 100, 'light'], [390, 100, 'dark'], [390, 200, 'light']]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(async ({ size, theme }) => { (await import('./lib/help.js')).setUiSize(size); document.documentElement.dataset.theme = theme; }, { size, theme });
+    await page.locator('#inspector .boxmodel').scrollIntoViewIfNeeded();
+    await sleep(350);
+    const collisions = await page.locator('#inspector .boxmodel').evaluate(model => {
+      const fields = [...model.querySelectorAll('.bm-field, .bm-offset, .bm-readout, .bm-core')].map(node => node.getBoundingClientRect());
+      const overlap = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
+      const bad = [];
+      if (model.scrollWidth > model.clientWidth + 1) bad.push('widget overflows');
+      for (let a = 0; a < fields.length; a++) for (let b = a + 1; b < fields.length; b++) if (overlap(fields[a], fields[b])) bad.push(`targets ${a}/${b} overlap`);
+      for (const node of model.querySelectorAll('.bm-caption, .bm-dimension')) {
+        if (node.scrollWidth > node.clientWidth + 1) bad.push(`${node.textContent} clips`);
+        if (node.matches('.bm-caption') && fields.some(field => overlap(node.getBoundingClientRect(), field))) bad.push(`${node.textContent} covers a value`);
+      }
+      return bad;
+    });
+    assert.deepEqual(collisions, [], `box model at ${width}px/${size}%/${theme}`);
+    assert.equal(await page.locator('#inspector .bm-margin input').first().evaluate(input => getComputedStyle(input, '::placeholder').opacity), '1', 'computed fallback numbers keep full contrast on the coloured bands');
+    await page.mouse.move(width - 1, 1);
+    await page.evaluate(() => document.activeElement?.blur());
+    await sleep(250);
+    await page.locator('#inspector .boxmodel').screenshot({ path: `artifacts/boxmodel-${width}-${size}-${theme}.png` });
+  }
+  await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(100));
+  await page.mouse.move(5, 5);
+  await patchProbe({ 'margin-top': '-123.456px', left: '123.456px', padding: '16.25px' });
+  const current = runtime.read({ view: 'document', documentId: probe.id });
+  await runtime.patch({ documentId: probe.id, expectedVersion: current.version, patch: { nodes: { 'box-probe': { className: 'relative p-[16.25px] ml-[123.456px]' } } } });
+  await waitUntil(async () => (await page.locator('#inspector [data-key="m-t"]').getAttribute('placeholder')) === '-123.456', 'long computed fallback');
+  assert.equal(await page.locator('#inspector [data-key="inset-l"]').getAttribute('placeholder'), '123.456');
+  for (const [width, size] of [[1280, 100], [390, 200]]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(async size => (await import('./lib/help.js')).setUiSize(size), size);
+    await page.locator('#inspector .boxmodel').scrollIntoViewIfNeeded();
+    await sleep(350);
+    const clipped = await page.locator('#inspector .boxmodel').evaluate(model => {
+      const canvas = document.createElement('canvas').getContext('2d');
+      return [...model.querySelectorAll('input')].flatMap(input => {
+        const style = getComputedStyle(input);
+        canvas.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        const shown = input.value || input.placeholder;
+        return canvas.measureText(shown).width > input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1 ? [`${input.dataset.key}: ${shown}`] : [];
+      });
+    });
+    assert.deepEqual(clipped, [], `whole authored and computed fractional/signed values at ${width}px/${size}%`);
+    const overflow = await page.locator('#inspector .boxmodel').evaluate(model => model.scrollWidth - model.clientWidth);
+    assert.ok(overflow <= 1, 'expansion adds height, not horizontal overflow');
+    await page.locator('#inspector .boxmodel').screenshot({ path: `artifacts/boxmodel-long-${width}-${size}.png` });
+  }
+  const boxTouch = await browser.newContext({ viewport: { width: 390, height: 900 }, hasTouch: true });
+  const touchPage = await boxTouch.newPage();
+  await touchPage.goto(runtime.url);
+  await touchPage.waitForSelector('.artboard');
+  await touchPage.evaluate(async id => { (await import('./lib/help.js')).setUiSize(200); const m = await import('./lib/store.js'); m.selectArtboards([id]); m.selectNodes(id, ['box-probe']); }, probe.id);
+  await touchPage.waitForSelector('#inspector [data-key="inset-l"]');
+  await waitUntil(async () => (await touchPage.locator('#inspector [data-key="m-t"]').getAttribute('placeholder')) === '-123.456', 'coarse-pointer long measurements');
+  const touchTargets = await touchPage.locator('#inspector .boxmodel').evaluate(model => {
+    const bad = [], canvas = document.createElement('canvas').getContext('2d');
+    const controls = [...model.querySelectorAll('.vf')];
+    const overlap = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
+    for (const field of controls) {
+      const rect = field.getBoundingClientRect(), input = field.querySelector('input'), style = getComputedStyle(input);
+      if (rect.width < 24 || rect.height < 24) bad.push(`${input.dataset.key} has a small touch target`);
+      canvas.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      if (canvas.measureText(input.value || input.placeholder).width > input.clientWidth + 1) bad.push(`${input.dataset.key} clips`);
+    }
+    for (let a = 0; a < controls.length; a++) for (let b = a + 1; b < controls.length; b++) if (overlap(controls[a].getBoundingClientRect(), controls[b].getBoundingClientRect())) bad.push(`touch targets ${a}/${b} overlap`);
+    if (model.scrollWidth > model.clientWidth + 1) bad.push('touch widget overflows');
+    return bad;
+  });
+  assert.deepEqual(touchTargets, [], 'coarse-pointer phone/200% keeps full values and distinct 24px targets');
+  await boxTouch.close();
+  await page.evaluate(async id => { (await import('./lib/store.js')).selectNodes(id, ['box-probe', 'box-other']); }, probe.id);
+  await waitUntil(async () => /— by —/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'multi-selection does not invent aggregate geometry');
+  assert.deepEqual(await page.locator('#inspector .bm-border > .bm-cell').allTextContents(), ['—', '—', '—', '—']);
+  assert.equal(await page.locator('#inspector [data-key="m-t"]').getAttribute('placeholder'), '—');
+  checks.push('real per-edge borders, signed margins, fractional untransformed content size, hidden/visible recovery, one undoable offset editor, truthful mixed state and desktop/phone/200% geometry');
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'passed', checks }, null, 2));
 } finally { await browser?.close(); await runtime.close(); await rm(cwd, { recursive: true, force: true }); }

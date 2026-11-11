@@ -134,7 +134,19 @@ export function previewBridge(documentId, initialVersion, bridgeToken, readOnly 
       const p = { t: side('padding', 'top'), r: side('padding', 'right'), b: side('padding', 'bottom'), l: side('padding', 'left') };
       const ix = r.left + b.l, iy = r.top + b.t, iw = r.width - b.l - b.r, ih = r.height - b.t - b.b;
       // The numbers the page really has, for the inspector (a class it cannot read, such as padding:var(--space-3), still counts).
-      if (single) handleBox = { nodeId: id, margin: [m.t, m.r, m.b, m.l].map(Math.round), padding: [p.t, p.r, p.b, p.l].map(Math.round), colors: { background: cs.backgroundColor, color: cs.color, radius: cs.borderTopLeftRadius, fontSize: cs.fontSize, borderColor: cs.borderTopColor } };
+      if (single) {
+        const edges = ['top', 'right', 'bottom', 'left'];
+        const contentSize = (axis, padding, border) => {
+          const size = parseFloat(cs[axis]);
+          return element.getClientRects().length && cs.display !== 'contents' && Number.isFinite(size) ? Math.max(0, size - (cs.boxSizing === 'border-box' ? padding + border : 0)) : null;
+        };
+        handleBox = { nodeId: id,
+          margin: edges.map(edge => parseFloat(cs.getPropertyValue(`margin-${edge}`)) || 0),
+          padding: [p.t, p.r, p.b, p.l], border: [b.t, b.r, b.b, b.l],
+          position: cs.position, inset: edges.map(edge => cs.getPropertyValue(edge)),
+          content: { width: contentSize('width', p.l + p.r, b.l + b.r), height: contentSize('height', p.t + p.b, b.t + b.b) },
+          colors: { background: cs.backgroundColor, color: cs.color, radius: cs.borderTopLeftRadius, fontSize: cs.fontSize, borderColor: cs.borderTopColor } };
+      }
       band('margin', 't', r.left - m.l, r.top - m.t, r.width + m.l + m.r, m.t, m.t);
       band('margin', 'b', r.left - m.l, r.bottom, r.width + m.l + m.r, m.b, m.b);
       band('margin', 'l', r.left - m.l, r.top, m.l, r.height, m.l);

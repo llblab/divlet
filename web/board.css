@@ -388,32 +388,48 @@ body.is-expanded .resize-handle, body:has(.scrim:not([hidden])) .resize-handle {
 .vf-unit, .num-unit { flex: none; font: 10px var(--mono); color: var(--muted); pointer-events: none; user-select: none; }
 .vf-unit[hidden] { display: none; }
 .num-unit { padding-right: 8px; }
-/* Eight equal, independent targets; compact nested bands identify margin/padding without a second legend or linking row. */
-.boxmodel { position: relative; display: grid; min-width: 0; container: boxmodel / inline-size; }
-.bm-sq { --bm-field: 48px; position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr) auto; gap: 2px; padding: 3px; min-width: 0; border-radius: var(--radius-inner); }
-.bm-margin { background: color-mix(in srgb, #ff9933 10%, transparent); }
-.bm-padding { background: color-mix(in srgb, #2fb870 11%, transparent); }
-.bm-cell { display: flex; min-width: 0; }
-.bm-cell.bm-t { grid-area: 1 / 2; justify-content: center; }
-.bm-cell.bm-b { grid-area: 3 / 2; justify-content: center; }
-.bm-cell.bm-l { grid-area: 2 / 1; align-items: center; width: var(--bm-field); }
-.bm-cell.bm-r { grid-area: 2 / 3; align-items: center; width: var(--bm-field); }
-.bm-centre { grid-area: 2 / 2; min-width: 0; display: grid; container: core / inline-size; }
-.bm-cell .bm-field { flex: none; width: var(--bm-field); }
-.vf.bm-field { display: grid; grid-template-rows: 9px minmax(0, 1fr); gap: 0; align-items: stretch; min-height: 24px; height: 24px; padding: 1px 2px; background: var(--solid); box-shadow: inset 0 0 0 1px var(--hair); }
-.bm-side { font: 8px/9px var(--mono); color: var(--muted); text-align: center; pointer-events: none; user-select: none; }
-.bm-field .vf-input { width: 100%; min-width: 0; padding: 0; line-height: 12px; text-align: center; }
-/* The middle of the padding square: what the numbers are around. */
-.bm-core { display: grid; place-items: center; min-height: 12px; border-radius: var(--radius-small); color: var(--faint); font: 10px var(--mono); letter-spacing: .04em; text-transform: uppercase; background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--hair) 60%, transparent) 5px 6px); }
-.bm-mark { position: absolute; right: 4px; bottom: 3px; color: var(--muted); font: 600 9px/10px var(--mono); pointer-events: none; user-select: none; }
-.bm-unit { position: absolute; top: 4px; right: 6px; color: var(--muted); font: 9px/10px var(--mono); pointer-events: none; }
-/* One field size for all eight numbers at every width: the model narrows as a whole rather than shrinking one square into the
-   other. Only the very tight middle loses the content label; the numbers never do. */
-@container boxmodel (max-width: 270px) { .bm-sq { --bm-field: 42px; } }
-@container boxmodel (max-width: 190px) { .bm-sq { --bm-field: 34px; } }
-@container core (max-width: 40px) {
-  .bm-core { font-size: 0; min-height: 0; background: none; }
+/* Developer-tools box model: nested, non-proportional CSS bands with the actual values on each edge. */
+.boxmodel { --bm-edge: 24px; --bm-field: 24px; position: relative; min-width: 0; container: boxmodel / inline-size; }
+.bm-sq { position: relative; padding: 20px var(--bm-edge); min-width: 0; border: 1px solid #4c4b40; color: #202621; }
+.bm-position { border: 1px dotted var(--muted); color: var(--ink); background: repeating-linear-gradient(135deg, transparent 0 3px, color-mix(in srgb, var(--hair) 35%, transparent) 3px 4px); }
+.bm-margin { background: #bc8c61; border-style: dashed; }
+.bm-border { background: #e3c78f; }
+.bm-padding { background: #c6d7a7; border-style: dashed; }
+.bm-caption { position: absolute; top: 2px; left: 4px; font: 10px/14px var(--font); pointer-events: none; }
+.bm-cell { position: absolute; display: flex; justify-content: center; align-items: center; width: var(--bm-field); height: 18px; min-width: 0; font: 10px/16px var(--mono); }
+.bm-cell.bm-t { top: 1px; left: 50%; transform: translateX(-50%); }
+.bm-cell.bm-b { bottom: 1px; left: 50%; transform: translateX(-50%); }
+.bm-cell.bm-l { left: 0; top: 50%; transform: translateY(-50%); width: var(--bm-field); }
+.bm-cell.bm-r { right: 0; top: 50%; transform: translateY(-50%); width: var(--bm-field); }
+.bm-centre { min-width: 0; }
+.vf.bm-field, .vf.bm-offset { flex: none; width: var(--bm-field); min-height: 18px; height: 18px; padding: 0; border-radius: var(--radius-small); background: transparent; box-shadow: none; color: inherit; }
+.bm-field:hover, .bm-offset:hover { background: #ffffff30; }
+.bm-field:focus-within, .bm-offset:focus-within { background: var(--solid); color: var(--ink); }
+.bm-field .vf-input, .bm-offset .vf-input { width: 100%; min-width: 0; padding: 0; color: inherit; font: 10px/16px var(--mono); text-align: center; }
+.bm-field .vf-input::placeholder, .bm-offset .vf-input::placeholder { color: inherit; opacity: 1; }
+.bm-readout { white-space: nowrap; }
+.bm-core { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 3px; min-width: 0; min-height: 23px; padding: 2px; border: 1px solid #314554; background: #8eaec2; color: #17232b; font: 10px/15px var(--mono); }
+.bm-dimension { white-space: nowrap; }
+.bm-unit { position: absolute; top: 4px; right: 5px; color: var(--muted); font: 9px/12px var(--mono); pointer-events: none; }
+@container boxmodel (max-width: 270px) {
+  .bm-sq { --bm-edge: 20px; --bm-field: 20px; }
+  .bm-cell, .bm-field .vf-input, .bm-offset .vf-input { font-size: 8.5px; }
 }
+/* At phone/200% widths, stagger the side values down the bands instead of hiding or overlapping them. */
+@container boxmodel (max-width: 230px) {
+  .bm-sq { --bm-edge: 8px; --bm-field: 24px; }
+  .bm-padding { --bm-edge: 24px; }
+  .bm-caption { font-size: 8px; }
+  .bm-cell.bm-l, .bm-cell.bm-r { top: auto; bottom: 4px; transform: none; }
+  .bm-cell, .bm-field .vf-input, .bm-offset .vf-input, .bm-core { font-size: 9px; }
+}
+/* Long signed/fractional values earn rows, not clipping or tiny type; short values keep the reference's compact shape. */
+.bm-expanded-values { padding-top: 76px; }
+.bm-expanded-values > .bm-cell { width: max(var(--bm-field), var(--bm-value-width)); max-width: calc(100% - 4px); }
+.bm-expanded-values > .bm-cell > .vf { width: 100%; }
+.bm-expanded-values > .bm-t { top: 18px; }
+.bm-expanded-values > .bm-l { top: 36px; left: 2px; bottom: auto; transform: none; }
+.bm-expanded-values > .bm-r { top: 54px; right: 2px; bottom: auto; transform: none; }
 .box4 { min-width: 0; flex: 1 1 var(--control-min); }
 .caption.has-variants::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 4px; border-radius: 50%; background: var(--accent); vertical-align: 1px; }
 .quick-attrs { margin-top: 1px; }
@@ -847,6 +863,17 @@ body.is-expanded .brand, body.is-expanded .sidebar-foot, body.is-expanded .panel
   .cls-input { height: 28px; }
   .ident-field, .ident { height: 32px; }
   .vf, .num, .pick { min-height: 36px; }
+  .boxmodel .bm-sq { --bm-edge: 24px; --bm-field: 24px; padding-top: 28px; padding-bottom: 28px; }
+  .boxmodel .bm-cell, .boxmodel .vf.bm-field, .boxmodel .vf.bm-offset { min-height: 24px; height: 24px; }
+  .boxmodel .bm-core { font-size: 9px; }
+  .boxmodel .bm-expanded-values { padding-top: 104px; }
+  .boxmodel .bm-expanded-values > .bm-t { top: 20px; }
+  .boxmodel .bm-expanded-values > .bm-l { top: 48px; }
+  .boxmodel .bm-expanded-values > .bm-r { top: 76px; }
+  @container boxmodel (max-width: 230px) {
+    .boxmodel .bm-sq { --bm-edge: 8px; }
+    .boxmodel .bm-padding { --bm-edge: 24px; }
+  }
   .swatch:not(.plain) { width: 28px; height: 28px; }
 }
 
