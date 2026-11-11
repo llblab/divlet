@@ -305,7 +305,7 @@ function appearanceFold(nodes, { value, run, measured, tokens }) {
   // Border: width presets or any px, and a colour.
   const BORDER_STEPS = [['0', 'border-0'], ['1', 'border'], ['2', 'border-2'], ['4', 'border-4']];
   const borderClass = value(cls => tw.get(cls, 'borderWidth'));
-  const borderPx = borderClass === MIXED ? MIXED : borderClass == null ? null : borderClass === 'border' ? 1 : borderClass === 'border-0' ? 0 : /^border-(\d+)$/.exec(borderClass)?.[1] ?? /^border-\[(\d+(?:\.\d+)?)px\]$/.exec(borderClass)?.[1] ?? borderClass;
+  const borderPx = borderClass === MIXED ? MIXED : borderClass == null ? null : borderClass === 'border' ? 1 : borderClass === 'border-0' ? 0 : /^border-(\d+)$/.exec(borderClass)?.[1] ?? /^border-\[(\d+(?:\.\d+)?)px\]$/.exec(borderClass)?.[1] ?? /^\[border-width:(\d+(?:\.\d+)?)px\]$/.exec(borderClass)?.[1] ?? borderClass;
   const border = field('border-width', 'B', borderPx, next => run(cls => tw.set(cls, 'borderWidth', next), `border ${next ? '' : 'none'}`.trim()), {
     tip: 'Border width, px', unit: 'px', placeholder: '0', min: 0, max: 64,
     parse: raw => { const t = raw.trim(); if (!t) return null; if (!/^\d+(?:\.\d+)?$/.test(t)) return undefined; return Number(t) === 1 ? 'border' : Number(t) === 0 ? 'border-0' : [2, 4, 8].includes(Number(t)) ? `border-${Number(t)}` : `border-[${Number(t)}px]`; },

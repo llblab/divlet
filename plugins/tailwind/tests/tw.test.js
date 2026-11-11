@@ -94,3 +94,17 @@ test('spreading and stretching are separate from the 3×3 pad', () => {
   assert.deepEqual(tw.alignment('flex justify-evenly items-stretch'), { x: null, y: null, between: false });
   assert.equal(tw.setAlignment('flex justify-evenly items-stretch', 'center', 'end'), 'flex justify-center items-end');
 });
+
+test('a declarative border-width reads, replaces and coexists like the utility it stands for', async () => {
+  const { applyStyles } = await import('../lib/styles.js');
+  const emitted = applyStyles('p-4', { 'border-width': '2px' });
+  assert.equal(emitted, 'p-4 [border-width:2px]', 'the emitter writes the arbitrary property');
+  assert.equal(tw.get(emitted, 'borderWidth'), '[border-width:2px]', 'and the inspector reads it back as the border width');
+  assert.equal(tw.get('p-4 [border-width:2.5px]', 'borderWidth'), '[border-width:2.5px]');
+  assert.equal(tw.get('border-2 [border-width:5px]', 'borderWidth'), '[border-width:5px]', 'the later source declaration is the one read');
+  assert.equal(tw.set('p-4 [border-width:2px] rounded', 'borderWidth', 'border-4'), 'p-4 border-4 rounded', 'a new width replaces it in place');
+  assert.equal(tw.set('border-2 [border-width:5px]', 'borderWidth', null), '', 'and clearing removes every spelling of the width');
+  for (const other of ['[border-top-width:2px]', '[border-width:2em]', '[border-width:2px_3px]', '[border-color:red]', 'border-t-2', '[border-width:var(--w)]']) assert.equal(tw.get(other, 'borderWidth'), null, `${other} is not a single px width`);
+  assert.equal(tw.get('md:[border-width:2px]', 'borderWidth'), null, 'a variant stays out of the base-class group');
+  assert.deepEqual(tw.variantsOf('md:[border-width:2px]', 'borderWidth'), ['md:[border-width:2px]']);
+});

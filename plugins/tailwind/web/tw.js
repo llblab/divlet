@@ -50,7 +50,8 @@ export const GROUPS = {
   bgColor: colorGroup('bg', /^bg-(?:transparent|current|inherit|white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}(?:\/\d+)?|\[(?:#|rgb|hsl|oklch|var\(--color|color:)[^\]]*\])$/),
   fontSize: /^text-(?:xs|sm|base|lg|xl|[2-9]xl|\[length:[^\]]+\])$/,
   fontWeight: /^font-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black|\[\d+\])$/,
-  borderWidth: /^border(?:-(?:0|2|4|8|\[\d+(?:\.\d+)?px\]))?$/,
+  // `[border-width:Npx]` is what a declarative `border-width` style becomes; it is the same property as `border-N`.
+  borderWidth: /^(?:border(?:-(?:0|2|4|8|\[\d+(?:\.\d+)?px\]))?|\[border-width:\d+(?:\.\d+)?px\])$/,
   borderColor: colorGroup('border', /^border-(?:transparent|current|white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}(?:\/\d+)?|\[(?:#|rgb|hsl|oklch|var\(--color)[^\]]*\])$/),
   textColor: colorGroup('text', /^text-(?:transparent|current|inherit|white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}(?:\/\d+)?|\[(?:#|rgb|hsl|oklch|var\(--color|color:)[^\]]*\])$/),
   translateX: /^-?translate-x-(.+)$/,

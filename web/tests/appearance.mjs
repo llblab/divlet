@@ -58,6 +58,12 @@ try {
   assert.equal(await page.locator('#inspector [data-key="border-width"]').evaluate(node => document.activeElement === node), true, 'Tab follows the paired fields before their optional presets');
   await page.locator('#inspector [data-key="border-width"]').fill('2'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('border-2'), 'the adjacent border field edits its own property');
+  // A declarative border-width is stored as `[border-width:3px]`; the same field must read it back, not fall back to 0.
+  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-width': '3px' } } } } });
+  await waitUntil(() => classesOf('cta').includes('[border-width:3px]'), 'a declarative border-width becomes an arbitrary-property class');
+  await waitUntil(async () => await page.locator('#inspector [data-key="border-width"]').inputValue() === '3', 'Appearance reads the declarative border width back');
+  await page.locator('#inspector [data-key="border-width"]').fill('2'); await page.keyboard.press('Enter');
+  await waitUntil(() => { const names = classesOf('cta'); return names.includes('border-2') && !names.includes('[border-width:3px]'); }, 'editing the width replaces the declarative spelling instead of stacking another');
   await page.locator('#inspector [data-key="pick:Weight"]').click();
   await page.locator('.menu .menu-item', { hasText: 'Extra bold 800' }).click();
   await waitUntil(() => classesOf('cta').includes('font-extrabold'), 'a long weight option can still be selected');
