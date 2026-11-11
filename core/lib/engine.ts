@@ -1,6 +1,6 @@
 /*
  * The style engine seam. The core speaks plain HTML/CSS; everything that turns utility classes into CSS, explains or suggests
- * classes and converts CSS declarations to classes goes through the registered style engine (see plugins.js; Tailwind is the
+ * classes and converts CSS declarations to classes goes through the registered style engine (see plugins.ts; Tailwind is the
  * engine that ships in `plugins/tailwind`). Core modules import these functions, never the engine's package.
  *
  * The engine is a plugin, so the seam is the one place that states what a plugin must provide: `StyleEngine` is the contract,
@@ -58,7 +58,7 @@ export interface StyleEngine {
 export type ResolvedStyleEngine = StyleEngine & { version: string; compileClasses: NonNullable<StyleEngine['compileClasses']> };
 
 const engines: StyleEngine[] = [tailwind as StyleEngine];
-/** The active style engine: the first registered (Tailwind ships with the package). Engines carry no core imports, so this seam never cycles. */
+/** The first registered engine. The draft registry seeds bundled Tailwind; hosts may explicitly replace the registry. */
 export const styleEngine = (): StyleEngine => engines[0] as StyleEngine;
 /** Browser modules the active plugins contribute: `{ id, module }`, the module being a path under the board's token URL. */
 export const clientPlugins = (): Array<{ id: string; module: string }> => engines.filter(engine => engine.client).map(engine => ({ id: engine.id, module: `plugins/${engine.id}/${engine.client?.entry}` }));
