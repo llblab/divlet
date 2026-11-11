@@ -43,6 +43,8 @@ Native HTML admission lives in `core/lib/html-import.ts`. A static page opened b
 
 Two deliberate limits (maintainer decisions, 2026-11-08): the **exporter** contract (`registerExporter`, `exportAs` in `core/lib/plugins.js`) ships without an exporter until a concrete consumer and format exist (per-frame HTML downloads are the board's own route, not an exporter); and a changed `.pen` is never merged into an edited project: the board notices it and **Import again** creates a new sibling project (`<name>-2.divlet`), leaving the current project and the source untouched.
 
+The browser's `web/lib/actions.js` is a command facade, not a dependency of clipboard internals. `web/lib/artboards.js` owns frame creation, duplication and deletion, including grouping, component-safe deletion order, selection/reveal and failure/Undo feedback. The facade re-exports the same functions; `clip.js` calls that lower owner directly. Literal local imports (including lazy imports and plugin client modules) are checked for existence and cycles by `core/tests/web-modules.test.js`.
+
 ## One capability contract
 
 `core/lib/contract.js` owns the product's operations: the tool list (names, titles, descriptions), their parameters in a small

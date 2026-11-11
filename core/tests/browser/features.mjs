@@ -305,6 +305,20 @@ try {
   await waitUntil(() => textsOf(doc('plain-css'), 'p').includes('A pasted paragraph'), 'paste plain text');
   check('Ctrl+C / Ctrl+X / Ctrl+V of elements across frames, HTML and text paste');
 
+  const artboardCopyBase = ids();
+  await page.evaluate(async () => {
+    const actions = await import('./lib/actions.js'), lifecycle = await import('./lib/artboards.js');
+    for (const name of ['newArtboard', 'duplicateArtboards', 'deleteArtboards']) if (actions[name] !== lifecycle[name]) throw new Error(`Lifecycle alias changed: ${name}`);
+    (await import('./lib/store.js')).selectArtboards(['components', 'pricing']);
+  });
+  await focusCanvas(); await page.keyboard.press('Control+c'); await page.keyboard.press('Control+v');
+  await waitUntil(() => ids().length === artboardCopyBase.length + 2, 'clipboard duplicates both artboards');
+  const pastedArtboards = ids().filter(id => !artboardCopyBase.includes(id));
+  await waitUntil(() => runtime.info().selection.ids.join() === pastedArtboards.join(), 'pasted artboards are selected together');
+  await focusCanvas(); await page.keyboard.press('Control+z');
+  await waitUntil(() => ids().join() === artboardCopyBase.join(), 'one Undo removes the grouped pasted artboards');
+  check('artboard clipboard uses the shared lifecycle commands and one undo group; facade exports retain function identity');
+
   /* ---- export ------------------------------------------------------------- */
   await pickBoard('welcome');
   const label = await board('welcome').locator('.ab-label').boundingBox();
@@ -406,6 +420,7 @@ try {
   for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
   await waitUntil(() => runtime.readHistory().changes.filter(change => change.label === 'nudge artboard').length === 3, 'three nudges');
   await page.keyboard.press('h');
+  await page.locator('#activity .history-log summary').click();
   await page.locator('#activity .change .times', { hasText: '×3' }).waitFor();
   await page.keyboard.press('h');
   check('History folds one gesture into one row (×3)');

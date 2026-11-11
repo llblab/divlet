@@ -88,6 +88,7 @@ This is the first release in preparation. No version has been published.
 
 ### Changed
 
+- **Artboard lifecycle has one lower client owner.** Creation, duplication and deletion now live in `web/lib/artboards.js`, preserving grouping, reveal/selection, component-safe deletion and failure/Undo feedback. The command facade retains the same exports; clipboard no longer lazily imports that facade, removing its concrete import cycle without callbacks or duplicate implementations. Browser-module checks now include plugin clients and literal lazy imports, with a regression against cycles; Chromium covers multi-artboard clipboard paste/one Undo and lifecycle alias compatibility. The gesture-audit check opens the existing Activity log disclosure before requiring its visible row.
 - Tests: the Appearance radius check waits for the panel's redraw instead of reading the field once (it failed about one run in three once the fold tabs changed the panel's redraw timing).
 - Canvas: a cancelled drag drops its preview at once instead of keeping the artboard at the dragged position until the undo arrives — Escape restores immediately, and a gesture that starts in that window can no longer snapshot a stale preview as its starting rectangle.
 - Canvas: an inline editor (rename, size) closes when the pointer goes down outside it. While it stayed open, a press on the artboard's own label typed into the field instead of dragging the artboard, and nothing on the board closed it.

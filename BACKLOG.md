@@ -4,6 +4,10 @@ This is the canonical list of remaining work. Contributor rules live in [AGENTS.
 
 Order is priority, highest first. Every item names what is left, not history.
 
+## Active convergence — post-growth drying
+
+- [ ] **ACTIVE-DRYING — Reduce demonstrated accidental complexity without changing useful behavior.** Grow Loop scope: inspect the existing core, client, plugins/adapters, tests and operational paths; select one behavior-preserving, independently validated refinement per checkpoint. Preserve schema-2/frame-1 semantics, single-writer/history/output/preview safety, public exports, UI behavior and compatibility; no feature removal, migration, publication or deployment. Next refine partial-deletion outcome bookkeeping at the lifecycle owner: a refused first frame followed by a successful later deletion currently reports the first requested name as deleted. Derive success count/name from accepted IDs rather than the requested-first assumption; preserve per-operation refusals, dependency order and grouped Undo, with a real mixed refusal/success regression. Reassess concrete nearby candidates after each slice rather than harvesting unrelated feature work. Stop at an evidenced local fixed point or a named gate; do not claim uninspected areas are dry.
+
 ## P1 — format freeze preparation
 
 Implement the [approved first-release profile](docs/format.md#approved-first-release-profile): ordered CSS declarations, native cascade, explicit renderer requirements, consumer component scope, conflict/DOM-ID refusal, finite binary64 with equivalent signed zeros, and an explicit project-3/frame-2 migration-copy transition. Approval covers implementation, not freezing or publishing. Preserve the currently working schema-2/frame-1 path until its replacement passes a coherent cutover; do not silently reinterpret or overwrite draft sources. Asset embedding/packaging was not decided by this approval; preserve existing file resources and reusable image/SVG elements.

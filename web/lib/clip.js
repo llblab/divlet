@@ -1,5 +1,6 @@
 import { store, documents, descriptor, edit, toast, cachedModel, loadModel, selectNodes, parentOf, canContain, apiUrl } from './store.js';
 import * as canvas from './canvas.js';
+import { duplicateArtboards } from './artboards.js';
 
 /* Copy, cut and paste of elements and artboards, plus images from the clipboard or a drop.
    The system clipboard receives clean HTML; the board keeps a lossless copy (names, metadata,
@@ -159,7 +160,6 @@ export async function paste({ text, files } = {}) {
   const normalize = value => value?.replace(/\r\n?/g, '\n');
   const own = clip && (clip.preferInternal || text === undefined || normalize(text) === normalize(clip.text));
   if (own && clip.kind === 'artboards') {
-    const { duplicateArtboards } = await import('./actions.js');
     const alive = clip.ids.filter(id => descriptor(id));
     if (!alive.length) { toast('The copied artboards no longer exist'); return null; }
     return duplicateArtboards(alive);
