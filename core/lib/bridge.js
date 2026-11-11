@@ -549,7 +549,20 @@ export function previewBridge(documentId, initialVersion, bridgeToken, readOnly 
     element.removeAttribute('spellcheck');
     send({ type: 'divlet:editing', active: false });
     if (commit && content !== original && override) send({ type: 'divlet:override-text', ...override, content });
-    else if (commit && content !== original) send({ type: 'divlet:text-edit', nodeId: textId ?? element.dataset.divletId, content });
+    else if (commit && content !== original) {
+      // The page this text was typed on may already be superseded by a render held back while editing: the previous commit of this
+      // same session (Tab, Enter to the next item) re-rendered it. That newer render is the same page as far as this element is
+      // concerned when its text there is still what the edit started from; naming it keeps a valid edit from being refused as stale.
+      let renderVersion = version;
+      if (pending && pending.documentId === documentId && Number.isInteger(pending.version) && pending.version > version && !textId && !wrapper && element.dataset.divletId) {
+        try {
+          const held = new DOMParser().parseFromString(pending.html, 'text/html').body.querySelectorAll('[data-divlet-id]');
+          const same = [...held].find(node => node.dataset.divletId === element.dataset.divletId);
+          if (same && same.textContent === original) renderVersion = pending.version;
+        } catch { /* an unreadable held render keeps the version the page shows */ }
+      }
+      send({ type: 'divlet:text-edit', nodeId: textId ?? element.dataset.divletId, content, renderVersion });
+    }
     else if (wrapper) element.replaceWith(...saved);
     else element.replaceChildren(...saved);
     if (pending) {

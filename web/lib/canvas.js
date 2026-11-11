@@ -976,7 +976,7 @@ function handlePreviewMessage(entry, data) {
     // Text typed into an instance becomes an override of that instance, never an edit of the component.
     emit('override-text', { documentId: data.documentId, instance: data.instance, address: data.address, content: data.content });
   } else if (data.type === 'divlet:text-edit' && typeof data.nodeId === 'string' && typeof data.content === 'string') {
-    edit(data.documentId, { type: 'text', id: data.nodeId, content: data.content }, { label: `edit text of ${data.nodeId}`, expectedRender: data.version }).catch(() => {});
+    edit(data.documentId, { type: 'text', id: data.nodeId, content: data.content }, { label: `edit text of ${data.nodeId}`, expectedRender: Number.isInteger(data.renderVersion) ? data.renderVersion : data.version }).catch(() => {});
   } else if (data.type === 'divlet:render-error' || data.type === 'divlet:error') {
     entry.awaitingVersion = 0;
     setFrameStatus(entry, 'error');
