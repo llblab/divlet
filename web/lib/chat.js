@@ -16,15 +16,31 @@ const unreadBadge = $('#agent-count');
 let unread = 0;
 let focusSeq = null;
 let followLatest = true;
+// An explicitly focused message stays in view through the layout changes that follow (the pane finishing its open/resize,
+// the composer settling) until the reader scrolls it away; it is the one place `scrollTop` is re-applied after a resize.
+let pinnedSeq = null, pinnedTop = 0;
 let readWidth = 0, readHeight = 0;
 const atBottom = () => list.scrollHeight - list.scrollTop - list.clientHeight < 40;
 const scrollToLatest = () => { if (followLatest && list.clientHeight) list.scrollTop = list.scrollHeight; };
+const revealPinned = () => {
+  const target = pinnedSeq === null ? null : [...list.querySelectorAll('[data-seq]')].find(node => node.dataset.seq === String(pinnedSeq));
+  if (!target || !list.clientHeight) return false;
+  followLatest = false;
+  target.scrollIntoView({ block: 'nearest' });
+  followLatest = atBottom();
+  pinnedTop = list.scrollTop;
+  return true;
+};
 list.addEventListener('scroll', () => {
   // A queued scroll from the old layout is not a reader leaving the bottom after the composer/status resizes.
-  if (list.clientHeight && list.clientWidth === readWidth && list.clientHeight === readHeight) followLatest = atBottom();
+  if (list.clientHeight && list.clientWidth === readWidth && list.clientHeight === readHeight) {
+    followLatest = atBottom();
+    if (pinnedSeq !== null && Math.abs(list.scrollTop - pinnedTop) > 1) pinnedSeq = null;
+  }
 }, { passive: true });
 new ResizeObserver(() => {
   readWidth = list.clientWidth; readHeight = list.clientHeight;
+  if (pinnedSeq !== null && revealPinned()) return;
   scrollToLatest();
 }).observe(list);
 
@@ -115,7 +131,7 @@ function paintUnread() {
 /** A new request or answer arrived: unseen answers are counted on the Agent tab until it is opened. */
 export function note(change) {
   if (!isChat(change)) return;
-  if (change.kind === 'ask') followLatest = true;
+  if (change.kind === 'ask') { followLatest = true; pinnedSeq = null; }
   if (change.kind === 'reply' && !sidebar.isOpen('agent')) { unread++; paintUnread(); }
   render();
 }
@@ -128,7 +144,7 @@ export function render() {
   if (focusSeq !== null) {
     const target = [...list.querySelectorAll('[data-seq]')].find(node => node.dataset.seq === String(focusSeq));
     focusSeq = null;
-    if (target) { followLatest = false; target.scrollIntoView({ block: 'nearest' }); followLatest = atBottom(); target.classList.add('flash'); setTimeout(() => target.classList.remove('flash'), 1200); return; }
+    if (target) { pinnedSeq = Number(target.dataset.seq); revealPinned(); target.classList.add('flash'); setTimeout(() => target.classList.remove('flash'), 1200); return; }
   }
   if (followLatest) scrollToLatest();
   else if (list.clientHeight) list.scrollTop = top;
