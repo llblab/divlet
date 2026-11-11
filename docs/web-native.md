@@ -82,6 +82,10 @@ Disabling a plugin for a dependent project is an explicit, validated conversion:
 
 Core model, validation and generic registries depend on public capability contracts, not concrete plugin implementations. Composition code selects and registers built-in or optional providers. An importer is not required to read an existing native project. A plugin cannot widen the core's executable-content policy or bypass its transaction and filesystem boundaries.
 
+## Browser-host portability investigation
+
+A shared semantic kernel with explicit browser/Node hosts is a proposed extension of these boundaries, not an alternative model or a second validation implementation. See [browser runtime exploration](browser-runtime.md) for current Node dependencies, offline/demo modes, Service Worker scope and WebMCP/bridge distinctions. The investigation does not move connected accepted-state authority into an untrusted client, make arbitrary scripts part of the project profile, or establish a new format/release gate.
+
 ## Stabilization boundary
 
 This architectural contract leaves persisted field names, dependency profiles, override-conflict algorithms and migration APIs to the [approved format profile](format.md#approved-first-release-profile). That profile is approved for implementation, not already delivered or frozen; its compatibility decisions still require implementation evidence and final freeze approval. The wire schema version, content revisions and rendering dependencies are separate concerns; a stable JSON shape alone does not guarantee a stable rendering environment.

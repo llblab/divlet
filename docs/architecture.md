@@ -4,6 +4,8 @@ divlet is a local browser board for agents. A **project** is one `<name>.divlet`
 
 This guide describes the current implementation. The accepted [web-native core contract](web-native.md) owns the target architecture; [BACKLOG.md](../BACKLOG.md) tracks the gaps. In particular, the existing provider registry and style-engine seam do not yet establish complete plugin independence.
 
+A browser-hosted/offline editor is not implemented: current startup depends on the Node HTTP/SSE host. The [browser runtime investigation](browser-runtime.md) separates a proposed shared semantic kernel, host persistence, static demonstration and browser-agent connectivity without changing that current ownership contract.
+
 ## Layout
 
 ```text
