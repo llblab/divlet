@@ -5,7 +5,7 @@
 import { isDeepStrictEqual } from 'node:util';
 import type { Artboard, DocumentModel, Node, NodeId } from './model.ts';
 
-const PATCH_KEYS = ['name', 'artboard', 'rootId', 'tokens', 'css', 'metadata', 'nodes'] as const;
+const PATCH_KEYS = ['name', 'head', 'artboard', 'rootId', 'tokens', 'css', 'metadata', 'nodes'] as const;
 const plain = (value: unknown): value is Record<string, any> => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 /** A patch in divlet's merge semantics: objects merge, arrays replace, null removes. */
@@ -37,7 +37,7 @@ export function matchesPatch(current: unknown, expected: unknown, change: unknow
 export function diffDocuments(from: DocumentModel, to: DocumentModel): ValuePatch {
   const patch: ValuePatch = {};
   for (const key of PATCH_KEYS) {
-    const change = diffValue(from[key], to[key]);
+    const change = key === 'head' && Object.hasOwn(from, key) && !Object.hasOwn(to, key) ? null : diffValue(from[key], to[key]);
     if (change !== undefined) patch[key] = change;
   }
   return patch;
@@ -63,7 +63,7 @@ export interface ChangeSummary {
  */
 export function summarizeChange(from: DocumentModel | null | undefined, to: DocumentModel | null | undefined): ChangeSummary {
   const fields: string[] = [];
-  for (const key of ['name', 'artboard', 'rootId', 'tokens', 'css', 'metadata'] as const) if (!isDeepStrictEqual((from as any)?.[key], (to as any)?.[key])) fields.push(key);
+  for (const key of ['name', 'head', 'artboard', 'rootId', 'tokens', 'css', 'metadata'] as const) if (!isDeepStrictEqual((from as any)?.[key], (to as any)?.[key])) fields.push(key);
   const added: NodeId[] = [];
   const removed: NodeId[] = [];
   const changed: Record<NodeId, string[]> = {};
@@ -94,7 +94,7 @@ export function summarizeChange(from: DocumentModel | null | undefined, to: Docu
     const keys = [...new Set(ids.flatMap(id => changed[id] ?? []))];
     parts.push(ids.length === 1 ? `${ids[0]}: ${keys.join(', ')}` : `${ids.length} nodes: ${keys.join(', ')}`);
   }
-  for (const key of ['tokens', 'css', 'metadata'] as const) if (fields.includes(key)) parts.push(key);
+  for (const key of ['head', 'tokens', 'css', 'metadata'] as const) if (fields.includes(key)) parts.push(key);
   return { fields, artboard, nodes: { added, removed, changed }, touched: count, text: parts.join(' · ') || 'no change' };
 }
 

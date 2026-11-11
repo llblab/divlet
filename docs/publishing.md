@@ -38,7 +38,7 @@ Both packages require Node.js 22.19 or later. Pi is not required for the product
 - Inspect `npm pack --dry-run --json` at the root and `npm pack --dry-run --json ./packages/pi-divlet` for intended files and metadata. `prepack` builds `dist/`; never publish with `--ignore-scripts` unless the exact build has been prepared and independently verified. The release smoke check installs local tarballs, not a package fetched by its unpublished name.
 - Check the npm registry again immediately before publication: `npm view divlet version --registry=https://registry.npmjs.org/` and the same for `pi-divlet`. An `E404` means no public package is visible, not that the name is reserved or guaranteed claimable. An unexpected existing package requires an ownership decision, never an automatic overwrite or rename.
 - The maintainer must have an npm account entitled to both names and satisfy npm's current authentication/2FA policy. Do not add a token to the repository. Authentication and publication are maintainer-controlled external steps; no automatic npm publish workflow is configured here.
-- The GitHub origin is `git@github.com:llblab/divlet.git`. Its presence proves local configuration, not push access or that Pages is enabled. Package repository, homepage and issue links point at this repository; a live landing-page URL is not assumed.
+- The GitHub origin is `git@github.com:llblab/divlet.git`. Its presence proves local configuration, not push access or that Pages is enabled. Package repository and issue links identify this repository; a configured Pages homepage is not proof of a live deployment.
 
 ## First-publication sequence
 
@@ -68,4 +68,4 @@ Only after explicit authorization, from the frozen and validated checkout:
 
 npm package publication is not atomic across the two names. If the product succeeds but the wrapper fails, retain that truthful partial state and resume with the wrapper; do not republish or unpublish the product to make the steps look atomic. A defective published version needs a new version and corresponding wrapper dependency, not an attempt to overwrite immutable package bytes.
 
-The static landing page is a separate delivery surface. Its workflow publishes only when the folder fingerprint changes, and GitHub Pages must serve the `gh-pages` branch root. npm publication does not itself enable Pages or authorize deployment.
+The static landing page is a separate delivery surface. Its workflow verifies the native example's prepared cache and publishes only when the public-file fingerprint changes, and GitHub Pages must serve the `gh-pages` branch root. npm publication does not itself enable Pages or authorize deployment.

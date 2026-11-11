@@ -57,7 +57,7 @@
   ],
   "scripts": {
     "start": "node ./adapters/cli/index.js",
-    "demo": "node ./adapters/cli/index.js --cwd ./examples",
+    "demo": "node ./adapters/cli/index.js ./examples/landing.divlet",
     "demo:site": "node ./adapters/cli/index.js --cwd ./examples/site",
     "demo:pen": "node ./adapters/cli/index.js ./examples/pen/field-notes.pen",
     "pretest": "tsc --noEmit",
@@ -75,7 +75,7 @@
     "test:controls": "node core/tests/browser/selection-completion.mjs && node core/tests/browser/size-editor.mjs && node core/tests/browser/controls.mjs",
     "test:settings": "node core/tests/browser/settings.mjs",
     "test:defaults": "node core/tests/browser/native-default.mjs",
-    "test:browser:all": "node core/tests/browser/run.mjs && node core/tests/browser/responsive.mjs && node core/tests/browser/layout-wrap.mjs && node core/tests/browser/site.mjs && node core/tests/browser/fullscreen.mjs && node core/tests/browser/settings.mjs && node core/tests/browser/interact.mjs && node core/tests/browser/selection-completion.mjs && node core/tests/browser/size-editor.mjs && node core/tests/browser/controls.mjs && node core/tests/browser/features.mjs && node core/tests/browser/chat.mjs && node core/tests/browser/spacing.mjs && node core/tests/browser/toolbars.mjs && node core/tests/browser/appearance.mjs && node core/tests/browser/reimport.mjs && node core/tests/browser/chrome.mjs && node core/tests/browser/fluid.mjs && node core/tests/browser/snapshots.mjs && node core/tests/browser/launcher.mjs && node core/tests/browser/launcher-errors.mjs && node core/tests/browser/native-collections.mjs && node core/tests/browser/projects.mjs && node core/tests/browser/security.mjs && node core/tests/browser/static.mjs && node core/tests/browser/native-default.mjs",
+    "test:browser:all": "node core/tests/browser/run.mjs && node core/tests/browser/responsive.mjs && node core/tests/browser/layout-wrap.mjs && node core/tests/browser/site.mjs && node core/tests/browser/fullscreen.mjs && node core/tests/browser/settings.mjs && node core/tests/browser/interact.mjs && node core/tests/browser/selection-completion.mjs && node core/tests/browser/size-editor.mjs && node core/tests/browser/controls.mjs && node core/tests/browser/features.mjs && node core/tests/browser/chat.mjs && node core/tests/browser/spacing.mjs && node core/tests/browser/toolbars.mjs && node core/tests/browser/appearance.mjs && node core/tests/browser/reimport.mjs && node core/tests/browser/chrome.mjs && node core/tests/browser/fluid.mjs && node core/tests/browser/snapshots.mjs && node core/tests/browser/launcher.mjs && node core/tests/browser/launcher-errors.mjs && node core/tests/browser/native-collections.mjs && node core/tests/browser/projects.mjs && node core/tests/browser/security.mjs && node core/tests/browser/static.mjs && node core/tests/browser/native-default.mjs && node core/tests/browser/landing.mjs",
     "test:features": "node core/tests/browser/features.mjs",
     "test:chat": "node core/tests/browser/chat.mjs",
     "test:spacing": "node core/tests/browser/spacing.mjs",
@@ -97,6 +97,9 @@
     "test:contract": "node --test core/tests/contract.test.js",
     "typecheck": "tsc --noEmit",
     "landing:hash": "node scripts/landing-hash.mjs",
+    "landing:build": "node scripts/landing-build.mjs",
+    "landing:check": "node scripts/landing-build.mjs --check",
+    "test:landing": "node core/tests/browser/landing.mjs",
     "build": "node scripts/build.mjs",
     "prepack": "npm run build"
   },

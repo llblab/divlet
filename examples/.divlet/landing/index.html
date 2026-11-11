@@ -1,0 +1,383 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>divlet — a layout board for agents</title>
+<meta name="description" content="divlet is a local browser layout board for coding agents: one project file, live frames of real HTML styled with Tailwind, reusable components, and the same tools through Pi or MCP."><link rel="icon" href="_assets/6d93c1a5fbb2c0e8010d-favicon.svg"><style>@layer theme, base, components, utilities;
+@layer components {
+/* Authored in examples/landing.divlet; this stylesheet travels with its frame. */
+:root {
+  color-scheme: light dark;
+  --paper: #f7f5f1;
+  --ink: #17161a;
+  --muted: #5f5b57;
+  --faint: #8d8781;
+  --hair: #e2ddd5;
+  --panel: #fffefc;
+  --accent: #5b5bf0;
+  --accent-ink: #4646d8;
+  --accent-soft: #ebebfd;
+  --code: #2a2740;
+  --code-ink: #ece9ff;
+  --green: #123524;
+  --gold: #d7b474;
+  --shadow: 0 12px 28px -18px rgba(23, 22, 26, .45);
+  --radius: 18px;
+  --radius-inner: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #14131a;
+    --ink: #f1eef7;
+    --muted: #a9a4b3;
+    --faint: #7d7887;
+    --hair: #2b2833;
+    --panel: #1b1a22;
+    --accent: #8e8eff;
+    --accent-ink: #a5a5ff;
+    --accent-soft: #262544;
+    --code: #100f16;
+    --code-ink: #dcd8ff;
+    --shadow: 0 18px 34px -22px rgba(0, 0, 0, .8);
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+main { width: min(940px, 100% - 40px); margin: 0 auto; padding: 28px 0 56px; overflow-wrap: anywhere; }
+h1, h2, h3 { letter-spacing: -.02em; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(30px, 5.4vw, 50px); font-weight: 660; }
+h2 { font-size: clamp(20px, 3vw, 26px); font-weight: 640; }
+h3 { font-size: 16px; font-weight: 640; }
+p { margin: 0; }
+code { font: .92em ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: inherit; }
+
+/* ---- top bar ------------------------------------------------------------------------------------ */
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 56px; }
+.mark { display: inline-flex; align-items: center; gap: 8px; font-weight: 640; letter-spacing: -.01em; text-decoration: none; }
+.mark svg { width: 24px; height: 24px; fill: none; color: var(--accent); stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.top nav { display: flex; flex-wrap: wrap; gap: 4px; }
+.top nav a { padding: 6px 10px; border-radius: 9px; color: var(--muted); font-size: 13.5px; text-decoration: none; }
+.top nav a:hover { background: var(--panel); color: var(--ink); box-shadow: var(--shadow); }
+
+/* ---- hero --------------------------------------------------------------------------------------- */
+.hero { display: grid; gap: 16px; max-width: 42em; }
+.eyebrow { color: var(--accent); font-size: 12.5px; font-weight: 640; letter-spacing: .1em; text-transform: uppercase; }
+.lede { color: var(--muted); font-size: clamp(15px, 1.9vw, 17.5px); }
+.cta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 8px; }
+.button { display: inline-flex; align-items: center; height: 42px; padding: 0 20px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 14.5px; font-weight: 620; text-decoration: none; }
+.button:hover { background: var(--accent-ink); }
+.quiet-link { color: var(--muted); font-size: 14px; text-decoration: none; border-bottom: 1px solid var(--hair); }
+.quiet-link:hover { color: var(--ink); border-color: var(--accent); }
+
+/* ---- the board: one live-looking frame and what it holds ---------------------------------------- */
+.board { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; margin: 64px 0; }
+.frame { border: 1px solid var(--hair); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); overflow: hidden; }
+.frame-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--hair); color: var(--faint); font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.frame-body { display: grid; gap: 12px; padding: 22px; background: var(--green); color: #f6f0e3; }
+.hero-line { font-size: clamp(19px, 2.6vw, 26px); font-weight: 660; line-height: 1.12; letter-spacing: -.03em; }
+.sub-line { color: #b9cdbd; font-size: 12.5px; line-height: 1.5; max-width: 30em; }
+.pill { justify-self: start; padding: 8px 14px; border-radius: 999px; background: var(--gold); color: #1d1b16; font-size: 12.5px; font-weight: 640; }
+.facts { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
+.facts li { display: grid; gap: 2px; }
+.facts b { font-size: 14px; font-weight: 640; }
+.facts span { color: var(--muted); font-size: 13.5px; }
+
+/* ---- steps -------------------------------------------------------------------------------------- */
+.how { margin: 64px 0; }
+.steps { display: grid; gap: 14px; margin: 22px 0 0; padding: 0; list-style: none; }
+.steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; align-items: start; }
+.step { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12.5px; font-weight: 660; }
+.steps b { font-size: 14.5px; }
+.steps p { color: var(--muted); font-size: 13.5px; }
+
+/* ---- formats ------------------------------------------------------------------------------------ */
+.formats { margin: 64px 0; }
+.prose { color: var(--muted); font-size: 14.5px; max-width: 44em; margin-top: 12px; }
+.prose.small { font-size: 13px; margin-top: 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.chips span { padding: 6px 12px; border: 1px solid var(--hair); border-radius: 999px; background: var(--panel); color: var(--muted); font-size: 12.5px; }
+.chips code { color: var(--ink); }
+
+/* ---- start -------------------------------------------------------------------------------------- */
+.start { margin: 64px 0 0; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 16px; margin-top: 20px; }
+.card { display: grid; gap: 8px; padding: 18px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); }
+.card p { color: var(--muted); font-size: 13.5px; }
+.card pre { margin: 4px 0 0; padding: 12px; border-radius: var(--radius-inner); background: var(--code); color: var(--code-ink); font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: auto; }
+
+footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--hair); color: var(--faint); font-size: 12.5px; }
+
+@media (max-width: 720px) {
+  .board { grid-template-columns: 1fr; }
+  .top { margin-bottom: 36px; }
+}
+
+}</style>
+<style>/*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */
+@layer theme, base, components, utilities;
+@layer theme {
+  :root, :host {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+      "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+      "Segoe UI Symbol", "Noto Color Emoji";
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+    --default-font-family: var(--font-sans);
+    --default-mono-font-family: var(--font-mono);
+  }
+}
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+  html, :host {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    tab-size: 4;
+    font-family: var(--default-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
+    font-feature-settings: var(--default-font-feature-settings, normal);
+    font-variation-settings: var(--default-font-variation-settings, normal);
+    -webkit-tap-highlight-color: transparent;
+  }
+  hr {
+    height: 0;
+    color: inherit;
+    border-top-width: 1px;
+  }
+  abbr:where([title]) {
+    -webkit-text-decoration: underline dotted;
+    text-decoration: underline dotted;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  a {
+    color: inherit;
+    -webkit-text-decoration: inherit;
+    text-decoration: inherit;
+  }
+  b, strong {
+    font-weight: bolder;
+  }
+  code, kbd, samp, pre {
+    font-family: var(--default-mono-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-feature-settings: var(--default-mono-font-feature-settings, normal);
+    font-variation-settings: var(--default-mono-font-variation-settings, normal);
+    font-size: 1em;
+  }
+  small {
+    font-size: 80%;
+  }
+  sub, sup {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+  }
+  sub {
+    bottom: -0.25em;
+  }
+  sup {
+    top: -0.5em;
+  }
+  table {
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+  :-moz-focusring:where(:not(iframe)) {
+    outline: auto;
+  }
+  progress {
+    vertical-align: baseline;
+  }
+  summary {
+    display: list-item;
+  }
+  ol, ul, menu {
+    list-style: none;
+  }
+  img, svg, video, canvas, audio, iframe, embed, object {
+    display: block;
+    vertical-align: middle;
+  }
+  img, video {
+    max-width: 100%;
+    height: auto;
+  }
+  button, input, select, optgroup, textarea, ::file-selector-button {
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    border-radius: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+  :where(select:is([multiple], [size])) optgroup {
+    font-weight: bolder;
+  }
+  :where(select:is([multiple], [size])) optgroup option {
+    padding-inline-start: 20px;
+  }
+  ::file-selector-button {
+    margin-inline-end: 4px;
+  }
+  ::placeholder {
+    opacity: 1;
+  }
+  @supports (not (-webkit-appearance: -apple-pay-button))  or (contain-intrinsic-size: 1px) {
+    ::placeholder {
+      color: currentcolor;
+      @supports (color: color-mix(in lab, red, red)) {
+        color: color-mix(in oklab, currentcolor 50%, transparent);
+      }
+    }
+  }
+  textarea {
+    resize: vertical;
+  }
+  ::-webkit-search-decoration {
+    -webkit-appearance: none;
+  }
+  ::-webkit-date-and-time-value {
+    min-height: 1lh;
+    text-align: inherit;
+  }
+  ::-webkit-datetime-edit {
+    display: inline-flex;
+  }
+  ::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+  ::-webkit-datetime-edit, ::-webkit-datetime-edit-year-field, ::-webkit-datetime-edit-month-field, ::-webkit-datetime-edit-day-field, ::-webkit-datetime-edit-hour-field, ::-webkit-datetime-edit-minute-field, ::-webkit-datetime-edit-second-field, ::-webkit-datetime-edit-millisecond-field, ::-webkit-datetime-edit-meridiem-field {
+    padding-block: 0;
+  }
+  ::-webkit-calendar-picker-indicator {
+    line-height: 1;
+  }
+  :-moz-ui-invalid {
+    box-shadow: none;
+  }
+  button, input:where([type="button"], [type="reset"], [type="submit"]), ::file-selector-button {
+    appearance: button;
+  }
+  ::-webkit-inner-spin-button, ::-webkit-outer-spin-button {
+    height: auto;
+  }
+  [hidden]:where(:not([hidden="until-found"])) {
+    display: none !important;
+  }
+}
+@layer utilities;
+</style>
+</head>
+<body><main data-divlet-id="top" id="top">
+  <header data-divlet-id="node-2" class="top">
+    <a data-divlet-id="node-4" href="#top" aria-label="divlet" class="mark">
+      <svg data-divlet-id="node-6" viewBox="0 0 20 20" aria-hidden="true"><path data-divlet-id="node-7" d="M8 4.5 2.5 10 8 15.5" fill="none"></path><path data-divlet-id="node-8" d="M10.5 4.5H12L17.5 10 12 15.5h-1.5Z" fill="currentColor" stroke="none"></path></svg>
+      <span data-divlet-id="node-10">divlet</span>
+    </a>
+    <nav data-divlet-id="node-14" aria-label="Sections">
+      <a data-divlet-id="node-16" href="#what">What it is</a>
+      <a data-divlet-id="node-19" href="#how">How it works</a>
+      <a data-divlet-id="node-22" href="#formats">Formats</a>
+      <a data-divlet-id="node-25" href="#start">Get it</a>
+    </nav>
+  </header>
+
+  <section data-divlet-id="node-30" class="hero">
+    <p data-divlet-id="node-32" class="eyebrow">A local board for agents</p>
+    <h1 data-divlet-id="node-35">Design in the browser.<br data-divlet-id="node-37">Change it in conversation.</h1>
+    <p data-divlet-id="node-40" class="lede">divlet gives a coding agent somewhere to work: frames of real HTML on a board you can see, styled with Tailwind
+      classes, built from reusable components and shared tokens. You watch it happen and ask for the next thing.</p>
+    <div data-divlet-id="node-43" class="cta">
+      <a data-divlet-id="node-45" href="#start" class="button">Run it locally</a>
+      <a data-divlet-id="node-48" href="#how" class="quiet-link">See how a change lands</a>
+    </div>
+  </section>
+
+  <section data-divlet-id="what" id="what" aria-label="What the board holds" class="board">
+    <div data-divlet-id="node-54" class="frame">
+      <div data-divlet-id="node-56" class="frame-bar"><span data-divlet-id="node-57">Landing</span><span data-divlet-id="node-59">1440 × 900</span></div>
+      <div data-divlet-id="node-62" class="frame-body">
+        <p data-divlet-id="node-64" class="hero-line">Make room for<br data-divlet-id="node-66">something new.</p>
+        <p data-divlet-id="node-69" class="sub-line">A button, a card, a whole page — live HTML, not a picture of it.</p>
+        <span data-divlet-id="node-72" class="pill">Start exploring</span>
+      </div>
+    </div>
+    <ul data-divlet-id="node-77" class="facts">
+      <li data-divlet-id="node-79"><b data-divlet-id="node-80">One project file</b><span data-divlet-id="node-82"><code data-divlet-id="node-83">project.divlet</code> holds every frame, component, token and the CSS that is shared.</span></li>
+      <li data-divlet-id="node-87"><b data-divlet-id="node-88">Real HTML</b><span data-divlet-id="node-90">What you see is the page: real markup rendered from the validated project, not a screenshot or a hidden app.</span></li>
+      <li data-divlet-id="node-93"><b data-divlet-id="node-94">Tailwind first</b><span data-divlet-id="node-96">Classes, not bespoke CSS. The inspector explains a class, suggests one, or sets a declaration for you.</span></li>
+      <li data-divlet-id="node-99"><b data-divlet-id="node-100">Undo means undo</b><span data-divlet-id="node-102">Every change is logged with who made it, what it touched, and reverts as one step.</span></li>
+    </ul>
+  </section>
+
+  <section data-divlet-id="how" id="how" class="how">
+    <h2 data-divlet-id="node-108">How a change lands</h2>
+    <ol data-divlet-id="node-111" class="steps">
+      <li data-divlet-id="node-113"><span data-divlet-id="node-114" class="step">1</span><div data-divlet-id="node-116"><b data-divlet-id="node-117">You point at something</b><p data-divlet-id="node-119">Select a frame or an element on the board and say what you want — “tighter hero, warmer card”.</p></div></li>
+      <li data-divlet-id="node-122"><span data-divlet-id="node-123" class="step">2</span><div data-divlet-id="node-125"><b data-divlet-id="node-126">The agent reads, then edits</b><p data-divlet-id="node-128">It reads the frame model, then changes structure with one operation and classes, text or components with another.</p></div></li>
+      <li data-divlet-id="node-131"><span data-divlet-id="node-132" class="step">3</span><div data-divlet-id="node-134"><b data-divlet-id="node-135">The board validates and shows it</b><p data-divlet-id="node-137">The change is checked against the format, versioned, rendered, saved and logged. Nothing half-applied, nothing lost.</p></div></li>
+      <li data-divlet-id="node-140"><span data-divlet-id="node-141" class="step">4</span><div data-divlet-id="node-143"><b data-divlet-id="node-144">You keep or undo it</b><p data-divlet-id="node-146">Undo reverts a whole accepted edit, including a drag you made yourself a minute ago.</p></div></li>
+    </ol>
+  </section>
+
+  <section data-divlet-id="formats" id="formats" class="formats">
+    <h2 data-divlet-id="node-152">Other formats come in, nothing gets locked in</h2>
+    <p data-divlet-id="node-155" class="prose">HTML pages come in through the native core; foreign formats such as PEN use importer plugins. Explicitly opening
+      a source creates or reuses a sibling project without rewriting it. Pages exported back out are plain, readable HTML.</p>
+    <div data-divlet-id="node-158" role="list" class="chips">
+      <span data-divlet-id="node-160" role="listitem"><code data-divlet-id="node-161">.pen</code> Pencil</span>
+      <span data-divlet-id="node-165" role="listitem"><code data-divlet-id="node-166">.html</code> static pages</span>
+      <span data-divlet-id="node-170" role="listitem"><code data-divlet-id="node-171">.divlet</code> native</span>
+      <span data-divlet-id="node-175" role="listitem">Markdown sites</span>
+    </div>
+  </section>
+
+  <section data-divlet-id="start" id="start" class="start">
+    <h2 data-divlet-id="node-181">Get divlet</h2>
+    <p data-divlet-id="node-184" class="prose">One npm package, <code data-divlet-id="node-186">divlet</code>, provides the board, CLI and MCP server. Requires Node.js 22.19 or later.
+      Version 0.0.1 is in preparation, not yet published; these npm commands become available after the first release.</p>
+    <div data-divlet-id="node-190" class="cards">
+      <div data-divlet-id="node-192" class="card">
+        <h3 data-divlet-id="node-194">Open a local board</h3>
+        <p data-divlet-id="node-197">No agent host required. Run the <code data-divlet-id="node-199">divlet</code> command from the package of the same name.</p>
+        <pre data-divlet-id="node-203"><code data-divlet-id="node-204">npx -y divlet ./my-project</code></pre>
+      </div>
+      <div data-divlet-id="node-208" class="card">
+        <h3 data-divlet-id="node-210">From Pi</h3>
+        <p data-divlet-id="node-213">Install <code data-divlet-id="node-215">pi-divlet</code>, the thin Pi extension that depends on <code data-divlet-id="node-218">divlet</code>, once both are published.</p>
+        <pre data-divlet-id="node-222"><code data-divlet-id="node-223">pi install npm:pi-divlet</code></pre>
+        <p data-divlet-id="node-226">Then run <code data-divlet-id="node-228">/divlet ./my-project</code> in Pi for the board, tools and bundled skill.</p>
+      </div>
+      <div data-divlet-id="node-233" class="card">
+        <h3 data-divlet-id="node-235">From anything that speaks MCP</h3>
+        <p data-divlet-id="node-238">Configure your MCP host to start this stdio server. <code data-divlet-id="node-240">divlet-mcp</code> is a command inside <code data-divlet-id="node-243">divlet</code>, not a separate package. No Pi required.</p>
+        <pre data-divlet-id="node-247"><code data-divlet-id="node-248">npx -y --package=divlet divlet-mcp --cwd ./my-project</code></pre>
+      </div>
+    </div>
+    <p data-divlet-id="node-253" class="prose small">Local first: the board binds to loopback, the project is a file in your folder, and nothing is uploaded.
+      Frames, components and shared tokens live in <code data-divlet-id="node-255">project.divlet</code>; generated pages live under <code data-divlet-id="node-258">.divlet/</code> beside it.</p>
+  </section>
+
+  <footer data-divlet-id="node-263">
+    <span data-divlet-id="node-265">divlet · MIT</span>
+    <span data-divlet-id="node-268">A browser board, not a service.</span>
+  </footer>
+</main>
+</body></html>

@@ -1,67 +1,68 @@
-// The landing folder and its fingerprint. One module owns both questions the workflow asks — "what gets published" and "is that
-// already live" — so the set of published files cannot drift from the set that was hashed.
-//
-//   node scripts/landing-hash.mjs                 the hash
-//   node scripts/landing-hash.mjs --json          the hash, the file list and the folder
-//   node scripts/landing-hash.mjs --copy <dir>    write the published files into <dir> (and print the hash)
+// One owner of the Pages public set, its fingerprint and its byte-for-byte publication copy.
 import { createHash } from 'node:crypto';
-import { copyFile, mkdir, readdir, readFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
+import { isDeepStrictEqual } from 'node:util';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { OutputStore, safeDirectory } from '../core/lib/output.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-/** Written for whoever edits the page; it is not part of the site. */
-const NOT_PUBLISHED = new Set(['README.md']);
+export const landingSource = path.join(root, 'examples/landing.divlet');
+export const landingDirectory = path.join(root, 'examples/.divlet/landing');
+const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 
-/** The files of the landing folder that are published, as sorted relative paths with forward slashes. */
-export async function landingFiles(directory = path.join(root, 'landing')) {
-  const walk = async current => {
-    const entries = await readdir(current, { withFileTypes: true });
-    const files = [];
-    for (const entry of entries) {
-      if (entry.name.startsWith('.')) continue;
-      const full = path.join(current, entry.name);
-      if (entry.isDirectory()) files.push(...await walk(full));
-      else files.push(full);
-    }
-    return files;
-  };
-  return (await walk(directory))
-    .map(file => path.relative(directory, file).split(path.sep).join('/'))
-    .filter(name => !NOT_PUBLISHED.has(name))
-    .sort();
+/** The landing is one page plus portable assets, never sidecars, ownership data or unowned directory debris. */
+export const publicLandingFile = name => name === 'index.html' || /^_assets\/[a-z0-9_-][a-z0-9_.-]*\.(?:svg|png|jpe?g|gif|webp|avif|ico|css|woff2?|ttf|otf)$/i.test(name);
+
+async function publicEntries(directory) {
+  directory = path.resolve(directory);
+  const store = new OutputStore(path.resolve(directory, '../../landing.divlet'));
+  if (store.directory !== directory) throw new Error('Expected the managed .divlet/landing directory.');
+  const manifest = await store.manifest();
+  const names = Object.keys(manifest.files).filter(publicLandingFile).sort();
+  if (!names.includes('index.html')) throw new Error('Landing cache is missing: run npm run landing:build.');
+  // Pages otherwise runs Jekyll, which omits the generated _assets directory. This is publication metadata, not a second page.
+  const entries = [['.nojekyll', Buffer.alloc(0)]];
+  for (const name of names) {
+    const bytes = await store.read(name);
+    if (!bytes || digest(bytes) !== manifest.files[name]) throw new Error(`Landing cache changed or was hand-edited: ${name}. Rebuild it through its owner.`);
+    entries.push([name, bytes]);
+  }
+  if (!isDeepStrictEqual(await store.manifest(), manifest)) throw new Error('Landing cache changed while it was being read. Retry after the owner finishes.');
+  return entries;
 }
 
-/** `sha256` over `path\0bytes` for every published file, in sorted order: the same on any machine. */
-export async function landingHash(directory = path.join(root, 'landing')) {
-  const digest = createHash('sha256');
-  for (const name of await landingFiles(directory)) {
-    digest.update(name).update('\0');
-    digest.update(await readFile(path.join(directory, name))).update('\0');
+const fingerprint = entries => {
+  const hash = createHash('sha256');
+  for (const [name, bytes] of entries) hash.update(name).update('\0').update(bytes).update('\0');
+  return hash.digest('hex');
+};
+async function copyEntries(entries, target) {
+  await safeDirectory(path.resolve(target), { create: true });
+  for (const [name, bytes] of entries) {
+    const destination = path.resolve(target, name);
+    await safeDirectory(path.dirname(destination), { create: true });
+    await writeFile(destination, bytes, { flag: 'wx' });
   }
-  return digest.digest('hex');
 }
 
-/** Copy the published files into `target`, keeping their relative paths. */
-export async function copyLanding(target, directory = path.join(root, 'landing')) {
-  for (const name of await landingFiles(directory)) {
-    const destination = path.join(target, name);
-    await mkdir(path.dirname(destination), { recursive: true });
-    await copyFile(path.join(directory, name), destination);
-  }
-  return landingFiles(directory);
+export async function landingFiles(directory = landingDirectory) { return (await publicEntries(directory)).map(([name]) => name); }
+export async function landingHash(directory = landingDirectory) { return fingerprint(await publicEntries(directory)); }
+export async function copyLanding(target, directory = landingDirectory) {
+  const entries = await publicEntries(directory);
+  await copyEntries(entries, target);
+  return entries.map(([name]) => name);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const directory = path.join(root, 'landing');
-  const hash = await landingHash(directory);
+  const entries = await publicEntries(landingDirectory), hash = fingerprint(entries);
   const copy = process.argv.indexOf('--copy');
   if (copy >= 0) {
     const target = process.argv[copy + 1];
-    if (!target) throw new Error('--copy needs a target directory');
-    const files = await copyLanding(path.resolve(target), directory);
-    console.error(`published ${files.length} file(s) to ${path.resolve(target)}`);
+    if (!target || target.startsWith('--')) throw new Error('--copy needs a target directory');
+    await copyEntries(entries, path.resolve(target));
+    console.error(`prepared ${entries.length} public file(s) in ${path.resolve(target)}`);
   }
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ directory: path.relative(root, directory), files: await landingFiles(directory), hash }, null, 2));
+  if (process.argv.includes('--json')) console.log(JSON.stringify({ directory: path.relative(root, landingDirectory), files: entries.map(([name]) => name), hash }, null, 2));
   else console.log(hash);
 }

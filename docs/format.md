@@ -67,7 +67,11 @@ Project and frame names share the same character, length and LF-normalization ru
 
 ## Frame document
 
-A stored frame has `{ id, name, version, artboard, rootId, tokens, css, metadata, nodes }`. `id`, `name`, `version`, `artboard`, `rootId` and `nodes` are required. Tokens, CSS and metadata default as in the project. Frame names pass the same well-formed-string and line-ending normalization as project names.
+A stored frame has `{ id, name, head?, version, artboard, rootId, tokens, css, metadata, nodes }`. `id`, `name`, `version`, `artboard`, `rootId` and `nodes` are required. Tokens, CSS and metadata default as in the project. Frame names pass the same well-formed-string and line-ending normalization as project names.
+
+The optional `head` object is an explicit additive field in the working draft, not interpreted metadata. It admits only `description` (a well-formed string of at most 2048 UTF-16 code units) and `icon` (a well-formed URL string of at most 8192 units, subject to the same executable-scheme refusal as ordinary resource attributes). Unknown fields, null stored values and nonstrings are refused. Absent head stays absent; an explicitly empty object remains distinguishable in the native preview manifest. Frame patches merge it and permit null removal of a member or the whole object. The title remains `name`; the document language remains `en`. No arbitrary head tags, scripts, MIME/sizes hints or executable metadata are admitted.
+
+The codec emits supported description/icon fields into the real HTML head, safely escaped, and refuses duplicate or conflicting supported physical values. Strict decoding refuses unsupported icon attributes rather than discarding them; lossy external HTML admission can normalize them to the supported URL-only profile. Icons join the ordinary resource graph for static bundling and source-relative project copies; this does not add general external/absolute-resource relocation to Save a copy. Existing inputs gain no head field or changed meaning, and schema-3 migration must retain an explicitly authored head and its resource base.
 
 Identifiers match `[A-Za-z][A-Za-z0-9_.:-]{0,95}`: 1–96 ASCII characters, starting with a letter. A frame ID is unique in its project. A node ID is unique in its frame; another frame may use the same node ID. Every node map key must equal that node's `id`. Reserved safe-JSON object member names are not usable node-map keys, even when they match the identifier grammar; a frame ID is a string value rather than such a key.
 

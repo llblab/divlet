@@ -30,7 +30,7 @@ npm start -- /absolute/path/to/workspace
 
 Open the URL printed in the terminal. An empty workspace gets `project.divlet` with a starter artboard; an existing project opens directly, and a folder with several projects opens the launcher.
 
-To explore the bundled projects, use `npm run demo`, `npm run demo:pen` or `npm run demo:site`. The [PEN example](examples/pen/README.md) includes reusable components, variables and a local SVG.
+`npm run demo` opens the real onboarding page, [examples/landing.divlet](examples/landing.divlet). Its tracked, derived cache supplies GitHub Pages; see [editing and rebuilding the landing](examples/README.md). `npm run demo:pen` and `npm run demo:site` retain the importer and Markdown-site scenarios.
 
 **First moves:** `V` selects, `P` lets the page behave normally, `L` opens Layers and `H` opens History. `Ctrl K` finds commands; `?` shows shortcuts. See the [board guide](docs/board.md) for direct editing, the inspector and touch controls.
 

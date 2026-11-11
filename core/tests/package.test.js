@@ -59,6 +59,9 @@ test('the npm package includes public entrypoints and a complete documentation l
     }
   }
   for (const source of [
+    'examples/README.md',
+    'examples/landing.divlet',
+    'examples/assets/landing/favicon.svg',
     'examples/pen/field-notes.pen',
     'examples/pen/assets/field.svg',
     'examples/pen/README.md',

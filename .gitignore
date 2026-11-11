@@ -3,5 +3,14 @@ coverage/
 *.log
 artifacts/
 .divlet/
+!examples/.divlet/
+examples/.divlet/*
+!examples/.divlet/landing/
+examples/.divlet/landing/*
+!examples/.divlet/landing/index.html
+!examples/.divlet/landing/index.meta.json
+!examples/.divlet/landing/.divlet-build.json
+!examples/.divlet/landing/_assets/
+examples/.divlet/landing/_assets/.*
 .divlet-upload-*/
 dist/

@@ -1,14 +1,22 @@
-# Publish landing/ to GitHub Pages, and only when it changed.
+# Copy the prepared examples/.divlet/landing public artifact to GitHub Pages only when its bytes changed.
 #
-# The published site is the root of the `gh-pages` branch: this folder's files, plus `.landing-hash` — the fingerprint of exactly
-# those files. If that line already matches what `scripts/landing-hash.mjs` says today, the workflow stops without a commit, so a
+# The branch root holds the module's explicit public set (including .nojekyll), plus .landing-hash — its byte fingerprint. If that line already matches what `scripts/landing-hash.mjs` says today, the workflow stops without a commit, so a
 # push that does not touch the page cannot rewrite it. Serve Pages from the `gh-pages` branch root (Settings → Pages).
 name: Landing
 
 on:
   push:
     branches: [main]
-    paths: ['landing/**', 'scripts/landing-hash.mjs', '.github/workflows/landing.yml']
+    paths:
+      - 'examples/landing.divlet'
+      - 'examples/assets/landing/**'
+      - 'examples/.divlet/landing/**'
+      - 'scripts/landing-*.mjs'
+      - 'core/lib/**'
+      - 'plugins/tailwind/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/landing.yml'
   workflow_dispatch:
 
 permissions:
@@ -30,8 +38,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
-      - name: Fingerprint the landing folder
+      - name: Install validation dependencies
+        run: npm ci --legacy-peer-deps --ignore-scripts
+
+      - name: Verify the prepared cache against its project
+        # Validation regenerates only in a sandbox; publication never builds or patches a second page.
+        run: npm run landing:check
+
+      - name: Fingerprint the prepared public files
         id: landing
         run: echo "hash=$(node scripts/landing-hash.mjs)" >> "$GITHUB_OUTPUT"
 
@@ -56,8 +72,9 @@ jobs:
           set -euo pipefail
           workspace="$(mktemp -d)"
           # The same module that hashed the folder decides what gets published.
-          node scripts/landing-hash.mjs --copy "$workspace" > /dev/null
-          echo "${{ steps.landing.outputs.hash }}" > "$workspace/.landing-hash"
+          copied_hash="$(node scripts/landing-hash.mjs --copy "$workspace")"
+          test "$copied_hash" = "${{ steps.landing.outputs.hash }}"
+          echo "$copied_hash" > "$workspace/.landing-hash"
           cd "$workspace"
           git init --quiet --initial-branch=gh-pages
           git config user.name 'github-actions[bot]'

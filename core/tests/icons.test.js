@@ -34,7 +34,7 @@ test('each distinct icon paint is one element, and alpha never sits on a part', 
 
 test('the divlet mark keeps an open bracket and a filled D with matching diagonals across every product surface', async () => {
   const mark = (await readIcons()).find(icon => icon.name === 'divlet').markup;
-  const paths = markup => [...markup.matchAll(/<path\b([^>]+)>/g)].map(([, attrs]) => Object.fromEntries([...attrs.matchAll(/([\w-]+)="([^"]*)"/g)].map(([, key, value]) => [key, value])));
+  const paths = markup => [...markup.matchAll(/<path\b([^>]+)>/g)].map(([, attrs]) => Object.fromEntries([...attrs.matchAll(/([\w-]+)="([^"]*)"/g)].filter(([, key]) => !key.startsWith('data-divlet-')).map(([, key, value]) => [key, value])));
   const wanted = [
     { d: 'M8 4.5 2.5 10 8 15.5', fill: 'none' },
     { d: 'M10.5 4.5H12L17.5 10 12 15.5h-1.5Z', fill: 'currentColor', stroke: 'none' },
@@ -43,7 +43,7 @@ test('the divlet mark keeps an open bracket and a filled D with matching diagona
   // Both bracket arms and D diagonals have a 1:1 rise/run, meeting on the same horizontal centre.
   const [bracket, wedge] = paths(mark).map(part => part.d.match(/-?\d+(?:\.\d+)?/g).map(Number));
   assert.equal(Math.abs((bracket[1] - bracket[3]) / (bracket[0] - bracket[2])), Math.abs((wedge[4] - wedge[1]) / (wedge[3] - wedge[2])));
-  for (const file of ['web/index.html', 'core/lib/hub.ts', 'landing/index.html', 'landing/favicon.svg']) {
+  for (const file of ['web/index.html', 'core/lib/hub.ts', 'examples/.divlet/landing/index.html', 'examples/assets/landing/favicon.svg', 'examples/site/handbook/assets/divlet-mark.svg']) {
     const source = await readFile(path.join(root, file), 'utf8');
     const svg = source.match(/<svg\b[^>]*>[\s\S]*?<\/svg>/)?.[0];
     assert.ok(svg, `${file}: literal mark exists`);

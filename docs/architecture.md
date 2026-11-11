@@ -70,13 +70,13 @@ The **skill** (`skills/divlet/SKILL.md`) is the same product surface for a human
 
 ## The landing page
 
-`landing/` is a static page for GitHub Pages, and a repository artifact: it is not part of the npm package and the product never
-reads it. It is self-contained by rule — no scripts, no remote fonts, images or stylesheets — because nothing else is published
-with it. `.github/workflows/landing.yml` fingerprints the folder with `scripts/landing-hash.mjs`, compares that with the
-`.landing-hash` file at the root of the `gh-pages` branch, and publishes only when they differ: the published branch holds exactly
-the files the hash covered (the same module answers "what ships" and "did it change"), so a commit that never touched the page
-cannot rewrite it. Publishing needs a GitHub remote and Pages configured to serve `gh-pages`. This checkout has an origin;
-that does not prove the remote is synchronized or Pages is enabled. npm publication is separate (see [npm publication](publishing.md)).
+`examples/landing.divlet` is the canonical onboarding page, with one English `index` frame. Its text, layout and inline SVG are ordinary editable nodes; optional typed frame `head` data preserves the description/favicon without interpreting inert metadata. The project and authored `examples/assets/landing/` resources ship as an example, but the product never imports a marketing tree from that folder. `npm run demo` opens it; new-workspace template initialization is separate remaining work.
+
+The narrowly tracked `examples/.divlet/landing/` build is derived through normal validation/output ownership, with portable provenance and no tracked locks or recovery state. `scripts/landing-build.mjs` attaches to any existing owner; its check mode snapshots inputs and owned output into a relocated sandbox, regenerates there and compares the complete owned cache without editing the original. A stale build or unresolved hand edit fails rather than being silently published. Rendering remains self-contained: no scripts or remote font/image/stylesheet dependencies.
+
+`scripts/landing-hash.mjs` alone owns the public set and its fingerprint: owned `index.html` and eligible portable `_assets/` files, plus an empty `.nojekyll` marker required by Pages. It validates public bytes against output provenance and excludes sidecars, manifests, locks, trash and unowned files. The copy command prints the fingerprint of the exact byte snapshot it copied. `.github/workflows/landing.yml` verifies freshness, compares that hash with `.landing-hash` on `gh-pages`, and copies prepared public output only when different. It neither authors nor patches a second HTML page; metadata-only changes with identical public bytes create no deployment commit.
+
+See [editable examples](../examples/README.md) for commands and file sets. Publishing requires separately authorized remote access and Pages configured for the `gh-pages` root. A configured origin/homepage does not prove synchronization or a live deployment; npm publication is separate (see [npm publication](publishing.md)).
 
 ## Project ownership
 

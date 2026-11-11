@@ -9,7 +9,7 @@
 import { parse, parseFragment } from 'parse5';
 import postcss from 'postcss';
 import { serializeDeclarations } from './declarations.ts';
-import { validateDocument, DivletError, VOID_TAGS, LIMITS, documentLimits, supportsTag } from './model.ts';
+import { validateDocument, validateHead, DivletError, VOID_TAGS, LIMITS, documentLimits, supportsTag } from './model.ts';
 import type { DocumentModel, ElementNode, Limits, Node, NodeId } from './model.ts';
 
 /** A node of the parse5 tree, as this codec needs to read it. */
@@ -65,6 +65,10 @@ function need(doc: DocumentModel, id: NodeId): Node {
   return node;
 }
 
+function renderHead(doc: DocumentModel): string {
+  return (doc.head?.description !== undefined ? `<meta name="description" content="${escapeAttribute(doc.head.description)}">` : '') + (doc.head?.icon !== undefined ? `<link rel="icon" href="${escapeAttribute(doc.head.icon)}">` : '');
+}
+
 export function encodeHtml(input: unknown, { compiledCss = '', parts, instances, limits = LIMITS }: EncodeOptions = {}): string {
   const doc = validateDocument(input, { limits });
   const nodeMetadata: Record<NodeId, Record<string, unknown>> = {};
@@ -73,7 +77,7 @@ export function encodeHtml(input: unknown, { compiledCss = '', parts, instances,
     if (Object.keys(node.metadata).length) nodeMetadata[node.id] = node.metadata;
     if (node.type === 'element' && node.tag === 'textarea' && node.children.length) textIds[node.id] = node.children[0] as NodeId;
   }
-  const manifest = { schemaVersion: 1, id: doc.id, name: doc.name, version: doc.version, artboard: doc.artboard, metadata: doc.metadata, nodeMetadata, textIds };
+  const manifest = { schemaVersion: 1, id: doc.id, name: doc.name, version: doc.version, artboard: doc.artboard, ...(doc.head !== undefined ? { head: doc.head } : {}), metadata: doc.metadata, nodeMetadata, textIds };
   function render(id: NodeId): string {
     const node = need(doc, id);
     if (node.type === 'text') return `<!--divlet:text:${id}-->${escapeText(node.content)}<!--/divlet:text:${id}-->`;
@@ -100,7 +104,7 @@ export function encodeHtml(input: unknown, { compiledCss = '', parts, instances,
   }
   if (typeof compiledCss !== 'string' || /<\/style/i.test(compiledCss)) error('Invalid compiled stylesheet');
   const tokens = Object.entries(doc.tokens).map(([name, value]) => `${name}:${value};`).join('');
-  return `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeText(doc.name)}</title><script id="${META_ID}" type="application/json">${jsonText(manifest)}</script><style data-divlet-tokens>:root{${tokens}}</style><style data-divlet-custom>${layered(doc.css)}</style>${compiledCss ? `<style data-divlet-compiled>${compiledCss}</style>` : ''}</head><body data-divlet-root="${escapeAttribute(doc.rootId)}">${render(doc.rootId)}</body></html>\n`;
+  return `<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeText(doc.name)}</title>${renderHead(doc)}<script id="${META_ID}" type="application/json">${jsonText(manifest)}</script><style data-divlet-tokens>:root{${tokens}}</style><style data-divlet-custom>${layered(doc.css)}</style>${compiledCss ? `<style data-divlet-compiled>${compiledCss}</style>` : ''}</head><body data-divlet-root="${escapeAttribute(doc.rootId)}">${render(doc.rootId)}</body></html>\n`;
 }
 
 
@@ -167,7 +171,7 @@ export function exportHtml(input: unknown, { nodeId, compiledCss = '', limits = 
   if (typeof compiledCss !== 'string' || /<\/style/i.test(compiledCss)) error('Invalid compiled stylesheet');
   const tokens = Object.entries(doc.tokens).map(([name, value]) => `  ${name}: ${value};`).join('\n');
   const styles = [tokens && `:root {\n${tokens}\n}`, layered(doc.css), compiledCss].filter(Boolean).join('\n');
-  return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${escapeText(doc.name)}</title>\n${styles ? `<style>\n${styles}\n</style>\n` : ''}</head>\n<body>\n${body}\n</body>\n</html>\n`;
+  return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${escapeText(doc.name)}</title>\n${renderHead(doc)}${styles ? `<style>\n${styles}\n</style>\n` : ''}</head>\n<body>\n${body}\n</body>\n</html>\n`;
 }
 
 const DROPPED_TAGS = new Set('script style template iframe object embed link meta noscript base head title frame frameset applet portal'.split(' '));
@@ -274,7 +278,7 @@ export function renderFile(input: unknown, { compiledCss = '', parts, instances,
   };
   const tokens = Object.entries(doc.tokens).map(([name, value]) => `${name}:${value};`).join('');
   const body = `<body\n>${block(doc.rootId, 0)}\n></body>`;
-  return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${escapeText(doc.name)}</title>\n${tokens ? `<style>:root{${tokens}}</style>\n` : ''}${doc.css ? `<style>${layered(doc.css)}</style>\n` : ''}${compiledCss ? `<style>${compiledCss}</style>\n` : ''}</head>\n${body}</html>\n`;
+  return `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>${escapeText(doc.name)}</title>\n${renderHead(doc)}${tokens ? `<style>:root{${tokens}}</style>\n` : ''}${doc.css ? `<style>${layered(doc.css)}</style>\n` : ''}${compiledCss ? `<style>${compiledCss}</style>\n` : ''}</head>\n${body}</html>\n`;
 }
 
 function attr(node: P5Node, name: string): string | undefined {
@@ -348,6 +352,7 @@ export function decodeHtml(source: unknown, { fallbackId = 'imported', previous,
   let manifest: any;
   let css = '';
   let title: string | undefined;
+  const physicalHead: NonNullable<DocumentModel['head']> = {};
   const tokens: Record<string, string> = {};
   let tokenStyleSeen = false;
   for (const node of head?.childNodes ?? []) {
@@ -357,7 +362,7 @@ export function decodeHtml(source: unknown, { fallbackId = 'imported', previous,
       if (manifest) error('Duplicate divlet metadata');
       try { manifest = JSON.parse(node.childNodes.map((child: P5Node) => child.value ?? '').join('')); } catch { error('Invalid divlet metadata JSON'); }
       if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) error('Divlet metadata must be an object');
-      const allowed = new Set('schemaVersion id name version artboard metadata nodeMetadata textIds'.split(' '));
+      const allowed = new Set('schemaVersion id name head version artboard metadata nodeMetadata textIds'.split(' '));
       for (const key of Object.keys(manifest)) if (!allowed.has(key)) error(`Unsupported divlet metadata field: ${key}`);
       continue;
     }
@@ -385,6 +390,16 @@ export function decodeHtml(source: unknown, { fallbackId = 'imported', previous,
       if (node.attrs.length) error('Title attributes are not supported', undefined, 'UNSUPPORTED_HTML');
       if (title !== undefined) error('Duplicate title');
       title = node.childNodes.map((child: P5Node) => child.value ?? '').join('');
+      continue;
+    }
+    if (node.tagName === 'meta' && attr(node, 'name') === 'description' && attr(node, 'content') !== undefined && node.attrs.length === 2) {
+      if (Object.hasOwn(physicalHead, 'description')) error('Duplicate description');
+      physicalHead.description = attr(node, 'content');
+      continue;
+    }
+    if (node.tagName === 'link' && attr(node, 'rel') === 'icon' && attr(node, 'href') !== undefined && node.attrs.length === 2) {
+      if (Object.hasOwn(physicalHead, 'icon')) error('Duplicate icon');
+      physicalHead.icon = attr(node, 'href');
       continue;
     }
     if (node.tagName === 'meta' && attr(node, 'charset')?.toLowerCase() === 'utf-8' && node.attrs.length === 1) continue;
@@ -481,6 +496,11 @@ export function decodeHtml(source: unknown, { fallbackId = 'imported', previous,
     rootId = claim(allocate('root'));
     nodes[rootId] = { id: rootId, type: 'element', tag: 'div', attrs: {}, className: '', style: {}, metadata: {}, children: readChildren(body.childNodes) };
   }
+  if (manifest && Object.hasOwn(manifest, 'head')) {
+    const stored = validateHead(manifest.head);
+    if (stored.description !== physicalHead.description || stored.icon !== physicalHead.icon) error('Conflicting head metadata');
+  }
+  const frameHead = Object.keys(physicalHead).length || (manifest && Object.hasOwn(manifest, 'head')) ? { head: physicalHead } : {};
   const fallback = String(fallbackId).replace(/[^A-Za-z0-9_.:-]/g, '-').replace(/^[^A-Za-z]+/, '').slice(0, 96) || 'imported';
-  return validateDocument({ schemaVersion: manifest?.schemaVersion ?? 1, id: manifest?.id ?? prior?.id ?? fallback, name: title ?? manifest?.name ?? prior?.name ?? fallback, version: manifest?.version ?? prior?.version ?? 1, artboard: manifest?.artboard ?? prior?.artboard ?? { x: 80, y: 100, width: 960, height: 720 }, rootId, tokens, css, metadata: manifest?.metadata ?? prior?.metadata ?? {}, nodes }, { limits });
+  return validateDocument({ ...frameHead, schemaVersion: manifest?.schemaVersion ?? 1, id: manifest?.id ?? prior?.id ?? fallback, name: title ?? manifest?.name ?? prior?.name ?? fallback, version: manifest?.version ?? prior?.version ?? 1, artboard: manifest?.artboard ?? prior?.artboard ?? { x: 80, y: 100, width: 960, height: 720 }, rootId, tokens, css, metadata: manifest?.metadata ?? prior?.metadata ?? {}, nodes }, { limits });
 }

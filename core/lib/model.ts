@@ -61,6 +61,7 @@ export interface DocumentModel {
   schemaVersion: 1;
   id: NodeId;
   name: string;
+  head?: { description?: string; icon?: string };
   version: number;
   artboard: Artboard;
   rootId: NodeId;
@@ -111,7 +112,7 @@ for (const [parent, children] of Object.entries(TABLE_CHILDREN)) {
 const BAD_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
 export const ID = /^[A-Za-z][A-Za-z0-9_.:-]{0,95}$/;
 const TOKEN = /^--[A-Za-z_][A-Za-z0-9_-]*$/;
-const DOC_KEYS: ReadonlySet<string> = new Set('schemaVersion id name version artboard rootId tokens css metadata nodes'.split(' '));
+const DOC_KEYS: ReadonlySet<string> = new Set('schemaVersion id name head version artboard rootId tokens css metadata nodes'.split(' '));
 const ELEMENT_KEYS: ReadonlySet<string> = new Set('id type tag attrs className style metadata children reusable'.split(' '));
 const TEXT_KEYS: ReadonlySet<string> = new Set('id type content metadata'.split(' '));
 const REF_KEYS: ReadonlySet<string> = new Set('id type ref descendants metadata'.split(' '));
@@ -347,6 +348,7 @@ export function validateDocument(input: unknown, { limits = LIMITS }: { limits?:
     schemaVersion: 1,
     id: raw.id,
     name: string(raw.name, 'name', 512),
+    ...(Object.hasOwn(raw, 'head') ? { head: validateHead(raw.head) } : {}),
     version: raw.version,
     artboard: { x: artboard.x, y: artboard.y, width: artboard.width, height: artboard.height },
     rootId: raw.rootId,
@@ -355,6 +357,18 @@ export function validateDocument(input: unknown, { limits = LIMITS }: { limits?:
     metadata: metadata(raw.metadata ?? {}, 'metadata'),
     nodes: nodes as Record<NodeId, Node>,
   };
+}
+
+export function validateHead(input: unknown): NonNullable<DocumentModel['head']> {
+  const raw = object(input, 'head');
+  keys(raw, new Set(['description', 'icon']), 'head');
+  const head: NonNullable<DocumentModel['head']> = {};
+  if (Object.hasOwn(raw, 'description')) head.description = string(raw.description, 'head.description', 2048);
+  if (Object.hasOwn(raw, 'icon')) {
+    head.icon = string(raw.icon, 'head.icon', 8192);
+    safeAttribute('href', head.icon, 'head.icon');
+  }
+  return head;
 }
 
 /** CSS custom properties (`--name`) mapped to values. */
@@ -413,7 +427,7 @@ export function applyDocumentPatch(document: unknown, patch: unknown, options: S
   const base = validateDocument(document);
   const rawPatch = object(patch, 'patch');
   json(rawPatch, 'patch');
-  keys(rawPatch, new Set('name artboard tokens css metadata rootId nodes'.split(' ')), 'patch');
+  keys(rawPatch, new Set('name head artboard tokens css metadata rootId nodes'.split(' ')), 'patch');
   return validateDocument(merge(base, withStyles(base, rawPatch, options)));
 }
 

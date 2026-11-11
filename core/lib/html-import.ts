@@ -30,6 +30,7 @@ function sanitize(html: string): SanitizedPage {
   const head = root?.childNodes.find((node): node is HtmlElement => tree.isElementNode(node) && node.tagName === 'head');
   const body = root?.childNodes.find((node): node is HtmlElement => tree.isElementNode(node) && node.tagName === 'body');
   const css: string[] = [];
+  const supportedHead: string[] = [];
   let title = '';
   const keepAttrs = (node?: HtmlElement) => (node?.attrs ?? []).filter(item => {
     if (/^data-divlet-id$/i.test(item.name)) return true;
@@ -59,20 +60,28 @@ function sanitize(html: string): SanitizedPage {
     if (!tree.isElementNode(node)) continue;
     if (node.tagName === 'title') title = textOf(node).trim();
     else if (node.tagName === 'style') css.push(textOf(node));
+    else if (node.tagName === 'meta' && node.attrs.some(a => a.name === 'name' && a.value.toLowerCase() === 'description')) {
+      const content = node.attrs.find(a => a.name === 'content')?.value ?? '';
+      supportedHead.push(`<meta name="description" content="${esc(content)}">`);
+    }
+    else if (node.tagName === 'link' && node.attrs.some(a => a.name === 'rel' && a.value.toLowerCase() === 'icon')) {
+      const href = node.attrs.find(a => a.name === 'href')?.value ?? '';
+      supportedHead.push(`<link rel="icon" href="${esc(href)}">`);
+    }
     else if (node.tagName === 'link') dropped.links++;
     else if (node.tagName === 'script') dropped.scripts++;
   }
   let inner = (body?.childNodes ?? []).map(serializeNode).join('');
   const bodyAttrs = keepAttrs(body);
   if (bodyAttrs.length) inner = `<div${bodyAttrs.map(item => ` ${item.name}="${esc(item.value)}"`).join('')}>${inner}</div>`;
-  const page = `<!doctype html><html><head><meta charset="utf-8">${css.length ? `<style>${css.join('\n').replace(/<\/style/gi, '<\\/style')}</style>` : ''}</head><body>${inner}</body></html>`;
+  const page = `<!doctype html><html><head><meta charset="utf-8">${supportedHead.join('')}${css.length ? `<style>${css.join('\n').replace(/<\/style/gi, '<\\/style')}</style>` : ''}</head><body>${inner}</body></html>`;
   return { page, title, dropped };
 }
 
 function frameOf({ page, title, dropped }: SanitizedPage, { fallbackId, name, source, format }: PageOptions & { name?: string }): DocumentModel {
   const decoded = decodeHtml(page, { fallbackId });
   const metadata = source ? { import: { source, format, dropped } } : {};
-  return validateDocument({ schemaVersion: 1, id: decoded.id, name: title || name || fallbackId, version: 1, rootId: decoded.rootId, artboard: decoded.artboard, tokens: decoded.tokens, css: decoded.css, metadata, nodes: decoded.nodes });
+  return validateDocument({ schemaVersion: 1, id: decoded.id, name: title || name || fallbackId, ...(decoded.head !== undefined ? { head: decoded.head } : {}), version: 1, rootId: decoded.rootId, artboard: decoded.artboard, tokens: decoded.tokens, css: decoded.css, metadata, nodes: decoded.nodes });
 }
 
 /** A dropped page and an explicitly opened page use the same admission profile. */
