@@ -183,7 +183,7 @@ export class DivletRuntime extends EventEmitter {
   }
 
   historyHead() {
-    return { seq: this.seq, pointId: this.#historyLine.currentId, canUndo: this.undoStack.length > 0, canRedo: this.redoStack.length > 0, undoLabel: this.undoStack.at(-1)?.label ?? null, redoLabel: this.redoStack.at(-1)?.label ?? null };
+    return { seq: this.seq, pointId: this.#historyLine.currentId, navigation: true, canUndo: this.undoStack.length > 0, canRedo: this.redoStack.length > 0, undoLabel: this.undoStack.at(-1)?.label ?? null, redoLabel: this.redoStack.at(-1)?.label ?? null };
   }
 
   readHistory({ since = 0, limit = 50, documentId, actor } = {}) {

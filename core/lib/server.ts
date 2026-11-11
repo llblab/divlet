@@ -5,6 +5,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { runOnRuntime } from './contract.ts';
 import type { BoardRuntime } from './contract.ts';
+import type { HistoryNavigation } from './history.ts';
 import { fileURLToPath } from 'node:url';
 import { previewBridge } from './bridge.js';
 import { clientPluginFile } from './engine.ts';
@@ -22,6 +23,7 @@ export interface BoardApi extends BoardRuntime {
   read(query: Record<string, unknown>): any;
   render(documentId: string): any;
   readHistory(query: Record<string, unknown>): any;
+  navigateHistory(query: HistoryNavigation): Promise<unknown>;
   setSelection(body: unknown): any;
   setObservations(body: unknown): any;
   exportDocument(documentId: string, options: { nodeId?: string }): any;
@@ -176,6 +178,10 @@ export async function startServer(runtime: BoardApi, { port = 0 }: { port?: numb
         const number = (name: string) => (url.searchParams.has(name) ? Number(url.searchParams.get(name)) : undefined);
         return json(res, 200, runtime.readHistory({ since: number('since'), limit: number('limit'), documentId: url.searchParams.get('documentId') || undefined, actor: url.searchParams.get('actor') || undefined }));
       }
+      if (req.method === 'POST' && route === 'api/history/navigate') {
+        const body = await readBody(req);
+        return json(res, 200, await runtime.navigateHistory({ pointId: body?.pointId, expectedPoint: body?.expectedPoint, actor: 'user' }));
+      }
       if (req.method === 'GET' && route.startsWith('api/export/')) {
         const nodeId = url.searchParams.get('node') || undefined;
         const result = runtime.exportDocument(route.slice('api/export/'.length), { nodeId });
@@ -308,7 +314,7 @@ export async function startServer(runtime: BoardApi, { port = 0 }: { port?: numb
       if (res.headersSent) return res.end();
       const cause = error as NodeJS.ErrnoException & { details?: unknown };
       const code = cause.code || (error instanceof SyntaxError ? 'INVALID_JSON' : 'INTERNAL_ERROR');
-      const status = ['NOT_FOUND', 'ENOENT'].includes(code) ? 404 : ['STALE_PREVIEW', 'REVISION_CONFLICT', 'RENDER_CONFLICT', 'EXTERNAL_PENDING', 'CANNOT_UNDO', 'NO_AGENT', 'NOT_BUSY', 'NO_HOST'].includes(code) ? 409 : code === 'BODY_TOO_LARGE' ? 413 : 400;
+      const status = ['NOT_FOUND', 'ENOENT'].includes(code) ? 404 : ['STALE_PREVIEW', 'REVISION_CONFLICT', 'RENDER_CONFLICT', 'EXTERNAL_PENDING', 'CANNOT_UNDO', 'HISTORY_CONFLICT', 'HISTORY_POINT_UNAVAILABLE', 'NO_AGENT', 'NOT_BUSY', 'NO_HOST'].includes(code) ? 409 : code === 'BODY_TOO_LARGE' ? 413 : 400;
       return json(res, status, { error: code, message: cause.message, details: cause.details });
     }
   });
