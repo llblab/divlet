@@ -823,7 +823,7 @@ window.addEventListener('message', event => {
 /**
  * Play: a link in one artboard names a page of the project. When that page is another artboard's, reveal it, select it and
  * take its page to the fragment (a plain page link lands at the top, like a navigation would). The frames stay loaded; nothing
- * is swapped, and a link to no artboard does nothing rather than leave for a missing file.
+ * is swapped, and a link to no artboard says so rather than leave for a missing file.
  */
 function followLink(entry, href) {
   const base = entry.doc.viewUrl;
@@ -832,7 +832,11 @@ function followLink(entry, href) {
   let target;
   try { target = new URL(href, new URL(base, location.href)); } catch { return; }
   const destination = [...entries.values()].find(item => item.doc.viewUrl && page(new URL(item.doc.viewUrl, location.href)) === page(target));
-  if (!destination) return;
+  if (!destination) {
+    const name = page(target).split('/').pop() || target.pathname;
+    toast(`“${name.length > 60 ? name.slice(0, 57) + '…' : name}” is not an artboard of this project`);
+    return;
+  }
   const id = destination.doc.id;
   if (id !== entry.doc.id) { selectArtboards([id]); reveal(id); }
   const message = { type: 'divlet:scroll-to', fragment: target.hash };

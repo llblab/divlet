@@ -82,6 +82,8 @@ try {
   assert.ok(await page.evaluate(id => document.querySelector(`.artboard[data-artboard-id="${id}"]`).classList.contains('selected'), secondId), 'the target artboard is selected');
   assert.equal(await scroll(), 0, 'the source page stayed where it was');
   await link('to-nothing').click();
+  await page.locator('#toast', { hasText: 'no-such-page.html' }).waitFor();
+  assert.match(await page.locator('#toast').innerText(), /not an artboard of this project/, 'an unknown page is named, not silently ignored');
   await link('to-pricing').click();
   await page.waitForTimeout(400);
   assert.equal(await sibling().evaluate(() => Math.round(scrollY)), 0, 'a plain page link lands at the top');
