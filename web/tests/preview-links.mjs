@@ -36,6 +36,7 @@ try {
   await runtime.edit({ documentId: 'welcome', expectedVersion: withLinks.version, actor: 'user', label: 'Add page links', op: { type: 'insert', parentId: withLinks.rootId, spec: [
     { id: 'to-plans', tag: 'a', attrs: { href: `${pricingPage}#plans` }, style: { display: 'block', height: '40px' }, text: 'Plans' },
     { id: 'to-pricing', tag: 'a', attrs: { href: `./${pricingPage}` }, style: { display: 'block', height: '40px' }, text: 'Pricing' },
+    { id: 'to-query', tag: 'a', attrs: { href: `${pricingPage}?plan=pro#plans` }, style: { display: 'block', height: '40px' }, text: 'Query' },
     { id: 'to-nothing', tag: 'a', attrs: { href: 'no-such-page.html#x' }, style: { display: 'block', height: '40px' }, text: 'Nothing' },
   ] } });
   browser = await playwright.chromium.launch(launch);
@@ -51,6 +52,12 @@ try {
   const settled = navigations.length;
   const scroll = () => preview().evaluate(() => Math.round(scrollY));
   const link = id => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator(`[data-divlet-id="${id}"]`);
+  const expectScroll = async (min, label) => {
+    const end = Date.now() + 8000;
+    const here = async () => Math.round((await sibling()?.evaluate(() => scrollY).catch(() => -1)) ?? -1);
+    while (Date.now() < end) { const y = await here(); if (min === 0 ? y === 0 : y > min) return; await page.waitForTimeout(40); }
+    assert.fail(`${label} (scrollY ${await here()})`);
+  };
   const waitScroll = async (predicate, label) => {
     const end = Date.now() + 5000;
     while (Date.now() < end) { if (predicate(await scroll())) return; await page.waitForTimeout(40); }
@@ -81,6 +88,10 @@ try {
   assert.ok((await sibling().evaluate(() => scrollY)) > 400, 'the sibling page scrolled to #plans');
   assert.ok(await page.evaluate(id => document.querySelector(`.artboard[data-artboard-id="${id}"]`).classList.contains('selected'), secondId), 'the target artboard is selected');
   assert.equal(await scroll(), 0, 'the source page stayed where it was');
+  await link('to-pricing').click();
+  await expectScroll(0, 'a plain page link first returns the sibling to the top');
+  await link('to-query').click();
+  await expectScroll(400, 'a query string is ignored when naming the page, the fragment still applies');
   await link('to-nothing').click();
   await page.locator('#toast', { hasText: 'no-such-page.html' }).waitFor();
   assert.match(await page.locator('#toast').innerText(), /not an artboard of this project/, 'an unknown page is named, not silently ignored');
