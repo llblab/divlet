@@ -319,6 +319,93 @@ try {
   await waitUntil(() => ids().join() === artboardCopyBase.join(), 'one Undo removes the grouped pasted artboards');
   check('artboard clipboard uses the shared lifecycle commands and one undo group; facade exports retain function identity');
 
+  const deleteBase = ids(), refusedFrame = doc('components'), removedFrame = doc('plain-css');
+  const deleteRequests = [];
+  const recordDelete = request => { if (request.url().endsWith('/api/artboards/delete')) deleteRequests.push(request.postDataJSON()); };
+  await waitUntil(async () => (await page.evaluate(async () => (await import('./lib/store.js')).descriptor('plain-css')?.version)) === removedFrame.version, 'restored frame version is visible before deletion');
+  page.on('request', recordDelete);
+  let deletionMessages;
+  try {
+    deletionMessages = await page.evaluate(async () => {
+      const m = await import('./lib/store.js'), messages = [];
+      const stop = m.on('toast', event => messages.push(event.message));
+      try { await (await import('./lib/actions.js')).deleteArtboards(['components', 'plain-css']); return messages; }
+      finally { stop(); }
+    });
+  } finally { page.off('request', recordDelete); }
+  assert.deepEqual(ids(), deleteBase.filter(id => id !== 'plain-css'));
+  assert.deepEqual(doc('components'), refusedFrame, 'a refused component library remains unchanged');
+  assert.ok(deletionMessages.some(message => /components used by/.test(message)), 'the component refusal is still reported');
+  assert.equal(deletionMessages.at(-1), `“${removedFrame.name}” deleted`, 'success names the accepted deletion, not the refused first request');
+  assert.deepEqual(deleteRequests.map(request => [request.documentId, request.expectedVersion]), [['components', refusedFrame.version], ['plain-css', removedFrame.version]], 'optimistic hiding does not discard version guards');
+  await page.locator('#toast .toast-action', { hasText: 'Undo' }).click();
+  await waitUntil(() => ids().join() === deleteBase.join(), 'one toast Undo restores only the accepted deletion in its original slot');
+  assert.deepEqual(doc('components'), refusedFrame);
+  assert.deepEqual(doc('plain-css').nodes, removedFrame.nodes);
+  await waitUntil(async () => !(await page.evaluate(async () => (await import('./lib/store.js')).store.leaving.has('components'))), 'the refused frame is no longer optimistically hidden');
+  check('mixed component refusal and successful deletion report the accepted frame and preserve versions, visibility and grouped toast Undo');
+
+  let releaseDelete, heldDelete;
+  const deleteGate = new Promise(resolve => { releaseDelete = resolve; });
+  const holdDelete = async route => { heldDelete = route.request().postDataJSON(); await deleteGate; await route.continue(); };
+  await waitUntil(async () => (await page.evaluate(async () => (await import('./lib/store.js')).descriptor('plain-css')?.version)) === doc('plain-css').version, 'the restored version reaches the client');
+  const guardedVersion = doc('plain-css').version;
+  await page.route('**/api/artboards/delete', holdDelete);
+  let deleteCommand;
+  try {
+    deleteCommand = page.evaluate(async () => {
+      const m = await import('./lib/store.js'), messages = [];
+      const stop = m.on('toast', event => messages.push(event.message));
+      try { await (await import('./lib/actions.js')).deleteArtboards(['plain-css']); return messages; }
+      finally { stop(); }
+    });
+    await waitUntil(() => heldDelete !== undefined, 'the actual deletion request is held');
+    await runtime.patch({ documentId: 'plain-css', expectedVersion: doc('plain-css').version, patch: { metadata: { peerDuringDelete: true } } });
+    const peerFrame = structuredClone(doc('plain-css')), peerRevision = runtime.revision, peerDepth = runtime.undoStack.length;
+    releaseDelete();
+    const messages = await deleteCommand;
+    assert.equal(heldDelete.expectedVersion, guardedVersion, 'deletion retains its observed version after hiding');
+    assert.ok(messages.some(message => /Expected frame version/.test(message)), 'a peer edit forces an explicit stale-version refusal');
+    assert.ok(!messages.some(message => /deleted$/.test(message)), 'a wholly refused command cannot announce success or offer its Undo');
+    assert.deepEqual(doc('plain-css'), peerFrame); assert.equal(runtime.revision, peerRevision); assert.equal(runtime.undoStack.length, peerDepth);
+    await waitUntil(async () => !(await page.evaluate(async () => (await import('./lib/store.js')).store.leaving.has('plain-css'))), 'stale refusal restores frame visibility');
+  } finally { releaseDelete(); await deleteCommand; await page.unroute('**/api/artboards/delete', holdDelete); }
+  check('a held deletion cannot discard a concurrent peer edit, create an Undo step or leave the refused frame hidden');
+
+  const dependencyDeleteBase = ids();
+  deleteRequests.length = 0;
+  page.on('request', recordDelete);
+  try { await page.evaluate(async () => (await import('./lib/actions.js')).deleteArtboards(['components', 'pricing'])); }
+  finally { page.off('request', recordDelete); }
+  assert.deepEqual(deleteRequests.map(request => request.documentId), ['pricing', 'components'], 'component consumers are deleted before the library, regardless of request order');
+  assert.deepEqual(ids(), dependencyDeleteBase.filter(id => !['components', 'pricing'].includes(id)));
+  await page.locator('#toast', { hasText: '2 artboards deleted' }).waitFor();
+  await page.locator('#toast .toast-action', { hasText: 'Undo' }).click();
+  await waitUntil(() => ids().join() === dependencyDeleteBase.join(), 'one Undo restores library and consumer in source order');
+  assert.deepEqual(doc('components').nodes, refusedFrame.nodes);
+  check('multi-delete keeps dependency order, accepted success count and one grouped Undo for component library plus consumer');
+
+  let releaseOverlap, overlapRequests = 0;
+  const overlapGate = new Promise(resolve => { releaseOverlap = resolve; });
+  const holdOverlap = async route => { overlapRequests++; if (overlapRequests === 1) await overlapGate; await route.continue(); };
+  await waitUntil(async () => (await page.evaluate(async () => (await import('./lib/store.js')).descriptor('plain-css')?.version)) === doc('plain-css').version, 'the peer-edited frame is ready before overlap');
+  await page.route('**/api/artboards/delete', holdOverlap);
+  let firstDelete;
+  try {
+    firstDelete = page.evaluate(async () => (await import('./lib/actions.js')).deleteArtboards(['plain-css']));
+    await waitUntil(() => overlapRequests === 1, 'first overlapping request is held');
+    await runtime.patch({ documentId: 'plain-css', expectedVersion: doc('plain-css').version, patch: { metadata: { overlappingPeer: true } } });
+    const peerFrame = structuredClone(doc('plain-css')), peerRevision = runtime.revision, peerDepth = runtime.undoStack.length;
+    await page.evaluate(async () => (await import('./lib/actions.js')).deleteArtboards(['plain-css', 'missing-frame']));
+    assert.equal(overlapRequests, 1, 'hidden or absent targets must not send an unguarded second delete');
+    assert.equal(await page.evaluate(async () => (await import('./lib/store.js')).store.leaving.has('plain-css')), true, 'the second call does not release the first call visibility reservation');
+    assert.equal(await page.evaluate(async () => (await import('./lib/store.js')).store.leaving.has('missing-frame')), false, 'an absent target cannot leak a visibility reservation');
+    releaseOverlap(); await firstDelete;
+    assert.deepEqual(doc('plain-css'), peerFrame); assert.equal(runtime.revision, peerRevision); assert.equal(runtime.undoStack.length, peerDepth);
+    await waitUntil(async () => !(await page.evaluate(async () => (await import('./lib/store.js')).store.leaving.has('plain-css'))), 'the first refused deletion releases its own visibility reservation');
+  } finally { releaseOverlap(); await firstDelete; await page.unroute('**/api/artboards/delete', holdOverlap); }
+  check('overlapping or absent deletion targets cannot bypass version guards, overwrite peers or steal/leak optimistic visibility');
+
   /* ---- export ------------------------------------------------------------- */
   await pickBoard('welcome');
   const label = await board('welcome').locator('.ab-label').boundingBox();
