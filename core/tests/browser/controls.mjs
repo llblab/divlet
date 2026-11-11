@@ -650,6 +650,21 @@ try {
   await page.locator('#activity .change').first().waitFor();
   assert.equal(await page.locator('#activity .chip, #activity [data-filter]').count(), 0, 'History has no author filters: it lists every change, the conversation is in the Agent tab');
   assert.ok(await page.locator('#activity .change.actor-user').count() > 0);
+  for (const [kind, badge] of [['undo', 'Undo'], ['redo', 'Redo'], ['create', 'New'], ['delete', 'Removed'], ['external', 'File edit'], ['host-event', null], ['constructor', null], ['__proto__', null]]) {
+    const change = runtime.record({ actor: 'user', kind, documentId: 'mobile', text: `Audit kind ${kind}` });
+    const row = page.locator(`#activity .history-log .change[data-seq="${change.seq}"]`);
+    await row.waitFor({ state: 'attached' });
+    assert.equal(await row.locator('.kind').count(), badge ? 1 : 0, `only registered kinds get badges: ${kind}`);
+    if (badge) assert.equal(await row.locator('.kind').textContent(), badge);
+    assert.ok((await row.locator('.msg').textContent()).includes(change.summary), 'unknown kinds retain their ordinary message');
+  }
+  for (const [actor, who] of [['agent', 'Pi'], ['user', 'You'], ['file', 'File'], ['system', 'divlet'], ['external-tool', 'divlet'], ['constructor', 'divlet'], ['__proto__', 'divlet']]) {
+    await runtime.patch({ documentId: 'mobile', expectedVersion: doc('mobile').version, patch: { metadata: { historyActorProbe: actor } }, actor });
+    const row = page.locator(`#activity .history-log .change[data-seq="${last().seq}"]`);
+    await row.waitFor({ state: 'attached' });
+    assert.ok((await row.locator('.sub').textContent()).includes(` · ${who}`), `actor label uses the registered value or system fallback: ${actor}`);
+  }
+  check('audit labels: known variants preserved; unknown/prototype-named kinds have no badge and actors use the system fallback');
   const historyBase = runtime.historyHead().pointId, mobileBeforeHistory = doc('mobile').name;
   await runtime.patch({ documentId: 'mobile', expectedVersion: doc('mobile').version, patch: { name: 'Mobile by Pi' }, actor: 'agent', label: 'rename mobile' });
   const historyFuture = runtime.historyHead().pointId;
