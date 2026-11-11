@@ -28,7 +28,13 @@ let browser;
 try {
   await legacyProject(path.join(cwd, 'project.divlet'), { demo: true });
   runtime = await openRuntime({ cwd, watch: false });
-  await runtime.patch({ documentId: 'welcome', expectedVersion: 1, patch: { nodes: { cta: { tag: 'a', attrs: { type: null, href: externalUrl } } } } });
+  const initial = runtime.documents.get('welcome').document;
+  const image = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" onload="parent.postMessage({dataImageScript:true},\'*\')"><path d="M0 0h20v20H0z"/></svg>');
+  await runtime.patch({ documentId: 'welcome', expectedVersion: 1, patch: { nodes: {
+    cta: { tag: 'a', attrs: { type: null, href: externalUrl } },
+    [initial.rootId]: { children: [...initial.nodes[initial.rootId].children, 'data-image'] },
+    'data-image': { id: 'data-image', type: 'element', tag: 'img', attrs: { src: image }, children: [] },
+  } } });
   await mkdir(path.join(cwd, 'content'));
   await writeFile(path.join(cwd, 'content', 'index.md'), '# Site home');
   await writeFile(path.join(cwd, 'site.json'), JSON.stringify({ schemaVersion: 1, title: 'Private site', templateId: 'welcome', contentDir: 'content', slots: { content: 'cards' } }));
@@ -37,9 +43,20 @@ try {
   const before = runtime.read({ view: 'frame', documentId: 'welcome' }).nodes['title-text'].content;
   browser = await chromium.launch({ headless: true, executablePath: process.env.PI_DIVLET_CHROMIUM_EXECUTABLE, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const page = await browser.newPage({ viewport: { width: 1500, height: 1000 } });
+  await page.addInitScript(() => {
+    window.dataImageMessages = [];
+    addEventListener('message', event => { if (event.data?.dataImageScript) window.dataImageMessages.push(event.data); });
+  });
   const live = () => page.waitForFunction(() => document.querySelector('.artboard[data-artboard-id="welcome"]')?.dataset.status === 'live');
   await page.goto(runtime.url);
   await live();
+  const preview = page.locator('iframe[data-document-id="welcome"]').contentFrame();
+  assert.ok(await preview.locator('[data-divlet-id="data-image"]').evaluate(async node => { await node.decode(); return node.naturalWidth === 20; }), 'data image decodes under the real preview CSP');
+  assert.deepEqual(await preview.locator('body').evaluate(() => window.dataImageMessages), [], 'no script message in the preview');
+  assert.deepEqual(await page.evaluate(() => window.dataImageMessages), [], 'SVG image scripts cannot message the board parent either');
+  await preview.locator('body').evaluate(() => parent.postMessage({ dataImageScript: true, probe: true }, '*'));
+  await page.waitForFunction(() => window.dataImageMessages.some(message => message.probe), null, { timeout: 5000 });
+  assert.deepEqual(await page.evaluate(() => window.dataImageMessages), [{ dataImageScript: true, probe: true }], 'positive control proves the actual parent receiver is observed');
   const previousCapability = new URL(await page.locator('iframe[data-document-id="welcome"]').getAttribute('src')).searchParams.get('bridge');
   assert.ok(previousCapability);
   await page.locator('#viewport').focus();
@@ -78,7 +95,7 @@ try {
     const doc = await fetch('api/documents/welcome').then(response => response.json());
     return doc.nodes['title-text'].content === 'Trusted edit after reset';
   });
-  console.log(JSON.stringify({ status: 'passed', checks: ['forged window edits and fake channel handshakes rejected', 'pre-view capability replay rejected after navigation', 'preview capability not leaked in referrers', 'model, selection and site capabilities not delivered to a navigated page', 'trusted editing works after remount'] }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', checks: ['data SVG images load under preview CSP without executing their scripts', 'forged window edits and fake channel handshakes rejected', 'pre-view capability replay rejected after navigation', 'preview capability not leaked in referrers', 'model, selection and site capabilities not delivered to a navigated page', 'trusted editing works after remount'] }, null, 2));
 } finally {
   await browser?.close();
   await runtime?.close();

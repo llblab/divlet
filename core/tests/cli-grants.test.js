@@ -8,7 +8,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { fixture } from './fixtures/source-project.js';
 
-const cli = fileURLToPath(new URL('../../adapters/cli/index.js', import.meta.url));
+const cli = fileURLToPath(import.meta.resolve('@divlet/cli'));
 const run = promisify(execFile);
 
 test('CLI and browser-hosted projects open outside resources without flags or approvals', async t => {

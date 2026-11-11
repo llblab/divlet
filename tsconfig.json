@@ -1,10 +1,14 @@
 {
   "compilerOptions": {
     "target": "es2024",
-    "lib": ["es2024"],
+    "lib": [
+      "es2024"
+    ],
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
@@ -18,8 +22,23 @@
     "checkJs": false,
     "noEmit": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "customConditions": [
+      "divlet-source"
+    ]
   },
-  "include": ["core/**/*.ts", "core/**/*.js", "adapters/**/*.ts", "adapters/**/*.js", "plugins/**/*.ts", "plugins/**/*.js"],
-  "exclude": ["node_modules", "dist", "web", "examples"]
+  "include": [
+    "core/**/*.ts",
+    "core/**/*.js",
+    "packages/**/*.ts",
+    "packages/**/*.js",
+    "plugins/**/*.ts",
+    "plugins/**/*.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/dist/**",
+    "web",
+    "examples"
+  ]
 }

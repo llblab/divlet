@@ -23,7 +23,7 @@ them; nothing to start.
 After the first npm publication, any MCP host can start it over stdio:
 
 ```bash
-npx -y --package=divlet divlet-mcp --cwd /absolute/path/to/the/workspace
+npx -y @divlet/mcp --cwd /absolute/path/to/the/workspace
 # --cwd <dir>      working directory for relative paths and the default project (default: current directory)
 # --project <path> open this project the first time a tool needs one
 # --port <n>       port for the board the first open starts (0 picks a free one)
@@ -33,10 +33,10 @@ npx -y --package=divlet divlet-mcp --cwd /absolute/path/to/the/workspace
 Register it once and the tools survive the session — a project-scoped `.mcp.json` in the workspace, or the host's own config:
 
 ```json
-{ "mcpServers": { "divlet": { "command": "npx", "args": ["-y", "--package=divlet", "divlet-mcp", "--cwd", "/absolute/path/to/the/workspace"] } } }
+{ "mcpServers": { "divlet": { "command": "npx", "args": ["-y", "@divlet/mcp", "--cwd", "/absolute/path/to/the/workspace"] } } }
 ```
 
-Pin a version in a shared repository (`--package=divlet@0.0.1`) so every machine runs the same board. Diagnostics go to stderr;
+Pin a version in a shared repository (`@divlet/mcp@0.0.1`) so every machine runs the same board. Diagnostics go to stderr;
 stdout is the MCP stream. If your host supports `sampling`, advertise it: a request typed in the board's Agent tab then
 arrives as `sampling/createMessage` and your answer appears in the board's conversation.
 

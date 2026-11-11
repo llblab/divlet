@@ -1,0 +1,42 @@
+{
+  "name": "@divlet/mcp",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "The divlet MCP stdio adapter",
+  "bin": {
+    "divlet-mcp": "./dist/index.js"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/llblab/divlet.git",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://github.com/llblab/divlet#readme",
+  "bugs": {
+    "url": "https://github.com/llblab/divlet/issues"
+  },
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "divlet-source": "./index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "imports": {
+    "#package": "./package.json"
+  },
+  "dependencies": {
+    "divlet": "0.0.1"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "prepack": "node ../../scripts/build.mjs"
+  }
+}

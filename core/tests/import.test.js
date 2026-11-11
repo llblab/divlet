@@ -33,7 +33,7 @@ test('opening a .pen converts it into a sibling Divlet project and leaves the .p
   assert.ok(result.utilities > 0);
   assert.equal(await fs.readFile(pen, 'utf8'), text, 'the PEN file is never rewritten');
   const project = JSON.parse(await fs.readFile(result.file, 'utf8'));
-  assert.equal(project.schemaVersion, 2, 'a Divlet project, not a PEN document');
+  assert.equal(project.schemaVersion, 1, 'a Divlet project, not a PEN document');
   assert.deepEqual(project.metadata.import, { source: 'landing.pen', format: 'pen', sha256: sha(Buffer.from(text)), bytes: Buffer.byteLength(text) });
   assert.deepEqual(project.frames.map(frame => frame.name), ['Landing Page', 'shared', 'Screen']);
   assert.equal(project.tokens['--color-ink-primary'], '#123456', 'color variables become shared tokens');
@@ -179,7 +179,7 @@ test('a page dropped into a folder of its own uses native external-HTML admissio
 
 test('a page dropped into a project folder becomes a frame through the same native HTML admission', async t => {
   const dir = await workspace(t);
-  await fs.writeFile(path.join(dir, 'project.divlet'), JSON.stringify({ schemaVersion: 2, name: 'Dropped', version: 1, tokens: {}, css: '', metadata: {}, frames: [
+  await fs.writeFile(path.join(dir, 'project.divlet'), JSON.stringify({ schemaVersion: 1, name: 'Dropped', version: 1, tokens: {}, css: '', metadata: {}, frames: [
     { id: 'kept', name: 'Kept', version: 1, artboard: { x: 0, y: 0, width: 320, height: 200 }, rootId: 'root', tokens: {}, css: '', metadata: {}, nodes: { root: { id: 'root', type: 'element', tag: 'main', className: 'p-4', attrs: {}, style: {}, metadata: {}, children: [] } } },
   ] }));
   const runtime = await openRuntime({ cwd: dir, watch: false, createDemo: false });

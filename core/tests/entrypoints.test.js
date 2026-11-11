@@ -1,9 +1,8 @@
-// The package is harness-agnostic: its root entry is the library, every other surface is a named subpath, and a host manifest
-// field points at that host's adapter rather than at a root shim. This test is the shape — if a new host needs the root to look
-// like itself, it fails here first.
+// Package boundaries are installation boundaries: one product and three adapters, with no copied wrapper layer.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,58 +10,62 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 const exists = async file => { try { return (await stat(file)).isFile(); } catch { return false; } };
 
-test('the root entry is the library, and the runtime keeps its own subpath', async () => {
-  assert.equal(pkg.exports['.'], './dist/core/index.js', 'the package is the product, not one host');
-  assert.equal(pkg.exports['./runtime'], './dist/core/lib/runtime.js');
-  const api = path.join(root, 'core/index.js');
-  const source = await readFile(api, 'utf8');
-  for (const name of ['openRuntime', 'launch', 'makeHost', 'startServer', 'resolveOpenFile']) {
-    assert.match(source, new RegExp(`\\b${name}\\b`), `the library exposes ${name}`);
+test('divlet is the shared product library, not a host or command package', async () => {
+  assert.equal(pkg.name, 'divlet');
+  assert.equal(pkg.exports['.'].default, './dist/core/index.js');
+  assert.equal(pkg.exports['./runtime'].default, './dist/core/lib/runtime.js');
+  assert.equal(pkg.bin, undefined);
+  assert.equal(pkg.pi, undefined);
+  assert.equal(pkg.exports['./pi'], undefined, 'the Pi adapter now belongs to @divlet/pi');
+  assert.equal(pkg.peerDependencies?.typebox, undefined);
+  for (const word of ['pi', 'pi-package']) assert.equal(pkg.keywords.includes(word), false);
+  assert.equal(pkg.exports['./skill'], './skills/divlet/SKILL.md', 'the workflow remains product-owned');
+  assert.equal(await exists(path.join(root, 'adapters')), false, 'there is one package owner per adapter');
+  assert.equal(pkg.files.includes('packages'), false);
+  assert.ok(pkg.workspaces.includes('.'), 'source adapters can resolve the product workspace without a registry release');
+});
+
+for (const name of ['cli', 'mcp', 'pi']) test(`@divlet/${name} owns its adapter, release version and installed entry`, async () => {
+  const directory = path.join(root, 'packages', name);
+  const adapter = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'));
+  assert.equal(adapter.name, `@divlet/${name}`);
+  assert.notEqual(adapter.private, true);
+  assert.equal(adapter.version, pkg.version);
+  assert.equal(adapter.dependencies.divlet, pkg.version);
+  assert.equal(adapter.repository.directory, `packages/${name}`);
+  assert.deepEqual(adapter.exports['.'], { 'divlet-source': './index.js', default: './dist/index.js' });
+  assert.equal(adapter.files.includes('dist'), true);
+  assert.equal(adapter.files.includes('tests'), false);
+  const source = await readFile(path.join(directory, 'index.js'), 'utf8');
+  if (name === 'pi') {
+    assert.deepEqual(adapter.pi.extensions, ['./dist/index.js']);
+    assert.match(source, /from '\.\/lib\/extension\.js'/, 'the implementation lives in this package');
+    assert.ok(adapter.keywords.includes('pi-package'));
+    assert.equal(adapter.peerDependencies.typebox, '*');
+  } else {
+    assert.deepEqual(adapter.bin, { [name === 'cli' ? 'divlet' : 'divlet-mcp']: './dist/index.js' });
+    assert.match(source, /import\.meta\.main/, 'imports do not start the executable');
   }
-  assert.equal(await exists(path.join(root, 'index.js')), false, 'no root shim that means "this package is a Pi extension"');
 });
 
-test('a host manifest field points at that host adapter, never at a root entry', () => {
-  assert.ok(Array.isArray(pkg.pi?.extensions) && pkg.pi.extensions.length, 'the Pi manifest declares its entry');
-  for (const entry of pkg.pi.extensions) {
-    assert.equal(entry, './dist/adapters/pi/index.js', 'the Pi entry is the adapter');
-    assert.ok(pkg.exports['./pi'], 'and the same adapter is exported as a subpath for any host that embeds it');
-    assert.equal(pkg.exports['./pi'], entry.replace(/^\.\//, './'), 'the manifest and the subpath name one file');
+test('public adapter imports start no process service or stdio listeners', () => {
+  execFileSync(process.execPath, ['--input-type=module', '-e', `
+    import assert from 'node:assert/strict';
+    const before = [process.stdin.listenerCount('data'), process.listenerCount('SIGINT'), process.listenerCount('SIGTERM')];
+    const cli = await import('@divlet/cli');
+    const mcp = await import('@divlet/mcp');
+    const pi = await import('@divlet/pi');
+    assert.equal(typeof cli.runCli, 'function');
+    assert.equal(typeof mcp.runMcp, 'function');
+    assert.equal(typeof pi.default, 'function');
+    assert.deepEqual([process.stdin.listenerCount('data'), process.listenerCount('SIGINT'), process.listenerCount('SIGTERM')], before);
+  `], { cwd: root, stdio: 'pipe', timeout: 10000 });
+});
+
+test('published library targets are compiled; development targets name real source files', async () => {
+  for (const [name, target] of Object.entries(pkg.exports)) {
+    if (name === './skill') { assert.equal(await exists(path.join(root, target)), true); continue; }
+    assert.match(target.default, /^\.\/dist\//);
+    assert.equal(await exists(path.join(root, target['divlet-source'])), true, name);
   }
-});
-
-test('the adapter is a package a host can install by itself', async () => {
-  // This is what a symlink in an extensions folder points at: the adapter folder, not the product repository.
-  const adapter = JSON.parse(await readFile(path.join(root, 'adapters/pi/package.json'), 'utf8'));
-  assert.deepEqual(adapter.pi.extensions, ['./index.js'], 'the adapter declares its own host entry');
-  assert.equal(adapter.main, './index.js');
-  assert.equal(adapter.exports['.'], './index.js');
-  const entry = path.join(root, 'adapters/pi/index.js');
-  assert.ok(await exists(entry), 'the declared entry exists');
-  const source = await readFile(entry, 'utf8');
-  assert.match(source, /from '\.\/lib\/extension\.js'/, 'and it points at the adapter implementation rather than copying it');
-});
-
-test('host packaging lives in its own package, with no copy of the adapter', async () => {
-  const wrapper = JSON.parse(await readFile(path.join(root, 'packages/pi-divlet/package.json'), 'utf8'));
-  assert.equal(wrapper.name, 'pi-divlet');
-  assert.equal(wrapper.repository.directory, 'packages/pi-divlet');
-  assert.deepEqual(wrapper.pi.extensions, ['./index.js'], 'Pi installs the thin package');
-  assert.equal(wrapper.dependencies.divlet, pkg.version, 'and depends on the product at its current version');
-  const index = await readFile(path.join(root, 'packages/pi-divlet/index.js'), 'utf8');
-  assert.match(index, /from 'divlet\/pi'/, 'it re-exports the adapter instead of shipping a copy');
-  assert.equal(wrapper.files.includes('index.js'), true);
-  for (const keyword of ['pi', 'pi-package']) assert.ok(wrapper.keywords.includes(keyword), `the host keywords live with the host package (${keyword})`);
-  for (const keyword of ['pi', 'pi-package']) assert.equal(pkg.keywords.includes(keyword), false, `and not at the root (${keyword})`);
-});
-
-test('every export is a real module, and the package ships only published output', async () => {
-  for (const [condition, target] of Object.entries(pkg.exports)) {
-    assert.match(target, /^\.\/dist\//, `${condition} resolves into dist`);
-    const built = path.join(root, target);
-    if (await exists(built)) assert.ok(true);
-    else assert.ok(await exists(path.join(root, 'dist')), `${target} is produced by the build`);
-  }
-  assert.equal(pkg.files.includes('index.js'), false, 'the root shim is gone from the tarball too');
-  assert.equal(pkg.files.includes('packages'), false, 'host packaging is its own package, not root files');
 });

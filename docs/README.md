@@ -14,7 +14,7 @@ Start with the [project README](../README.md) for the product overview and a wor
 - [Project format](format.md): First-release specification candidate and current wire-format reference; schemas, defaults, components, supported web content and explicit freeze boundaries. Not yet frozen.
 - [Markdown sites](site.md): Configuration, template slots, routes, source ownership, links, live updates and current limits.
 - [Testing and validation](testing.md): Test layout, every command (unit, browser suites, PEN fidelity, release, Pi RPC), what each check does and does not prove, and the conventions the suites follow.
-- [npm publication](publishing.md): Package and command identity, release gates, product-before-wrapper publication order, and verification after publication.
+- [npm publication](publishing.md): Package and command identity, release gates, four-package product-before-adapters publication order, and verification after publication.
 
 ## Contributor context
 
@@ -26,4 +26,4 @@ Start with the [project README](../README.md) for the product overview and a wor
 
 - [Board workflow skill](../skills/divlet/SKILL.md): How an agent operates the board; not the contributor protocol.
 - [Editable examples and landing](../examples/README.md): The canonical onboarding project, owned cache, local regeneration and prepared-output Pages publication.
-- [Example documentation site](../examples/site/handbook/content/index.md): Markdown sources used by `npm run demo:site`, with a [guide](../examples/site/handbook/content/guide/index.md) and [first-route walkthrough](../examples/site/handbook/content/guide/start.md).
+- [Example documentation site](../examples/handbook/content/index.md): Markdown sources used by `npm run demo:site`, with a [guide](../examples/handbook/content/guide/index.md) and [first-route walkthrough](../examples/handbook/content/guide/start.md).

@@ -187,13 +187,15 @@ export function metadata(value: unknown, label: string): Metadata {
   return structuredClone(record) as Metadata;
 }
 
-export function safeAttribute(name: string, value: string, nodeId: string): void {
+export function safeAttribute(name: string, value: string, nodeId: string, dataResource = false): void {
   if (!/^[A-Za-z_:][A-Za-z0-9_.:-]*$/.test(name) || /^on/i.test(name)) fail(`Unsupported attribute ${name} on ${nodeId}`);
   if (/^(data-divlet-|style$|class$|srcdoc$)/i.test(name)) fail(`Reserved attribute ${name} on ${nodeId}`);
   string(value, `attribute ${name}`, 65536);
   if (/^(href|src|action|formaction|poster|xlink:href)$/i.test(name)) {
     const compact = value.replace(/[\u0000-\u0020\u007f]+/g, '');
     const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(compact)?.[1]?.toLowerCase();
+    // Resource elements consume data as images/media, not as an active document or form destination.
+    if (scheme === 'data' && (dataResource || /^(src|poster)$/i.test(name))) return;
     if (scheme && !['http', 'https', 'mailto', 'tel'].includes(scheme)) fail(`Unsupported URL scheme in ${name} on ${nodeId}`);
   }
 }
@@ -366,7 +368,7 @@ export function validateHead(input: unknown): NonNullable<DocumentModel['head']>
   if (Object.hasOwn(raw, 'description')) head.description = string(raw.description, 'head.description', 2048);
   if (Object.hasOwn(raw, 'icon')) {
     head.icon = string(raw.icon, 'head.icon', 8192);
-    safeAttribute('href', head.icon, 'head.icon');
+    safeAttribute('href', head.icon, 'head.icon', true);
   }
   return head;
 }

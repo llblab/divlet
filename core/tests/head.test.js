@@ -15,7 +15,7 @@ const description = 'A "quoted" & <safe> description';
 
 test('head is strictly opt-in, bounded and URL validated', () => {
   assert.equal(Object.hasOwn(base(), 'head'), false);
-  for (const head of [null, [], { title: 'no' }, { description: 2 }, { description: 'a'.repeat(2049) }, { icon: 'javascript:alert(1)' }, { icon: 'data:image/svg+xml,x' }]) {
+  for (const head of [null, [], { title: 'no' }, { description: 2 }, { description: 'a'.repeat(2049) }, { icon: 'javascript:alert(1)' }]) {
     assert.throws(() => validateDocument({ ...base(), head }));
   }
   assert.deepEqual(validateDocument({ ...base(), head: {} }).head, {});

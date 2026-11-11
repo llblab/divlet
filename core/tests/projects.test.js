@@ -6,7 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { resolveProject, listProjects, createProject, initProject, inspectPath } from '../lib/projects.ts';
 import { launch } from '../lib/launch.ts';
-import divletExtension from '../../adapters/pi/index.js';
+import divletExtension from '@divlet/pi';
 import { openRuntime } from '../lib/runtime.js';
 import { writeProject, validateSettings, readProject } from '../lib/project.ts';
 import { decodeHtml } from '../lib/codec.ts';
@@ -52,12 +52,12 @@ test('existing .pen files appear beside .divlet projects without changing new-pr
   const root = await temp();
   try {
     const pen = path.join(root, 'layout.pen');
-    await writeFile(pen, JSON.stringify({ schemaVersion: 2, frames: [] }));
+    await writeFile(pen, JSON.stringify({ schemaVersion: 1, frames: [] }));
     assert.deepEqual(await resolveProject(pen), { kind: 'project', file: pen, dir: root });
     assert.equal((await resolveProject(root)).file, pen);
     assert.equal((await listProjects(root))[0].name, 'layout');
     await initProject(path.join(root, 'current.divlet'));
-    await writeFile(path.join(root, 'upper.PEN'), JSON.stringify({ schemaVersion: 2, frames: [] }));
+    await writeFile(path.join(root, 'upper.PEN'), JSON.stringify({ schemaVersion: 1, frames: [] }));
     const info = await inspectPath(root);
     assert.equal(info.kind, 'collection');
     assert.deepEqual(info.files.map(file => file.name), ['current.divlet', 'layout.pen', 'upper.PEN']);

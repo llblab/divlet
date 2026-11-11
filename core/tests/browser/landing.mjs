@@ -46,7 +46,13 @@ try {
     assert.equal(layout.logo[1].fill, layout.logo[0].stroke, 'filled D and outlined bracket share the theme colour');
     for (const rect of layout.links) assert.ok(rect.width > 0 && rect.left >= -1 && rect.right <= width + 1, 'wrapped navigation and CTAs stay reachable');
     const icon = await page.locator('link[rel="icon"]').getAttribute('href');
-    assert.ok((await page.request.get(new URL(icon, base).href)).ok(), 'favicon resolves below the repository prefix');
+    assert.match(icon, /^data:image\/svg\+xml;base64,/);
+    assert.ok(await page.evaluate(src => new Promise(resolve => {
+      const image = new Image();
+      image.onload = () => resolve(image.naturalWidth > 0 && image.naturalHeight > 0);
+      image.onerror = () => resolve(false);
+      image.src = src;
+    }), icon), 'embedded favicon decodes without any source or cache asset file');
     await page.screenshot({ path: `artifacts/landing-native-${width}-${colorScheme}.png`, fullPage: true });
     for (const [label, id] of [['What it is', 'what'], ['How it works', 'how'], ['Formats', 'formats'], ['Get it', 'start'], ['Run it locally', 'start'], ['divlet', 'top']]) {
       await page.getByRole('link', { name: label, exact: true }).click();
@@ -55,7 +61,7 @@ try {
       assert.equal(await page.locator('h1').count(), 1, 'a fragment click never escapes to a missing resource route');
     }
     assert.deepEqual(failures, []);
-    assert.ok(requests.every(url => url.startsWith(base)), 'nothing depends on a remote font, image, script or root-only URL');
+    assert.ok(requests.every(url => url.startsWith(base) || url.startsWith('data:')), 'nothing depends on a remote font, image, script or root-only URL');
     checks.push(`${width}px ${colorScheme}: layout, themed mark, prefix favicon and real fragment clicks`);
     await context.close();
   }

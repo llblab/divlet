@@ -42,14 +42,15 @@ test('it is an entry point: install the tools, then open, then work', async () =
 
   // A session that has only this skill must be able to run the server and register it.
   const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
-  assert.match(source, /npx -y --package=divlet divlet-mcp/, 'npx selects the package before the server binary');
+  const adapter = JSON.parse(await readFile(path.join(root, 'packages/mcp/package.json'), 'utf8'));
+  assert.match(source, /npx -y @divlet\/mcp/, 'npx selects the real adapter package');
   const config = JSON.parse(/```json\n([\s\S]*?)\n```/.exec(source)[1]);
-  assert.deepEqual(config.mcpServers.divlet.args.slice(0, 3), ['-y', `--package=${pkg.name}`, 'divlet-mcp']);
-  assert.ok(pkg.bin[config.mcpServers.divlet.args[2]], 'the configured server is a binary the package ships');
-  assert.ok(source.includes(`--package=${pkg.name}@${pkg.version}`), 'version pinning names the package, not the binary');
+  assert.deepEqual(config.mcpServers.divlet.args.slice(0, 2), ['-y', adapter.name]);
+  assert.deepEqual(Object.keys(adapter.bin), ['divlet-mcp']);
+  assert.ok(source.includes(`${adapter.name}@${pkg.version}`), 'version pinning names the adapter package');
   assert.match(source, /"mcpServers"/, 'and how an MCP host registers it');
   for (const flag of ['--cwd', '--project', '--port', '--no-demo']) assert.ok(source.includes(flag), `it documents ${flag}`);
-  const help = await readFile(path.join(root, 'adapters/mcp/index.js'), 'utf8');
+  const help = await readFile(path.join(root, 'packages/mcp/index.js'), 'utf8');
   for (const flag of ['--cwd', '--project', '--port', '--no-demo']) assert.ok(help.includes(flag), `the server accepts ${flag}`);
 });
 

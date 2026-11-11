@@ -8,18 +8,18 @@ The first npm release is still in preparation. The checkout instructions work no
 
 ## Pi from a checkout
 
-Install dependencies and build the checkout as described in [Quick start](../README.md#quick-start). With Pi installed, choose **one** way to load the adapter:
+Install dependencies as described in [Quick start](../README.md#quick-start). With Pi installed, choose **one** way to load the adapter:
 
 ```bash
-# Load the built checkout as a package:
-pi install /absolute/path/to/divlet
+# One-off source execution, without a build:
+NODE_OPTIONS=--conditions=divlet-source pi -e /absolute/path/to/divlet/packages/pi/index.js
 
-# Or link the source adapter, not the repository root:
-mkdir -p ~/.pi/agent/extensions
-ln -s /absolute/path/to/divlet/adapters/pi ~/.pi/agent/extensions/pi-divlet
+# Or build, then install the adapter package persistently:
+npm run build
+pi install /absolute/path/to/divlet/packages/pi
 ```
 
-For a one-off session, use `pi -e /absolute/path/to/divlet/adapters/pi/index.js`. Do not combine installation methods: the extension must load only once.
+After building, a folder-scanning installation can instead symlink `/absolute/path/to/divlet/packages/pi` into `~/.pi/agent/extensions/`. Its manifest loads `dist/index.js`, not the raw source. Do not install the repository root or combine installation methods: the extension must load only once.
 
 Open Pi in your workspace, run `/reload` if the session is already running, then `/divlet`. It returns the board URL. `/divlet /absolute/path/to/landing.divlet` opens an exact project; a directory with several projects opens the launcher.
 
@@ -35,7 +35,8 @@ Register this stdio server in your host's configuration; no Pi installation is r
     "divlet": {
       "command": "node",
       "args": [
-        "/absolute/path/to/divlet/adapters/mcp/index.js",
+        "--conditions=divlet-source",
+        "/absolute/path/to/divlet/packages/mcp/index.js",
         "--cwd",
         "/absolute/path/to/workspace"
       ]
@@ -43,6 +44,8 @@ Register this stdio server in your host's configuration; no Pi installation is r
   }
 }
 ```
+
+From the checkout root, the equivalent source command is `node scripts/source.mjs packages/mcp/index.js --cwd /absolute/path/to/workspace`. The runner passes the `divlet-source` export condition to child processes through `NODE_OPTIONS`.
 
 The server starts a board when the first tool needs one. Open the URL returned by `open_divlet` in your browser.
 
@@ -57,15 +60,15 @@ A board is the **single writer** of its project. A second client attaches to the
 
 ## After npm publication
 
-The product package is `divlet`; it ships both the `divlet` CLI and the `divlet-mcp` server command. There is no separate `divlet-mcp` package.
+The product library is `divlet`. The [CLI adapter](https://github.com/llblab/divlet/blob/main/packages/cli/README.md), [MCP adapter](https://github.com/llblab/divlet/blob/main/packages/mcp/README.md) and [Pi adapter](https://github.com/llblab/divlet/blob/main/packages/pi/README.md) are published as `@divlet/cli`, `@divlet/mcp` and `@divlet/pi`. They own their implementations, not wrappers, and depend on the exact matching `divlet` version.
 
 ```bash
-npx -y --package=divlet divlet-mcp --cwd /absolute/path/to/workspace
+npx -y @divlet/cli ./my-project
+npx -y @divlet/mcp --cwd /absolute/path/to/workspace
+pi install npm:@divlet/pi
 ```
 
-In an MCP configuration, use `"command": "npx"` and `"args": ["-y", "--package=divlet", "divlet-mcp", "--cwd", "/absolute/path/to/workspace"]`. Pin the package version for shared configurations; see [npm publication](publishing.md).
-
-After both `divlet` and its [thin host wrapper `pi-divlet`](https://github.com/llblab/divlet/blob/main/packages/pi-divlet/README.md) are published, Pi users can run `pi install npm:pi-divlet`. The wrapper re-exports `divlet/pi`; it does not contain a second adapter implementation.
+In an MCP configuration, use `"command": "npx"` and `"args": ["-y", "@divlet/mcp@0.0.1", "--cwd", "/absolute/path/to/workspace"]`. Shared configurations should also pin `@divlet/cli@0.0.1` and `npm:@divlet/pi@0.0.1`; see [npm publication](publishing.md). The `divlet` and `divlet-mcp` binary names belong to the CLI and MCP packages respectively. The root library has no bins, Pi manifest or `divlet/pi` export.
 
 For other hosts, copy or link `skills/divlet/` into the host's skills directory, globally or per project, and register the MCP server separately. Installing a skill alone does not register tools. The [workflow skill](../skills/divlet/SKILL.md) explains the model, component recipes and the read → edit → verify loop.
 

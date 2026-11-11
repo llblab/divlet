@@ -1,71 +1,62 @@
 # npm publication
 
-The first release, **0.0.1**, is prepared locally but has not been published. This guide describes the intended publication, not permission to run it. Publishing packages, pushing release refs and deploying the landing page require explicit maintainer authorization.
+The first release, **0.0.1**, is in preparation and has not been published. This guide describes the intended publication, not permission to run it. Publishing packages, pushing release refs and deploying the landing page require explicit maintainer authorization. This packaging change does not freeze or cut over the native schema.
 
 ## Package identity
 
 | Package | Contents | User entry point after publication |
 | --- | --- | --- |
-| `divlet` | Library, declarations, board assets, built-in plugins, CLI, MCP server and the workflow skill | `npx -y divlet ./my-project` |
-| `pi-divlet` | Pi manifest and a re-export of `divlet/pi`; depends on the exact product version | `pi install npm:pi-divlet` |
+| `divlet` | Library, declarations, board assets, built-in plugins and shared workflow skill (`divlet/skill`) | JavaScript public exports |
+| `@divlet/cli` | Standalone CLI implementation and `divlet` bin | `npx -y @divlet/cli ./my-project` |
+| `@divlet/mcp` | MCP server implementation and `divlet-mcp` bin | `npx -y @divlet/mcp --cwd ./workspace` |
+| `@divlet/pi` | Pi adapter implementation, manifest and host dependencies | `pi install npm:@divlet/pi` |
 
-**`divlet-mcp` is a binary in `divlet`, not a separate npm package.** Select the package explicitly when launching it through npx:
+The adapter packages live in `packages/cli`, `packages/mcp` and `packages/pi`, each with its own implementation and tests, not a wrapper. They share the root release version and depend on exact `divlet@0.0.1` initially. The root has no bins, Pi manifest/peer requirements or `divlet/pi` export. All four packages require Node.js 22.19 or later; Pi is not required for CLI or MCP use. Built-in plugins remain bundled in the product, not separately published in this release.
 
-```bash
-npx -y --package=divlet divlet-mcp --cwd /absolute/path/to/workspace
-```
-
-A shared MCP configuration should pin the **package** version:
+Shared configurations should pin `@divlet/cli@0.0.1`, `@divlet/mcp@0.0.1` and `npm:@divlet/pi@0.0.1`. For MCP:
 
 ```json
 {
   "mcpServers": {
     "divlet": {
       "command": "npx",
-      "args": ["-y", "--package=divlet@0.0.1", "divlet-mcp", "--cwd", "/absolute/path/to/workspace"]
+      "args": ["-y", "@divlet/mcp@0.0.1", "--cwd", "/absolute/path/to/workspace"]
     }
   }
 }
 ```
 
-Both packages require Node.js 22.19 or later. Pi is not required for the product's CLI or MCP server. The Pi package is optional; keep its gallery keywords and host identity out of the root package. Plugins in `plugins/` are bundled in `divlet`'s build; publishing workspace packages separately is not part of this release.
-
 ## Readiness gates
 
-- Freeze a coherent candidate first. Do not release a working tree another agent is still changing; review and commit all intended changes, and leave no unrelated edits in the candidate.
-- Keep `package.json`, the root lockfile, `packages/pi-divlet/package.json` and `dependencies.divlet` in that wrapper aligned with the intended versions. The initial pair is `divlet@0.0.1` and `pi-divlet@0.0.1`.
-- Run the checks in [Testing](testing.md): `npm test`, `npm run test:browser:all`, `npm run test:mcp`, `npm run test:contract`, `npm run test:pi` and `npm run test:release`. A skipped Pi check is not proof that the Pi installation works.
-- Inspect `npm pack --dry-run --json` at the root and `npm pack --dry-run --json ./packages/pi-divlet` for intended files and metadata. `prepack` builds `dist/`; never publish with `--ignore-scripts` unless the exact build has been prepared and independently verified. The release smoke check installs local tarballs, not a package fetched by its unpublished name.
-- Check the npm registry again immediately before publication: `npm view divlet version --registry=https://registry.npmjs.org/` and the same for `pi-divlet`. An `E404` means no public package is visible, not that the name is reserved or guaranteed claimable. An unexpected existing package requires an ownership decision, never an automatic overwrite or rename.
-- The maintainer must have an npm account entitled to both names and satisfy npm's current authentication/2FA policy. Do not add a token to the repository. Authentication and publication are maintainer-controlled external steps; no automatic npm publish workflow is configured here.
-- The GitHub origin is `git@github.com:llblab/divlet.git`. Its presence proves local configuration, not push access or that Pages is enabled. Package repository and issue links identify this repository; a configured Pages homepage is not proof of a live deployment.
+- Build with `npm run build`, then freeze a coherent candidate and run the checks below. Do not release a working tree another agent is still changing; review and commit intended changes and exclude unrelated edits. `dist/` is publishing output, not a development prerequisite.
+- Align the root manifest, lockfile and all three adapter manifests with the shared release version and exact adapter `dependencies.divlet` values.
+- Run the checks in [Testing](testing.md): `npm test`, `npm run test:browser:all`, `npm run test:mcp`, `npm run test:contract`, `npm run test:pi` and `npm run test:release`. A skipped Pi check is not proof that Pi installation works.
+- Inspect four tarballs: the root product and `packages/cli`, `packages/mcp`, `packages/pi`. Use `npm pack --dry-run --json` at the root and for each package path. Check exports, bins, manifests, declarations and documentation closure. The product excludes adapter packages, so shipped documentation links to their READMEs must use absolute GitHub URLs. Never publish unverified or stale generated output; the release smoke check installs local tarballs, not unpublished registry names.
+- Recheck the registry immediately before publication with `npm view <name> version --registry=https://registry.npmjs.org/` for all four names. An `E404` does not establish reservation or entitlement. Unexpected existing packages require an ownership decision.
+- **Namespace entitlement remains unverified.** The maintainer must control `divlet` and the `@divlet` scope, have permission to publish all three scoped packages publicly, and satisfy current npm authentication/2FA policy. Never add a token to the repository. No automatic npm publication is authorized by this guide.
+- The configured GitHub origin and Pages homepage do not prove push access, Pages activation or a live deployment.
 
 ## First-publication sequence
 
-Only after explicit authorization, from the frozen and validated checkout:
+Only after explicit authorization, from the built, frozen and validated candidate:
 
-1. Review the release notes and move the delivered Unreleased content under the actual release version/date as part of the release commit. Record the candidate commit; do not describe an attempted or failed publish as successful.
-2. Authenticate with npm using the maintainer's approved flow and recheck package ownership/availability.
-3. Publish **the product first**, from the repository root:
+1. Review release notes, record the candidate commit and move delivered Unreleased content to the actual release version/date. Do not describe an attempted or failed publication as successful.
+2. Authenticate using the approved maintainer flow and recheck ownership and scope entitlement.
+3. Publish the product first from the root, then verify availability:
    ```bash
    npm publish --access public --registry=https://registry.npmjs.org/
    npm view divlet@0.0.1 version --registry=https://registry.npmjs.org/
    ```
-4. Verify the registry installation in a fresh directory, outside the checkout, so workspace dependencies and local bins cannot hide missing files:
+4. Only once `divlet@0.0.1` is available, publish each of `packages/cli`, `packages/mcp` and `packages/pi` from its package directory with `npm publish --access public --registry=https://registry.npmjs.org/`. Verify all three registry versions.
+5. Verify installations outside the checkout, where workspace dependencies cannot hide missing files:
    ```bash
-   npx -y --package=divlet@0.0.1 divlet --help
-   npx -y --package=divlet@0.0.1 divlet-mcp --help
+   npx -y @divlet/cli@0.0.1 --help
+   npx -y @divlet/mcp@0.0.1 --help
+   pi install npm:@divlet/pi@0.0.1
    ```
-   Also open a scratch project and check the board and MCP tools with the published package; `--help` alone does not prove those paths.
-5. Publish the wrapper only after `divlet@0.0.1` is available, then verify its registry version:
-   ```bash
-   cd packages/pi-divlet
-   npm publish --access public --registry=https://registry.npmjs.org/
-   npm view pi-divlet@0.0.1 version --registry=https://registry.npmjs.org/
-   ```
-   In a clean Pi profile, install `npm:pi-divlet@0.0.1`, reload and check `/divlet`, the seven tools and the skill. Do not load a local adapter at the same time.
-6. After both installations pass, create the release tag `v0.0.1` on the candidate commit and push the intended commit/tag only if that is authorized too. Remove the pre-publication notices in the README and landing page only once their npm instructions are actually usable; reconcile [BACKLOG.md](../BACKLOG.md) and [CHANGELOG.md](../CHANGELOG.md) with the real outcome.
+   Open a scratch project and check board serving and MCP tools; help output alone does not prove them. In a clean Pi profile, check `/divlet`, all seven tools and the shared skill without also loading a local adapter.
+6. After all installations pass, create `v0.0.1` on the candidate commit and push only if separately authorized. Remove pre-publication notices only when the documented npm paths are usable; reconcile [BACKLOG.md](../BACKLOG.md) and [CHANGELOG.md](../CHANGELOG.md) with the real outcome.
 
-npm package publication is not atomic across the two names. If the product succeeds but the wrapper fails, retain that truthful partial state and resume with the wrapper; do not republish or unpublish the product to make the steps look atomic. A defective published version needs a new version and corresponding wrapper dependency, not an attempt to overwrite immutable package bytes.
+npm publication is not atomic across four names. If any adapter fails after the product succeeds, report that partial state and resume only the remaining publications; do not republish or unpublish successful packages to simulate atomicity. Defective immutable bytes require a new aligned release version and exact adapter dependencies.
 
-The static landing page is a separate delivery surface. Its workflow verifies the native example's prepared cache and publishes only when the public-file fingerprint changes, and GitHub Pages must serve the `gh-pages` branch root. npm publication does not itself enable Pages or authorize deployment.
+The static landing is a separate delivery surface. Its workflow checks the native example's prepared cache and publishes only when the public-file fingerprint changes; GitHub Pages must serve the `gh-pages` branch root. npm publication neither enables Pages nor authorizes deployment.

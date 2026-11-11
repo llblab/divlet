@@ -8,7 +8,7 @@ import { listProjects, resolveProject, inspectPath } from '../lib/projects.ts';
 import { SOURCE_LIMITS } from '../lib/model.ts';
 import { launch, makeHost } from '../lib/launch.ts';
 import { openRuntime } from '../lib/runtime.js';
-import extension from '../../adapters/pi/index.js';
+import extension from '@divlet/pi';
 
 const secret = 'S3cr3t!';
 const native = () => ({ version: '2.21', fileToken: secret, name: secret, frames: [{ id: 'foreign', name: 'Not a PEN root' }], children: [

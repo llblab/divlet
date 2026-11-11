@@ -7,7 +7,7 @@ import { validateDocument, DivletError } from '../lib/model.ts';
 const fixtures = new URL('./fixtures/format/', import.meta.url);
 const cases = JSON.parse(await readFile(new URL('reader-boundaries.json', fixtures), 'utf8'));
 const baseFrame = validateDocument({ schemaVersion: 1, ...JSON.parse(await readFile(new URL('web.divlet', fixtures), 'utf8')).frames[0] });
-readProject({ schemaVersion: 2, frames: [] });
+readProject({ schemaVersion: 1, frames: [] });
 const admit = operation => {
   try { return { accepted: true, value: operation() }; }
   catch (error) {
@@ -19,7 +19,7 @@ const summary = result => result.accepted ? { accepted: true } : { accepted: fal
 const checks = cases.map(entry => {
   if (!['name', 'metadata'].includes(entry.field) || !['semantic-roundtrip', 'same-field-policy'].includes(entry.invariant)) throw new Error(`Unknown reader witness: ${entry.id}`);
   const value = JSON.parse(entry.valueJson);
-  const project = admit(() => readProject({ schemaVersion: 2, frames: [], [entry.field]: structuredClone(value) }));
+  const project = admit(() => readProject({ schemaVersion: 1, frames: [], [entry.field]: structuredClone(value) }));
   const frame = admit(() => validateDocument({ schemaVersion: 1, ...baseFrame, [entry.field]: structuredClone(value) }));
   const sameFieldPolicy = project.accepted === frame.accepted && (!project.accepted || isDeepStrictEqual(project.value.settings[entry.field], frame.value[entry.field]));
   const roundTrip = project.accepted ? admit(() => readProject(JSON.parse(writeProject(project.value.settings, project.value.frames)))) : null;

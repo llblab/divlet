@@ -114,12 +114,12 @@ test('reusable table rows remain valid only when their expanded parent context i
     root: element('root', 'table', ['body']), body: element('body', 'tbody', ['instance']),
     instance: { id: 'instance', type: 'ref', ref: 'rows/row' },
   } };
-  const accepted = readProject({ schemaVersion: 2, frames: [source, consumer] });
+  const accepted = readProject({ schemaVersion: 1, frames: [source, consumer] });
   assert.equal(accepted.frames[1].nodes.instance.type, 'ref');
   const misplaced = structuredClone(consumer);
   misplaced.nodes.root = element('root', 'main', ['instance']);
   delete misplaced.nodes.body;
-  assert.throws(() => readProject({ schemaVersion: 2, frames: [source, misplaced] }), { code: 'INVALID_DOCUMENT' });
+  assert.throws(() => readProject({ schemaVersion: 1, frames: [source, misplaced] }), { code: 'INVALID_DOCUMENT' });
 });
 
 test('detach turns an instance into ordinary nodes that keep its ID', async t => {

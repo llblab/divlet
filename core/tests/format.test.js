@@ -13,6 +13,23 @@ const readJson = async name => JSON.parse(await readFile(new URL(name, fixtures)
 const corpus = await readJson('cases.json');
 const at = (value, path) => path.reduce((current, key) => current[key], value);
 
+test('the unfrozen native envelope is schema 1, independently of npm and content revisions', () => {
+  const input = { schemaVersion: 1, version: 7, metadata: { schemaVersion: 3, npmVersion: '0.0.1' }, frames: [] };
+  const before = structuredClone(input);
+  const project = readProject(input);
+  const written = JSON.parse(writeProject(project.settings, project.frames));
+  assert.equal(written.schemaVersion, 1);
+  assert.equal(written.version, 7);
+  assert.deepEqual(written.metadata, input.metadata, 'renumbering never rewrites inert application data');
+  assert.deepEqual(input, before);
+  for (const schemaVersion of [0, 2, 3, 99, '1', null]) {
+    const invalid = { ...input, schemaVersion };
+    const snapshot = structuredClone(invalid);
+    assert.throws(() => readProject(invalid), { code: 'INVALID_PROJECT', message: 'schemaVersion must be 1' });
+    assert.deepEqual(invalid, snapshot, 'unsupported draft markers are refused, not silently migrated');
+  }
+});
+
 for (const entry of corpus.accepted) {
   test(`format accepts and semantically round-trips ${entry.id}`, async () => {
     const input = await readJson(entry.file);
@@ -21,7 +38,7 @@ for (const entry of corpus.accepted) {
     assert.deepEqual(input, before, 'admission does not mutate authored input');
     for (const check of entry.checks) assert.deepEqual(at(project, check.path), check.equals, check.path.join('.'));
     const serialized = JSON.parse(writeProject(project.settings, project.frames));
-    assert.equal(serialized.schemaVersion, 2);
+    assert.equal(serialized.schemaVersion, 1);
     assert.ok(serialized.frames.every(frame => !Object.hasOwn(frame, 'schemaVersion')), 'stored frames omit the standalone envelope marker');
     assert.deepEqual(readProject(serialized), project, 'semantic identity is retained, not JSON formatting');
     for (const frame of project.frames) {
@@ -94,7 +111,7 @@ test('metadata stays arbitrary inert JSON rather than becoming an application sc
     opaqueText: '\0\ud800\r\n',
   };
   const frame = (await readJson('web.divlet')).frames[0];
-  const project = readProject({ schemaVersion: 2, metadata, frames: [{ ...frame, metadata }] });
+  const project = readProject({ schemaVersion: 1, metadata, frames: [{ ...frame, metadata }] });
   const restored = readProject(JSON.parse(writeProject(project.settings, project.frames)));
   assert.deepEqual(restored.settings.metadata, metadata);
   assert.deepEqual(restored.frames[0].metadata, metadata);

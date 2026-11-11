@@ -1,4 +1,4 @@
-# Copy the prepared examples/.divlet/landing public artifact to GitHub Pages only when its bytes changed.
+# Copy the prepared examples/landing/.divlet/landing public artifact to GitHub Pages only when its bytes changed.
 #
 # The branch root holds the module's explicit public set (including .nojekyll), plus .landing-hash — its byte fingerprint. If that line already matches what `scripts/landing-hash.mjs` says today, the workflow stops without a commit, so a
 # push that does not touch the page cannot rewrite it. Serve Pages from the `gh-pages` branch root (Settings → Pages).
@@ -8,14 +8,20 @@ on:
   push:
     branches: [main]
     paths:
-      - 'examples/landing.divlet'
-      - 'examples/assets/landing/**'
-      - 'examples/.divlet/landing/**'
+      - 'examples/landing/**'
       - 'scripts/landing-*.mjs'
       - 'core/lib/**'
+      - 'core/tests/landing.test.js'
+      - 'core/tests/icons.test.js'
+      - 'core/tests/data-urls.test.js'
+      - 'web/index.html'
+      - 'web/lib/util.js'
+      - 'web/board.css'
       - 'plugins/tailwind/**'
       - 'package.json'
       - 'package-lock.json'
+      - 'tsconfig*.json'
+      - 'scripts/source.mjs'
       - '.github/workflows/landing.yml'
   workflow_dispatch:
 
@@ -46,6 +52,11 @@ jobs:
       - name: Verify the prepared cache against its project
         # Validation regenerates only in a sandbox; publication never builds or patches a second page.
         run: npm run landing:check
+
+      - name: Test landing and resource contracts
+        run: |
+          npm run typecheck
+          node scripts/source.mjs --test core/tests/landing.test.js core/tests/icons.test.js core/tests/data-urls.test.js
 
       - name: Fingerprint the prepared public files
         id: landing

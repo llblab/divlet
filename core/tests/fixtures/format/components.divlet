@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 1,
   "name": "Components",
   "outputDir": "public/build",
   "css": ".button,.cta{padding:8px}",

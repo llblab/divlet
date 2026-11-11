@@ -1,0 +1,52 @@
+{
+  "name": "@divlet/pi",
+  "version": "0.0.1",
+  "description": "The divlet Pi adapter: tools, /divlet and the shared workflow skill",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "divlet-source": "./index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "typebox": "*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/llblab/divlet.git",
+    "directory": "packages/pi"
+  },
+  "homepage": "https://github.com/llblab/divlet#readme",
+  "bugs": {
+    "url": "https://github.com/llblab/divlet/issues"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "divlet",
+    "design",
+    "layout"
+  ],
+  "dependencies": {
+    "divlet": "0.0.1"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "prepack": "node ../../scripts/build.mjs"
+  }
+}

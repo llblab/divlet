@@ -1,6 +1,6 @@
 /*
  * Source ownership stays in one JSON file, <name>.divlet.
- * The document is { schemaVersion: 2, name, version, tokens, css, metadata, outputDir, frames }.
+ * The document is { schemaVersion: 1, name, version, tokens, css, metadata, outputDir, frames }.
  *
  * A legacy frame is the ID-addressed node tree of one artboard. Any element marked
  * `reusable: true` is a component; a node `{ type: "ref", ref: "frameId/nodeId" }` is an
@@ -14,7 +14,7 @@ import {
 } from './model.ts';
 import type { Attrs, DocumentModel, Limits, Metadata, Node, NodeId, Override, Style } from './model.ts';
 
-export const PROJECT_SCHEMA = 2;
+export const PROJECT_SCHEMA = 1;
 const MAX_FRAMES = SOURCE_LIMITS.roots;
 const PROJECT_KEYS: ReadonlySet<string> = new Set(['schemaVersion', 'name', 'version', 'tokens', 'css', 'metadata', 'outputDir', 'frames']);
 const FIELDS = ['name', 'tokens', 'css', 'metadata', 'outputDir'];

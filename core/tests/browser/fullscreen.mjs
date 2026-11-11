@@ -29,7 +29,7 @@ try {
   await writeFile(path.join(divlet, 'content/index.md'), '# Site home\n\n[Go nested](guide/start.md?from=expanded#section)\n');
   await writeFile(markdownPath, '# Nested page\n\n## Section\n\nOriginal routed text.\n');
   await writeFile(path.join(divlet, 'site.json'), JSON.stringify({ schemaVersion: 1, title: 'Expanded site', templateId: 'docs-template', contentDir: 'content', slots: { content: 'content', title: 'title', navigation: 'navigation' } }));
-  await writeFile(path.join(divlet, 'project.divlet'), JSON.stringify({ schemaVersion: 2, name: 'Expanded fixture', version: 1, frames: [] }));
+  await writeFile(path.join(divlet, 'project.divlet'), JSON.stringify({ schemaVersion: 1, name: 'Expanded fixture', version: 1, frames: [] }));
   const original = decodeHtml('<style>main{padding:24px;font:16px/1.5 system-ui}a{display:block;margin-block:12px}input{border:1px solid #999}</style><main id="root"><h1 id="title">Original page</h1><nav id="navigation">Navigation placeholder</nav><article id="content"><p id="label">Original accepted layout</p></article><label>Draft value<input id="draft" value="initial"></label><a href="raw/sibling.html">Visit raw sibling</a><a href="#details">Jump to details</a><section id="details" style="margin-top:1000px"><h2>Details</h2><a href="second.html?from=expanded#second-target">Second page</a></section></main>', { fallbackId: 'original' });
   original.name = 'Original artboard';
   original.artboard = { x: 80, y: 80, width: 450, height: 420 };

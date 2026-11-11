@@ -24,13 +24,12 @@ From a source checkout:
 ```bash
 cd /path/to/divlet
 npm ci --legacy-peer-deps
-npm run build
 npm start -- /absolute/path/to/workspace
 ```
 
 Open the URL printed in the terminal. An empty workspace gets `project.divlet` with a starter artboard; an existing project opens directly, and a folder with several projects opens the launcher.
 
-`npm run demo` opens the real onboarding page, [examples/landing.divlet](examples/landing.divlet). Its tracked, derived cache supplies GitHub Pages; see [editing and rebuilding the landing](examples/README.md). `npm run demo:pen` and `npm run demo:site` retain the importer and Markdown-site scenarios.
+`npm run demo` opens the real onboarding page, [examples/landing/landing.divlet](examples/landing/landing.divlet). Its tracked, derived cache supplies GitHub Pages; see [editing and rebuilding the landing](examples/README.md). `npm run demo:site` opens the Markdown handbook in `examples/handbook/`; `examples/studio/` holds a separate layout scenario. Pencil import remains supported, but no authored PEN demo is bundled.
 
 **First moves:** `V` selects, `P` lets the page behave normally, `L` opens Layers and `H` opens History. `Ctrl K` finds commands; `?` shows shortcuts. See the [board guide](docs/board.md) for direct editing, the inspector and touch controls.
 
@@ -38,11 +37,13 @@ Open the URL printed in the terminal. An empty workspace gets `project.divlet` w
 
 ### Pi
 
-After building the checkout, install it once:
+Load the source adapter for a one-off session (no build needed):
 
 ```bash
-pi install /absolute/path/to/divlet
+NODE_OPTIONS=--conditions=divlet-source pi -e /absolute/path/to/divlet/packages/pi/index.js
 ```
+
+For a persistent local package installation, first run `npm run build`, then `pi install /absolute/path/to/divlet/packages/pi`. Choose one method; never load both.
 
 Open Pi in your workspace, run `/reload` if it is already running, then:
 
@@ -62,7 +63,8 @@ Register the checkout's stdio server in your host:
     "divlet": {
       "command": "node",
       "args": [
-        "/absolute/path/to/divlet/adapters/mcp/index.js",
+        "--conditions=divlet-source",
+        "/absolute/path/to/divlet/packages/mcp/index.js",
         "--cwd",
         "/absolute/path/to/workspace"
       ]
@@ -78,20 +80,20 @@ Call `open_divlet` and open its returned URL. No Pi installation is needed. Clie
 <details>
 <summary><strong>npm installation — after the first publication</strong></summary>
 
-The package **`divlet`** ships both commands: `divlet` and `divlet-mcp`. There is no separate `divlet-mcp` package.
+The **`divlet`** package is the library, board, built-in plugins and shared workflow skill. Three real adapter packages own their implementation and commands: **`@divlet/cli`**, **`@divlet/mcp`** and **`@divlet/pi`**. Each depends on the exact matching product version.
 
 ```bash
 # Open a standalone board:
-npx -y divlet ./my-project
+npx -y @divlet/cli ./my-project
 
 # Launch the server from an MCP host:
-npx -y --package=divlet divlet-mcp --cwd ./my-project
+npx -y @divlet/mcp --cwd ./workspace
 
 # Or install both commands globally:
-npm install -g divlet
+npm install -g @divlet/cli @divlet/mcp
 ```
 
-For Pi, install `pi install npm:pi-divlet` only after **both** `divlet` and `pi-divlet` have been published. The thin wrapper depends on the product; it does not copy the adapter.
+For Pi, run `pi install npm:@divlet/pi` after publication. Shared setups should pin `@divlet/cli@0.0.1`, `@divlet/mcp@0.0.1` and `npm:@divlet/pi@0.0.1`. The root package has no commands or Pi manifest; there is no wrapper layer.
 
 See [npm publication](docs/publishing.md) for version pinning, package identity and release gates.
 

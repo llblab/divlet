@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 1,
   "name": "Plain web",
   "tokens": {
     "--accent": "#123456"

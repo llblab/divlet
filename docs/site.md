@@ -137,4 +137,4 @@ The runtime prepares a complete candidate before replacing the accepted site. In
 
 JSON ↔ HTML round trips apply to the template and the existing static model profile. Generated route HTML does not encode the original Markdown syntax and cannot reconstruct its source file. Site export, authored JavaScript and application-style client-side routing are not implemented.
 
-Run the included example with `npm run demo:site`. Its sources live in `examples/site/handbook/`.
+Run the included example with `npm run demo:site`. Its sources live in `examples/handbook/`: the native `project.divlet` template, `site.json`, Markdown under `content/`, and guide/template asset inputs remain independently owned sources. The complete Markdown site is not a single portable `.divlet` file.

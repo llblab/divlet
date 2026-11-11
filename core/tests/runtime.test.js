@@ -49,7 +49,7 @@ test('patches persist the project file, the generated page and its meta.json wit
   const page = await fs.readFile(entry.htmlPath, 'utf8');
   assert.match(page, />Updated</);
   const stored = await readJson(project);
-  assert.equal(stored.schemaVersion, 2);
+  assert.equal(stored.schemaVersion, 1);
   assert.equal(stored.frames[0].nodes.label.content, 'Updated');
   assert.equal(stored.frames[0].schemaVersion, undefined);
   const meta = await readJson(entry.metaPath);

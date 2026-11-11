@@ -31,7 +31,7 @@ for (const createDemo of [false, true]) test(`missing-source initialization (dem
   const root = await fixture(t), file = path.join(root, 'project.divlet'), snapshots = [], preflight = OutputStore.prototype.preflight;
   t.mock.method(OutputStore.prototype, 'preflight', async function(files, ...args) { if (this.projectFile === file) snapshots.push(Object.fromEntries([...files].map(([name, data]) => [name, hash(data)]))); return preflight.call(this, files, ...args); });
   const runtime = await openRuntime({ file, watch: false, createDemo }); t.after(() => runtime.close());
-  const source = JSON.parse(await fs.readFile(file, 'utf8')); assert.equal(source.schemaVersion, 2); assert.equal(Object.hasOwn(source, 'children'), false); assert.equal(source.frames.length, createDemo ? 1 : 0);
+  const source = JSON.parse(await fs.readFile(file, 'utf8')); assert.equal(source.schemaVersion, 1); assert.equal(Object.hasOwn(source, 'children'), false); assert.equal(source.frames.length, createDemo ? 1 : 0);
   assert.equal(runtime.info().project.format, 'divlet'); assert.equal(runtime.settings.version, 1); assert.equal(runtime.history.length, 0); assert.equal(runtime.documents.size, createDemo ? 1 : 0);
   assert.deepEqual(snapshots.at(-1), snapshots[0]);
   if (createDemo) { assert.ok(Object.keys(snapshots[0]).some(name => name.endsWith('.html'))); assert.ok(Object.keys(snapshots[0]).some(name => name.endsWith('.meta.json'))); }
@@ -53,7 +53,7 @@ test('a source-absent starter project can be edited and is saved as an ordinary 
   const entry = [...runtime.documents.values()][0], edited = await runtime.edit({ documentId: entry.document.id, expectedVersion: entry.document.version, expectedRender: entry.render, op: { type: 'text', id: 'brand-text', content: 'Default edit' } });
   assert.equal(edited.saved, true);
   const saved = JSON.parse(await fs.readFile(runtime.projectPath, 'utf8'));
-  assert.equal(saved.schemaVersion, 2); assert.match(JSON.stringify(saved.frames[0]), /Default edit/);
+  assert.equal(saved.schemaVersion, 1); assert.match(JSON.stringify(saved.frames[0]), /Default edit/);
 });
 
 test('existing source disappearance is refused even when a direct load caller asks for initialization', async t => {

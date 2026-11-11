@@ -9,5 +9,11 @@
     "outDir": "dist",
     "rootDir": "."
   },
-  "exclude": ["node_modules", "dist", "web", "examples", "**/tests/**"]
+  "exclude": [
+    "node_modules",
+    "**/dist/**",
+    "web",
+    "examples",
+    "**/tests/**"
+  ]
 }

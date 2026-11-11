@@ -78,7 +78,7 @@ try {
   checks.push('a new open clears the previous error; an older held failure cannot replace the latest error or steal card focus');
   await page.locator('#q').fill('New canvas'); await page.locator('#make').click();
   await page.locator('#open-error-title', { hasText: 'Could not open the new project' }).waitFor();
-  assert.equal(JSON.parse(await fs.readFile(path.join(root, 'new-canvas.divlet'), 'utf8')).schemaVersion, 2);
+  assert.equal(JSON.parse(await fs.readFile(path.join(root, 'new-canvas.divlet'), 'utf8')).schemaVersion, 1);
   assert.equal(page.url(), hub.url); assert.deepEqual(errors, []);
   checks.push('new-project open failure uses the same bottom alert without falsely claiming its already-published source was not created');
   console.log(JSON.stringify({ status: 'passed', checks, screenshots: ['artifacts/launcher-error-wide.png', 'artifacts/launcher-error-narrow.png'] }, null, 2));

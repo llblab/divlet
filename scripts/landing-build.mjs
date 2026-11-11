@@ -15,24 +15,12 @@ const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const equal = (a, b) => a.size === b.size && [...a].every(([name, bytes]) => b.get(name)?.equals(bytes));
 
 async function inputs(source) {
-  const directory = path.dirname(source), budget = { bytes: 0 }, files = new Map();
+  const budget = { bytes: 0 }, files = new Map();
   files.set('landing.divlet', await readResourceBytes(source, budget));
   const raw = JSON.parse(files.get('landing.divlet').toString('utf8'));
   if (raw.outputDir != null || raw.frames?.length !== 1 || raw.frames[0]?.id !== 'index') throw new Error('Landing must have one index frame and the default output directory.');
-  const walk = async relative => {
-    const full = path.join(directory, relative);
-    await safeDirectory(full);
-    for (const entry of await fs.readdir(full, { withFileTypes: true })) {
-      if (entry.name.startsWith('.')) continue;
-      const name = path.posix.join(relative, entry.name);
-      if (entry.isDirectory()) await walk(name);
-      else {
-        if (files.size >= 400) throw new Error('Too many landing inputs.');
-        files.set(name, await readResourceBytes(path.join(directory, name), budget));
-      }
-    }
-  };
-  await walk('assets/landing');
+  // Literal SVG nodes and a data-URL favicon keep this project's input closure inside its source.
+  if (!raw.frames[0].head?.icon?.startsWith('data:image/svg+xml;base64,')) throw new Error('Landing favicon must be embedded in its project.');
   return files;
 }
 
@@ -101,5 +89,5 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   const unknown = process.argv.slice(2).filter(arg => arg !== '--check');
   if (unknown.length) throw new Error(`Unknown landing build argument: ${unknown.join(', ')}`);
   const files = await (check ? checkLanding() : buildLanding());
-  console.log(`${check ? 'Verified' : 'Built and verified'} examples/landing.divlet → examples/.divlet/landing (${files.length} owned files).`);
+  console.log(`${check ? 'Verified' : 'Built and verified'} examples/landing/landing.divlet → examples/landing/.divlet/landing (${files.length} owned files).`);
 }

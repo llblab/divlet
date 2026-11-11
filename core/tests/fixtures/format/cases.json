@@ -239,7 +239,7 @@
     {
       "id": "unknown-project-field",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [],
         "custom": "use metadata"
       },
@@ -248,7 +248,7 @@
     {
       "id": "non-array-frames",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": {}
       },
       "errorCode": "INVALID_PROJECT"
@@ -256,7 +256,7 @@
     {
       "id": "css-build-directive",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [],
         "css": "@import \"outside.css\";"
       },
@@ -265,7 +265,7 @@
     {
       "id": "future-frame-schema",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "page",
@@ -294,7 +294,7 @@
     {
       "id": "unknown-node-field",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "page",
@@ -323,7 +323,7 @@
     {
       "id": "node-key-mismatch",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "page",
@@ -351,7 +351,7 @@
     {
       "id": "missing-child",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "page",
@@ -382,7 +382,7 @@
     {
       "id": "unreachable-node",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "page",
@@ -415,7 +415,7 @@
     {
       "id": "executable-tag",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "page",
@@ -443,7 +443,7 @@
     {
       "id": "executable-url",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "page",
@@ -474,7 +474,7 @@
     {
       "id": "numeric-inline-value",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "page",
@@ -505,7 +505,7 @@
     {
       "id": "unsafe-frame-metadata-key",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "page",
@@ -538,7 +538,7 @@
     {
       "id": "missing-component",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "page",
@@ -574,7 +574,7 @@
     {
       "id": "component-cycle",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "page",
@@ -611,7 +611,7 @@
     {
       "id": "duplicate-frame-id",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "page",
@@ -658,7 +658,7 @@
     {
       "id": "contextless-table-row",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "invalid-context",
@@ -687,7 +687,7 @@
     {
       "id": "paragraph-browser-repair",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "invalid-context",
@@ -724,7 +724,7 @@
     {
       "id": "foster-parented-table-text",
       "input": {
-        "schemaVersion": 2,
+        "schemaVersion": 1,
         "frames": [
           {
             "id": "invalid-context",

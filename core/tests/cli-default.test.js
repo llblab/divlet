@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 for (const demo of [false, true]) test(`real CLI creates a Divlet project with ${demo ? 'a starter frame' : 'zero frames via --no-demo'}`, async t => {
   const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-cli-default-'));
-  const child = spawn(process.execPath, [fileURLToPath(new URL('../../adapters/cli/index.js', import.meta.url)), '--no-watch', ...(demo ? [] : ['--no-demo'])], { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [fileURLToPath(import.meta.resolve('@divlet/cli')), '--no-watch', ...(demo ? [] : ['--no-demo'])], { cwd, stdio: ['ignore', 'pipe', 'pipe'] });
   const exited = new Promise(resolve => child.once('exit', resolve)); let stderr = '';
   child.stderr.on('data', data => { stderr += data; });
   t.after(async () => { if (child.exitCode === null) child.kill('SIGINT'); await exited; await fs.rm(cwd, { recursive: true, force: true }); });
@@ -21,5 +21,5 @@ for (const demo of [false, true]) test(`real CLI creates a Divlet project with $
   const state = await (await fetch(new URL('api/project', url))).json();
   assert.equal(state.project.format, 'divlet'); assert.equal(state.documents.length, demo ? 1 : 0); assert.equal(state.project.version, 1);
   const source = JSON.parse(await fs.readFile(path.join(cwd, 'project.divlet'), 'utf8'));
-  assert.equal(source.schemaVersion, 2); assert.equal(Object.hasOwn(source, 'children'), false); assert.equal(source.frames.length, demo ? 1 : 0); assert.equal(stderr, '');
+  assert.equal(source.schemaVersion, 1); assert.equal(Object.hasOwn(source, 'children'), false); assert.equal(source.frames.length, demo ? 1 : 0); assert.equal(stderr, '');
 });

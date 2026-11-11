@@ -12,7 +12,7 @@ const root = await mkdtemp(path.join(os.tmpdir(), 'divlet-open-'));
 const examples = fileURLToPath(new URL('../../../examples/studio/', import.meta.url));
 await cp(examples, path.join(root, 'work', 'first'), { recursive: true });
 await mkdir(path.join(root, 'work', 'second'));
-await writeFile(path.join(root, 'work', 'second', 'project.divlet'), JSON.stringify({ schemaVersion: 2, name: 'Second project', version: 1, tokens: {}, css: '', metadata: {}, frames: [] }));
+await writeFile(path.join(root, 'work', 'second', 'project.divlet'), JSON.stringify({ schemaVersion: 1, name: 'Second project', version: 1, tokens: {}, css: '', metadata: {}, frames: [] }));
 await mkdir(path.join(root, 'empty-folder'));
 await mkdir(path.join(root, 'busy'));
 await writeFile(path.join(root, 'busy', 'notes.txt'), 'hello');
@@ -88,12 +88,12 @@ try {
   assert.ok((await readdir(path.join(root, 'empty-folder'))).includes('project.divlet'));
   await page.waitForFunction(() => document.querySelector('#loading')?.hidden);
   const nativeFile = path.join(root, 'empty-folder/project.divlet'), nativeSeed = JSON.parse(await readFile(nativeFile, 'utf8'));
-  assert.deepEqual(nativeSeed, { schemaVersion: 2, name: 'Untitled project', version: 1, tokens: {}, css: '', metadata: {}, frames: [] }); await page.locator('#empty-new').waitFor();
+  assert.deepEqual(nativeSeed, { schemaVersion: 1, name: 'Untitled project', version: 1, tokens: {}, css: '', metadata: {}, frames: [] }); await page.locator('#empty-new').waitFor();
   await page.setViewportSize({ width: 390, height: 860 }); await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(200));
   await page.locator('#empty-new').scrollIntoViewIfNeeded(); assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await mkdir('artifacts', { recursive: true }); await page.screenshot({ path: 'artifacts/native-created-empty.png' });
   await page.locator('#empty-new').click(); await page.locator('.artboard').waitFor();
-  const firstNative = JSON.parse(await readFile(nativeFile, 'utf8')); assert.equal(firstNative.frames.length, 1); assert.equal(firstNative.schemaVersion, 2);
+  const firstNative = JSON.parse(await readFile(nativeFile, 'utf8')); assert.equal(firstNative.frames.length, 1); assert.equal(firstNative.schemaVersion, 1);
   await page.reload(); await page.waitForFunction(() => document.querySelector('#loading')?.hidden); await page.locator('.artboard').waitFor();
   await page.setViewportSize({ width: 1300, height: 860 }); await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(100));
   checks.push('Create here publishes an empty Divlet project; 390px/200% first-frame creation and reload retain it');
@@ -141,7 +141,7 @@ try {
   assert.equal(await page.locator('#status').getAttribute('data-project'), 'portable');
   assert.equal(await page.locator('#empty').isVisible(), true);
   assert.equal(await readFile(pen, 'utf8'), penSource);
-  assert.equal(JSON.parse(await readFile(path.join(root, 'work', 'second', 'portable.divlet'), 'utf8')).schemaVersion, 2, 'the converted project sits beside it');
+  assert.equal(JSON.parse(await readFile(path.join(root, 'work', 'second', 'portable.divlet'), 'utf8')).schemaVersion, 1, 'the converted project sits beside it');
   checks.push('Open project lists a .pen file, converts it into a sibling Divlet project and opens that, leaving the .pen unchanged');
 
   assert.deepEqual(errors, []);

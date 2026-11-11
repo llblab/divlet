@@ -1,0 +1,39 @@
+{
+  "name": "@divlet/cli",
+  "version": "0.0.1",
+  "description": "The divlet command-line adapter",
+  "type": "module",
+  "main": "./dist/index.js",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/llblab/divlet.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/llblab/divlet#readme",
+  "bugs": {
+    "url": "https://github.com/llblab/divlet/issues"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "exports": {
+    ".": {
+      "divlet-source": "./index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "divlet": "./dist/index.js"
+  },
+  "dependencies": {
+    "divlet": "0.0.1"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "prepack": "node ../../scripts/build.mjs"
+  }
+}

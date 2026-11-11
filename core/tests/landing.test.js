@@ -11,6 +11,8 @@ import { readProject, writeProject } from '../lib/project.ts';
 import { encodeHtml, decodeHtml } from '../lib/codec.ts';
 import { landingSource, landingDirectory, landingFiles, landingHash, copyLanding } from '../../scripts/landing-hash.mjs';
 import { checkLanding, buildLanding } from '../../scripts/landing-build.mjs';
+import { OutputStore } from '../lib/output.ts';
+import { openRuntime } from '../lib/runtime.js';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const read = name => fs.readFile(path.join(landingDirectory, name), 'utf8');
@@ -20,8 +22,12 @@ const fixture = async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-landing-test-'));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
   await fs.copyFile(landingSource, path.join(directory, 'landing.divlet'));
-  await fs.cp(path.join(root, 'examples/assets/landing'), path.join(directory, 'assets/landing'), { recursive: true });
-  await fs.cp(landingDirectory, path.join(directory, '.divlet/landing'), { recursive: true });
+  const store = new OutputStore(landingSource), manifest = await store.manifest();
+  for (const name of ['.divlet-build.json', ...Object.keys(manifest.files)]) {
+    const file = path.join(directory, '.divlet/landing', name);
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(file, await store.read(name), { flag: 'wx' });
+  }
   return { directory, source: path.join(directory, 'landing.divlet'), output: path.join(directory, '.divlet/landing') };
 };
 
@@ -32,7 +38,7 @@ test('the native landing reopens and reproduces its relocated owned cache withou
   assert.equal(writeProject(project.settings, project.frames), source);
   assert.deepEqual(decodeHtml(encodeHtml(project.frames[0])), project.frames[0]);
   assert.match(project.frames[0].head.description, /local browser layout board/);
-  assert.equal(project.frames[0].head.icon, 'assets/landing/favicon.svg');
+  assert.match(project.frames[0].head.icon, /^data:image\/svg\+xml;base64,/);
   const before = await landingHash();
   await checkLanding();
   assert.equal(await fs.readFile(landingSource, 'utf8'), source);
@@ -42,7 +48,7 @@ test('the native landing reopens and reproduces its relocated owned cache withou
 test('fingerprint and copy share the exact public bytes, including the Pages marker but not sidecars', async t => {
   const files = await landingFiles(), hash = await landingHash();
   assert.deepEqual(files.filter(name => !name.startsWith('_assets/')), ['.nojekyll', 'index.html']);
-  assert.ok(files.some(name => /^_assets\/.+-favicon\.svg$/.test(name)));
+  assert.deepEqual(files, ['.nojekyll', 'index.html'], 'the self-contained source needs no separately materialized favicon');
   assert.match(hash, /^[a-f0-9]{64}$/); assert.equal(await landingHash(), hash);
   const target = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-pages-copy-'));
   t.after(() => fs.rm(target, { recursive: true, force: true }));
@@ -52,8 +58,26 @@ test('fingerprint and copy share the exact public bytes, including the Pages mar
   assert.deepEqual(await fs.readFile(path.join(target, 'index.html')), await fs.readFile(path.join(landingDirectory, 'index.html')));
 });
 
+test('the public set still includes separately owned portable resources and verifies their bytes', async t => {
+  const { source, output } = await fixture(t);
+  const project = JSON.parse(await fs.readFile(source, 'utf8'));
+  const prefix = 'data:image/svg+xml;base64,';
+  await fs.writeFile(path.join(path.dirname(source), 'icon.svg'), Buffer.from(project.frames[0].head.icon.slice(prefix.length), 'base64'));
+  project.frames[0].head.icon = 'icon.svg';
+  await fs.writeFile(source, JSON.stringify(project, null, 2) + '\n');
+  const runtime = await openRuntime({ file: source, watch: false, createDemo: false });
+  t.after(() => runtime.close());
+  const files = await landingFiles(output), resource = files.find(name => /^_assets\/.+-icon\.svg$/.test(name));
+  assert.ok(resource, 'embedded examples must not remove public-set support for ordinary file resources');
+  const before = await landingHash(output);
+  assert.match(before, /^[a-f0-9]{64}$/);
+  await fs.appendFile(path.join(output, resource), '<!-- hand edit -->');
+  await assert.rejects(() => landingHash(output), /hand-edited/);
+});
+
 test('private and unowned output is never published; hand-edited owned output is refused', async t => {
   const { output } = await fixture(t), before = await landingHash(output);
+  await fs.mkdir(path.join(output, '_assets'), { recursive: true });
   for (const name of ['secret.txt', 'index.meta.json.backup', '_assets/not-owned.svg', '.divlet-write.lock']) {
     await fs.writeFile(path.join(output, name), 'private');
   }
@@ -77,6 +101,11 @@ test('the generated page keeps crawler metadata, real section links and a self-c
   const files = new Set(await landingFiles());
   for (const node of nodes) for (const item of node.attrs) {
     if (!['src', 'href'].includes(item.name)) continue;
+    if (item.value.startsWith('data:')) {
+      assert.equal(node.tagName, 'link'); assert.equal(attr(node, 'rel'), 'icon');
+      assert.match(item.value, /^data:image\/svg\+xml;base64,/);
+      continue;
+    }
     assert.ok(!/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(item.value), `no external request: ${item.value}`);
     if (item.value.startsWith('#')) assert.equal(nodes.filter(target => attr(target, 'id') === item.value.slice(1)).length, 1, `unique target for ${item.value}`);
     else assert.ok(files.has(item.value.split(/[?#]/)[0]), `published file backs ${item.value}`);
@@ -88,23 +117,25 @@ test('the generated page keeps crawler metadata, real section links and a self-c
 test('installation examples distinguish packages, commands and unpublished status', async () => {
   const html = await read('index.html');
   const pkg = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
-  const wrapper = JSON.parse(await fs.readFile(path.join(root, 'packages/pi-divlet/package.json'), 'utf8'));
-  assert.ok(html.includes(`npx -y ${pkg.name} ./my-project`));
-  assert.ok(html.includes(`npx -y --package=${pkg.name} divlet-mcp --cwd ./my-project`));
+  const wrapper = JSON.parse(await fs.readFile(path.join(root, 'packages/pi/package.json'), 'utf8'));
+  assert.ok(html.includes('npx -y @divlet/cli ./my-project'));
+  assert.ok(html.includes('npx -y @divlet/mcp --cwd ./my-project'));
   assert.ok(html.includes(`pi install npm:${wrapper.name}`));
   assert.match(html, /not yet published/);
 });
 
-test('freshness refuses source/asset drift and metadata-only rebuilds do not change the public fingerprint', async t => {
-  const { source, output, directory } = await fixture(t), original = await landingHash(output);
+test('freshness refuses source/embedded-resource drift and metadata-only rebuilds do not change the public fingerprint', async t => {
+  const { source, output } = await fixture(t), original = await landingHash(output);
   const project = JSON.parse(await fs.readFile(source, 'utf8'));
   project.frames[0].metadata.reviewNote = 'Not public content';
   await fs.writeFile(source, JSON.stringify(project, null, 2) + '\n');
   await assert.rejects(() => checkLanding(source), /cache is stale/);
   await buildLanding(source);
   assert.equal(await landingHash(output), original, 'sidecar/ownership changes cannot trigger deployment commits');
-  const icon = path.join(directory, 'assets/landing/favicon.svg');
-  await fs.writeFile(icon, (await fs.readFile(icon, 'utf8')).replace('#5b5bf0', '#3737f0'));
+  const prefix = 'data:image/svg+xml;base64,';
+  const icon = Buffer.from(project.frames[0].head.icon.slice(prefix.length), 'base64').toString('utf8');
+  project.frames[0].head.icon = prefix + Buffer.from(icon.replace('#5b5bf0', '#3737f0')).toString('base64');
+  await fs.writeFile(source, JSON.stringify(project, null, 2) + '\n');
   await assert.rejects(() => checkLanding(source), /cache is stale/);
   await buildLanding(source);
   assert.notEqual(await landingHash(output), original, 'published resource bytes participate in the fingerprint');
@@ -114,12 +145,19 @@ test('CI verifies then copies the prepared public set without compiling a differ
   const workflow = YAML.parse(await fs.readFile(path.join(root, '.github/workflows/landing.yml'), 'utf8'));
   const steps = workflow.jobs.publish.steps, publish = steps.find(step => step.name === 'Publish');
   assert.ok(steps.some(step => step.run === 'npm run landing:check'));
+  assert.equal(steps.find(step => step.uses?.startsWith('actions/setup-node@')).with['node-version'], 22);
+  const contracts = steps.find(step => step.name === 'Test landing and resource contracts').run;
+  assert.match(contracts, /npm run typecheck/);
+  for (const file of ['landing', 'icons', 'data-urls']) assert.ok(contracts.includes(`core/tests/${file}.test.js`));
   assert.ok(steps.some(step => String(step.run).includes('node scripts/landing-hash.mjs')));
   assert.match(publish.run, /node scripts\/landing-hash\.mjs --copy/);
   assert.match(publish.run, /test "\$copied_hash"/);
   assert.equal(/landing:build|sed |index\.html/.test(publish.run), false);
   assert.equal(workflow.permissions.contents, 'write');
-  assert.ok(workflow.on.push.paths.includes('examples/.divlet/landing/**'));
+  assert.ok(workflow.on.push.paths.includes('examples/landing/**'), 'nested source, favicon and prepared cache trigger CI');
+  assert.equal(workflow.on.push.paths.some(value => /examples\/(?:assets|\.divlet)/.test(value)), false, 'retired landing locations do not drive publication');
+  assert.equal(landingSource, path.join(root, 'examples/landing/landing.divlet'));
+  assert.equal(landingDirectory, path.join(path.dirname(landingSource), '.divlet/landing'));
   assert.ok(workflow.on.workflow_dispatch !== undefined);
   assert.match(publish.if, /outputs.hash !=/);
   const ignores = await fs.readFile(path.join(root, 'examples/.npmignore'), 'utf8');

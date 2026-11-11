@@ -2,7 +2,7 @@
 // reach by a relative path (`web`, the skill, plugin client modules), copied so those paths keep meaning the same thing.
 // Development and tests run the TypeScript sources directly; only what npm publishes goes through here.
 import { execFileSync } from 'node:child_process';
-import { chmod, cp, readdir, rm } from 'node:fs/promises';
+import { chmod, cp, readFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,7 +19,17 @@ for (const plugin of await readdir(path.join(root, 'plugins'), { withFileTypes: 
   if (!plugin.isDirectory()) continue;
   await cp(path.join(root, 'plugins', plugin.name, 'web'), path.join(dist, 'plugins', plugin.name, 'web'), { recursive: true }).catch(() => {});
 }
-// A bin file has to be executable in the tarball; tsc does not carry the mode bit.
-for (const bin of ['adapters/cli/index.js', 'adapters/mcp/index.js']) await chmod(path.join(dist, bin), 0o755);
+// Each adapter owns its published output; none of its implementation ships in the product tarball.
+const product = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+for (const name of ['cli', 'mcp', 'pi']) {
+  const directory = path.join(root, 'packages', name);
+  const pkg = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'));
+  if (pkg.version !== product.version || pkg.dependencies?.divlet !== product.version) throw new Error(`${pkg.name} must share the product version and pin divlet exactly.`);
+  await rm(path.join(directory, 'dist'), { recursive: true, force: true });
+  await cp(path.join(dist, 'packages', name), path.join(directory, 'dist'), { recursive: true });
+  await cp(path.join(root, 'LICENSE'), path.join(directory, 'dist/LICENSE'));
+  if (pkg.bin) await chmod(path.join(directory, 'dist/index.js'), 0o755);
+}
+await rm(path.join(dist, 'packages'), { recursive: true, force: true });
 // Progress goes to stderr: stdout may be a machine-readable `npm pack --json` stream.
 console.error(`dist: ${(await readdir(dist)).length} entries`);

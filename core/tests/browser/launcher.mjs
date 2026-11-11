@@ -11,7 +11,7 @@ const playwright = await import('playwright');
 const root = await mkdtemp(path.join(os.tmpdir(), 'divlet-launcher-'));
 await cp(fileURLToPath(new URL('../../../examples/studio/', import.meta.url)), path.join(root, 'Designs', 'app'), { recursive: true });
 await mkdir(path.join(root, 'Designs', 'landing'));
-await writeFile(path.join(root, 'Designs', 'landing', 'project.divlet'), JSON.stringify({ schemaVersion: 2, name: 'Landing page', version: 1, tokens: {}, css: '', metadata: {}, frames: [] }));
+await writeFile(path.join(root, 'Designs', 'landing', 'project.divlet'), JSON.stringify({ schemaVersion: 1, name: 'Landing page', version: 1, tokens: {}, css: '', metadata: {}, frames: [] }));
 await mkdir(path.join(root, 'Designs', 'broken'));
 await writeFile(path.join(root, 'Designs', 'broken', 'project.divlet'), '{ nope');
 const boards = new Map();
@@ -60,7 +60,7 @@ try {
     assert.ok(!created.includes('pricing-page'), 'creation does not add a wrapper folder');
     await page.waitForFunction(() => document.querySelector('#loading')?.hidden); await page.locator('#source-mode').waitFor({ state: 'hidden' });
     const createdFile = path.join(root, 'Designs/pricing-page.divlet');
-    assert.deepEqual(JSON.parse(await readFile(createdFile, 'utf8')), { schemaVersion: 2, name: 'Pricing Page', version: 1, tokens: {}, css: '', metadata: {}, frames: [] });
+    assert.deepEqual(JSON.parse(await readFile(createdFile, 'utf8')), { schemaVersion: 1, name: 'Pricing Page', version: 1, tokens: {}, css: '', metadata: {}, frames: [] });
     await page.locator('#empty-new').click(); await page.locator('.artboard').waitFor();
     const firstRoot = JSON.parse(await readFile(createdFile, 'utf8')); assert.equal(firstRoot.frames.length, 1); assert.equal(firstRoot.name, 'Pricing Page');
     const firstUrl = page.url();

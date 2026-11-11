@@ -43,7 +43,7 @@ test('the divlet mark keeps an open bracket and a filled D with matching diagona
   // Both bracket arms and D diagonals have a 1:1 rise/run, meeting on the same horizontal centre.
   const [bracket, wedge] = paths(mark).map(part => part.d.match(/-?\d+(?:\.\d+)?/g).map(Number));
   assert.equal(Math.abs((bracket[1] - bracket[3]) / (bracket[0] - bracket[2])), Math.abs((wedge[4] - wedge[1]) / (wedge[3] - wedge[2])));
-  for (const file of ['web/index.html', 'core/lib/hub.ts', 'examples/.divlet/landing/index.html', 'examples/assets/landing/favicon.svg', 'examples/site/handbook/assets/divlet-mark.svg']) {
+  for (const file of ['web/index.html', 'core/lib/hub.ts', 'examples/landing/.divlet/landing/index.html']) {
     const source = await readFile(path.join(root, file), 'utf8');
     const svg = source.match(/<svg\b[^>]*>[\s\S]*?<\/svg>/)?.[0];
     assert.ok(svg, `${file}: literal mark exists`);
@@ -53,6 +53,13 @@ test('the divlet mark keeps an open bracket and a filled D with matching diagona
       assert.ok(encoded, `${file}: embedded favicon exists`);
       assert.deepEqual(paths(decodeURIComponent(encoded)), wanted, `${file}: favicon matches the mark`);
     }
+  }
+  const landing = JSON.parse(await readFile(path.join(root, 'examples/landing/landing.divlet'), 'utf8'));
+  const handbook = JSON.parse(await readFile(path.join(root, 'examples/handbook/project.divlet'), 'utf8'));
+  const embedded = [landing.frames[0].head.icon, handbook.frames[0].nodes['node-4'].attrs.src];
+  for (const uri of embedded) {
+    assert.match(uri, /^data:image\/svg\+xml;base64,/);
+    assert.deepEqual(paths(Buffer.from(uri.split(',')[1], 'base64').toString('utf8')), wanted, 'project-owned embedded marks match the same geometry');
   }
 });
 

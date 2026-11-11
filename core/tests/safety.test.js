@@ -127,7 +127,7 @@ test('the frame limit is enforced before writing a project that cannot reopen', 
   const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-frame-limit-'));
   t.after(() => rm(cwd, { recursive: true, force: true }));
   const frames = Array.from({ length: 200 }, (_, i) => { const { schemaVersion, ...stored } = frame(`frame${i}`); return stored; });
-  await writeFile(path.join(cwd, 'project.divlet'), JSON.stringify({ schemaVersion: 2, name: 'Limit', version: 1, tokens: {}, css: '', metadata: {}, frames }));
+  await writeFile(path.join(cwd, 'project.divlet'), JSON.stringify({ schemaVersion: 1, name: 'Limit', version: 1, tokens: {}, css: '', metadata: {}, frames }));
   const runtime = await openRuntime({ cwd, watch: false, createDemo: false });
   t.after(() => runtime.close());
   const disk = await readFile(runtime.projectPath, 'utf8');

@@ -7,8 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { OutputStore, safeDirectory } from '../core/lib/output.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-export const landingSource = path.join(root, 'examples/landing.divlet');
-export const landingDirectory = path.join(root, 'examples/.divlet/landing');
+export const landingSource = path.join(root, 'examples/landing/landing.divlet');
+export const landingDirectory = path.join(root, 'examples/landing/.divlet/landing');
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 
 /** The landing is one page plus portable assets, never sidecars, ownership data or unowned directory debris. */

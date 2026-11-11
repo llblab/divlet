@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { PROJECT_SCHEMA } from '../../../core/lib/project.ts';
 
 
 import { DivletError, SOURCE_LIMITS, LIMITS, PROJECTION_LIMITS, validateTokens, validateCss, validateMetadata, merge } from '../../../core/lib/model.ts';
@@ -7,7 +8,7 @@ import { validateProjectSource, isSourceReplacement, validateDivletPresentation,
 /*
  * Source ownership stays in one JSON file, <name>.divlet or an existing .pen.
  * PEN uses { version: "2.21", children, variables, divlet? }; read/write retain that graph.
- * The runtime still consumes { schemaVersion: 2, name, version, tokens, css, metadata, frames }
+ * The runtime still consumes { schemaVersion: 1, name, version, tokens, css, metadata, frames }
  * during its transition. Native source must never be persisted through that legacy writer.
  *
  * A legacy frame is the ID-addressed node tree of one artboard. Any element marked
@@ -16,7 +17,7 @@ import { validateProjectSource, isSourceReplacement, validateDivletPresentation,
  * "/" to reach into nested instances), following the Pencil .pen conventions.
  */
 
-export const PROJECT_SCHEMA = 2;
+export { PROJECT_SCHEMA };
 const MAX_FRAMES = SOURCE_LIMITS.roots;
 const THEME_UNITS = new Set(['', 'px', 'rem', 'em', '%', 'ms', 's', 'deg']);
 

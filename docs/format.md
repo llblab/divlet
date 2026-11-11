@@ -12,13 +12,13 @@ The format does not standardize editor selection, hover, panels, viewport naviga
 
 ## Versions and compatibility
 
-- The current project envelope uses `schemaVersion: 2`. The first npm release does not imply renumbering it to 1.
-- Standalone frame documents passed to the validator/codec use `schemaVersion: 1`. Frames stored inside a project omit that field; the reader supplies 1, and currently also accepts an explicit 1. This is a distinction between envelopes, not two npm release versions.
+- Native project envelopes and standalone frame documents use `schemaVersion: 1`. This is the unfrozen first-format baseline; no released compatibility contract exists for speculative schema 2 or 3. Keep 1 throughout pre-freeze development rather than advancing it for unpublished design iterations. npm release numbers are independent.
+- Standalone frame documents passed to the validator/codec use `schemaVersion: 1`. Frames stored inside a project omit that field; the reader supplies 1, and currently also accepts an explicit 1. Project and standalone-frame shapes remain distinct even though both use the same initial schema marker.
 - Project `version` is a positive safe-integer revision for project settings; each frame has its own positive safe-integer `version`. Neither is a schema version or an aggregate clock for every change in the file. Runtime render/revision counters are separate.
 - The current reader rejects an unsupported project schema version and unknown project/frame/node fields. Extensions belong under metadata, not invented top-level fields.
 - Once frozen, changing the meaning of an existing valid file must not be hidden behind an unchanged schema version. A breaking change needs an explicit schema/migration decision; a migration must not silently replace authored source.
 
-**Implementation boundary:** the [approved profile](#approved-first-release-profile) selects compatibility, migration, numeric, duplicate-member and capacity rules for implementation. The current reader does not yet implement that versioned transition. An object-based validator cannot prove that the original JSON text had unique member names. This candidate does not promise byte-preserving JSON serialization or support for future schema versions.
+**Implementation boundary:** the [approved profile](#approved-first-release-profile) selects compatibility, migration, numeric, duplicate-member and capacity rules for implementation. The current reader does not yet implement that complete draft-profile update. Proposed fields are not accepted merely because they carry the same schema marker. An object-based validator cannot prove that the original JSON text had unique member names. This candidate does not promise byte-preserving JSON serialization or support for future schema versions.
 
 The implementation currently parses JSON numbers as JavaScript binary64 values. A lexical `9007199254740993` is already `9007199254740992` before model validation; `1e-400` becomes zero at the same stage. Metadata `-0` survives admission but `JSON.stringify` writes positive zero. Parse-time rounding must not be misreported as corruption by the project writer. The approved direction is finite binary64 values with equivalent signed zeros, using application-defined strings for precision-sensitive values; exact lexical/decimal preservation would require a different admission representation. This is an implementation target, not a newly frozen numeric promise. The [approved first-release profile](#approved-first-release-profile) below owns the related CSS, identity, dependency and migration choices.
 
@@ -28,7 +28,7 @@ This is a complete valid source example, not JSON with placeholder comments:
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 1,
   "name": "Landing",
   "version": 1,
   "tokens": { "--color-brand": "#d7b474" },
@@ -52,7 +52,7 @@ This is a complete valid source example, not JSON with placeholder comments:
 
 | Field | Current admission and meaning |
 | --- | --- |
-| `schemaVersion` | Required; exactly 2. |
+| `schemaVersion` | Required; exactly 1. |
 | `frames` | Required array, including an empty array. Frame IDs must be unique in the project. Array order is retained. |
 | `name` | Well-formed string, at most 512 UTF-16 code units, normalized to LF; omitted/null defaults to `Untitled project`. |
 | `version` | Positive safe integer; omitted or null defaults to 1. |
@@ -71,7 +71,7 @@ A stored frame has `{ id, name, head?, version, artboard, rootId, tokens, css, m
 
 The optional `head` object is an explicit additive field in the working draft, not interpreted metadata. It admits only `description` (a well-formed string of at most 2048 UTF-16 code units) and `icon` (a well-formed URL string of at most 8192 units, subject to the same executable-scheme refusal as ordinary resource attributes). Unknown fields, null stored values and nonstrings are refused. Absent head stays absent; an explicitly empty object remains distinguishable in the native preview manifest. Frame patches merge it and permit null removal of a member or the whole object. The title remains `name`; the document language remains `en`. No arbitrary head tags, scripts, MIME/sizes hints or executable metadata are admitted.
 
-The codec emits supported description/icon fields into the real HTML head, safely escaped, and refuses duplicate or conflicting supported physical values. Strict decoding refuses unsupported icon attributes rather than discarding them; lossy external HTML admission can normalize them to the supported URL-only profile. Icons join the ordinary resource graph for static bundling and source-relative project copies; this does not add general external/absolute-resource relocation to Save a copy. Existing inputs gain no head field or changed meaning, and schema-3 migration must retain an explicitly authored head and its resource base.
+The codec emits supported description/icon fields into the real HTML head, safely escaped, and refuses duplicate or conflicting supported physical values. Strict decoding refuses unsupported icon attributes rather than discarding them; lossy external HTML admission can normalize them to the supported URL-only profile. Icons join the ordinary resource graph for static bundling and source-relative project copies; this does not add general external/absolute-resource relocation to Save a copy. Existing inputs gain no head field or changed meaning, and any explicit draft conversion must retain an explicitly authored head and its resource base.
 
 Identifiers match `[A-Za-z][A-Za-z0-9_.:-]{0,95}`: 1–96 ASCII characters, starting with a letter. A frame ID is unique in its project. A node ID is unique in its frame; another frame may use the same node ID. Every node map key must equal that node's `id`. Reserved safe-JSON object member names are not usable node-map keys, even when they match the identifier grammar; a frame ID is a string value rather than such a key.
 
@@ -105,7 +105,7 @@ An `svg` may enter the SVG namespace; its supported tags retain their case:
 svg g path rect circle ellipse line polyline polygon text tspan defs linearGradient radialGradient stop clipPath mask pattern filter feGaussianBlur use symbol title desc
 ```
 
-HTML attributes normalize to lowercase on HTML elements; SVG attributes retain case. Duplicate normalized HTML attribute names are rejected. Attribute values are strings; boolean HTML attributes use the empty string. Attribute maps must not contain `class`, `style`, `srcdoc`, `on*` handlers or `data-divlet-*` instrumentation; classes and inline CSS have their own fields. URL-bearing attributes have scheme checks; executable URL schemes are not supported.
+HTML attributes normalize to lowercase on HTML elements; SVG attributes retain case. Duplicate normalized HTML attribute names are rejected. Attribute values are strings; boolean HTML attributes use the empty string. Attribute maps must not contain `class`, `style`, `srcdoc`, `on*` handlers or `data-divlet-*` instrumentation; classes and inline CSS have their own fields. URL-bearing attributes have scheme checks; executable URL schemes are not supported. `data:` URLs are supported in resource attributes (`src`, `poster`, `srcset`), CSS URLs and `head.icon`, including percent-encoded and base64 images. The existing string/document budgets still apply; URLs are preserved rather than fetched or decoded by the model. Ordinary link navigation, SVG `href`/`xlink:href` and form destinations do not gain `data:` document-navigation authority. Preview CSP independently constrains resource loading and already permits data images and fonts. These inline URLs do not implement the planned shared binary-resource table.
 
 Void elements cannot have children. Structural checks reject block content inside paragraphs, nested links/buttons/forms/headings, unsupported children of table/select containers and misplaced list items. A textarea has at most one text child. SVG-only elements must be inside SVG and HTML elements cannot be inserted into SVG. A component's expanded result must satisfy the same content model; being an instance does not exempt it.
 
@@ -155,6 +155,16 @@ The size check applies to the stored patch, not just the expanded result: a null
 
 A node patch may carry `styles: { property: value }`; this is an editing input, not a stored node field. Currently it delegates to the active style engine and reports `NO_STYLE_ENGINE` without one; direct `style` declarations remain available. The native fallback and cascade-preserving normalization required by the [target contract](web-native.md#tailwind-style-plugin) remain WEB-1 implementation work. The current PEN converter also uses the Tailwind declaration codec; decoupling it is WEB-2 work, not a new node syntax.
 
+## Approved embedded-resource ownership
+
+**Accepted direction, not implemented by the current reader/writer.** The unfrozen schema-1 project must own the bytes of its file assets inside the `.divlet` file, not depend on a sibling authored `assets/` directory or on its generated cache. This is native project storage, not merely a portable export option. Keep the JSON container; use a typed, validated resource payload rather than hiding binary data in metadata or repeating data URLs throughout node attributes. The concrete table/reference encoding and capacities must be settled and tested as one implementation boundary before the reader accepts it.
+
+Model, CSS, font/image and head-icon references must resolve to stable project-owned resources. Imports/uploads admit the bytes through bounded reads and validation before committing them with authored state. Resource names, MIME declarations and payloads do not grant filesystem, executable-content or network authority; do not silently fetch external URLs to fill a bundle. Preserve admitted bytes and reusable image/SVG/component semantics.
+
+The generated form materializes pages and resources under one output directory: `.divlet/<name>/<frame>.html` alongside `.divlet/<name>/assets/`. That resource directory is disposable output, never canonical input. Deleting the whole cache must not lose project asset bytes; an otherwise supported project must rebuild without the original asset files. Update source/model validation, serialization, upload/drop, import, copying, history/atomic acceptance, resource resolution and public output together; moving files into a cache without embedding them first is not an implementation of this requirement.
+
+Each example has its own folder, for example `examples/landing/landing.divlet` with its generated cache under `examples/landing/.divlet/landing/`. This directory rule does not itself decide whether separate authored Markdown/site inputs are absorbed into the project; that is distinct from eliminating external file-asset ownership.
+
 ## Generated output
 
 ```text
@@ -165,6 +175,8 @@ A node patch may carry `styles: { property: value }`; this is an editing input, 
   _assets/                bundled resources
   .trash/                 preserved hand edits and removed pages
 ```
+
+This diagram describes the current `_assets/` output. The approved embedded-resource implementation above targets `assets/` beside the pages; no prefix change is active merely because it is documented. The output planner, public-file enumeration, portable copies and provenance checks must agree when that change lands.
 
 Edits to the model regenerate the page. Hand-edited generated pages are currently diagnosed and preserved on regeneration, not reconciled back into the model. The managed reverse-editing contract remains distinct from strict codec round trips and clean export; implementing that editor capability is WEB-5. Output files belong to one project and must not overwrite unowned files or share another project's destination.
 
@@ -202,7 +214,7 @@ The canonical backlog owns the remaining policy preparation and approval gates; 
 
 ## Approved first-release profile
 
-**Approved for implementation, not frozen or fully implemented.** User approval covers this direction, not compatibility freeze or publication. Current project schema 2 / standalone frame schema 1 remain active until the validated transition. Read-only probes against `9a3a11e` reproduced the remaining order/scope/ID/numeric/dependency witnesses and the two Chromium CSS counterexamples below.
+**Approved for implementation, not frozen or fully implemented.** User approval covers this direction, not compatibility freeze or publication. Project and standalone-frame envelopes both remain schema 1 while the first format is unfrozen. Implement the profile coherently without inventing schema 2/3 or treating an unchanged marker as permission to accept unsupported fields. Read-only probes against `9a3a11e` reproduced the remaining order/scope/ID/numeric/dependency witnesses and the two Chromium CSS counterexamples below.
 
 The ordered CSS foundation is implemented in `core/lib/declarations.ts`: immutable property operations and a shared serializer now serve the existing codec emitters. The codec still adapts current style maps through `Object.entries`; this does not activate declaration-list admission, native CSS emission, new envelopes or migration. The [renderer seam](architecture.md#layout) also has exact requirement resolution and opt-in required compilation. A compiler-only bundled descriptor now pins its stylesheet base and identifies installed dependencies/configuration/stylesheets, independently of installation paths. Project readers/render preparation and default selection still use the draft path; `requires`, trusted composition and complete resource/inspector integration remain open.
 
@@ -246,13 +258,13 @@ This keeps compact utility source with derived compiled CSS. The alternative is 
 
 ### Target envelopes and migration
 
-Recommend project **schema 3** and standalone frame **schema 2**, because a required dependency declaration and ordered style data are real wire changes, not cosmetic first-release renumbering. Stored frames still omit their standalone envelope marker. Content revision counters retain their existing separate meaning.
+Keep project and standalone frame **schema 1** until the first format freeze. Required dependencies and ordered styles change the draft wire shape, but do not create released schema generations before one has been frozen. Update readers, writers and consumers together; do not add a second draft/version field as a substitute counter. Stored frames still omit their standalone envelope marker. Content revisions and npm versions retain their separate meaning.
 
 This illustrates the approved target native profile; **the current reader still refuses it**:
 
 ```json
 {
-  "schemaVersion": 3,
+  "schemaVersion": 1,
   "requires": {},
   "frames": [
     {
@@ -276,7 +288,7 @@ This illustrates the approved target native profile; **the current reader still 
 
 A compiler-dependent project would instead declare, for example, `"requires":{"styleEngine":{"id":"tailwind","version":"EXAMPLE-EXACT-RENDERER"}}`. That version is illustrative, not an installed-provider claim.
 
-A frozen reader supports these exact envelopes, not hypothetical future versions. Treat current schema-2 projects as pre-release inputs requiring explicit migration, not silent reinterpretation as plain CSS. Preserve original bytes; produce an approved sibling copy with a fresh owned output destination. Preserve existing map declaration order when converting to lists and preserve existing override operation order. Choose the actual rendering profile explicitly. To retain the old appearance, make the old implicit CSS layer wrappers/order explicit in authored CSS; adopting native cascade instead is a visible choice. Conflicting overrides, duplicate IDs and lexical ambiguities require diagnosis/owner correction rather than guessed repairs. Opening alone must neither migrate nor overwrite.
+The eventual frozen reader must support its exact agreed envelope, not every historical unpublished draft or hypothetical future version. There is no schema-number-only migration to implement here. If an authored draft needs structural/style conversion to the finalized profile, make that conversion explicit and validated; never silently reinterpret a compiler-dependent file as plain CSS. Preserve original bytes; produce an approved sibling copy with a fresh owned output destination. Preserve existing map declaration order when converting to lists and preserve existing override operation order. Choose the actual rendering profile explicitly. To retain the old appearance, make the old implicit CSS layer wrappers/order explicit in authored CSS; adopting native cascade instead is a visible choice. Conflicting overrides, duplicate IDs and lexical ambiguities require diagnosis/owner correction rather than guessed repairs. Opening alone must neither migrate nor overwrite.
 
 ### Implementation owners and approval evidence
 
@@ -286,6 +298,6 @@ This proposal adds no implementation evidence merely by being written. Before an
 - **WEB-1 CSS boundary — model/codec/render and their style consumers:** ordered declarations/patches, repeated fallbacks and order-aware equality; Chromium must distinguish 10px/20px declaration orders and give red for a later unlayered red root rule over a blue token. Explicit legacy layer conversion must preserve the old blue result. Native emitters/export must agree; not every style-editor feature is a freeze prerequisite.
 - **WEB-4 expansion/identity:** reversed conflicting text/alias maps refuse in either order; non-conflicting writes compose; style blocks have explicit order; consumer scope is intentional; IDs remain unique and references/selection/provenance survive valid instances. Include importer-created SVG occurrence cases.
 - **WEB-3 requirements — project/settings types, the public engine contract, renderer and runtime:** pure CSS rebuilds with no provider and ignores available utility compilers; missing/version-mismatched required providers and refused disables preserve source/history/output. Deleting the cache must not hide a missing dependency. Provider matching belongs in rendering, not the pure data validator.
-- **Native migration/output owners:** explicit schema-2 copies preserve declared CSS order/cascade, resource bases and output isolation; no implicit source overwrite, metadata erasure or ambiguity repair. This is an obligation of the approved transition, not an existing migration command.
+- **Native migration/output owners:** explicit structural/style draft conversions preserve declared CSS order/cascade, resource bases and output isolation; no implicit source overwrite, metadata erasure or ambiguity repair. This is an obligation of the approved transition, not an existing migration command.
 
 **Final approval gate:** the direction is approved for scoped implementation. Compatibility freeze still requires the implemented exact candidate, passing evidence and explicit final approval. Publication remains separate.
