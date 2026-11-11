@@ -398,11 +398,30 @@ try {
   await waitUntil(async () => /— by —/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'a hidden element has no fabricated content size');
   await patchProbe({ display: null, 'box-sizing': 'border-box', width: '75.328125px', height: '44px', transform: null, 'margin-top': null, 'border-right-width': null });
   await waitUntil(async () => /65\.328 by 34/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'measurement recovers after showing the element');
+  // A viewport or UI-size change re-renders the inspector and replaces `.boxmodel`, and its geometry keeps moving until layout settles; a
+  // locator action or measurement taken before that can land on a detached element or on a half-laid-out one. Wait until the widget has
+  // stopped being replaced and its size has stopped changing, then act on the element that exists at that moment, in one task.
+  const settleBoxModel = (target, scroll) => target.evaluate(scroll => new Promise((resolve, reject) => {
+    const started = performance.now();
+    let element = null, key = '', stable = 0;
+    const tick = () => {
+      const current = document.querySelector('#inspector .boxmodel');
+      const box = current?.getBoundingClientRect();
+      const now = current ? `${box.width}x${box.height}x${[...current.querySelectorAll('.vf')].length}` : '';
+      stable = current && current === element && now === key ? stable + 1 : 0;
+      element = current; key = now;
+      if (stable >= 20) { if (scroll) current.scrollIntoView({ block: 'nearest' }); return resolve(); }
+      if (performance.now() - started > 8000) return reject(new Error('The box model kept changing after a resize'));
+      requestAnimationFrame(tick);
+    };
+    tick();
+  }), scroll);
+  const revealBoxModel = () => settleBoxModel(page, true);
   await mkdir('artifacts', { recursive: true });
   for (const [width, size, theme] of [[1280, 100, 'light'], [390, 100, 'dark'], [390, 200, 'light']]) {
     await page.setViewportSize({ width, height: 900 });
     await page.evaluate(async ({ size, theme }) => { (await import('./lib/help.js')).setUiSize(size); document.documentElement.dataset.theme = theme; }, { size, theme });
-    await page.locator('#inspector .boxmodel').scrollIntoViewIfNeeded();
+    await revealBoxModel();
     await sleep(350);
     const collisions = await page.locator('#inspector .boxmodel').evaluate(model => {
       const fields = [...model.querySelectorAll('.bm-field, .bm-offset, .bm-readout, .bm-core')].map(node => node.getBoundingClientRect());
@@ -433,7 +452,7 @@ try {
   for (const [width, size] of [[1280, 100], [390, 200]]) {
     await page.setViewportSize({ width, height: 900 });
     await page.evaluate(async size => (await import('./lib/help.js')).setUiSize(size), size);
-    await page.locator('#inspector .boxmodel').scrollIntoViewIfNeeded();
+    await revealBoxModel();
     await sleep(350);
     const clipped = await page.locator('#inspector .boxmodel').evaluate(model => {
       const canvas = document.createElement('canvas').getContext('2d');
@@ -456,6 +475,7 @@ try {
   await touchPage.evaluate(async id => { (await import('./lib/help.js')).setUiSize(200); const m = await import('./lib/store.js'); m.selectArtboards([id]); m.selectNodes(id, ['box-probe']); }, probe.id);
   await touchPage.waitForSelector('#inspector [data-key="inset-l"]');
   await waitUntil(async () => (await touchPage.locator('#inspector [data-key="m-t"]').getAttribute('placeholder')) === '-123.456', 'coarse-pointer long measurements');
+  await settleBoxModel(touchPage, false);
   const touchTargets = await touchPage.locator('#inspector .boxmodel').evaluate(model => {
     const bad = [], canvas = document.createElement('canvas').getContext('2d');
     const controls = [...model.querySelectorAll('.vf')];
