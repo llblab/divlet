@@ -35,6 +35,18 @@ for (const mode of ['local', 'shared']) {
   files.set(`${prefix}${mode}/util.js`, ['text/javascript', utilSource]);
   files.set(`${prefix}${mode}/host.js`, ['text/javascript', selectionHost]);
 }
+const [activitySource, projectSource, servicesHost, servicesCases] = await Promise.all([
+  readFile(new URL('../lib/activity.js', import.meta.url), 'utf8'), readFile(new URL('../lib/project.js', import.meta.url), 'utf8'),
+  readFile(new URL('./fixtures/services-host.js', import.meta.url), 'utf8'), readFile(new URL('./fixtures/services-cases.js', import.meta.url), 'utf8'),
+]);
+files.set(`${prefix}services-cases.js`, ['text/javascript', servicesCases]);
+for (const mode of ['absent', 'audit', 'services']) {
+  for (const [file, source] of Object.entries({ 'store.js': storeSource, 'util.js': utilSource, 'host.js': servicesHost, 'selection-host.js': selectionHost, 'activity.js': activitySource, 'project.js': projectSource,
+    'canvas.js': 'export const reveal = () => {}; export const flashNodes = () => {};',
+    'sidebar.js': 'export const isOpen = () => true; export const toggle = () => {}; export const show = () => {}; export const close = () => {};',
+    'chat.js': 'export const render = () => {}; export const note = () => {};',
+  })) files.set(`${prefix}${mode}/${file}`, ['text/javascript', source]);
+}
 const requests = [];
 const server = http.createServer((request, response) => {
   requests.push(request.url);
@@ -67,8 +79,11 @@ try {
     const publicPage = { projectId: publicState.projectId, keys: Object.keys(publicState), descriptor: publicState.documents[0], capabilities: publicState.project.capabilities, nodes: Object.keys(publicFrame.nodes).length, metadataEmpty: Object.keys(publicFrame.metadata).length === 0 && Object.values(publicFrame.nodes).every(node => Object.keys(node.metadata).length === 0), versionMatches: publicFrame.version === publicState.documents[0].version };
     const [local, localHost, shared, sharedHost, { selectionCases }] = await Promise.all(['local/store.js', 'local/host.js', 'shared/store.js', 'shared/host.js', 'selection-cases.js'].map(path => import(new URL(path, location.href).href)));
     const selection = await selectionCases(local, localHost, shared, sharedHost);
+    const { serviceCases } = await import(new URL('services-cases.js', location.href).href);
+    const services = await serviceCases();
     return {
       selection,
+      services,
       publicPage,
       sessions,
       nodeGlobals: ['Buffer', 'process', 'require'].filter(name => name in globalThis),
@@ -80,7 +95,7 @@ try {
   });
   assert.deepEqual(result.nodeGlobals, [], 'no Node globals/polyfills supply the kernel');
   assert.ok(result.cases.length > 25, 'the shared acceptance/refusal regions are exercised');
-  for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.sessions, ...result.selection]) assert.deepEqual(actual, expected, name);
+  for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
   assert.deepEqual(result.frames, expectedFrames, 'the same full-frame validation, patch and inspection semantics run in Node and browser');
   assert.deepEqual(result.publicPage.keys.sort(), ['clientPlugins', 'diagnostics', 'documents', 'project', 'projectId', 'revision', 'selection', 'stateVersion', 'work']);
   assert.equal(result.publicPage.descriptor.viewUrl, 'index.html');
@@ -90,7 +105,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + verified public landing data in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

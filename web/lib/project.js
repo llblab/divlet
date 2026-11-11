@@ -2,6 +2,7 @@
 // disk, so project files and folders are listed by the server; the address is a path.
 import { $, el, icon, debounce } from './util.js';
 import { store, request, post, toast, on, receiveState } from './store.js';
+import { sourceUpdates } from './host.js';
 
 const scrim = el('div', 'scrim chrome');
 scrim.id = 'project';
@@ -18,16 +19,17 @@ scrim.append(dialog);
  */
 const noticed = new Set();
 export async function checkImport() {
+  if (!sourceUpdates) return;
   let status;
-  try { status = (await request('api/import-status')).status; } catch { return; }
+  try { status = (await sourceUpdates.readStatus()).status; } catch { return; }
   if (!status?.changed || noticed.has(status.source)) return;
   noticed.add(status.source);
   toast(`“${status.source}” changed after it was imported. This project is untouched.`, {
     label: 'Import again',
     run: async () => {
       try {
-        const { file } = await post('api/reimport', {});
-        toast(`Imported again as ${file.split(/[\\/]/).pop()}`, { label: 'Open', run: () => post('api/open-project', { path: file }).then(result => { location.href = result.url; }).catch(error => toast(error.message)) }, { sticky: true });
+        const { file } = await sourceUpdates.reimport();
+        toast(`Imported again as ${file.split(/[\\/]/).pop()}`, { label: 'Open', run: () => sourceUpdates.openProject(file).then(result => { location.href = result.url; }).catch(error => toast(error.message)) }, { sticky: true });
       } catch (error) { toast(error.message); }
     },
   }, { sticky: true });

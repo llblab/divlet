@@ -5,6 +5,6 @@
     "types": [],
     "checkJs": true
   },
-  "include": ["web/lib/http.js", "web/lib/http-session.js", "web/lib/host.js"],
+  "include": ["web/lib/http.js", "web/lib/http-session.js", "web/lib/http-services.js", "web/lib/host.js"],
   "exclude": ["node_modules", "**/dist/**"]
 }

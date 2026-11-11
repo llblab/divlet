@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createJsonTransport } from '../lib/http.js';
 import { createHttpReadSession, createHttpSelectionPublisher } from '../lib/http-session.js';
+import { createHttpHistoryService, createHttpSourceUpdates } from '../lib/http-services.js';
 
 class Stream {
   handlers = new Map();
@@ -41,6 +42,19 @@ test('native selection publisher preserves payload, reply and exact refusal with
   assert.deepEqual(calls, [['api/selection', selection]]);
   const refusal = Object.assign(new Error('Unavailable'), { code: 'OFFLINE' });
   await assert.rejects(createHttpSelectionPublisher(async () => { throw refusal; })(selection), error => error === refusal);
+});
+
+test('native optional services preserve history and source-update routes, replies and refusals', async () => {
+  const calls = [], reply = { opaque: true };
+  const transport = { request: async path => { calls.push(['get', path]); return reply; }, post: async (path, body) => { calls.push(['post', path, body]); return reply; } };
+  const history = createHttpHistoryService(transport), source = createHttpSourceUpdates(transport);
+  assert.equal(Object.isFrozen(history) && Object.isFrozen(source), true);
+  for (const result of [await history.readRecent(), await history.navigate({ pointId: 'past', expectedPoint: 'now' }), await source.readStatus(), await source.reimport(), await source.openProject('copy.divlet')]) assert.equal(result, reply);
+  assert.deepEqual(calls, [['get', 'api/history?limit=100'], ['post', 'api/history/navigate', { pointId: 'past', expectedPoint: 'now' }], ['get', 'api/import-status'], ['post', 'api/reimport', {}], ['post', 'api/open-project', { path: 'copy.divlet' }]]);
+  const refusal = Object.assign(new Error('Changed'), { code: 'HISTORY_CONFLICT' });
+  const refused = { request: async () => { throw refusal; }, post: async () => { throw refusal; } };
+  await assert.rejects(createHttpHistoryService(refused).navigate({ pointId: 'past', expectedPoint: 'now' }), error => error === refusal);
+  await assert.rejects(createHttpSourceUpdates(refused).readStatus(), error => error === refusal);
 });
 
 test('HTTP read session is lazy, encodes frame identities and grants no raw route or write capability', async () => {

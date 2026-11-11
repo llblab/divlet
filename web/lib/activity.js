@@ -1,5 +1,6 @@
 import { $, el, icon, ago, pressGuard } from './util.js';
-import { store, on, request, post, documents, descriptor, selectArtboards, selectNodes, loadModel } from './store.js';
+import { store, on, documents, descriptor, selectArtboards, selectNodes, loadModel } from './store.js';
+import { historyService } from './host.js';
 import { reveal, flashNodes } from './canvas.js';
 import * as sidebar from './sidebar.js';
 import * as chat from './chat.js';
@@ -18,7 +19,7 @@ let timelineRead = null;
 // Server point IDs may recur after Undo; each observed transition invalidates in-flight snapshots, including A → B → A.
 let observedHead = '', stateGeneration = 0, requestedGeneration = -1;
 let reading = false, readAgain = false, navigating = null, readError = '', navigationError = '', auditOpen = false, restorePoint = null;
-const supportsNavigation = () => store.state?.history?.navigation === true;
+const supportsNavigation = () => !!historyService?.navigate && store.state?.history?.navigation === true;
 const timelineReady = () => supportsNavigation() && timelineRead?.generation === stateGeneration && timelineRead.projectId === store.state?.projectId && timelineRead.timeline?.current === store.state?.history?.pointId;
 
 export const isOpen = () => sidebar.isOpen('activity');
@@ -45,13 +46,14 @@ export function paintStatus() {
 }
 
 export async function loadRecent() {
+  if (!historyService) return;
   if (reading) { readAgain = true; return; }
   reading = true;
   const project = store.state?.projectId;
   const generation = stateGeneration;
   requestedGeneration = generation;
   try {
-    const result = await request('api/history?limit=100');
+    const result = await historyService.readRecent();
     if (project && project !== store.state?.projectId) return;
     store.recent = [...new Map([...result.changes, ...store.recent].map(change => [change.seq, change])).values()].sort((a, b) => a.seq - b.seq).slice(-300);
     timelineRead = { projectId: store.state?.projectId, generation, timeline: result.navigation === true && Array.isArray(result.timeline?.points) ? result.timeline : null };
@@ -173,7 +175,7 @@ async function navigate(pointId, expectedPoint) {
   navigating = pointId;
   navigationError = '';
   render();
-  try { await post('api/history/navigate', { pointId, expectedPoint }); }
+  try { await historyService.navigate({ pointId, expectedPoint }); }
   catch (error) { navigationError = error.message; }
   finally { navigating = null; await loadRecent(); render(); }
 }
@@ -253,8 +255,8 @@ export function render() {
     for (const row of rows) audit.append(changeRow(row, true));
     body.append(audit);
   } else {
-    body.append(el('p', 'history-boundary', 'This board does not advertise state navigation. Rows only show affected elements in their current state.'));
-    if (!rows.length && !issues.length) body.append(el('div', 'quiet', 'No changes yet. Every edit by you, Pi or external files appears here; the conversation with Pi is in the Agent tab.'));
+    body.append(el('p', 'history-boundary', historyService ? 'This board does not advertise state navigation. Rows only show affected elements in their current state.' : 'This host does not provide change history.'));
+    if (historyService && !rows.length && !issues.length) body.append(el('div', 'quiet', 'No changes yet. Every edit by you, Pi or external files appears here; the conversation with Pi is in the Agent tab.'));
     for (const row of rows) body.append(changeRow(row));
   }
   const foot = el('div', 'panel-foot');
