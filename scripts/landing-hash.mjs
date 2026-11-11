@@ -14,7 +14,7 @@ const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 /** The landing is one page plus portable assets, never sidecars, ownership data or unowned directory debris. */
 export const publicLandingFile = name => name === 'index.html' || /^_assets\/[a-z0-9_-][a-z0-9_.-]*\.(?:svg|png|jpe?g|gif|webp|avif|ico|css|woff2?|ttf|otf)$/i.test(name);
 
-async function publicEntries(directory) {
+export async function landingEntries(directory = landingDirectory) {
   directory = path.resolve(directory);
   const store = new OutputStore(path.resolve(directory, '../../landing.divlet'));
   if (store.directory !== directory) throw new Error('Expected the managed .divlet/landing directory.');
@@ -46,16 +46,16 @@ async function copyEntries(entries, target) {
   }
 }
 
-export async function landingFiles(directory = landingDirectory) { return (await publicEntries(directory)).map(([name]) => name); }
-export async function landingHash(directory = landingDirectory) { return fingerprint(await publicEntries(directory)); }
+export async function landingFiles(directory = landingDirectory) { return (await landingEntries(directory)).map(([name]) => name); }
+export async function landingHash(directory = landingDirectory) { return fingerprint(await landingEntries(directory)); }
 export async function copyLanding(target, directory = landingDirectory) {
-  const entries = await publicEntries(directory);
+  const entries = await landingEntries(directory);
   await copyEntries(entries, target);
   return entries.map(([name]) => name);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const entries = await publicEntries(landingDirectory), hash = fingerprint(entries);
+  const entries = await landingEntries(landingDirectory), hash = fingerprint(entries);
   const copy = process.argv.indexOf('--copy');
   if (copy >= 0) {
     const target = process.argv[copy + 1];

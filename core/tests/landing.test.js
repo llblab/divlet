@@ -9,7 +9,8 @@ import { parse } from 'parse5';
 import YAML from 'yaml';
 import { readProject, writeProject } from '../lib/project.ts';
 import { encodeHtml, decodeHtml } from '../lib/codec.ts';
-import { landingSource, landingDirectory, landingFiles, landingHash, copyLanding } from '../../scripts/landing-hash.mjs';
+import { landingSource, landingDirectory, landingFiles, landingEntries, landingHash, copyLanding } from '../../scripts/landing-hash.mjs';
+import { landingDemoSnapshot } from '../../scripts/landing-demo.mjs';
 import { checkLanding, buildLanding } from '../../scripts/landing-build.mjs';
 import { OutputStore } from '../lib/output.ts';
 import { openRuntime } from '../lib/runtime.js';
@@ -56,6 +57,21 @@ test('fingerprint and copy share the exact public bytes, including the Pages mar
   for (const name of files) assert.deepEqual(await fs.readFile(path.join(target, name)), name === '.nojekyll' ? Buffer.alloc(0) : await fs.readFile(path.join(landingDirectory, name)));
   await assert.rejects(() => copyLanding(target), { code: 'EEXIST' });
   assert.deepEqual(await fs.readFile(path.join(target, 'index.html')), await fs.readFile(path.join(landingDirectory, 'index.html')));
+});
+
+test('demo inspection data comes from the same verified public bytes without changing the landing', async t => {
+  const { output } = await fixture(t), before = await landingHash(output);
+  const entries = await landingEntries(output);
+  assert.deepEqual(entries.map(([name]) => name), await landingFiles(output));
+  const snapshot = await landingDemoSnapshot({ directory: output });
+  assert.equal(snapshot.state.documents[0].viewUrl, 'index.html');
+  assert.ok(Object.keys(snapshot.frames.get('index').nodes).length > 100);
+  await fs.writeFile(path.join(output, 'private.meta.json'), '{"token":"private-token-sentinel"}');
+  assert.equal((await landingDemoSnapshot({ directory: output })).state.projectId, snapshot.state.projectId);
+  assert.equal(JSON.stringify({ state: snapshot.state, frames: [...snapshot.frames.values()] }).includes('private-token-sentinel'), false);
+  assert.equal(await landingHash(output), before);
+  await fs.appendFile(path.join(output, 'index.html'), '<!-- hand edit -->');
+  await assert.rejects(() => landingDemoSnapshot({ directory: output }), /hand-edited/);
 });
 
 test('the public set still includes separately owned portable resources and verifies their bytes', async t => {

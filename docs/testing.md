@@ -23,6 +23,8 @@ Frontend unit suites (`icons.test.js`, `modules.test.js`, `http-session.test.js`
 
 The read-session gate is `node scripts/source.mjs --test core/tests/board-session.test.js core/tests/board-session-types.test.ts web/tests/http-session.test.js web/tests/modules.test.js`. It checks detached snapshot data, read-only capabilities, independent/reentrant unsubscribe, opaque payload types, native URL/header/error projection, dynamic fetch instrumentation, SSE decode/refusal/cleanup and real runtime-import discovery without JSDoc false positives. `run.mjs`, `history.mjs` and `security.mjs` exercise the integrated native board, held-request History authority and authenticated preview boundary. The snapshot witnesses also run through the native-browser kernel suite; that does not establish an offline board or public-safe snapshot publication.
 
+`node scripts/source.mjs --test core/tests/public-snapshot.test.js core/tests/landing.test.js` checks the build-side public-page projection: allowlisted state/descriptor fields, omitted editor/runtime metadata, script refusal, explicit presentation geometry/identity, safe sibling browsing references, and reuse of the verified landing public set without changing its bytes. The kernel browser suite also loads that projection as static JSON, validates its frame with the same browser model and reads it through the snapshot session. This is public inspection-data proof, not secret scanning, resource-graph certification, an offline board or deployment.
+
 ## Format candidate
 
 Run these from a source checkout:

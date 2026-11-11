@@ -42,6 +42,16 @@ The native client composes its JSON transport and HTTP/SSE reader in `web/lib/ho
 
 This is not yet a host-replaceable offline board: remaining auxiliary requests and mutation affordances require explicit host capabilities and semantic read ports or absence, not synthetic HTTP routing.
 
+## Public prepared-page inspection data
+
+The build-side `core/lib/public-snapshot.ts` projector accepts an intentionally public prepared HTML page, a deliberate public label/viewport and a sibling HTML browsing filename. It uses the existing strict HTML codec, refuses script elements including editor metadata scripts, clears frame/node metadata and builds allowlisted state/descriptors. It never accepts `runtime.info()` as a state template: native paths/URLs, source/output/sidecar names, agent/history/client state and application metadata are not copied. Edit capabilities are explicitly false; the data itself is not whole-board read-only enforcement.
+
+This is a flattened **inspection projection**, with presentation ID `index` and initial version 1, not the authored source project. Public `renderFile` pages have element anchors/styles but no `encodeHtml` metadata manifest; original text/component identities, source revisions and board geometry cannot be recovered from them. The viewport is supplied explicitly. Keep the prepared page and its styles unchanged as rendering authority; re-rendering the inspection model can change CSS layering and identities.
+
+`scripts/landing-demo.mjs` reads the exact public bytes through `landingEntries` in `scripts/landing-hash.mjs`, the existing public-set/fingerprint/copy owner. It creates inspection data only: no alternate renderer, authored landing, source/cache write or publication. Ownership/hash verification is not source/cache freshness; the existing freshness check remains a publication gate. The content-derived snapshot ID is a view identity, not an attestation.
+
+Public-content curation, HTML/model validity, publication provenance, reference closure and UI capabilities are different checks. This projector is not a secret scanner of visible authored text, attributes or CSS, nor a resource/link-graph validator. It does not make arbitrary input publishable. The first profile deliberately permits only a sibling `.html` browsing filename without paths, queries or fragments; broader routing needs an explicit contract rather than implicit URL guesses.
+
 ## Useful modes
 
 - **Static publication:** ordinary rendered HTML/CSS/resources. This already exists and needs no editor runtime or service worker.
