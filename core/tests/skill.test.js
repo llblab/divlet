@@ -136,3 +136,29 @@ test('the model it describes is the model the code validates', async () => {
   }
   assert.match(source, /REVISION_CONFLICT/, 'and a stale version is called out where it happens');
 });
+
+test('a copied standalone skill stands on its own, and the install path is the documented one', async t => {
+  const { cp } = await import('node:fs/promises');
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'divlet-skill-copy-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const copy = path.join(directory, 'divlet');
+  await cp(path.dirname(skillPath), copy, { recursive: true });
+  const copied = await readFile(path.join(copy, 'SKILL.md'), 'utf8');
+  assert.equal(copied, source, 'copying the folder copies the whole skill');
+  assert.doesNotMatch(copied, /node_modules/, 'it does not assume the package sits beside it');
+  for (const [, target] of copied.matchAll(/\]\(([^)\s]+)\)/g)) {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('#')) continue;
+    const resolved = path.resolve(copy, target.split('#')[0]);
+    assert.ok(resolved === copy || resolved.startsWith(copy + path.sep), `${target} stays inside the skill folder`);
+    assert.ok(await exists(resolved), `${target} exists in the copy`);
+  }
+  for (const [, doc] of copied.matchAll(/`docs\/([a-z-]+\.md)`/g)) assert.ok(await exists(path.join(root, 'docs', doc)), `docs/${doc} is the file its public address names`);
+  assert.ok(copied.includes('https://github.com/llblab/divlet/blob/main/docs/'), 'documents are named by their public address');
+
+  const command = 'npx skills add llblab/divlet --skill divlet --global';
+  for (const file of ['README.md', 'docs/agents.md']) assert.ok((await readFile(path.join(root, file), 'utf8')).includes(command), `${file} documents the skill installation command`);
+  const readme = await readFile(path.join(root, 'README.md'), 'utf8');
+  assert.ok(readme.indexOf(command) < readme.indexOf('Register the server'), 'the skill comes first, the server registration second');
+  assert.match(readme, /Skip this step under Pi/, 'Pi users are not sent to install the bundled skill twice');
+  assert.equal((await stat(path.join(root, 'skills/divlet/SKILL.md'))).isFile(), true, 'the --skill name is a folder in the repository');
+});

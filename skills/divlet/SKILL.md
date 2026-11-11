@@ -19,8 +19,8 @@ The same seven tools — `open_divlet`, `read_divlet`, `patch_divlet`, `edit_div
 **They are already available.** A Pi session with the divlet extension, or an MCP server this session is connected to. Call
 them; nothing to start.
 
-**Only this skill is installed.** The npm package is `divlet`; `divlet-mcp` is its server command, not another package.
-After the first npm publication, any MCP host can start it over stdio:
+**Only this skill is installed.** The skill alone registers no tools. The server is `@divlet/mcp` (its command is
+`divlet-mcp`; `divlet` is the library it depends on). After the first npm publication, any MCP host can start it over stdio:
 
 ```bash
 npx -y @divlet/mcp --cwd /absolute/path/to/the/workspace
@@ -220,7 +220,10 @@ assume a failed save was accepted.
 
 ## 10. Going deeper
 
-- `docs/format.md` in the installed package — the exact file format (`node_modules/divlet/docs/format.md`).
+This skill may be installed on its own, without the package beside it, so the documents are named by their public address
+(`https://github.com/llblab/divlet/blob/main/docs/<name>.md`; the npm package `divlet` ships the same files under `docs/`):
+
+- `docs/format.md` — the exact file format.
 - `docs/site.md` — Markdown sites built on a template frame (`site.json`, `content/`, routes, slots).
 - `docs/architecture.md` — how the board, the contract and the plugins fit together.
 - `read_divlet view:diagnostics` — what the board thinks is wrong with the files; `view:history` — who changed what, and the

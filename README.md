@@ -55,7 +55,17 @@ Open the returned board URL, select something and press `A` to ask about it. Pi 
 
 ### MCP
 
-Register the checkout's stdio server in your host:
+Two separate steps: the workflow skill teaches the agent the loop, the MCP server gives it the tools. Installing the skill registers no tools.
+
+**1. Install the skill** (user-level, so every project sees it; the installer asks which agents to target):
+
+```bash
+npx skills add llblab/divlet --skill divlet --global
+```
+
+Drop `--global` to install into the current project only. Skip this step under Pi: the extension below already registers the same bundled skill, and installing it twice makes two copies compete.
+
+**2. Register the server.** Pointing at a checkout works today:
 
 ```json
 {
