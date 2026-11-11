@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createJsonTransport } from '../lib/http.js';
-import { createHttpReadSession } from '../lib/http-session.js';
+import { createHttpReadSession, createHttpSelectionPublisher } from '../lib/http-session.js';
 
 class Stream {
   handlers = new Map();
@@ -32,6 +32,15 @@ test('native JSON refusal preserves message, code, details and status projection
   await assert.rejects(transport.request('api/project'), { message: body.message, code: body.error, details: body.details, status: 409 });
   const invalid = createJsonTransport(new URL('http://127.0.0.1/token/'), async () => new Response('not JSON', { status: 500 }));
   await assert.rejects(invalid.request('api/project'), { message: 'Request failed (500)', status: 500 });
+});
+
+test('native selection publisher preserves payload, reply and exact refusal without expanding the read port', async () => {
+  const calls = [], reply = { stateVersion: 2 }, selection = { ids: ['index'], nodes: { documentId: 'index', nodeIds: ['root'] } };
+  const publish = createHttpSelectionPublisher(async (...args) => { calls.push(args); return reply; });
+  assert.equal(await publish(selection), reply);
+  assert.deepEqual(calls, [['api/selection', selection]]);
+  const refusal = Object.assign(new Error('Unavailable'), { code: 'OFFLINE' });
+  await assert.rejects(createHttpSelectionPublisher(async () => { throw refusal; })(selection), error => error === refusal);
 });
 
 test('HTTP read session is lazy, encodes frame identities and grants no raw route or write capability', async () => {

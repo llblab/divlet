@@ -40,6 +40,8 @@ Do not select a new package name or folder hierarchy before the dependency bound
 
 The native client composes its JSON transport and HTTP/SSE reader in `web/lib/host.js`. The store keeps version/render-aware cache admission and the board keeps plugin-bootstrap ordering, reconnect feedback and change handling. JSON error projection and dynamic global-fetch instrumentation remain intact; native `EventSource` owns reconnects. `tsconfig.web.json` checks the three new transport/composition modules against DOM libraries without Node ambient types, not the whole frontend.
 
+Ephemeral shared selection is a separate optional `BoardSelectionPublisher`, not a writer added to `BoardReadSession`. The native host publishes through its existing selection POST. A fixed composition without that capability keeps selection browser-local, never starts a pending publication or falls back to HTTP, and uses host selection only as the initial seed. Later host reads cannot resurrect a cleared local selection or overwrite local frame/node choices; model/frame removal still prunes them. Native sequence, pending-response and failure-feedback semantics remain unchanged.
+
 This is not yet a host-replaceable offline board: remaining auxiliary requests and mutation affordances require explicit host capabilities and semantic read ports or absence, not synthetic HTTP routing.
 
 ## Public prepared-page inspection data

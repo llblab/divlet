@@ -1,4 +1,4 @@
-/* Owns: the board's transport-independent read-side contract and immutable snapshot reader. No I/O or writer authority. */
+/* Owns: transport-independent board reads, optional shared-selection publication and immutable snapshots. No project writer authority. */
 export type BoardReadEvent =
   | { type: 'connection'; status: 'connected' | 'offline' }
   | { type: 'state'; value: unknown }
@@ -12,6 +12,13 @@ export interface BoardReadSession {
   /** Each subscription owns its cleanup. After cleanup, it delivers no further events. */
   readonly subscribe: (listener: (event: BoardReadEvent) => void) => () => void;
 }
+
+/** Optional host capability for sharing ephemeral view selection, not committing project content. Replies are opaque board state. */
+export interface BoardSelection {
+  readonly ids: readonly string[];
+  readonly nodes?: { readonly documentId: string; readonly nodeIds: readonly string[] };
+}
+export type BoardSelectionPublisher = (selection: BoardSelection) => Promise<unknown>;
 
 /** A host-created snapshot; the caller owns project admission and public-data curation. Not an upload parser. */
 export function createSnapshotReadSession({ state, frames }: { state: unknown; frames: ReadonlyMap<string, unknown> }): BoardReadSession {

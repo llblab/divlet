@@ -1,5 +1,5 @@
 import { clamp } from './util.js';
-import { post, readSession } from './host.js';
+import { post, readSession, shareSelection } from './host.js';
 export { base, apiUrl, request, post } from './host.js';
 
 const listeners = new Map();
@@ -159,11 +159,12 @@ const same = (a, b) => a.length === b.length && a.every(id => b.includes(id));
 export const isSelectionPending = () => !!pendingSelection;
 
 function syncSelection() {
+  if (!shareSelection) return;
   const seq = ++selectionSequence;
   const ids = [...store.selected];
   const nodes = store.node && ids.length === 1 && ids[0] === store.node.documentId ? { documentId: store.node.documentId, nodeIds: store.node.nodeIds } : undefined;
   pendingSelection = { seq, ids };
-  post('api/selection', { ids, nodes }).then(result => {
+  shareSelection({ ids, nodes }).then(result => {
     if (seq !== selectionSequence) return;
     pendingSelection = null;
     receiveState(result);
@@ -205,7 +206,8 @@ export function receiveState(next) {
   store.state = next;
   if (oldSelection && (next.selection?.revision ?? 0) < (oldSelection.revision ?? 0)) next.selection = oldSelection;
   const ids = Array.isArray(next.selection?.ids) ? next.selection.ids : [];
-  if (!pendingSelection || same(ids, pendingSelection.ids)) store.selected = new Set(ids);
+  // Only the initial host state seeds a local selection; later snapshot reads cannot overwrite the user's view.
+  if ((!previous || shareSelection) && (!pendingSelection || same(ids, pendingSelection.ids))) store.selected = new Set(ids);
   store.selected = new Set([...store.selected].filter(id => next.documents.some(doc => doc.id === id)));
   if (!previous && next.selection?.selectedNodes && store.selected.has(next.selection.selectedNodes.documentId)) store.node = next.selection.selectedNodes;
   if (store.node && !store.selected.has(store.node.documentId)) store.node = null;
