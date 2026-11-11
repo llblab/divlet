@@ -748,6 +748,21 @@ export function previewBridge(documentId, initialVersion, bridgeToken, readOnly 
     choose(element, event.shiftKey || event.metaKey || event.ctrlKey);
   }, true);
 
+  // Play: the page behaves normally. Its `<base>` points at the project files, so a same-page `#fragment` would leave for
+  // `files/#fragment` (a 404). The canonical href stays as authored; the click scrolls to the target the way a browser would.
+  document.addEventListener('click', event => {
+    if (mode === 'inspect' || event.defaultPrevented || event.button !== 0 || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return;
+    const link = event.target.closest?.('a[href], area[href]');
+    const href = link?.getAttribute('href');
+    if (!href || href[0] !== '#' || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
+    event.preventDefault();
+    let name = href.slice(1);
+    try { name = decodeURIComponent(name); } catch { /* an undecodable fragment is matched as written */ }
+    const target = name && (document.getElementById(name) || document.getElementsByName(name)[0]);
+    if (target) target.scrollIntoView();
+    else if (name === '' || name.toLowerCase() === 'top') window.scrollTo(0, 0);
+  });
+
   document.addEventListener('contextmenu', event => {
     if (mode !== 'inspect' || editing) return;
     event.preventDefault();
