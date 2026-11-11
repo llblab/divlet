@@ -77,7 +77,6 @@ that is already open.
    in the user's words: "tighten hero spacing", not "patch nodes".
 3. Verify with `read_divlet view:preview` (measured geometry of the rendered page), `view:nodes` (ids, text, classes) or by
    asking the user to look. A change that renders wrong is still your bug, not theirs.
-
    What a good `view:preview` answer looks like: `observation` is **not null**, its `version` equals the frame `version` you
    just accepted (an older one is a stale measurement — read again), and its `nodes` carry each element's `rect` in page
    pixels with `overflowX`/`overflowY` flags. Check three things: nothing you touched has `overflowX: true`, no
