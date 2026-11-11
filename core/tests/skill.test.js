@@ -162,3 +162,15 @@ test('a copied standalone skill stands on its own, and the install path is the d
   assert.match(readme, /Skip this step under Pi/, 'Pi users are not sent to install the bundled skill twice');
   assert.equal((await stat(path.join(root, 'skills/divlet/SKILL.md'))).isFile(), true, 'the --skill name is a folder in the repository');
 });
+
+test('the preview verification it teaches is the shape the runtime returns', async () => {
+  const runtime = await readFile(path.join(root, 'core/lib/runtime.js'), 'utf8');
+  const section = source.split('What a good `view:preview` answer looks like')[1]?.split('4. `mark_divlet`')[0];
+  assert.ok(section, 'the verification step says what a good answer is');
+  for (const field of ['observation', 'overflowX', 'overflowY', 'contentHeight', 'viewport', 'rect']) {
+    assert.ok(section.includes(field), `the skill names ${field}`);
+    assert.ok(runtime.includes(field), `and the runtime really returns ${field}`);
+  }
+  assert.match(section, /observation: null/, 'the no-browser case is called out, not read as success');
+  assert.match(runtime, /observation: structuredClone\(this\.observations\.get\(entry\.document\.id\) \|\| null\)/, 'a frame nobody measured yields null');
+});

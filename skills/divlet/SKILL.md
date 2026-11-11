@@ -77,6 +77,13 @@ that is already open.
    in the user's words: "tighten hero spacing", not "patch nodes".
 3. Verify with `read_divlet view:preview` (measured geometry of the rendered page), `view:nodes` (ids, text, classes) or by
    asking the user to look. A change that renders wrong is still your bug, not theirs.
+
+   What a good `view:preview` answer looks like: `observation` is **not null**, its `version` equals the frame `version` you
+   just accepted (an older one is a stale measurement — read again), and its `nodes` carry each element's `rect` in page
+   pixels with `overflowX`/`overflowY` flags. Check three things: nothing you touched has `overflowX: true`, no
+   element's `rect.x + rect.width` runs past `viewport.width`, and `contentHeight` is what you expect next to `viewport.height`.
+   `observation: null` means no browser is showing that frame yet (the user has not opened the board URL, or the frame is
+   off-screen): say so and ask them to open it, instead of reading it as "all clear".
 4. `mark_divlet` before a long stretch of work so the board shows where you are. Marks end with your turn.
 5. Several widths are one frame with responsive classes, not several frames. Check by patching `artboard.width` (390, 768,
    1280, 1440) and reading `view:preview` again.
