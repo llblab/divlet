@@ -11,7 +11,7 @@ Start with the [project README](../README.md) for the product overview and a wor
 
 - [Web-native core contract](web-native.md): Accepted target semantics, the saved model/editor state/browser projection split, and importer/style-plugin boundaries; not a claim of complete implementation.
 - [Architecture](architecture.md): Module ownership, accepted-state commits, persistence, undo/redo, preview trust and the Pi bridge.
-- [Browser runtime exploration](browser-runtime.md): Portable semantic kernel and thin host direction, static/offline demo modes, Service Worker limits and WebMCP/external-agent routes; a feasibility/design note, not implemented offline support.
+- [Browser runtime direction](browser-runtime.md): Shared admission primitives, remaining portable-kernel/host boundaries, static/offline demo modes and WebMCP/external-agent routes; not a completed offline runtime.
 - [Project format](format.md): First-release specification candidate and current wire-format reference; schemas, defaults, components, supported web content and explicit freeze boundaries. Not yet frozen.
 - [Markdown sites](site.md): Configuration, template slots, routes, source ownership, links, live updates and current limits.
 - [Testing and validation](testing.md): Test layout, every command (unit, browser suites, PEN fidelity, release, Pi RPC), what each check does and does not prove, and the conventions the suites follow.

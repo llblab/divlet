@@ -4,7 +4,7 @@ divlet is a local browser board for agents. A **project** is one `<name>.divlet`
 
 This guide describes the current implementation. The accepted [web-native core contract](web-native.md) owns the target architecture; [BACKLOG.md](../BACKLOG.md) tracks the gaps. In particular, the existing provider registry and style-engine seam do not yet establish complete plugin independence.
 
-A browser-hosted/offline editor is not implemented: current startup depends on the Node HTTP/SSE host. The [browser runtime investigation](browser-runtime.md) separates a proposed shared semantic kernel, host persistence, static demonstration and browser-agent connectivity without changing that current ownership contract.
+A browser-hosted/offline editor is not implemented: current startup depends on the Node HTTP/SSE host. The [browser runtime direction](browser-runtime.md) separates incremental shared-kernel extraction, host persistence, static demonstration and browser-agent connectivity without changing that current ownership contract.
 
 ## Layout
 
@@ -120,6 +120,7 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | Module | Responsibility |
 | --- | --- |
 | `core/lib/model.ts` | Native document/node vocabulary, validation, limits and patches. |
+| `core/lib/validation.ts` | Host-free JSON/text checks and shared domain error, re-exported by the model. |
 | `core/lib/project.ts` | Project settings/read/write and component expansion/listing. |
 | `core/lib/codec.ts` | Strict native model ↔ HTML codec and `renderFile`. |
 | `core/lib/html-import.ts` | Loss-aware external HTML admission, separate from the strict codec. |

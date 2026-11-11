@@ -8,6 +8,8 @@
  */
 import { applyStyles } from './engine.ts';
 import postcss from 'postcss';
+import { DivletError, fail, object, string, keys, json } from './validation.ts';
+export { DivletError, fail, object, string, keys, json } from './validation.ts';
 
 /** A JSON value as it may be stored in metadata, overrides and tokens. */
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
@@ -81,18 +83,6 @@ export interface InspectResult { documentId: NodeId; version: number; rootId: No
 /** Declarative styles and the class patch they become. */
 export interface StyleOptions { colourNames?: ReadonlySet<string> }
 
-/** A domain error with a stable code: adapters show `message`, callers branch on `code`. */
-export class DivletError extends Error {
-  code: string;
-  details?: unknown;
-  constructor(code: string, message: string, details?: unknown) {
-    super(message);
-    this.name = 'DivletError';
-    this.code = code;
-    if (details !== undefined) this.details = details;
-  }
-}
-
 export const LIMITS: Readonly<Limits> = Object.freeze({ nodes: 2000, depth: 64, bytes: 2 * 1024 * 1024, text: 262144 });
 export const PROJECTION_LIMITS: Readonly<Limits> = Object.freeze({ nodes: 100000, bytes: 64 * 1024 * 1024, depth: 128, text: 262144, instanceDepth: 32 });
 // Profiles are selected by internal callers, never serialized document metadata or numeric overrides.
@@ -113,7 +103,6 @@ const TABLE_PARENTS = new Map<string, string[]>();
 for (const [parent, children] of Object.entries(TABLE_CHILDREN)) {
   for (const child of children) TABLE_PARENTS.set(child, [...(TABLE_PARENTS.get(child) ?? []), parent]);
 }
-const BAD_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
 export const ID = /^[A-Za-z][A-Za-z0-9_.:-]{0,95}$/;
 const TOKEN = /^--[A-Za-z_][A-Za-z0-9_-]*$/;
 const DOC_KEYS: ReadonlySet<string> = new Set('schemaVersion id name head version artboard rootId tokens css metadata nodes'.split(' '));
@@ -130,43 +119,6 @@ const ADDRESS = /^[A-Za-z][A-Za-z0-9_.:-]{0,95}(?:\/[A-Za-z][A-Za-z0-9_.:-]{0,95
 type Unchecked = Record<string, any>;
 /** Look up an unchecked record entry that a preceding check has already proved present. */
 const at = <T>(record: Record<string, T>, key: string): T => record[key] as T;
-
-export function fail(message: string, details?: unknown, code = 'INVALID_DOCUMENT'): never {
-  throw new DivletError(code, message, details);
-}
-
-export function object(value: unknown, label: string): Unchecked {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) fail(`${label} must be an object`);
-  return value as Unchecked;
-}
-
-export function string(value: unknown, label: string, max = 65536): string {
-  if (typeof value !== 'string' || value.length > max) fail(`${label} must be a string of at most ${max} characters`);
-  if (value.includes('\0') || !value.isWellFormed()) fail(`${label} contains an unrepresentable character`);
-  return value.replace(/\r\n?/g, '\n');
-}
-
-export function keys(value: Unchecked, allowed: ReadonlySet<string>, label: string): void {
-  for (const key of Object.keys(value)) if (!allowed.has(key)) fail(`Unsupported ${label} field: ${key}`);
-}
-
-export function json(value: unknown, label = 'value', depth = 0, preserveKeys = false, maxDepth = 80): void {
-  if (depth > maxDepth) fail(`${label} is too deeply nested`);
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) fail(`${label} contains a non-finite number`);
-    return;
-  }
-  if (Array.isArray(value)) {
-    for (const entry of value) json(entry, label, depth + 1, preserveKeys, maxDepth);
-    return;
-  }
-  const record = object(value, label);
-  for (const [key, entry] of Object.entries(record)) {
-    if (!preserveKeys && BAD_KEYS.has(key)) fail(`Unsafe property name: ${key}`);
-    json(entry, label, depth + 1, preserveKeys, maxDepth);
-  }
-}
 
 export const SOURCE_LIMITS: Readonly<SourceLimits> = Object.freeze({ bytes: 32 * 1024 * 1024, nodes: 10000, depth: 64, roots: 200 });
 

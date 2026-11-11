@@ -84,7 +84,7 @@ Core model, validation and generic registries depend on public capability contra
 
 ## Browser-host portability investigation
 
-A shared semantic kernel with explicit browser/Node hosts is a proposed extension of these boundaries, not an alternative model or a second validation implementation. See [browser runtime exploration](browser-runtime.md) for current Node dependencies, offline/demo modes, Service Worker scope and WebMCP/bridge distinctions. The investigation does not move connected accepted-state authority into an untrusted client, make arbitrary scripts part of the project profile, or establish a new format/release gate.
+The incremental shared semantic kernel with explicit browser/Node hosts follows these boundaries, not an alternative model or a second validation implementation. See [browser runtime exploration](browser-runtime.md) for current Node dependencies, offline/demo modes, Service Worker scope and WebMCP/bridge distinctions. The investigation does not move connected accepted-state authority into an untrusted client, make arbitrary scripts part of the project profile, or establish a new format/release gate.
 
 ## Stabilization boundary
 

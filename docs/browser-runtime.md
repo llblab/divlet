@@ -1,12 +1,13 @@
 # Browser runtime, offline demo and agent connectivity
 
-**Status: architecture investigation and recommended direction, not implemented capability or a frozen API.** The current board still requires its Node host. This note separates a portable semantic kernel, a static-hosted demo and browser-agent transports; it does not approve a wholesale runtime rewrite or add a release prerequisite. [BACKLOG.md](../BACKLOG.md) owns remaining work. The [web-native contract](web-native.md) remains the semantic authority.
+**Status: incremental implementation, not a completed browser runtime or a frozen API.** Shared JSON/text admission primitives run in Node and native browser ESM; full frame validation and the current board still require their Node closure. This note separates the portable semantic kernel direction, static-hosted demo and browser-agent transports. Implementation proceeds through bounded validated slices, not a wholesale runtime rewrite or a new release prerequisite. [BACKLOG.md](../BACKLOG.md) owns remaining work. The [web-native contract](web-native.md) remains the semantic authority.
 
 ## Current evidence
 
 - Generated project pages already work on ordinary static hosting. That does not mean the editor can run without its host.
 - `web/board.js` bootstraps through `api/project` and an `EventSource` at `events`; `web/lib/store.js` sends edits and model reads through HTTP. Copying `web/` to Pages would leave those dependencies unresolved.
-- The semantic and host closures are not yet separated: `core/lib/model.ts` uses `Buffer` and imports the engine; `project.ts` imports `node:path`; `codec.ts` uses `Buffer`; `engine.ts` selects the concrete Tailwind plugin, which imports Node APIs. The new asset decoder also uses `node:util` and `Buffer`. Browser compatibility cannot be inferred from TypeScript compilation.
+- `core/lib/validation.ts` owns the shared error class and JSON/object/key/text admission primitives without runtime imports, providers or Node globals. `model.ts` imports/re-exports those same bindings for existing consumers. This slice does not include CSS parsing, document-byte budgets or full model validation.
+- The remaining semantic and host closures are not yet separated: `core/lib/model.ts` uses `Buffer` and imports the engine; `project.ts` imports `node:path`; `codec.ts` uses `Buffer`; `engine.ts` selects the concrete Tailwind plugin, which imports Node APIs. The new asset decoder also uses `node:util` and `Buffer`. Browser compatibility cannot be inferred from TypeScript compilation.
 - The current style/provider, component and format-transition gaps remain relevant. An offline fork must not silently establish different cascade, override, resource or renderer rules.
 
 ## Recommended boundary: portable semantics, explicit hosts

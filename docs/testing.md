@@ -15,6 +15,10 @@ Development runs source files, not `dist/`. Root `npm test`, start/demo and Pi/M
 
 Frontend unit suites (`icons.test.js`, `modules.test.js`) and the Chromium entry scripts belong to `web/tests/`. Server/model unit suites and shared core fixture builders remain in `core/tests/`. `npm test` discovers both domains' unit suites; `test:browser:all` runs each Chromium entry. Frontend tests are excluded from served modules and published build assets.
 
+## Portable kernel slice
+
+`node scripts/source.mjs --test core/tests/validation.test.js` checks the shared JSON/object/key/text admission primitives and their exact model-facing function/error identity. `npm run test:browser:kernel` runs the same 38 accepted/refused witnesses as native browser ESM under a repository prefix, serving the actual core TypeScript after type erasure only. It checks UTF-16 limits, representable rendered text versus inert JSON strings, finite binary64, prototype/key restrictions, depth, domain error codes and null-versus-undefined details. No bundler, Node globals/polyfills, model/provider import, API/SSE route or dependency rescue is supplied. The browser entry is included once in the full battery. This proves only the primitive module, not complete frame validation, shipped browser SDK delivery or an offline editor.
+
 ## Format candidate
 
 Run these from a source checkout:
