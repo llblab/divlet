@@ -25,6 +25,8 @@ The read-session gate is `node scripts/source.mjs --test core/tests/board-sessio
 
 `node scripts/source.mjs --test core/tests/public-snapshot.test.js core/tests/landing.test.js` checks the build-side public-page projection: allowlisted state/descriptor fields, omitted editor/runtime metadata, script refusal, explicit presentation geometry/identity, safe sibling browsing references, and reuse of the verified landing public set without changing its bytes. The kernel browser suite also loads that projection as static JSON, validates its frame with the same browser model and reads it through the snapshot session. This is public inspection-data proof, not secret scanning, resource-graph certification, an offline board or deployment.
 
+`node scripts/source.mjs web/tests/projects.mjs` also exercises the shared filesystem picker in a real browser with a controlled read-only listing port: late success/refusal suppression, immediate typing invalidation, disposal, stable file rows/double-click and folder-only filtering. Its native Open/Create/Save-copy cases retain backend refusal and source checks. `web/tests/settings.mjs` composes the same control for folder navigation/keyboard selection, verifies that picking only changes the draft, and retains explicit Apply, stale-version and output-collision checks. These are native-host filesystem UI checks, not browser/offline filesystem access.
+
 ## Format candidate
 
 Run these from a source checkout:

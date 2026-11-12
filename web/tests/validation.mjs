@@ -40,8 +40,9 @@ const [activitySource, projectSource, servicesHost, servicesCases] = await Promi
   readFile(new URL('./fixtures/services-host.js', import.meta.url), 'utf8'), readFile(new URL('./fixtures/services-cases.js', import.meta.url), 'utf8'),
 ]);
 files.set(`${prefix}services-cases.js`, ['text/javascript', servicesCases]);
+const pickerSource = await readFile(new URL('../lib/file-picker.js', import.meta.url), 'utf8');
 for (const mode of ['absent', 'audit', 'services']) {
-  for (const [file, source] of Object.entries({ 'store.js': storeSource, 'util.js': utilSource, 'host.js': servicesHost, 'selection-host.js': selectionHost, 'activity.js': activitySource, 'project.js': projectSource,
+  for (const [file, source] of Object.entries({ 'store.js': storeSource, 'util.js': utilSource, 'host.js': servicesHost, 'selection-host.js': selectionHost, 'activity.js': activitySource, 'project.js': projectSource, 'file-picker.js': pickerSource,
     'canvas.js': 'export const reveal = () => {}; export const flashNodes = () => {};',
     'sidebar.js': 'export const isOpen = () => true; export const toggle = () => {}; export const show = () => {}; export const close = () => {};',
     'chat.js': 'export const render = () => {}; export const note = () => {};',

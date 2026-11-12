@@ -72,7 +72,7 @@ try {
   assert.equal(boards.get(importedName(empty)).projectPath, importedName(empty), 'a .PEN opens through the Divlet project imported beside it'); assert.equal(boards.get(importedName(empty)).documents.size, 0);
   assert.deepEqual(boards.get(importedName(empty)).externalFiles, []); assert.equal(await fs.readFile(empty, 'utf8'), snapshots.get(empty));
   await page.keyboard.press('Control+o');
-  await page.locator('#project .project-path input').fill(collection);
+  await page.locator('#project .file-picker-path input').fill(collection);
   await page.locator('#project .dir.is-project', { hasText: 'alpha.pen' }).waitFor();
   assert.equal(await page.locator('#project .dir.is-project').count(), 5);
   await page.keyboard.press('Escape');

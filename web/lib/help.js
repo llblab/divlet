@@ -1,11 +1,13 @@
 // Settings (the gear in the bottom-right toolbar, or Ctrl+,).
 import { $, el, icon } from './util.js';
+import { filePicker } from './file-picker.js';
 import { on, emit, store, post, request, receiveState } from './store.js';
 import * as canvas from './canvas.js';
 
 const scrim = $('#help');
 const dialog = scrim.querySelector('.dialog');
 let returnFocus = null;
+let outputPicker = null;
 let outputDraft = null;
 let pending = false;
 let outputStatus = '';
@@ -73,6 +75,8 @@ function block(content) {
 }
 
 function render() {
+  outputPicker?.dispose();
+  outputPicker = null;
   const hadFocus = dialog.contains(document.activeElement);
   const head = el('div', 'dialog-head');
   const title = el('h2', '', 'Settings');
@@ -163,45 +167,43 @@ function render() {
   field.append(input, browse);
   const picker = el('div', 'settings-picker');
   picker.hidden = true;
-  browse.addEventListener('click', () => { picker.hidden = !picker.hidden; if (!picker.hidden) openPicker(); });
+  browse.addEventListener('click', () => {
+    if (!picker.hidden) { outputPicker?.dispose(); outputPicker = null; picker.replaceChildren(); picker.hidden = true; return; }
+    picker.hidden = false;
+    openPicker();
+  });
   const relative = (from, to) => {
     const a = String(from).split(/[\\/]+/).filter(Boolean), b = String(to).split(/[\\/]+/).filter(Boolean);
     let at = 0;
     while (at < a.length && at < b.length && a[at] === b[at]) at++;
     return [...Array(a.length - at).fill('..'), ...b.slice(at)].join('/');
   };
-  const openPicker = async (where = store.state?.projectDir || '.') => {
-    picker.replaceChildren(el('p', 'caption', 'Loading folders…'));
-    try {
-      const info = await request(`api/fs?path=${encodeURIComponent(where)}`);
-      const head = el('div', 'settings-picker-head');
-      const up = el('button', 'tool mini', '');
-      up.type = 'button';
-      up.setAttribute('aria-label', 'Parent folder');
-      up.dataset.tip = 'Parent folder';
-      up.append(icon('chevron', 'icon up'));
-      up.disabled = !info.parent;
-      up.addEventListener('click', () => openPicker(info.parent));
-      head.append(up, el('code', 'settings-picker-path', info.directory || info.path || where));
-      const list = el('div', 'settings-picker-list');
-      for (const dir of info.dirs ?? []) {
-        const row = el('button', 'dir');
-        row.type = 'button';
-        row.append(icon('folder'), el('span', 'dir-name', dir.name));
-        row.addEventListener('click', () => openPicker(dir.file || `${info.directory}/${dir.name}`));
-        list.append(row);
-      }
-      if (!(info.dirs ?? []).length) list.append(el('p', 'caption', 'No sub-folders here'));
-      const use = el('button', 'tool', 'Use this folder');
-      use.type = 'button';
-      use.addEventListener('click', () => {
-        const chosen = relative(store.state?.projectDir || '.', info.directory || info.path || where);
-        outputDraft.value = chosen;
-        render();
-        if (isOpen()) dialog.querySelector('#settings-output')?.focus({ preventScroll: true });
-      });
-      picker.replaceChildren(head, list, use);
-    } catch (error) { picker.replaceChildren(el('p', 'caption', error.message)); }
+  const openPicker = () => {
+    const use = el('button', 'tool', 'Use this folder');
+    use.type = 'button';
+    use.disabled = true;
+    const status = el('p', 'caption file-picker-status');
+    status.setAttribute('role', 'status');
+    const choose = info => {
+      if (!info || info.kind === 'missing') return;
+      outputDraft.value = relative(store.state?.projectDir || '.', info.directory || info.path);
+      render();
+      if (isOpen()) dialog.querySelector('#settings-output')?.focus({ preventScroll: true });
+    };
+    const browser = filePicker({
+      read: path => request(`api/fs?path=${encodeURIComponent(path)}`),
+      includeFiles: false,
+      label: 'Folder to browse',
+      onChange: state => {
+        use.disabled = state.pending || !state.info || state.info.kind === 'missing';
+        status.textContent = state.error || (state.pending ? 'Loading…' : state.info?.kind === 'missing' ? 'This folder does not exist.' : '');
+      },
+      onSubmit: choose,
+    });
+    outputPicker = browser;
+    use.addEventListener('click', () => { if (!browser.state.pending) choose(browser.state.info); });
+    picker.replaceChildren(browser.element, use, status);
+    browser.load(store.state?.projectDir || '.');
   };
   const stem = String(store.state?.project?.file || 'project.divlet').split(/[\\/]/).pop().replace(/\.(?:divlet|pen)$/i, '');
   const hint = el('p', 'caption', `Relative to the source folder. Blank uses .divlet/${stem}. Apply saves explicitly.`);
@@ -243,6 +245,8 @@ export function toggle(force) {
     dialog.querySelector('.seg.on, button')?.focus({ preventScroll: true });
   } else {
     scrim.hidden = true;
+    outputPicker?.dispose();
+    outputPicker = null;
     if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true });
     else $('#viewport').focus({ preventScroll: true });
   }
@@ -253,7 +257,7 @@ scrim.addEventListener('keydown', event => {
   event.stopPropagation();
   if (event.key === 'Escape') { event.preventDefault(); toggle(false); }
   if (event.key === 'Tab') {
-    const focusable = [...dialog.querySelectorAll('button:not(:disabled), input:not(:disabled)')];
+    const focusable = [...dialog.querySelectorAll('button:not(:disabled), input:not(:disabled)')].filter(node => node.getClientRects().length);
     const index = focusable.indexOf(document.activeElement);
     event.preventDefault();
     focusable[(index + (event.shiftKey ? -1 : 1) + focusable.length) % focusable.length]?.focus();

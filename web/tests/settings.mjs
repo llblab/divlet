@@ -85,13 +85,24 @@ const waitUntil = async (check, label, timeout = 8000) => {
   await mkdir(path.join(cwd, 'designs', 'tokens'), { recursive: true });
   await button('Choose the output folder').click();
   await page.locator('#help .settings-picker').waitFor();
-  await page.locator('#help .settings-picker-list .dir', { hasText: 'designs' }).waitFor();
-  const repeatedNames = await page.locator('#help .settings-picker-list .dir').evaluateAll(rows => rows.filter(row => row.textContent !== row.querySelector('.dir-name')?.textContent).map(row => row.textContent));
+  await page.locator('#help .dir-list .dir', { hasText: 'designs' }).waitFor();
+  assert.equal(await page.locator('#help .file-picker').count(), 1, 'settings uses the shared file picker');
+  assert.equal(await page.locator('#help .dir-list [data-name="project.divlet"]').count(), 0, 'folder selection never offers project files');
+  const browsePath = page.getByRole('textbox', { name: 'Folder to browse', exact: true });
+  await browsePath.focus(); await browsePath.press('ArrowDown');
+  assert.equal(await page.locator('#help .dir-list .dir').first().evaluate(row => document.activeElement === row), true);
+  await page.keyboard.press('ArrowUp');
+  assert.equal(await browsePath.evaluate(input => document.activeElement === input), true, 'the same arrow navigation returns to the path field');
+  const repeatedNames = await page.locator('#help .dir-list .dir').evaluateAll(rows => rows.filter(row => row.textContent !== row.querySelector('.dir-name')?.textContent).map(row => row.textContent));
   assert.deepEqual(repeatedNames, [], 'folder rows contain one name, not a raw duplicate before the icon');
-  await page.locator('#help .settings-picker-list').getByRole('button', { name: 'designs', exact: true }).click();
-  await page.locator('#help .settings-picker-list').getByRole('button', { name: 'tokens', exact: true }).click();
+  await page.locator('#help .dir-list').getByRole('button', { name: 'designs', exact: true }).click();
+  await page.locator('#help .dir-list').getByRole('button', { name: 'tokens', exact: true }).click();
+  await button('Use this folder').waitFor();
+  await page.getByRole('button', { name: 'Parent folder', exact: true }).click();
+  await page.locator('#help .dir-list').getByRole('button', { name: 'tokens', exact: true }).click();
   await page.locator('#help .settings-picker button', { hasText: 'Use this folder' }).click();
   await waitUntil(async () => (await input.inputValue()) === 'designs/tokens', 'the picked folder arrives as a relative path');
+  assert.equal((await disk()).outputDir, 'build/custom', 'picking only fills the draft; Apply still owns the write');
   await input.press('Enter');
   await status.filter({ hasText: 'Build output saved.' }).waitFor();
   assert.equal((await disk()).outputDir, 'designs/tokens');
@@ -203,6 +214,16 @@ const waitUntil = async (check, label, timeout = 8000) => {
     }
   }
   await page.setViewportSize({ width: 390, height: 900 });
+  await button('Choose the output folder').click();
+  await page.locator('#help .dir-list .dir', { hasText: 'designs' }).waitFor();
+  await browsePath.scrollIntoViewIfNeeded();
+  assert.equal(await page.locator('#help .dialog').evaluate(node => node.scrollWidth <= node.clientWidth), true, 'expanded shared picker fits phone/200%');
+  await mkdir('artifacts', { recursive: true });
+  await page.screenshot({ path: 'artifacts/settings-picker-phone-200.png' });
+  await browsePath.fill(path.join(cwd, 'designs', 'tokens'));
+  await browsePath.press('Enter');
+  await waitUntil(async () => (await input.inputValue()) === 'designs/tokens', 'Enter resolves and chooses the typed folder');
+  assert.equal((await disk()).outputDir, 'resolved', 'Enter in the picker must not submit the settings form');
   await input.focus();
   await mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/settings-narrow.png' });

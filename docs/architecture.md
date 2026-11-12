@@ -126,6 +126,8 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `core/lib/public-snapshot.ts` | Build-side allowlisted inspection data from explicitly public prepared HTML. |
 | `web/lib/host.js`, `http-session.js`, `http.js` | Native host binding, HTTP/SSE read adapter and JSON transport. |
 | `web/lib/http-services.js` | Native History and source-update adapters; no model authority. |
+| `web/lib/file-picker.js` | Reusable read-only path/list/keyboard UI and request lifetime. |
+| `web/lib/project.js`, `help.js` | Open/copy and Settings policy, writes and modal lifetime. |
 | `core/lib/model-styles.ts`, `browser-styles.ts` | Node lowering binding and explicit absent browser capability. |
 | `core/lib/project.ts` | Project settings/read/write and component expansion/listing. |
 | `core/lib/codec.ts` | Strict native model ↔ HTML codec and `renderFile`. |
