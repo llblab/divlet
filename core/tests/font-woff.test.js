@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFont, FONT_LIMITS } from '../lib/font.ts';
 import { fontBytes } from './fixtures/font.js';
 import { woffBytes } from './fixtures/font-woff.js';
+import { referenceCffWoffBytes } from './fixtures/font-reference.js';
 const pad = length => Math.ceil(length / 4) * 4;
 const reject = bytes => assert.throws(() => readFont(bytes), error => error.code === 'INVALID_FONT');
 function records(bytes) { return Array.from({ length: bytes.readUInt16BE(12) }, (_, i) => 44 + i * 20); }
@@ -21,6 +22,13 @@ test('WOFF 1 metadata reuses SFNT semantics with compressed or raw tables and pr
     bytes.writeUInt16BE(49, 20); bytes.writeUInt16BE(83, 22);
     assert.deepEqual(readFont(bytes), expected, 'container version fields are opaque and never rewritten as schema versions');
   }
+});
+
+test('independently built and encoded CFF1 WOFF has the same bounded metadata path without rewriting bytes', () => {
+  const bytes = referenceCffWoffBytes(), before = Buffer.from(bytes);
+  assert.equal(bytes.readUInt32BE(4), 0x4f54544f, 'genuine OTTO/CFF container, not a glyf flavor mutation');
+  assert.deepEqual(readFont(bytes), { family: 'Reference Family', subfamily: 'Regular', format: 'woff', mediaType: 'font/woff', weight: '400', stretch: '100%', styles: ['normal'] });
+  assert.deepEqual(bytes, before);
 });
 
 test('WOFF header, directory, aggregate expansion and unsupported-block bounds refuse without native exceptions', () => {

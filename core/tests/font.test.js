@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFont, FONT_LIMITS } from '../lib/font.ts';
 import { fontBytes, fontFamily } from './fixtures/font.js';
 import { woff2Bytes } from './fixtures/font-woff2.js';
+import { referenceCff2Bytes } from './fixtures/font-reference.js';
 
 function table(bytes, tag) {
   for (let i = 0; i < bytes.readUInt16BE(4); i++) { const at = 12 + i * 16; if (bytes.toString('ascii', at, at + 4) === tag) return { record: at, offset: bytes.readUInt32BE(at + 8), length: bytes.readUInt32BE(at + 12) }; }
@@ -22,6 +23,13 @@ test('face metadata is derived from SFNT names/OS2, not a filename, without reta
     [{ width: 3, oblique: true, angle: -12 }, { stretch: '75%', styles: ['oblique 12deg'] }],
     [{ width: 9, oblique: true }, { stretch: '200%', styles: ['oblique 14deg'] }],
   ]) for (const [key, value] of Object.entries(expected)) assert.deepEqual(readFont(fontBytes(600, options))[key], value);
+});
+
+test('independently encoded static CFF2 derives ordinary OTF metadata without changing the original program', () => {
+  const bytes = referenceCff2Bytes(), before = Buffer.from(bytes), cff = table(bytes, 'CFF2');
+  assert.equal(bytes.readUInt32BE(0), 0x4f54544f); assert.equal(bytes[cff.offset], 2);
+  assert.deepEqual(readFont(bytes), { family: 'Reference Family', subfamily: 'Bold', format: 'opentype', mediaType: 'font/otf', weight: '700', stretch: '100%', styles: ['normal'] });
+  assert.deepEqual(bytes, before);
 });
 
 test('Unicode typographic names take precedence and remain exact text, not CSS or normalized identifiers', () => {
