@@ -113,12 +113,12 @@ See [npm publication](docs/publishing.md) for version pinning, package identity 
 
 ```text
 workspace/
-├─ project.divlet      Frames, components, tokens and CSS
-├─ assets/             Authored images and resources
+├─ project.divlet      Frames, components, tokens, CSS and embedded resources
+├─ assets/             Legacy local inputs, when still referenced
 └─ .divlet/project/    Generated HTML, metadata and build assets
 ```
 
-The `.divlet` JSON file is the source. Edit it through the board, agent tools or your editor: valid external changes appear on the board, and invalid ones leave the last working state visible. Generated output belongs to one project and does not overwrite unowned files.
+The `.divlet` JSON file is the source. Edit it through the board, agent tools or your editor: valid external changes appear on the board, and invalid ones leave the last working state visible. New image uploads are embedded in that file; explicitly named resources are materialized only as rebuildable output. Existing local-file references still work without silent conversion. Generated output belongs to one project and does not overwrite unowned files.
 
 Open a Pencil `.pen` or static `.html` file to import it into a sibling `.divlet` project. The source stays untouched and an existing destination is not overwritten. The generated output can also be served independently as a static site.
 

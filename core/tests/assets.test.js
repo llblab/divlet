@@ -43,10 +43,11 @@ test('portable component byte admission agrees with an independent Node UTF-8 or
   }
 });
 
-test('asset codecs do not silently activate an unsupported native project field', () => {
+test('native project asset storage uses the shared decoder, not opaque metadata', () => {
   const project = { schemaVersion: 1, frames: [] };
-  assert.doesNotThrow(() => readProject(project));
-  assert.throws(() => readProject({ ...project, assets: { font: url([1], 'font/woff2') } }), { code: 'INVALID_PROJECT', message: 'Unsupported project field: assets. Put application data under metadata.' });
+  assert.deepEqual(readProject(project).settings.assets, {});
+  assert.deepEqual(readProject({ ...project, assets: { font: url([1], 'font/woff2') } }).settings.assets, { font: url([1], 'font/woff2') });
+  assert.throws(() => readProject({ ...project, assets: null }), { code: 'INVALID_ASSET' });
 });
 
 test('asset keys cannot escape, alias or create private or nonportable output names', () => {

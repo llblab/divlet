@@ -11,6 +11,11 @@ import { importerFor, importExtensions, pageExtensions } from './plugins.ts';
 import type { Importer, ReadSource } from './plugins.ts';
 import { convertHtml, decodePage, summarizeHtml, isHtmlSource, HTML_EXTENSIONS } from './html-import.ts';
 import { SOURCE_LIMITS } from './model.ts';
+import { readProject, writeProject } from './project.ts';
+import { prepareFrame, frameMetadata } from './render.ts';
+import type { FrameEntry } from './render.ts';
+import { buildStatic } from './static.js';
+import { OutputStore } from './output.ts';
 import type { Metadata } from './model.ts';
 
 /** What a project records about the file it was converted from. */
@@ -59,6 +64,20 @@ const readBounded: ReadSource = async (file: string): Promise<Uint8Array> => {
   } finally { await handle.close(); }
 }
 
+/** Validate the converted native source and its complete owned-output plan before publishing a new source. */
+async function nativeImportText(text: string, file: string, projectDir: string): Promise<string> {
+  let native: unknown;
+  try { native = JSON.parse(text); } catch { throw Object.assign(new Error('The imported project is not valid JSON.'), { code: 'INVALID_PROJECT' }); }
+  const project = readProject(native), output = new OutputStore(file, project.settings.outputDir);
+  const canonical = writeProject(project.settings, project.frames);
+  const lookup = new Map(project.frames.map(frame => [frame.id, frame])), entries = new Map<string, FrameEntry>();
+  for (const frame of project.frames) entries.set(frame.id, { ...await prepareFrame(frame, { settings: project.settings, lookup: id => lookup.get(id) }), htmlPath: path.join(output.directory, `${frame.id}.html`) });
+  const plan = await (buildStatic as unknown as (options: Record<string, unknown>) => Promise<{ files: Map<string, string | Buffer>; mediaTypes?: Map<string, string> }>)({ projectDir, frames: new Map([...entries].map(([id, entry]) => [id, entry.fileHtml])), ...(Object.keys(project.settings.assets ?? {}).length ? { assets: project.settings.assets, nativeAssets: true } : {}) });
+  for (const [id, entry] of entries) { entry.fileHtml = String(plan.files.get(`${id}.html`)); plan.files.set(`${id}.meta.json`, frameMetadata(entry, entries, file)); }
+  await output.preflight(plan.files, [], { mediaTypes: plan.mediaTypes ?? new Map() });
+  return canonical;
+}
+
 /**
  * Return the Divlet project that stands for `source`, converting it on first use.
  * `{ file, created, frames, utilities, arbitrary }`: counts of converted frames and of Tailwind utility / arbitrary-property
@@ -76,8 +95,9 @@ export async function importSource(input: string, importer?: SourceReader): Prom
   let converted;
   try { converted = chosen.convert(bytes, { name: path.basename(source, path.extname(source)), provenance: provenanceOf(path.basename(source), chosen, bytes) }); }
   catch (error) { throw error instanceof SyntaxError ? Object.assign(new Error(`${path.basename(source)} is not valid JSON.`), { code: 'INVALID_PROJECT' }) : error; }
+  const canonical = await nativeImportText(converted.text, file, path.dirname(source));
   // Exclusive publication: a concurrent open or an author-created file wins, and is then simply used.
-  try { await fs.writeFile(file, converted.text, { flag: 'wx' }); }
+  try { await fs.writeFile(file, canonical, { flag: 'wx' }); }
   catch (error) { if ((error as NodeJS.ErrnoException).code === 'EEXIST') return existing; throw error; }
   const stats = converted.stats ?? {};
   return { file, created: true, frames: stats.frames ?? 0, utilities: stats.utilities ?? 0, arbitrary: stats.arbitrary ?? 0 };
@@ -107,7 +127,9 @@ export async function importAgain(projectFile: string, metadata: Metadata | null
   const converted = importer.convert(bytes, { name: stem, provenance: provenanceOf(record.source, importer, bytes) });
   for (let n = 2; n < 1000; n++) {
     const file = path.join(path.dirname(source), `${stem}-${n}.divlet`);
-    try { await fs.writeFile(file, converted.text, { flag: 'wx' }); return { file, frames: converted.stats?.frames ?? 0 }; }
+    if (await fs.lstat(file).catch(error => { if (error.code === 'ENOENT') return null; throw error; })) continue;
+    const canonical = await nativeImportText(converted.text, file, path.dirname(source));
+    try { await fs.writeFile(file, canonical, { flag: 'wx' }); return { file, frames: converted.stats?.frames ?? 0 }; }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; }
   }
   throw Object.assign(new Error('Too many re-imports beside the source.'), { code: 'INVALID_TARGET' });

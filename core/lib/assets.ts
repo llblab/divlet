@@ -9,6 +9,9 @@ export const ASSET_LIMITS = Object.freeze({ files: 400, fileBytes: 20 * 1024 * 1
 export interface ParsedAssets { readonly tree: AssetTree; readonly files: ReadonlyMap<string, AssetFile> }
 export interface AssetText { readonly kind: 'css' | 'svg'; readonly text: string; readonly ascii: boolean }
 
+/** Compare validated names/paths for portable collisions; never rewrite their authored spelling or identity. */
+export function assetCollisionKey(value: string): string { return value.normalize('NFC').toLowerCase(); }
+
 /** Interpret declared text by MIME, not its filename; unsupported encodings must not be silently transcoded. */
 export function readAssetText(file: AssetFile): AssetText | null {
   const mime = canonicalMediaType(file.mediaType);
@@ -41,7 +44,7 @@ function decode(value: string, where: string): AssetFile {
   const comma = value.indexOf(',');
   if (!value.startsWith('data:') || comma < 0 || value.slice(comma - 7, comma) !== ';base64') fail(`${where} must be a canonical base64 Data URL.`);
   const mediaType = value.slice(5, comma - 7);
-  if (!canonicalMediaType(mediaType)) fail(`${where} must use a canonical media type without discarded parameters.`);
+  if (!canonicalMediaType(mediaType) || mediaType.includes('#')) fail(`${where} must use a canonical Data-URL media type without discarded parameters or a fragment delimiter.`);
   const payload = value.slice(comma + 1), padding = payload.endsWith('==') ? 2 : payload.endsWith('=') ? 1 : 0;
   const size = payload.length / 4 * 3 - padding;
   if (size > ASSET_LIMITS.fileBytes) fail(`${where} exceeds the ${ASSET_LIMITS.fileBytes} decoded-byte limit.`);
@@ -52,7 +55,10 @@ function decode(value: string, where: string): AssetFile {
 }
 
 /** Validate a detached source tree and decode bounded leaves once; named aliases and literal input are never rewritten. */
-export function readAssets(input: unknown): ParsedAssets {
+export function readAssets(input: unknown): ParsedAssets { return readTree(input, false); }
+/** Check nullable sparse patches before merge, including names on deleted paths. */
+export function validateAssetPatch(input: unknown): void { readTree(input, true); }
+function readTree(input: unknown, deletions: boolean): ParsedAssets {
   const files = new Map<string, AssetFile>(), paths = new Set<string>(), active = new Set<object>();
   let encodedBytes = 0, nodes = 0;
   const visit = (input: unknown, parent: string, depth: number): AssetTree => {
@@ -66,11 +72,12 @@ export function readAssets(input: unknown): ParsedAssets {
       validateAssetName(name);
       const relative = parent ? `${parent}/${name}` : name;
       if (relative.length > ASSET_LIMITS.path) fail('Asset paths exceed the path-length limit.');
-      const portable = relative.normalize('NFC').toLowerCase();
+      const portable = assetCollisionKey(relative);
       if (paths.has(portable)) fail(`Asset paths alias on a portable filesystem: ${relative}.`);
       paths.add(portable);
       encodedBytes += Buffer.byteLength(name) + (typeof value === 'string' ? value.length : 0);
       if (encodedBytes > ASSET_LIMITS.encodedBytes) fail('Assets exceed the encoded-byte limit.');
+      if (value === null && deletions) continue;
       if (typeof value === 'string') {
         if (files.size >= ASSET_LIMITS.files) fail('Assets exceed the file-count limit.');
         files.set(relative, decode(value, relative));

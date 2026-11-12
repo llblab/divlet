@@ -1,4 +1,4 @@
-import { store, documents, descriptor, edit, toast, cachedModel, loadModel, selectNodes, parentOf, canContain, apiUrl } from './store.js';
+import { store, documents, descriptor, edit, toast, cachedModel, loadModel, selectNodes, parentOf, canContain, apiUrl, request } from './store.js';
 import * as canvas from './canvas.js';
 import { duplicateArtboards } from './artboards.js';
 
@@ -103,14 +103,29 @@ export function copySelection({ event, cut = false } = {}) {
     const text = htmlOf(model, ids);
     clip = { kind: 'nodes', documentId: node.documentId, specs: ids.map(id => toSpec(model, id)), text, count: ids.length, preferInternal: false };
     const current = clip;
-    const written = writeSystem(text, event);
-    Promise.resolve(written).then(ok => { if (!ok && clip === current) current.preferInternal = true; });
+    const declared = (store.state?.project?.resources?.length ?? 0) > 0;
+    if (declared) { event?.preventDefault(); current.preferInternal = true; }
+    const written = declared ? request(`api/export/${encodeURIComponent(node.documentId)}?${ids.map(id => `nodes=${encodeURIComponent(id)}`).join('&')}&version=${model.version}&projectVersion=${store.state.project.version}`).then(async result => {
+      if (clip !== current) return false;
+      current.text = result.html;
+      return writeSystem(result.html);
+    }) : writeSystem(text, event);
+    Promise.resolve(written).then(ok => { if (clip === current) current.preferInternal = !ok; }).catch(error => toast(error.message));
     const what = ids.length === 1 ? `<${model.nodes[ids[0]].tag ?? 'text'}>` : `${ids.length} elements`;
     if (cut) {
-      edit(node.documentId, { type: 'remove', ids }, { label: `cut ${what}` }).then(() => {
-        selectNodes(node.documentId, []);
-        toast(`Cut ${what} — paste with ${navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} V`);
-      }).catch(() => {});
+      const expectedRender = descriptor(node.documentId)?.render;
+      const remove = () => {
+        if (clip !== current) return;
+        edit(node.documentId, declared ? latest => {
+          if (latest.version !== model.version) throw new Error('The copied frame changed. Copy it again before cutting.');
+          return { type: 'remove', ids };
+        } : { type: 'remove', ids }, { label: `cut ${what}`, ...(declared ? { expectedRender } : {}) }).then(() => {
+          selectNodes(node.documentId, []);
+          toast(`Cut ${what} — paste with ${navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'} V`);
+        }).catch(() => {});
+      };
+      if (declared) Promise.resolve(written).then(remove).catch(() => {});
+      else remove();
     } else toast(`Copied ${what}`);
     return true;
   }
@@ -139,10 +154,10 @@ async function target() {
 
 const looksLikeHtml = text => /^\s*<([a-z][\w-]*)[\s>/][\s\S]*>\s*$/i.test(text) && /<\/[a-z][\w-]*\s*>|\/>\s*$|<(img|br|hr|input)\b/i.test(text);
 
-async function insert(op, label) {
+async function insert(op, label, group) {
   const spot = await target();
   if (!spot) { toast('Select an artboard or an element to paste into'); return null; }
-  const result = await edit(spot.documentId, { type: 'insert', ...spot.place, ...op }, { label }).catch(() => null);
+  const result = await edit(spot.documentId, { type: 'insert', ...spot.place, ...op }, { label, group }).catch(() => null);
   if (!result?.ids?.length) return null;
   if (store.mode !== 'select') canvas.setMode('select');
   selectNodes(spot.documentId, result.ids, { reveal: true });
@@ -173,15 +188,15 @@ export async function paste({ text, files } = {}) {
 }
 
 /* ---- images --------------------------------------------------------------- */
-async function upload(file, documentId) {
+async function upload(file, documentId, group) {
   const name = file.name && /\.[a-z0-9]+$/i.test(file.name) ? file.name : `pasted.${(file.type.split('/')[1] || 'png').replace('svg+xml', 'svg').replace('jpeg', 'jpg')}`;
-  const response = await fetch(apiUrl(`api/assets?name=${encodeURIComponent(name)}&documentId=${encodeURIComponent(documentId)}`), { method: 'POST', headers: { 'Content-Type': file.type || 'image/png' }, body: file });
+  const response = await fetch(apiUrl(`api/assets?name=${encodeURIComponent(name)}&documentId=${encodeURIComponent(documentId)}&group=${encodeURIComponent(group)}`), { method: 'POST', headers: { 'Content-Type': file.type || 'image/png' }, body: file });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.message || `Upload failed (${response.status})`);
   return { ...body, alt: name.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ') };
 }
 
-/** Upload images into divlet/assets/ and add an <img> for each at the paste/drop target. */
+/** Store images in the project and add an <img> for each at the paste/drop target. */
 export async function addImages(files, documentId) {
   if (documentId && !(store.selected.size === 1 && store.selected.has(documentId))) {
     const { selectArtboards } = await import('./store.js');
@@ -190,10 +205,10 @@ export async function addImages(files, documentId) {
   const spot = await target();
   if (!spot) { toast('Select an artboard first, or drop the image onto one'); return null; }
   try {
-    const saved = [];
-    for (const file of files.slice(0, 12)) saved.push(await upload(file, spot.documentId));
-    toast(saved.length === 1 ? `Added ${saved[0].file}` : `Added ${saved.length} images to divlet/assets`);
-    return insert({ spec: saved.map(item => ({ tag: 'img', className: 'block max-w-full h-auto', attrs: { src: item.path, alt: item.alt } })) }, saved.length > 1 ? `add ${saved.length} images` : 'add image');
+    const saved = [], group = `images:${crypto.randomUUID()}`;
+    for (const file of files.slice(0, 12)) saved.push(await upload(file, spot.documentId, group));
+    toast(saved.length === 1 ? `Added ${saved[0].file}` : `Added ${saved.length} project images`);
+    return insert({ spec: saved.map(item => ({ tag: 'img', className: 'block max-w-full h-auto', attrs: { src: item.path, alt: item.alt } })) }, saved.length > 1 ? `add ${saved.length} images` : 'add image', group);
   } catch (error) { toast(error.message); return null; }
 }
 

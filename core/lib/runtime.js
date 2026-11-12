@@ -16,31 +16,36 @@ import { operationPatch } from './ops.ts';
 import { HistoryLine } from './history.ts';
 import { expandPath, inspectPath, initProject, resolveProject, isProjectFile } from './projects.ts';
 import { OutputStore, safeDirectory } from './output.ts';
-import { buildStatic, readResourceBytes, normalizeExternalFiles } from './static.js';
+import { buildStatic, inlineDeclaredAssets, readResourceBytes, normalizeExternalFiles } from './static.js';
+import { readAssets, assetCollisionKey } from './assets.ts';
+import { assetReference } from './asset-reference.ts';
+import { canonicalMediaType } from './media-type.ts';
 import { readProject, writeProject, validateSettings, patchSettings, expandFrame, listComponents, instancesOf } from './project.ts';
 import { importStatus, importAgain, sourceFor, pageSourceExtensions } from './import.ts';
-import { clientPlugins, customClasses, explainClasses, suggestClasses, warmSuggestions } from './engine.ts';
+import { clientPlugins, compileClasses, customClasses, explainClasses, suggestClasses, warmSuggestions } from './engine.ts';
 
 const PACKAGE_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const PROJECT_FILE = 'project.divlet';
 const MAX_FILE_BYTES = 4 * 1024 * 1024;
 const MAX_PROJECT_BYTES = SOURCE_LIMITS.bytes;
 const MAX_ASSET_BYTES = 12 * 1024 * 1024;
-const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.avif']);
+const IMAGE_TYPES = new Map([['.png', 'image/png'], ['.jpg', 'image/jpeg'], ['.jpeg', 'image/jpeg'], ['.gif', 'image/gif'], ['.webp', 'image/webp'], ['.svg', 'image/svg+xml'], ['.avif', 'image/avif']]);
 const MAX_ASK = 4000;
 const MAX_REPLY = 6000;
 const HISTORY_LIMIT = 500;
 const UNDO_LIMIT = 200;
-const SETTINGS_FIELDS = ['name', 'tokens', 'css', 'metadata', 'outputDir'];
+const SETTINGS_FIELDS = ['name', 'tokens', 'css', 'metadata', 'outputDir', 'assets'];
 const capped = (list, limit = 50) => list.slice(0, limit);
 const digest = value => createHash('sha256').update(value).digest('hex');
 const hashOf = text => (text === null || text === undefined ? null : digest(text));
-const imageUpload = (name, data) => {
+const imageUpload = (name, data, mediaType) => {
   const extension = path.extname(String(name || '')).toLowerCase();
-  if (!IMAGE_EXTENSIONS.has(extension)) fail('UNSUPPORTED_ASSET', 'Only PNG, JPEG, GIF, WebP, SVG and AVIF images can be added.');
+  if (!IMAGE_TYPES.has(extension)) fail('UNSUPPORTED_ASSET', 'Only PNG, JPEG, GIF, WebP, SVG and AVIF images can be added.');
   if (!Buffer.isBuffer(data) || !data.length) fail('UNSUPPORTED_ASSET', 'The image is empty.');
   if (data.length > MAX_ASSET_BYTES) fail('BODY_TOO_LARGE', 'Images are limited to 12 MiB.');
-  return { extension, bytes: Buffer.from(data) };
+  const type = mediaType ?? IMAGE_TYPES.get(extension), parsed = canonicalMediaType(type);
+  if (!parsed || ![...IMAGE_TYPES.values()].includes(parsed.essence)) fail('UNSUPPORTED_ASSET', 'The upload must declare a supported canonical image media type.');
+  return { extension, mediaType: type, bytes: Buffer.from(data) };
 };
 const sameDocument = (a, b) => isDeepStrictEqual({ ...a, version: 0 }, { ...b, version: 0 });
 const sameSettings = (a, b) => SETTINGS_FIELDS.every(key => isDeepStrictEqual(a[key], b[key]));
@@ -263,6 +268,14 @@ export class DivletRuntime extends EventEmitter {
     };
   }
 
+  resourceList() {
+    if (this.resourceSettings !== this.settings) {
+      this.resourceSettings = this.settings;
+      this.resourceSummary = [...readAssets(this.settings.assets ?? {}).files].map(([file, asset]) => ({ file, path: assetReference(file), mediaType: asset.mediaType, size: asset.bytes.byteLength }));
+    }
+    return this.resourceSummary.map(item => ({ ...item }));
+  }
+
   info() {
     const state = {
       projectId: this.projectId,
@@ -271,7 +284,7 @@ export class DivletRuntime extends EventEmitter {
       outputDir: this.outputDir,
       url: this.url,
       revision: this.revision,
-      project: { file: this.projectPath, format: 'divlet', capabilities: { properties: !this.diagnostics.has(this.projectPath), settings: !this.diagnostics.has(this.projectPath), frames: !this.diagnostics.has(this.projectPath), saveAs: !this.diagnostics.has(this.projectPath) }, name: this.settings.name, version: this.settings.version, tokens: this.settings.tokens, css: this.settings.css, metadata: this.settings.metadata, outputDir: this.settings.outputDir },
+      project: { file: this.projectPath, format: 'divlet', capabilities: { properties: !this.diagnostics.has(this.projectPath), settings: !this.diagnostics.has(this.projectPath), frames: !this.diagnostics.has(this.projectPath), saveAs: !this.diagnostics.has(this.projectPath) }, name: this.settings.name, version: this.settings.version, tokens: this.settings.tokens, css: this.settings.css, metadata: this.settings.metadata, outputDir: this.settings.outputDir, resources: this.resourceList() },
       documents: [...this.documents.values()].map(entry => this.describe(entry)),
       diagnostics: [...this.diagnostics.values()],
       selection: structuredClone(this.selection),
@@ -346,7 +359,7 @@ export class DivletRuntime extends EventEmitter {
 
   render(id) {
     const entry = this.getEntry(id);
-    return { documentId: id, version: entry.document.version, render: entry.render, html: entry.html };
+    return { documentId: id, version: entry.document.version, render: entry.render, html: entry.previewHtml ?? entry.html };
   }
 
   siteInfo() {
@@ -375,7 +388,7 @@ export class DivletRuntime extends EventEmitter {
 
   renderSite(route) {
     const page = this.sitePage(route);
-    return { documentId: page.document.id, version: this.site.version, html: page.html };
+    return { documentId: page.document.id, version: this.site.version, html: page.previewHtml ?? page.html };
   }
 
   async siteCandidate(entries, settings) {
@@ -431,7 +444,7 @@ export class DivletRuntime extends EventEmitter {
       const generation = await this.prepareGeneration(entries, this.settings, candidate);
       await this.output.withLock(async () => {
         const removed = await this.obsoleteOutputs(generation.files);
-        await this.output.preflight(generation.files, removed);
+        await this.output.preflight(generation.files, removed, { mediaTypes: generation.mediaTypes ?? new Map() });
         await this.publishGeneration(entries, generation, [], { removed });
       });
       this.documents = entries;
@@ -575,7 +588,7 @@ export class DivletRuntime extends EventEmitter {
     generation ??= await this.prepareGeneration(next, settings);
     await output.withLock(async () => {
       const removedNames = await this.obsoleteOutputs(generation.files, output);
-      await output.preflight(generation.files, removedNames);
+      await output.preflight(generation.files, removedNames, { mediaTypes: generation.mediaTypes ?? new Map() });
       const latest = await this.fileContents(this.projectPath, MAX_PROJECT_BYTES);
       if (hashOf(latest) !== sourceHash) fail('FILE_CONFLICT', 'The project source changed during output preparation. Read it again and retry.');
       if (latest !== text) {
@@ -604,13 +617,27 @@ export class DivletRuntime extends EventEmitter {
     const frames = new Map([...entries].map(([id, entry]) => [id, entry.rawFileHtml]));
     const site = new Map([...(candidate.site?.pages ?? [])].map(([route, page]) => [route, page.fileHtml]));
     let generation;
-    try { generation = await buildStatic({ projectDir: this.projectDir, frames, site, assetBase: this.url + 'files/', siteBase: this.url + 'site/', externalFiles: this.externalFiles }); }
+    const declared = Object.keys(settings.assets ?? {}).length > 0;
+    try { generation = await buildStatic({ projectDir: this.projectDir, frames, site, assetBase: this.url + 'files/', siteBase: this.url + 'site/', externalFiles: this.externalFiles, ...(declared ? { assets: settings.assets, nativeAssets: true, previewBase: this.url + 'build/', previews: new Map([...entries].map(([id, entry]) => [id, entry.html])), sitePreviews: new Map([...(candidate.site?.pages ?? [])].map(([route, page]) => [route, page.html])) } : {}) }); }
     catch (error) { failStaticBuild(error, this.projectPath, this.externalFiles); }
     const inputs = [...generation.sources.keys(), ...(candidate.site?.routes ?? []).map(route => route.sourcePath)];
     if (inputs.some(file => inside(destination, file))) fail('INVALID_OUTPUT_DIR', 'The output directory cannot contain authored resources or Markdown sources used by this project.');
     for (const [id, entry] of entries) {
       const fileHtml = String(generation.files.get(path.basename(entry.htmlPath)));
-      if (entry.fileHtml !== fileHtml) entries.set(id, { ...entry, fileHtml });
+      const previewHtml = declared ? generation.previews.get(id) : undefined;
+      const previous = this.documents.get(id);
+      const changedPreview = previous && (previous.previewHtml ?? previous.html) !== (previewHtml ?? entry.html);
+      const render = changedPreview && entry.render === previous.render ? ++this.renderSeq : entry.render;
+      if (entry.fileHtml !== fileHtml || entry.previewHtml !== previewHtml || entry.render !== render) entries.set(id, { ...entry, fileHtml, previewHtml, render });
+    }
+    if (candidate.site) {
+      const pages = new Map(candidate.site.pages);
+      let changed = false;
+      for (const [route, page] of pages) {
+        const previewHtml = declared ? generation.sitePreviews.get(route) : undefined;
+        if (page.previewHtml !== previewHtml) { pages.set(route, { ...page, previewHtml }); changed = true; }
+      }
+      if (changed) candidate = { ...candidate, site: { ...candidate.site, pages } };
     }
     // Preserve the static owner's public graph before adding editor-only sidecars to the disk publication plan.
     const publicFiles = new Map(generation.files);
@@ -640,7 +667,7 @@ export class DivletRuntime extends EventEmitter {
       const changed = previous === undefined || !Buffer.from(previous).equals(Buffer.from(contents));
       if (name.endsWith('.meta.json') || stylesheets.has(name) || moved || selected.has(name) || changed && (!frames.has(name) || this.staticFiles)) files.set(name, contents);
     }
-    await this.output.writeLocked(files);
+    await this.output.writeLocked(files, { mediaTypes: generation.mediaTypes ?? new Map() });
     if (removed.length) await this.output.removeLocked(removed);
     for (const [name, contents] of files) {
       const file = this.output.file(name);
@@ -653,6 +680,7 @@ export class DivletRuntime extends EventEmitter {
     for (const warning of generation.warnings) this.diagnostics.set(`static:${warning.path}`, { ...warning, at: new Date().toISOString() });
     this.staticFiles = generation.files;
     this.publicFiles = generation.publicFiles;
+    this.publicMediaTypes = generation.mediaTypes ?? new Map();
     this.staticSources = generation.sources;
     this.diagnostics.delete('outputs');
   }
@@ -702,7 +730,7 @@ export class DivletRuntime extends EventEmitter {
     const next = new Map();
     for (const frame of frames) next.set(frame.id, this.entryFor(prepared.get(frame.id), undefined, output.directory));
     const generation = await this.prepareGeneration(next, settings);
-    await output.preflight(generation.files);
+    await output.preflight(generation.files, [], { mediaTypes: generation.mediaTypes ?? new Map() });
     const stale = [];
     for (const entry of next.values()) {
       const disk = await this.fileContents(entry.htmlPath).catch(() => undefined);
@@ -904,7 +932,7 @@ await this.importProject(project.settings, project.frames, hash);
       }
     }
     if (restore.size) {
-      await this.output.write(restore);
+      await this.output.write(restore, { mediaTypes: this.publicMediaTypes ?? new Map() });
       for (const [name, contents] of restore) { const file = this.output.file(name); this.knownHashes.set(file, digest(contents)); this.diagnostics.delete(file); }
       this.publish();
     }
@@ -916,6 +944,9 @@ await this.importProject(project.settings, project.frames, hash);
     if (typeof importer?.page !== 'function') fail('INVALID_PROJECT', `${path.basename(file)} is not a page this board can import.`);
     const fallbackId = path.basename(file).replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_.:-]/g, '-').replace(/^[^a-zA-Z]+/, '') || 'imported';
     const { document, dropped } = importer.page(Buffer.from(text), { fallbackId, source: path.basename(file) });
+    // A foreign page has no grant to the receiving project's declared namespace, including compiled CSS/srcset carriers.
+    const prepared = await prepareFrame(document);
+    await buildStatic({ projectDir: path.dirname(file), frames: new Map([[document.id, prepared.fileHtml]]) });
     return { document, dropped };
   }
 
@@ -1092,6 +1123,14 @@ await this.importProject(project.settings, project.frames, hash);
       if (expectedVersion !== entry.document.version) fail('REVISION_CONFLICT', `Expected frame version ${entry.document.version}; received ${expectedVersion}. Read the frame again.`, { actualVersion: entry.document.version });
       this.assertWritable();
       const { patch, ids, removed } = operationPatch(entry.document, op, { frame: id => this.documents.get(id)?.document, usedBy: this.usedBy(documentId) });
+      if (op.type === 'insert' && op.html !== undefined) {
+        // Clipboard/HTML fragments cannot borrow the receiver's asset namespace via CSS, srcset or compiler output.
+        const candidate = applyDocumentPatch(entry.document, patch);
+        const classes = [...new Set(Object.values(candidate.nodes).filter(node => !entry.document.nodes[node.id] && node.type === 'element').flatMap(node => node.className.split(/\s+/)).filter(Boolean))];
+        const css = await compileClasses({}, classes, PACKAGE_ROOT);
+        const html = `<style>${css}</style>` + ids.map(nodeId => exportHtml(candidate, { nodeId })).join('\n');
+        await buildStatic({ projectDir: this.projectDir, frames: new Map([['clipboard', html]]) });
+      }
       const subject = (op.ids ?? [op.id ?? ids?.[0]]).filter(Boolean);
       const verb = { remove: 'delete', duplicate: 'duplicate', move: 'move', insert: 'add', text: 'edit text of', wrap: 'wrap', unwrap: 'unwrap', detach: 'detach', rename: 'rename' }[op.type] ?? op.type;
       const result = await this._patch({ documentId, expectedVersion, expectedRender, patch, actor, group, label: label ?? `${verb} ${subject.slice(0, 3).join(', ')}${subject.length > 3 ? ` +${subject.length - 3}` : ''}`.trim() });
@@ -1356,7 +1395,7 @@ await this.importProject(project.settings, project.frames, hash);
       const copyOutput = new OutputStore(copyFile, this.settings.outputDir).directory;
       const copySettings = !within(target, copyOutput) || copyOutput === this.outputDir ? { ...this.settings, outputDir: null } : this.settings;
       await safeDirectory(target, { create: true });
-      const sources = [path.basename(this.projectPath), 'assets', 'site.json', this.site?.config.contentDir, ...[...this.staticSources.keys()].map(file => path.relative(this.projectDir, file))].filter(Boolean);
+      const sources = [path.basename(this.projectPath), ...(Object.keys(this.settings.assets ?? {}).length ? [] : ['assets']), 'site.json', this.site?.config.contentDir, ...[...this.staticSources.keys()].map(file => path.relative(this.projectDir, file))].filter(Boolean);
       for (const relative of new Set(sources)) {
         const source = path.resolve(this.projectDir, relative);
         if (!inside(this.projectDir, source)) fail('UNSAFE_PATH', 'A copy source escapes the project directory.');
@@ -1496,16 +1535,20 @@ await this.importProject(project.settings, project.frames, hash);
 
 
   /** Clean HTML of a whole artboard (standalone page) or of one node (fragment). */
-  exportDocument(id, { nodeId } = {}) {
+  async exportDocument(id, { nodeId, nodeIds, expectedVersion, expectedProjectVersion } = {}) {
     const entry = this.getEntry(id);
+    assertExpectedVersion(expectedVersion, entry.document);
+    assertExpectedVersion(expectedProjectVersion, this.settings, 'project');
     // Instances are exported as the elements they render.
     const expanded = expandFrame(entry.document, frameId => this.documents.get(frameId)?.document, this.settings).document;
-    if (nodeId) {
-      if (!Object.hasOwn(entry.document.nodes, nodeId)) fail('NOT_FOUND', `Unknown node: ${nodeId}`);
-      return { documentId: id, version: entry.document.version, nodeId, html: exportHtml(expanded, { nodeId, limits: LIMITS }) };
+    if (nodeId || nodeIds !== undefined) {
+      const ids = nodeIds ?? [nodeId];
+      if (!Array.isArray(ids) || !ids.length || ids.length > 100 || ids.some(node => typeof node !== 'string' || !Object.hasOwn(entry.document.nodes, node))) fail('NOT_FOUND', 'Export requires existing node IDs in one frame.');
+      const html = ids.map(nodeId => exportHtml(expanded, { nodeId, limits: LIMITS })).join('\n');
+      return { documentId: id, version: entry.document.version, ...(nodeId ? { nodeId } : { nodeIds: ids }), html: await inlineDeclaredAssets(html, this.settings.assets, { fragment: true }) };
     }
     const compiled = /<style data-divlet-compiled>([\s\S]*?)<\/style>/.exec(entry.html)?.[1] ?? '';
-    return { documentId: id, version: entry.document.version, html: exportHtml(expanded, { compiledCss: compiled, limits: LIMITS }), fileName: `${path.basename(entry.htmlPath, '.html')}.html` };
+    return { documentId: id, version: entry.document.version, html: await inlineDeclaredAssets(exportHtml(expanded, { compiledCss: compiled, limits: LIMITS }), this.settings.assets), fileName: `${path.basename(entry.htmlPath, '.html')}.html` };
   }
 
   /** Authored asset URLs always resolve beside the project source, never in generated output. */
@@ -1539,7 +1582,7 @@ await this.importProject(project.settings, project.frames, hash);
 
   async listAssets({ documentId } = {}) {
     const from = this.documentDir(documentId);
-    const found = [];
+    const found = this.resourceList().filter(item => item.mediaType.startsWith('image/')).map(item => ({ ...item, modified: '' }));
     const walk = async directory => {
       for (const item of await fs.readdir(directory, { withFileTypes: true })) {
         if (item.name.startsWith('.') || found.length >= 300) continue;
@@ -1548,14 +1591,14 @@ await this.importProject(project.settings, project.frames, hash);
           if (full === this.outputDir || await fs.lstat(path.join(full, '.divlet-build.json')).then(() => true, () => false)) continue;
           await walk(full);
         }
-        else if (item.isFile() && IMAGE_EXTENSIONS.has(path.extname(item.name).toLowerCase())) {
+        else if (item.isFile() && IMAGE_TYPES.has(path.extname(item.name).toLowerCase())) {
           const stat = await fs.stat(full);
           found.push({ path: path.relative(from, full).split(path.sep).join('/'), file: path.relative(this.projectDir, full).split(path.sep).join('/'), size: stat.size, modified: stat.mtime.toISOString() });
         }
       }
     };
     await walk(this.projectDir);
-    found.sort((a, b) => b.modified.localeCompare(a.modified));
+    found.sort((a, b) => Number(b.path.startsWith('asset:')) - Number(a.path.startsWith('asset:')) || b.modified.localeCompare(a.modified) || a.file.localeCompare(b.file));
     return { documentId: documentId ?? null, assets: found };
   }
 
@@ -1568,88 +1611,27 @@ await this.importProject(project.settings, project.frames, hash);
     fail('UNSUPPORTED_OPERATION', 'Image reuse has been retired. saveAsset publishes a new image; it does not resume recovery.');
   }
 
-  /** Publish a new authored image without replacing another upload or a caller-owned file. */
-  async saveAsset({ name, data, documentId }) {
+  /** Uploads append canonical project bytes through the same queued, versioned settings writer.
+   * @param {{ name: string, data: Buffer, mediaType?: string, documentId?: string, expectedVersion?: number, group?: string }} input
+   */
+  async saveAsset({ name, data, mediaType, documentId, expectedVersion, group }) {
     this.assertWritable();
-    return this._publishAsset({ name, data, documentId }, () => this.assertWritable());
-  }
-
-  async _publishAsset({ name, data, documentId }, admit) {
-    const { extension, bytes } = imageUpload(name, data), from = this.documentDir(documentId);
-    const directory = path.join(this.projectDir, 'assets');
-    const stem = path.basename(String(name), path.extname(String(name))).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'image';
-    const sameFile = (a, b) => a && b && a.dev === b.dev && a.ino === b.ino;
-    let directoryStat, stageStat, payloadStat, file, published = false, failure;
-    const retained = [];
-    const checkDirectory = async (create = false) => {
-      await admit();
-      if (inside(this.outputDir, directory)) fail('INVALID_ASSET_DIR', 'Authored uploads cannot be stored in generated output.');
-      await safeDirectory(directory);
-      for (let current = directory; ; current = path.dirname(current)) {
-        try { await fs.lstat(path.join(current, '.divlet-build.json')); fail('INVALID_ASSET_DIR', 'Authored uploads cannot be stored in generated output.'); }
-        catch (error) { if (error.code !== 'ENOENT') throw error; }
-        if (current === path.dirname(current)) break;
-      }
-      if (create) await safeDirectory(directory, { create: true });
-      const stat = await fs.lstat(directory, { bigint: true });
-      if (!stat.isDirectory() || directoryStat && !sameFile(stat, directoryStat)) fail('ASSET_CONFLICT', 'The upload directory changed during preparation.');
-      directoryStat ??= stat;
-    };
-    await checkDirectory(true);
-    const stage = await fs.mkdtemp(path.join(directory, '.divlet-upload-')), payload = path.join(stage, 'image');
-    const checkStage = async () => {
-      await checkDirectory();
-      await safeDirectory(stage);
-      if (!sameFile(await fs.lstat(stage, { bigint: true }), stageStat)) fail('ASSET_CONFLICT', 'The private upload stage changed.');
-    };
-    const checkPayload = async target => {
-      const stat = await fs.lstat(target, { bigint: true });
-      if (!stat.isFile() || !sameFile(stat, payloadStat) || stat.size !== BigInt(bytes.length) || !(await readResourceBytes(target)).equals(bytes)) fail('ASSET_CONFLICT', 'Prepared upload bytes or identity changed.');
-    };
-    try {
-      stageStat = await fs.lstat(stage, { bigint: true });
-      await checkStage();
-      const handle = await fs.open(payload, constants.O_RDWR | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW | constants.O_NONBLOCK, 0o666);
-      try { payloadStat = await handle.stat({ bigint: true }); await handle.writeFile(bytes); }
-      finally { await handle.close(); }
-      for (let n = 1; ; n++) {
-        await checkStage(); await checkPayload(payload);
-        await admit();
-        file = path.join(directory, `${stem}${n === 1 ? '' : '-' + n}${extension}`);
-        try { await fs.link(payload, file); published = true; break; }
-        catch (error) { if (error.code !== 'EEXIST') throw error; file = undefined; }
-      }
-      await checkStage(); await checkPayload(file);
-    } catch (error) { failure = error; }
-    // Inspect an ambiguous link while the private payload still anchors its identity.
-    if (failure && file && !published) {
-      published = null;
-      try {
-        await checkDirectory();
-        try { await fs.lstat(file); } catch (error) { if (error.code !== 'ENOENT') throw error; published = false; }
-        if (published !== false) { await checkStage(); await checkPayload(file); published = true; }
-      } catch { /* A failed inspection is not proof that publication did not happen. */ }
-    }
-    // Cleanup never follows replaced directories or removes bytes whose custody was lost.
-    try {
-      await checkStage();
-      try { await checkPayload(payload); await fs.unlink(payload); }
-      catch (error) { if (error.code !== 'ENOENT') retained.push(payload); }
-      try {
-        if (!sameFile(await fs.lstat(stage, { bigint: true }), stageStat)) throw new Error('Upload stage replaced.');
-        await fs.rmdir(stage);
-      } catch (error) { if (error.code !== 'ENOENT') retained.push(stage); }
-    } catch { retained.push(stage); }
-    if (!failure) {
-      try { await checkDirectory(); await checkPayload(file); } catch (error) { failure = error; }
-    }
-    if (failure) {
-      if (published !== false && file) retained.push(file);
-      failure.code ??= 'ASSET_WRITE_FAILED';
-      failure.details = { ...failure.details, asset: { file: file ? path.relative(this.projectDir, file).split(path.sep).join('/') : null, published, retained: [...new Set(retained)] } };
-      throw failure;
-    }
-    return { path: path.relative(from, file).split(path.sep).join('/'), file: path.relative(this.projectDir, file).split(path.sep).join('/'), size: bytes.length, ...(retained.length ? { retained: [...new Set(retained)] } : {}) };
+    const { extension, bytes, mediaType: type } = imageUpload(name, data, mediaType);
+    return this.enqueue(async () => {
+      this.assertWritable();
+      this.documentDir(documentId);
+      const stem = path.basename(String(name), path.extname(String(name))).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'image';
+      const tree = readAssets(this.settings.assets ?? {}).tree;
+      if (typeof tree.images === 'string') fail('INVALID_ASSET', 'The upload directory is already a declared file.');
+      const occupied = new Set(Object.keys(tree.images ?? {}).map(assetCollisionKey));
+      let leaf = `${stem}${extension}`, index = 1;
+      while (occupied.has(assetCollisionKey(leaf))) leaf = `${stem}-${++index}${extension}`;
+      const key = `images/${leaf}`, assets = { images: { [leaf]: `data:${type};base64,${bytes.toString('base64')}` } };
+      // Validate an uploaded SVG in its eventual image context even before a node references it.
+      await buildStatic({ projectDir: this.projectDir, frames: new Map([['upload', `<img src="${assetReference(key)}">`]]), assets, nativeAssets: true });
+      const result = await this._patchProject({ expectedVersion: expectedVersion ?? this.settings.version, patch: { assets }, actor: 'user', group, label: `upload ${leaf}` });
+      return { ...result, path: assetReference(key), file: key, size: bytes.length };
+    });
   }
 
   /**

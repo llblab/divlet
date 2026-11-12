@@ -14,7 +14,8 @@
             "tokens": {},
             "css": "",
             "metadata": {},
-            "outputDir": null
+            "outputDir": null,
+            "assets": {}
           }
         },
         {
@@ -23,6 +24,15 @@
           ],
           "equals": []
         }
+      ]
+    },
+    {
+      "id": "embedded-assets-and-explicit-inline",
+      "file": "assets.divlet",
+      "checks": [
+        { "path": ["settings", "assets", "empty"], "equals": {} },
+        { "path": ["frames", 0, "nodes", "image", "attrs", "src"], "equals": "asset:icons/logo.svg?v=%2f#mark" },
+        { "path": ["frames", 0, "head", "icon"], "equals": "asset:copy.svg" }
       ]
     },
     {

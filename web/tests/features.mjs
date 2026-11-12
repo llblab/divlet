@@ -427,19 +427,39 @@ try {
     const target = document.querySelector('.artboard[data-artboard-id="plain-css"] .frame-cover');
     for (const type of ['dragover', 'drop']) target.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: data }));
   }, PNG);
-  await waitUntil(() => Object.values(doc('plain-css').nodes).some(node => node.tag === 'img' && node.attrs.src === 'assets/dropped-photo.png'), 'dropping an image adds an <img>');
-  assert.ok((await readdir(path.join(cwd, 'assets'))).includes('dropped-photo.png'));
+  await waitUntil(() => Object.values(doc('plain-css').nodes).some(node => node.tag === 'img' && node.attrs.src === 'asset:images/dropped-photo.png'), 'dropping an image adds an <img>');
+  assert.ok(!(await readdir(path.join(cwd, 'assets')).catch(error => { if (error.code === 'ENOENT') return []; throw error; })).includes('dropped-photo.png'));
+  assert.equal(runtime.settings.assets.images['dropped-photo.png'], `data:image/png;base64,${PNG}`);
+  const uploadedId = Object.values(doc('plain-css').nodes).find(node => node.attrs?.src === 'asset:images/dropped-photo.png').id;
+  await focusCanvas(); await page.keyboard.press('Control+z');
+  await waitUntil(() => !doc('plain-css').nodes[uploadedId] && !runtime.settings.assets.images?.['dropped-photo.png'], 'one Undo removes the image and its new project bytes');
+  await page.keyboard.press('Control+Shift+z');
+  await waitUntil(() => !!doc('plain-css').nodes[uploadedId] && !!runtime.settings.assets.images?.['dropped-photo.png'], 'one Redo restores image and bytes');
+  // Redo restores content, not ephemeral selection; this 1px image is selected through the actual UI store.
+  await page.evaluate(async id => { const store = await import('./lib/store.js'); await store.loadModel('plain-css'); store.selectNodes('plain-css', [id]); }, uploadedId);
   await waitUntil(() => doc('plain-css').nodes[selectedNodes()[0]]?.tag === 'img', 'the image is selected');
   await page.locator('#inspector [data-key="image-alt"]').fill('A tiny test pattern');
   await page.keyboard.press('Enter');
   await waitUntil(() => Object.values(doc('plain-css').nodes).some(node => node.attrs?.alt === 'A tiny test pattern'), 'alt text');
   const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.locator('#inspector .image-buttons button', { hasText: 'Upload' }).click()]);
   await chooser.setFiles({ name: 'second.png', mimeType: 'image/png', buffer: Buffer.from(PNG, 'base64') });
-  await waitUntil(() => Object.values(doc('plain-css').nodes).some(node => node.attrs?.src === 'assets/second.png'), 'upload replaces the source');
+  await waitUntil(() => Object.values(doc('plain-css').nodes).some(node => node.attrs?.src === 'asset:images/second.png'), 'upload replaces the source');
   await page.locator('#inspector [data-key="image-replace"]').click();
-  await menuItem('assets/dropped-photo.png').click();
-  await waitUntil(() => Object.values(doc('plain-css').nodes).some(node => node.tag === 'img' && node.attrs.src === 'assets/dropped-photo.png'), 'replace picks a local image');
-  check('drop an image onto an artboard; inspector alt, upload and replace');
+  await menuItem('images/dropped-photo.png').click();
+  await waitUntil(() => Object.values(doc('plain-css').nodes).some(node => node.tag === 'img' && node.attrs.src === 'asset:images/dropped-photo.png'), 'replace picks a local image');
+  await focusCanvas(); await page.keyboard.press('Control+c');
+  await waitUntil(async () => (await clipboard()).includes(`data:image/png;base64,${PNG}`), 'declared image clipboard HTML embeds bytes, not a project URI or capability');
+  assert.ok(!(await clipboard()).includes('asset:') && !(await clipboard()).includes(runtime.url));
+  await setClipboard(`<img alt="external literal" src="data:image/png;base64,${PNG}">`);
+  await page.keyboard.press('Control+v');
+  await waitUntil(() => Object.values(doc('plain-css').nodes).some(node => node.attrs?.alt === 'external literal' && node.attrs.src === `data:image/png;base64,${PNG}`), 'foreign clipboard image bytes remain a literal Data URL');
+  const beforeForeign = doc('plain-css');
+  await setClipboard('<span style="background:url(asset:images/dropped-photo.png)">foreign namespace</span>');
+  const refusedNamespace = page.waitForResponse(response => response.url().endsWith('/api/edit') && response.request().method() === 'POST');
+  await focusCanvas(); await page.keyboard.press('Control+v');
+  assert.equal((await refusedNamespace).status(), 400);
+  assert.deepEqual(doc('plain-css'), beforeForeign, 'foreign inline CSS cannot borrow a receiving project declaration');
+  check('native image upload/replace, grouped history, portable clipboard, literal image paste and foreign namespace refusal');
 
   /* ---- components --------------------------------------------------------- */
   await pickNode('pricing', 'pro');
@@ -676,9 +696,9 @@ try {
   await page.mouse.click(photo.x, photo.y);
   await waitUntil(() => page.evaluate(() => document.activeElement?.dataset.key), 'double-click on an image focuses its source field').then(key => assert.equal(key, 'attr-new-value'));
   assert.equal(await page.evaluate(() => document.querySelector('[data-key="attr-new-key"]').value), 'src');
-  await page.keyboard.type('assets/photo.png');
+  await page.keyboard.type('asset:images/photo.png');
   await page.keyboard.press('Enter');
-  await waitUntil(() => doc('welcome').nodes.photo.attrs.src === 'assets/photo.png', 'the typed address becomes the image source');
+  await waitUntil(() => doc('welcome').nodes.photo.attrs.src === 'asset:images/photo.png', 'the typed address becomes the image source');
   check('double-click edits the text under the pointer (also among child elements); on an image it asks for the source');
 
   /* ---- the Ask Pi context is a path you can walk ------------------------------ */

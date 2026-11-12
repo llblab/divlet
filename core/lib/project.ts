@@ -1,6 +1,6 @@
 /*
  * Source ownership stays in one JSON file, <name>.divlet.
- * The document is { schemaVersion: 1, name, version, tokens, css, metadata, outputDir, frames }.
+ * The document is { schemaVersion: 1, name, version, tokens, css, metadata, outputDir, assets, frames }.
  *
  * A legacy frame is the ID-addressed node tree of one artboard. Any element marked
  * `reusable: true` is a component; a node `{ type: "ref", ref: "frameId/nodeId" }` is an
@@ -8,6 +8,8 @@
  * "/" to reach into nested instances), following the Pencil .pen conventions.
  */
 import path from 'node:path';
+import { readAssets, validateAssetPatch } from './assets.ts';
+import type { AssetTree } from './model.ts';
 import {
   DivletError, validateDocument, SOURCE_LIMITS, LIMITS, PROJECTION_LIMITS, documentLimits, validateTokens, validateCss,
   validateMetadata, string, merge, REF,
@@ -16,8 +18,8 @@ import type { Attrs, DocumentModel, Limits, Metadata, Node, NodeId, Override, St
 
 export const PROJECT_SCHEMA = 1;
 const MAX_FRAMES = SOURCE_LIMITS.roots;
-const PROJECT_KEYS: ReadonlySet<string> = new Set(['schemaVersion', 'name', 'version', 'tokens', 'css', 'metadata', 'outputDir', 'frames']);
-const FIELDS = ['name', 'tokens', 'css', 'metadata', 'outputDir'];
+const PROJECT_KEYS: ReadonlySet<string> = new Set(['schemaVersion', 'name', 'version', 'tokens', 'css', 'metadata', 'outputDir', 'assets', 'frames']);
+const FIELDS = ['name', 'tokens', 'css', 'metadata', 'outputDir', 'assets'];
 const MAX_EXPANDED_NODES = 4000;
 const MAX_INSTANCE_DEPTH = 12;
 
@@ -30,6 +32,8 @@ export interface ProjectSettings {
   metadata: Metadata;
   /** Relative build destination, or null for the default `.divlet/<source stem>/`. */
   outputDir: string | null;
+  /** Canonical reusable file bytes; optional for callers constructing legacy settings. */
+  assets?: AssetTree;
 }
 /** A project file as read from disk: its settings and its frames. */
 export interface ProjectFile { settings: ProjectSettings; frames: DocumentModel[] }
@@ -76,6 +80,7 @@ export function validateSettings(source: unknown = {}): ProjectSettings {
     css: validateCss(input.css ?? ''),
     metadata: validateMetadata(input.metadata ?? {}, 'project metadata'),
     outputDir: outputDir as string | null,
+    assets: readAssets(input.assets === undefined ? {} : input.assets).tree,
   };
 }
 
@@ -83,8 +88,9 @@ export function validateSettings(source: unknown = {}): ProjectSettings {
 export function patchSettings(settings: ProjectSettings, patch: unknown): ProjectSettings {
   if (!isObject(patch)) fail('INVALID_PATCH', 'A project patch must be an object');
   for (const key of Object.keys(patch)) {
-    if (!FIELDS.includes(key)) fail('INVALID_PATCH', key === 'nodes' || key === 'artboard' || key === 'rootId' ? `${key} belongs to a frame; pass frameId to patch a frame.` : `Unsupported project field: ${key}. A project patch may change name, tokens, css, metadata and outputDir.`);
+    if (!FIELDS.includes(key)) fail('INVALID_PATCH', key === 'nodes' || key === 'artboard' || key === 'rootId' ? `${key} belongs to a frame; pass frameId to patch a frame.` : `Unsupported project field: ${key}. A project patch may change name, tokens, css, metadata, outputDir and assets.`);
   }
+  if (Object.hasOwn(patch, 'assets') && patch.assets !== null) validateAssetPatch(patch.assets);
   return validateSettings(merge(settings, patch));
 }
 
@@ -118,7 +124,10 @@ export function readProject(source: unknown): ProjectFile {
 export function writeProject(settings: ProjectSettings, frames: DocumentModel[]): string {
   if (!Array.isArray(frames)) fail('INVALID_PROJECT', 'A Divlet project is written from its settings and frames.');
   if (frames.length > MAX_FRAMES) fail('INVALID_PROJECT', `A project can hold at most ${MAX_FRAMES} frames`);
-  return JSON.stringify({ schemaVersion: PROJECT_SCHEMA, name: settings.name, version: settings.version, tokens: settings.tokens, css: settings.css, metadata: settings.metadata, ...(settings.outputDir !== null && settings.outputDir !== undefined ? { outputDir: settings.outputDir } : {}), frames: frames.map(storedFrame) }, null, 2) + '\n';
+  const assets = readAssets(settings.assets ?? {}).tree;
+  const text = JSON.stringify({ schemaVersion: PROJECT_SCHEMA, name: settings.name, version: settings.version, tokens: settings.tokens, css: settings.css, metadata: settings.metadata, ...(settings.outputDir !== null && settings.outputDir !== undefined ? { outputDir: settings.outputDir } : {}), ...(Object.keys(assets).length ? { assets } : {}), frames: frames.map(storedFrame) }, null, 2) + '\n';
+  if (Buffer.byteLength(text) > SOURCE_LIMITS.bytes) fail('FILE_TOO_LARGE', 'The serialized project exceeds the source read limit.');
+  return text;
 }
 
 export { PROJECTION_LIMITS } from './model.ts';

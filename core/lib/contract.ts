@@ -129,7 +129,7 @@ export function toTypeBox(schema: ToolParameters, Type: TypeBoxApi): unknown {
 /* ---- results: one vocabulary for every host -------------------------------------------------------- */
 
 const RENAMED: Record<string, string> = { documentId: 'frameId', documentIds: 'frameIds', documents: 'frames', document: 'frame' };
-const VERBATIM = new Set(['nodes', 'descendants', 'metadata', 'tokens', 'variables', 'theme', 'attrs', 'style', 'frontmatter', 'config']);
+const VERBATIM = new Set(['nodes', 'descendants', 'metadata', 'tokens', 'assets', 'variables', 'theme', 'attrs', 'style', 'frontmatter', 'config']);
 export const LARGE_FRAME_BYTES = 60_000;
 
 /** Rename document → frame in tool results, leaving user data (node maps, metadata…) untouched. */
@@ -307,11 +307,11 @@ export const TOOLS: Tool[] = [
     name: 'patch_divlet',
     title: 'Patch divlet',
     kind: 'runtime',
-    description: 'Apply one atomic, validated partial patch. With frameId: patch that frame (name, head, artboard, nodes, tokens, css, metadata) at its current expectedVersion; nodes are addressed by stable IDs. Without frameId: patch the project (name, tokens, css, metadata, outputDir) at its version. For frame patches objects merge, arrays replace and null removes a property or node. A node accepts tag, className, attrs, style, metadata and text content (a text node: content). Declare styles per element with nodes.<id>.styles = {padding-top:16px, color:#fff, font-family:Inter} as a JSON object of CSS property to value: each property becomes a Tailwind utility (an arbitrary-property class when no utility exists) and replaces the class that set it earlier; null removes it; no Tailwind knowledge needed. Or write Tailwind utilities in className directly (compiled locally; arbitrary values and variants work, for example bg-[#14121c] md:px-10 hover:underline). Tokens named --color-*, --font-*, --breakpoint-* become theme classes (--color-brand gives bg-brand); css is for what utilities cannot express. The result lists warnings, e.g. classes that do nothing. Components: set reusable:true on an element; an instance is a node { type: ref, ref: frameId/nodeId, descendants: { componentNodeId: { content|text|className|style|attrs|tag } } }; editing a component re-renders every frame that uses it. For inserting, moving, wrapping or removing nodes, edit_divlet is simpler.',
+    description: 'Apply one atomic, validated partial patch. With frameId: patch that frame (name, head, artboard, nodes, tokens, css, metadata) at its current expectedVersion; nodes are addressed by stable IDs. Without frameId: patch the project (name, tokens, css, metadata, outputDir, assets) at its version. For frame patches objects merge, arrays replace and null removes a property or node. A node accepts tag, className, attrs, style, metadata and text content (a text node: content). Declare styles per element with nodes.<id>.styles = {padding-top:16px, color:#fff, font-family:Inter} as a JSON object of CSS property to value: each property becomes a Tailwind utility (an arbitrary-property class when no utility exists) and replaces the class that set it earlier; null removes it; no Tailwind knowledge needed. Or write Tailwind utilities in className directly (compiled locally; arbitrary values and variants work, for example bg-[#14121c] md:px-10 hover:underline). Tokens named --color-*, --font-*, --breakpoint-* become theme classes (--color-brand gives bg-brand); css is for what utilities cannot express. The result lists warnings, e.g. classes that do nothing. Components: set reusable:true on an element; an instance is a node { type: ref, ref: frameId/nodeId, descendants: { componentNodeId: { content|text|className|style|attrs|tag } } }; editing a component re-renders every frame that uses it. For inserting, moving, wrapping or removing nodes, edit_divlet is simpler.',
     snippet: 'Atomically change a frame or the shared project tokens/CSS by stable IDs.',
     parameters: {
       projectId: optional(S.string()),
-      frameId: optional(S.string({ description: 'Frame to patch. Omit to patch project-level name, tokens, css, metadata or outputDir (null resets its default).' })),
+      frameId: optional(S.string({ description: 'Frame to patch. Omit to patch project-level name, tokens, css, metadata, assets or outputDir (null resets its default).' })),
       expectedVersion: S.integer({ minimum: 1, description: 'Current version of the frame (or of the project when frameId is omitted).' }),
       label: optional(S.string({ maxLength: 200, description: 'Short intent shown in the undo menu and action log.' })),
       patch: S.object({
@@ -324,6 +324,7 @@ export const TOOLS: Tool[] = [
         css: optional(nullable(S.string({ description: 'Custom CSS — the exception: @keyframes, complex selectors, third-party content. Everything else goes into className.' }))),
         metadata: optional(nullable(S.object())),
         outputDir: optional(nullable(S.string({ description: 'Project-only relative build directory; null resets the source-stem default.' }))),
+        assets: optional(nullable(S.object(null, { description: 'Project-only hierarchical resource patch: directories contain canonical base64 Data-URL leaves; null removes a leaf/directory or resets the whole tree. Reference exact declared paths with asset: URIs; read project.resources for payload-free descriptions.' }))),
       }),
     },
     async run({ runtime }: ToolContext, params: any) {
@@ -336,7 +337,7 @@ export const TOOLS: Tool[] = [
     name: 'edit_divlet',
     title: 'Edit divlet',
     kind: 'runtime',
-    description: 'Apply one operation to a frame by stable node IDs: insert (a preset, spec, html fragment or component instance), move, duplicate, remove, text, wrap, unwrap, detach (turn an instance into ordinary elements) or rename. Pass expectedVersion from the frame you read and a short label. Insert accepts spec (a node spec: tag, className, text, attrs, style, children, or ref for an instance), or html (a fragment; classes, inline styles and attributes are kept; scripts and handlers are dropped); place with parentId plus index, after or before.',
+    description: 'Apply one operation to a frame by stable node IDs: insert (a preset, spec, html fragment or component instance), move, duplicate, remove, text, wrap, unwrap, detach (turn an instance into ordinary elements) or rename. Pass expectedVersion from the frame you read and a short label. Insert accepts spec (a node spec: tag, className, text, attrs, style, children, or ref for an instance), or html (a foreign fragment; classes, inline styles and safe attributes are kept; scripts and handlers are dropped; native asset references require spec instead); place with parentId plus index, after or before.',
     snippet: 'Insert elements, HTML or component instances; move, duplicate, wrap, unwrap, retext, detach, rename or remove nodes by ID.',
     parameters: {
       projectId: optional(S.string()),
@@ -354,7 +355,7 @@ export const TOOLS: Tool[] = [
         spec: optional(S.union([S.string(), S.object(), S.array(S.union([S.string(), S.object()]), { maxItems: 100 })], { description: 'Node spec(s) to insert: { preset|tag, className, text, attrs, style, children, ref (an instance of a component) }, or a preset/tag name.' })),
         content: optional(S.string()),
         to: optional(S.string({ description: 'For rename: the new node ID (a letter first, then letters, digits, - _ . : ).' })),
-        html: optional(S.string({ maxLength: 524288, description: 'For insert: an HTML fragment to add instead of spec (classes, inline styles and attributes are kept; scripts and handlers are dropped).' })),
+        html: optional(S.string({ maxLength: 524288, description: 'For insert: a foreign HTML fragment instead of spec (classes, inline styles and safe attributes are kept; scripts and handlers are dropped). Use a native spec, not HTML, to reference declared project assets.' })),
       }),
     },
     async run({ runtime }: ToolContext, params: any) {

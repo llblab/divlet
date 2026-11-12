@@ -7,6 +7,8 @@ import http from 'node:http';
 import { chromium } from 'playwright';
 import { openRuntime } from '../../core/lib/runtime.js';
 import { decodeHtml } from '../../core/lib/codec.ts';
+import { validateSettings, writeProject } from '../../core/lib/project.ts';
+import { fontDataUrl } from '../../core/tests/fixtures/font.js';
 
 const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-static-browser-'));
 const source = path.join(directory, 'source');
@@ -19,6 +21,7 @@ await legacyProject(path.join(source, 'manual.divlet'));
 const runtime = await openRuntime({ file: path.join(source, 'manual.divlet'), watch: false, createDemo: false });
 let browser;
 let server;
+let native;
 try {
   const template = decodeHtml(`<style>main{max-width:100%;box-sizing:border-box}${font ? '@font-face{font-family:Bundled;src:url(assets/font.ttf)}main{font-family:Bundled}' : ''}</style><main id="shell" class="min-h-screen p-4 md:p-8 bg-[#123456] text-white"><header><img id="logo" src="assets/mark.svg" alt="Local mark"><svg id="blur-example" width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><defs><filter id="soft-edge" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2"/></filter></defs><rect x="8" y="8" width="16" height="16" filter="url(#soft-edge)"/></svg><h1 id="title" class="text-2xl md:text-4xl">Title</h1></header><nav id="navigation"></nav><article id="content" class="max-w-prose"></article></main>`, { fallbackId: 'layout' });
   await runtime.create({ document: template });
@@ -88,12 +91,62 @@ try {
   assert.deepEqual(errors, []);
   assert.ok(requests.every(url => !url.startsWith(editorURL)));
   assert.equal(await page.locator('script').count(), 0);
+  const nativeDirectory = path.join(directory, 'native'); await fs.mkdir(nativeDirectory);
+  const nativeFile = path.join(nativeDirectory, 'project.divlet');
+  const nativeFrame = decodeHtml('<main><span id="font-proof" style="font-size:100px">AA</span><img id="native-logo" src="asset:icons/mark.svg"></main>', { fallbackId: 'native' });
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect id="mark" width="32" height="32" fill="#123456"/></svg>';
+  const nativeUse = decodeHtml('<main><svg width="32" height="32"><defs><rect id="local-mark" width="32" height="32"/></defs><use href="#local-mark"></use></svg></main>', { fallbackId: 'native-use' });
+  const settings = validateSettings({ css: '@font-face{font-family:NativeAsset;src:url(asset:fonts/typed.html)}main{font-family:NativeAsset}', assets: { fonts: { 'typed.html': fontDataUrl() }, icons: { 'mark.svg': 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64') } } });
+  await fs.writeFile(nativeFile, writeProject(settings, [nativeFrame, nativeUse]));
+  native = await openRuntime({ file: nativeFile, watch: false });
+  const nativeUrl = native.url, initialRender = native.getEntry('native').render;
+  const fontResponse = await fetch(nativeUrl + 'build/assets/fonts/typed.html');
+  assert.equal(fontResponse.headers.get('content-type'), 'font/ttf', 'declared MIME wins over .html; no browsing helper corrupts font bytes');
+  assert.ok(Buffer.from(await fontResponse.arrayBuffer()).equals(Buffer.from(fontDataUrl().split(',')[1], 'base64')));
+  await page.goto(nativeUrl);
+  const live = page.frameLocator('iframe[data-document-id="native"]');
+  await live.locator('#font-proof').waitFor();
+  assert.equal(await live.locator('body').evaluate(async () => (await document.fonts.load('100px NativeAsset')).length), 1);
+  assert.equal(await live.locator('#font-proof').evaluate(node => Math.round(node.getBoundingClientRect().width)), 120, 'the sandboxed board preview actually loads the stored font');
+  await live.locator('#native-logo').evaluate(image => image.decode());
+  const usePreview = page.frameLocator('iframe[data-document-id="native-use"]');
+  await usePreview.locator('use').waitFor();
+  await page.waitForTimeout(250);
+  assert.equal(await usePreview.locator('use').evaluate(node => node.getBBox().width), 32, 'same-document SVG use remains supported in the real sandboxed preview');
+  await page.locator('iframe[data-document-id="native"]').evaluate(node => { node.dataset.lifetimeProof = 'retained'; });
+  const liveDocument = await (await page.locator('iframe[data-document-id="native"]').elementHandle()).contentFrame();
+  await native.patchProject({ expectedVersion: native.settings.version, patch: { assets: { fonts: { 'typed.html': fontDataUrl(900) } } } });
+  await liveDocument.waitForFunction(() => Math.round(document.querySelector('#font-proof').getBoundingClientRect().width) === 180);
+  await native.undo();
+  await liveDocument.waitForFunction(() => Math.round(document.querySelector('#font-proof').getBoundingClientRect().width) === 120);
+  assert.equal(await page.locator('iframe[data-document-id="native"]').getAttribute('data-lifetime-proof'), 'retained', 'font byte changes and Undo keep the same iframe');
+  async function checkNativeFont(url, width) {
+    await page.goto(url);
+    assert.equal(await page.evaluate(async () => (await document.fonts.load('100px NativeAsset')).length), 1);
+    assert.equal(await page.locator('#font-proof').evaluate(node => Math.round(node.getBoundingClientRect().width)), width);
+    await page.locator('#native-logo').evaluate(image => image.decode());
+    assert.equal(await page.locator('#native-logo').evaluate(image => image.naturalWidth), 32);
+  }
+  await checkNativeFont(nativeUrl + 'preview/native', 120);
+  await native.patchProject({ expectedVersion: native.settings.version, patch: { assets: { fonts: { 'typed.html': fontDataUrl(900) } } } });
+  assert.equal(native.getEntry('native').document.version, 1);
+  assert.ok(native.getEntry('native').render > initialRender);
+  await checkNativeFont(nativeUrl + 'preview/native', 180);
+  await native.undo(); await checkNativeFont(nativeUrl + 'preview/native', 120);
+  const exported = await native.exportDocument('native');
+  assert.ok(exported.html.includes(fontDataUrl()));
+  await fs.writeFile(path.join(output, 'native-export.html'), exported.html);
+  await native.close(); await fs.rm(nativeDirectory, { recursive: true });
+  const requestStart = requests.length;
+  await checkNativeFont(base + 'native-export.html', 120);
+  assert.ok(requests.slice(requestStart).every(url => !url.startsWith(nativeUrl)), 'standalone fonts/images require neither canonical source, cache nor live board');
   await fs.mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/static.png', fullPage: true });
-  console.log(JSON.stringify({ status: 'passed', checks: ['copied build after editor shutdown and source removal', 'subpath hosting', 'real Tailwind CSS', '1280/768/390px responsive rendering', 'local SVG resources and rendered inline Gaussian blur', ...(font ? ['bundled local font'] : []), 'nested Markdown navigation and fragments', 'no editor traffic or scripts'], screenshot: 'artifacts/static.png' }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', checks: ['copied build after editor shutdown and source removal', 'subpath hosting', 'real Tailwind CSS', '1280/768/390px responsive rendering', 'local SVG resources and rendered inline Gaussian blur', ...(font ? ['bundled local font'] : []), 'nested Markdown navigation and fragments', 'no editor traffic or scripts', 'native MIME-aware image/font bytes independent of extension', 'real font loading, render invalidation and Undo', 'standalone embedded font/image HTML after deleting native source/cache'],  screenshot: 'artifacts/static.png' }, null, 2));
 } finally {
   await browser?.close();
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
   await runtime.close();
+  await native?.close();
   await fs.rm(directory, { recursive: true, force: true });
 }

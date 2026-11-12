@@ -181,7 +181,7 @@ instance.
 - `p` cannot contain block elements; no link in a link or button in a button; `li` only in `ul`/`ol`; table children follow
   table rules.
 - No scripts, `on*` handlers, `javascript:` URLs, `@import` or Tailwind directives in css.
-- Images: put files in source-relative `assets/` (the user can drop them on the board too) and use `src: "assets/name.png"`
+- Images: patch project `assets` with reusable canonical Data-URL leaves, for example `{ images: { "name.png": "data:image/png;base64,..." } }`, then use native node specs with `src: "asset:images/name.png"`. A device drop/upload stores the bytes automatically. Normal project reads list `resources` descriptions, not payloads. Existing source-relative file references still work without silent conversion.
   with a real `alt`.
 - Prefer responsive classes over copying a frame per breakpoint; one frame should work at several widths.
 - Keep labels short and human — they are what History and the undo menu show.
@@ -194,12 +194,12 @@ instance.
 workspace/             the chosen directory, without an automatic wrapper folder
   project.divlet       canonical project (JSON): frames, components, shared tokens and CSS
   landing.divlet       another independent project, identified by its full source path
-  assets/              authored images; use source-relative URLs such as "assets/photo.png"
+  assets/              legacy local inputs, only when still referenced
   site.json, content/  optional Markdown site built on a template frame
   .divlet/project/     default managed build for project.divlet
     <frame>.html      generated portable page; never edit as a source
     <frame>.meta.json generated frame version, dependencies and hashes
-    _assets/          bundled resources
+    assets/           reached declared resources (_assets/ for legacy builds)
     .divlet-build.json ownership manifest
     .trash/           preserved edits, removed output and imported originals
 ```

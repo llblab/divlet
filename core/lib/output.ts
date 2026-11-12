@@ -97,6 +97,7 @@ export class OutputStore {
   }
 
   async generated(name: string, contents: string | Buffer): Promise<boolean> {
+    if (name.startsWith('assets/') || name.startsWith('_assets/')) return false; // resource bytes never attest editor sidecar provenance
     const html = name.endsWith('.html') ? name : name.endsWith('.meta.json') ? name.slice(0, -10) + '.html' : null;
     if (!html) return false;
     const sidecar = html.slice(0, -5) + '.meta.json';

@@ -55,7 +55,7 @@ test('canonical syntax is checked before a component target exists, without echo
   assert.throws(() => model.validateDocument(input), error => error.code === 'INVALID_ASSET' && !error.message.includes('PRIVATE_PAYLOAD'));
 });
 
-test('native frame rendering composes with the declared graph without activating project storage', async () => {
+test('native frame rendering composes with the declared project resource graph', async () => {
   const input = resourceFrame('img', { src: 'asset:icons/logo.svg#mark' });
   input.head = { icon: 'asset:icons/logo.svg' };
   const prepared = await prepareFrame(input);
@@ -64,7 +64,7 @@ test('native frame rendering composes with the declared graph without activating
   assert.match(graph.files.get('test.html'), /src="assets\/icons\/logo.svg#mark"/);
   assert.match(graph.files.get('test.html'), /rel="icon" href="assets\/icons\/logo.svg"/);
   assert.equal(graph.mediaTypes.get('assets/icons/logo.svg'), 'image/svg+xml');
-  assert.throws(() => readProject({ schemaVersion: 1, frames: [], assets: {} }), { code: 'INVALID_PROJECT' });
+  assert.deepEqual(readProject({ schemaVersion: 1, frames: [], assets: {} }).settings.assets, {});
 });
 
 test('foreign page URL attributes cannot acquire the native namespace through opened or dropped HTML', async t => {

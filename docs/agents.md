@@ -78,7 +78,7 @@ The following tools use the project file's vocabulary in their results: `frames`
 
 - **`open_divlet`** — Opens a project and returns the board URL, project version and frames with their versions. Repeated calls reuse the runtime.
 - **`read_divlet`** — `view`: `project`, `frame`, `nodes` (`ids`, `query`, `depth`, `limit`), `components` (addresses, names, overridable text nodes and usage), `selection`, `preview` (measured geometry, overflow, `contentHeight`), `history` (`since`), `diagnostics`, `site` (`route`).
-- **`patch_divlet`** — Atomically patches a frame (`frameId` + `expectedVersion`) or, without `frameId`, project settings (name, `outputDir`, shared `tokens`, `css`, `metadata`). Objects merge, arrays replace and `null` removes.
+- **`patch_divlet`** — Atomically patches a frame (`frameId` + `expectedVersion`) or, without `frameId`, project settings (name, `outputDir`, shared `tokens`, `css`, `metadata`, `assets`). Resource patches use hierarchical Data-URL leaves and null deletions; project reads expose payload-free `resources` descriptions instead of binary strings. Objects merge, arrays replace and `null` removes.
 - **`edit_divlet`** — Structural operations: `insert` (a preset, a nested spec with `children`, an instance `{ ref, descendants }`, an array or an `html` fragment), `move`, `duplicate`, `remove`, `text`, `wrap`, `unwrap`, `detach`, `rename`.
 - **`frame_divlet`** — `create`, `duplicate` (for example, a 390px-wide copy) or `delete` a frame. A copy uses the original components rather than copying them.
 - **`undo_divlet`** — Undoes or redoes (`redo: true`) the latest change, optionally scoped to one frame.

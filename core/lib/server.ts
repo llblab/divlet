@@ -19,14 +19,15 @@ export interface BoardApi extends BoardRuntime {
   projectPath: string;
   diagnostics: { has(path: string): boolean };
   readonly publicFiles: ReadonlyMap<string, string | Buffer> | null;
+  readonly publicMediaTypes?: ReadonlyMap<string, string>;
   info(): any;
   read(query: Record<string, unknown>): any;
-  render(documentId: string): any;
+  render(documentId: string): { documentId: string; version: number; render: number; html: string };
   readHistory(query: Record<string, unknown>): any;
   navigateHistory(query: HistoryNavigation): Promise<unknown>;
   setSelection(body: unknown): any;
   setObservations(body: unknown): any;
-  exportDocument(documentId: string, options: { nodeId?: string }): any;
+  exportDocument(documentId: string, options: { nodeId?: string; nodeIds?: string[]; expectedVersion?: number; expectedProjectVersion?: number }): Promise<any>;
   browse(target: string): Promise<any>;
   importStatus(): Promise<any>;
   importAgain(): Promise<any>;
@@ -184,7 +185,7 @@ export async function startServer(runtime: BoardApi, { port = 0 }: { port?: numb
       }
       if (req.method === 'GET' && route.startsWith('api/export/')) {
         const nodeId = url.searchParams.get('node') || undefined;
-        const result = runtime.exportDocument(route.slice('api/export/'.length), { nodeId });
+        const result = await runtime.exportDocument(route.slice('api/export/'.length), { nodeId, ...(url.searchParams.has('nodes') ? { nodeIds: url.searchParams.getAll('nodes') } : {}), ...(url.searchParams.has('version') ? { expectedVersion: Number(url.searchParams.get('version')) } : {}), ...(url.searchParams.has('projectVersion') ? { expectedProjectVersion: Number(url.searchParams.get('projectVersion')) } : {}) });
         if (url.searchParams.get('download') !== '1') return json(res, 200, result);
         const originalName = result.fileName || 'artboard.html', fileName = originalName.replace(/[^A-Za-z0-9_.-]/g, '-');
         const disposition = `attachment; filename="${fileName}"` + (!/[^\x20-\x7e]/.test(originalName) ? '' : `; filename*=UTF-8''${encodeURIComponent(originalName).replace(/[!'()*]/g, char => '%' + char.charCodeAt(0).toString(16).toUpperCase())}`);
@@ -216,7 +217,7 @@ export async function startServer(runtime: BoardApi, { port = 0 }: { port?: numb
       if (req.method === 'POST' && route === 'api/assets') {
         if (!String(req.headers['content-type'] || '').startsWith('image/')) throw Object.assign(new Error('Expected an image upload'), { code: 'CONTENT_TYPE' });
         const data = await readRaw(req, 12 * 1024 * 1024);
-        return json(res, 200, await runtime.saveAsset({ name: url.searchParams.get('name'), documentId: url.searchParams.get('documentId') || undefined, data }));
+        return json(res, 200, await runtime.saveAsset({ name: url.searchParams.get('name'), documentId: url.searchParams.get('documentId') || undefined, group: url.searchParams.get('group') || undefined, mediaType: req.headers['content-type'], data }));
       }
       if (req.method === 'POST' && route.startsWith('api/')) {
         const body = await readBody(req);
@@ -265,7 +266,7 @@ export async function startServer(runtime: BoardApi, { port = 0 }: { port?: numb
         const base = prefix + 'files/' + (!directory || directory === '.' ? '' : directory.split(path.sep).map(encodeURIComponent).join('/') + '/');
         const bridgeToken = /^[a-f0-9-]{36}$/i.test(url.searchParams.get('bridge') || '') ? url.searchParams.get('bridge') : '';
         const bridge = `;(${previewBridge.toString()})(${JSON.stringify(id)},${entry.render},${JSON.stringify(bridgeToken)},${runtime.diagnostics.has(runtime.projectPath)},false);`;
-        const html = entry.html.replace(/<head([^>]*)>/i, `<head$1><base href="${base}">`).replace(/<\/body>/i, `<script nonce="${nonce}">${bridge}</script></body>`);
+        const html = runtime.render(id).html.replace(/<head([^>]*)>/i, `<head$1><base href="${base}">`).replace(/<\/body>/i, `<script nonce="${nonce}">${bridge}</script></body>`);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': `default-src 'none'; img-src 'self' data: https:; style-src 'unsafe-inline'; font-src 'self' data: https:; script-src 'nonce-${nonce}'; connect-src 'none'; base-uri 'self'; form-action 'none'`, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer' });
         return res.end(html);
       }
@@ -273,6 +274,11 @@ export async function startServer(runtime: BoardApi, { port = 0 }: { port?: numb
         const name = route.slice('build/'.length);
         const contents = runtime.publicFiles?.get(name);
         if (contents === undefined) return json(res, 404, { error: 'NOT_FOUND' });
+        const mediaType = runtime.publicMediaTypes?.get(name);
+        if (mediaType !== undefined) {
+          res.writeHead(200, { 'Content-Type': mediaType, 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data: https:" });
+          return res.end(contents);
+        }
         const extension = path.extname(name).toLowerCase();
         if (extension === '.html' || extension === '.htm') {
           const nonce = randomBytes(18).toString('base64');

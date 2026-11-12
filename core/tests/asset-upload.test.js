@@ -2,12 +2,12 @@ import test from 'node:test';
 import { legacyProject } from './fixtures/legacy-project.js';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { constants } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openRuntime } from '../lib/runtime.js';
 import { decodeHtml } from '../lib/codec.ts';
 import { DivletError } from '../lib/model.ts';
+import { readAssets } from '../lib/assets.ts';
 
 async function setup(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-upload-')), runtimes = [];
@@ -15,188 +15,136 @@ async function setup(t) {
   const open = async (name = 'project.divlet') => { await legacyProject(path.join(root, name)); const runtime = await openRuntime({ file: path.join(root, name), watch: false, createDemo: false }); runtimes.push(runtime); return runtime; };
   return { root, directory: path.join(root, 'assets'), open };
 }
-const state = runtime => ({ settings: structuredClone(runtime.settings), source: structuredClone(runtime.sourceProject?.source), revision: runtime.revision, render: runtime.renderSeq, history: runtime.history.length, documents: [...runtime.documents], hashes: new Map(runtime.knownHashes), files: new Map(runtime.staticFiles), grants: [...runtime.externalFiles] });
-const upload = (runtime, data = Buffer.from('image'), name = 'Photo.PNG') => runtime.saveAsset({ name, data });
-const noStages = async directory => assert.ok(!(await fs.readdir(directory)).some(name => name.startsWith('.divlet-upload-')));
-const isPayload = file => path.basename(String(file)) === 'image' && String(file).includes('.divlet-upload-');
+const upload = (runtime, data = Buffer.from('image'), name = 'Photo.PNG', extra = {}) => runtime.saveAsset({ name, data, ...extra });
+const stored = (runtime, key) => Buffer.from(readAssets(runtime.settings.assets).files.get(key).bytes);
+const state = runtime => ({ info: runtime.info(), history: runtime.readHistory() });
 
-test('retired reuse remains a synchronous unsupported compatibility entry without effects or input inspection', async t => {
-  const f = await setup(t), runtime = await f.open(), before = state(runtime), source = await fs.readFile(runtime.projectPath), info = runtime.info();
+test('retired reuse remains synchronous and does not inspect input or change state', async t => {
+  const f = await setup(t), runtime = await f.open(), before = state(runtime), source = await fs.readFile(runtime.projectPath);
   const opaque = new Proxy({}, { get() { throw new Error('Retired input must not be read'); }, ownKeys() { throw new Error('Retired input must not be enumerated'); } });
-  assert.equal(typeof runtime.reuseImage, 'function', 'the previously emitted public method remains callable');
-  for (const input of [undefined, null, {}, opaque]) assert.throws(() => runtime.reuseImage(input), error => error instanceof DivletError && error.code === 'UNSUPPORTED_OPERATION' && /retired/.test(error.message) && !error.message.includes('_reuseImage'));
-  assert.deepEqual(state(runtime), before); assert.deepEqual(runtime.info(), info);
-  assert.deepEqual(await fs.readFile(runtime.projectPath), source);
+  for (const input of [undefined, null, {}, opaque]) assert.throws(() => runtime.reuseImage(input), error => error instanceof DivletError && error.code === 'UNSUPPORTED_OPERATION');
+  assert.deepEqual(state(runtime), before); assert.deepEqual(await fs.readFile(runtime.projectPath), source);
   await assert.rejects(fs.stat(f.directory), { code: 'ENOENT' });
 });
 
-test('uploads retain supported names, exact bytes and the 12 MiB boundary without changing accepted project state', async t => {
-  const f = await setup(t), runtime = await f.open(), before = state(runtime), source = await fs.readFile(runtime.projectPath);
+test('supported image uploads become exact shared project bytes, concise catalog entries and undoable content', async t => {
+  const f = await setup(t), runtime = await f.open();
   for (const extension of ['PNG', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif']) {
-    const bytes = Buffer.from([0, 255, 12, 34]), result = await upload(runtime, bytes, `My Photo.${extension}`);
-    assert.deepEqual(result, { path: `assets/my-photo.${extension.toLowerCase()}`, file: `assets/my-photo.${extension.toLowerCase()}`, size: 4 });
-    assert.deepEqual(await fs.readFile(path.join(f.root, result.file)), bytes);
+    const bytes = extension === 'svg' ? Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>') : Buffer.from([0, 255, 12, 34]);
+    const version = runtime.settings.version, result = await upload(runtime, bytes, `My Photo.${extension}`);
+    assert.equal(result.path, `asset:images/my-photo.${extension.toLowerCase()}`);
+    assert.equal(result.version, version + 1);
+    assert.deepEqual(stored(runtime, result.file), bytes);
+    assert.deepEqual(Buffer.from(readAssets(JSON.parse(await fs.readFile(runtime.projectPath, 'utf8')).assets).files.get(result.file).bytes), bytes);
   }
-  const full = await upload(runtime, Buffer.alloc(12 * 1024 * 1024), 'large.png'); assert.equal(full.size, 12 * 1024 * 1024);
-  for (const [data, name, code] of [[Buffer.alloc(0), 'empty.png', 'UNSUPPORTED_ASSET'], [Buffer.from('x'), 'run.js', 'UNSUPPORTED_ASSET'], [Buffer.alloc(12 * 1024 * 1024 + 1), 'large.png', 'BODY_TOO_LARGE']]) await assert.rejects(upload(runtime, data, name), { code });
-  await assert.rejects(runtime.saveAsset({ name: 'ok.png', data: Buffer.from('x'), documentId: 'missing' }), { code: 'NOT_FOUND' });
-  assert.deepEqual(await fs.readFile(runtime.projectPath), source); assert.deepEqual(state(runtime), before); await noStages(f.directory);
+  assert.equal((await runtime.listAssets()).assets.filter(item => item.path.startsWith('asset:')).length, 7);
+  assert.ok(!JSON.stringify(runtime.info()).includes(';base64,'));
+  await runtime.undo(); assert.ok(!readAssets(runtime.settings.assets).files.has('images/my-photo.avif'));
+  await runtime.redo(); assert.deepEqual(stored(runtime, 'images/my-photo.avif'), Buffer.from([0, 255, 12, 34]));
+  await assert.rejects(fs.stat(f.directory), { code: 'ENOENT' });
 });
 
-test('same-name concurrent callers and sibling runtimes publish distinct complete files without overwriting', async t => {
-  const f = await setup(t), a = await f.open(), b = await f.open('sibling.divlet'), states = [state(a), state(b)];
-  const link = fs.link.bind(fs); let entered = 0, release;
-  const gate = new Promise(resolve => { release = resolve; });
-  t.mock.method(fs, 'link', async (from, to) => { if (to === path.join(f.directory, 'photo.png')) { if (++entered === 8) release(); await gate; } return link(from, to); });
+test('declared upload MIME survives independently of the filename and controls SVG interpretation', async t => {
+  const f = await setup(t), runtime = await f.open();
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>', mediaType = 'image/svg+xml;charset=utf-8';
+  const response = await fetch(runtime.url + 'api/assets?name=vector.png', { method: 'POST', headers: { 'Content-Type': mediaType, Origin: new URL(runtime.url).origin }, body: svg });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(readAssets(runtime.settings.assets).files.get(result.file).mediaType, mediaType);
+  await runtime.create({ document: decodeHtml(`<main><img src="${result.path}"></main>`, { fallbackId: 'image' }) });
+  assert.equal((await fetch(runtime.url + 'build/assets/' + result.file)).headers.get('content-type'), mediaType);
+  const before = state(runtime), source = await fs.readFile(runtime.projectPath);
+  await assert.rejects(upload(runtime, Buffer.from('<svg><script/></svg>'), 'vector.png', { mediaType }), { code: 'INVALID_ASSET' });
+  await assert.rejects(upload(runtime, Buffer.from('x'), 'other.png', { mediaType: 'text/html' }), { code: 'UNSUPPORTED_ASSET' });
+  assert.deepEqual(state(runtime), before); assert.deepEqual(await fs.readFile(runtime.projectPath), source);
+});
+
+test('upload allocation reserves populated/empty directories and portable file aliases without deleting authored content', async t => {
+  const f = await setup(t), runtime = await f.open();
+  const original = { images: { 'photo.png': { keep: 'data:image/png;base64,a2VlcA==' }, 'photo-2.png': {}, 'Photo-3.PNG': 'data:image/png;base64,AQ==' } };
+  await runtime.patchProject({ expectedVersion: 1, patch: { assets: original } });
+  const result = await upload(runtime, Buffer.from('new'), 'photo.png');
+  assert.equal(result.path, 'asset:images/photo-4.png');
+  const accepted = { images: { ...original.images, 'photo-4.png': 'data:image/png;base64,bmV3' } };
+  assert.deepEqual(runtime.settings.assets, accepted);
+  assert.deepEqual(JSON.parse(await fs.readFile(runtime.projectPath, 'utf8')).assets, accepted);
+  await runtime.undo();
+  assert.deepEqual(runtime.settings.assets, original);
+  assert.deepEqual(JSON.parse(await fs.readFile(runtime.projectPath, 'utf8')).assets, original);
+  await runtime.redo();
+  assert.deepEqual(runtime.settings.assets, accepted);
+  assert.deepEqual(JSON.parse(await fs.readFile(runtime.projectPath, 'utf8')).assets, accepted);
+});
+
+test('same-name concurrent callers serialize append-only keys; sibling projects have independent namespaces', async t => {
+  const f = await setup(t), a = await f.open(), b = await f.open('sibling.divlet');
   const data = Array.from({ length: 8 }, (_, i) => Buffer.from(`image-${i}`));
-  const results = await Promise.all(data.map((bytes, i) => upload(i % 2 ? a : b, bytes)));
-  assert.equal(entered, 8); assert.equal(new Set(results.map(result => result.file)).size, 8);
-  for (let i = 0; i < results.length; i++) assert.deepEqual(await fs.readFile(path.join(f.root, results[i].file)), data[i]);
-  assert.deepEqual(state(a), states[0]); assert.deepEqual(state(b), states[1]); await noStages(f.directory);
+  const results = await Promise.all(data.map(bytes => upload(a, bytes)));
+  assert.equal(new Set(results.map(result => result.file)).size, 8);
+  for (let i = 0; i < results.length; i++) assert.deepEqual(stored(a, results[i].file), data[i]);
+  const other = await upload(b, Buffer.from('sibling'));
+  assert.equal(other.file, 'images/photo.png');
+  assert.deepEqual(stored(a, other.file), data[0]); assert.deepEqual(stored(b, other.file), Buffer.from('sibling'));
 });
 
-test('occupied regular, directory, symlink and hardlink names are skipped without reading or replacing them', async t => {
-  const f = await setup(t), runtime = await f.open(); await fs.mkdir(f.directory);
-  const foreign = path.join(f.root, 'foreign'); await fs.writeFile(foreign, 'foreign');
-  await fs.writeFile(path.join(f.directory, 'photo.png'), 'first'); await fs.mkdir(path.join(f.directory, 'photo-2.png'));
-  await fs.symlink(foreign, path.join(f.directory, 'photo-3.png')); await fs.link(foreign, path.join(f.directory, 'photo-4.png'));
-  const result = await upload(runtime); assert.equal(result.file, 'assets/photo-5.png');
-  assert.equal(await fs.readFile(path.join(f.directory, 'photo.png'), 'utf8'), 'first');
-  assert.ok((await fs.lstat(path.join(f.directory, 'photo-2.png'))).isDirectory());
-  assert.ok((await fs.lstat(path.join(f.directory, 'photo-3.png'))).isSymbolicLink());
-  assert.equal(await fs.readFile(foreign, 'utf8'), 'foreign'); await noStages(f.directory);
+test('12 MiB image admission is retained, while invalid bytes, stale versions and missing targets leave source/history unchanged', async t => {
+  const f = await setup(t), runtime = await f.open();
+  assert.equal((await upload(runtime, Buffer.alloc(12 * 1024 * 1024), 'large.png')).size, 12 * 1024 * 1024);
+  const before = state(runtime), source = await fs.readFile(runtime.projectPath);
+  for (const [data, name, code] of [[Buffer.alloc(0), 'empty.png', 'UNSUPPORTED_ASSET'], [Buffer.from('x'), 'run.js', 'UNSUPPORTED_ASSET'], [Buffer.alloc(12 * 1024 * 1024 + 1), 'large.png', 'BODY_TOO_LARGE'], [Buffer.from('<svg><script/></svg>'), 'bad.svg', 'INVALID_ASSET']]) await assert.rejects(upload(runtime, data, name), { code });
+  await assert.rejects(upload(runtime, Buffer.from('x'), 'ok.png', { documentId: 'missing' }), { code: 'NOT_FOUND' });
+  await assert.rejects(upload(runtime, Buffer.from('x'), 'ok.png', { expectedVersion: 1 }), { code: 'REVISION_CONFLICT' });
+  assert.deepEqual(await fs.readFile(runtime.projectPath), source); assert.deepEqual(state(runtime), before);
 });
 
-test('a foreign target appearing at publication wins its name and upload allocates the next one', async t => {
-  const f = await setup(t), runtime = await f.open(), link = fs.link.bind(fs); let appeared = false;
-  t.mock.method(fs, 'link', async (from, to) => { if (!appeared) { appeared = true; await fs.writeFile(to, 'appeared', { flag: 'wx' }); } return link(from, to); });
-  const result = await upload(runtime); assert.equal(result.file, 'assets/photo-2.png');
-  assert.equal(await fs.readFile(path.join(f.directory, 'photo.png'), 'utf8'), 'appeared');
-  assert.equal(await fs.readFile(path.join(f.root, result.file), 'utf8'), 'image'); await noStages(f.directory);
+test('caller mutation after upload admission cannot change queued bytes', async t => {
+  const f = await setup(t), runtime = await f.open(), data = Buffer.from('original');
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  const held = runtime.enqueue(() => gate);
+  const pending = upload(runtime, data); data.fill(120); release(); await held;
+  const result = await pending;
+  assert.deepEqual(stored(runtime, result.file), Buffer.from('original'));
 });
 
-test('mutating the caller Buffer after admission cannot change prepared upload bytes', async t => {
-  const f = await setup(t), runtime = await f.open(), data = Buffer.from('original'), mkdtemp = fs.mkdtemp.bind(fs);
-  t.mock.method(fs, 'mkdtemp', async (...args) => { data.fill(120); return mkdtemp(...args); });
-  const result = await upload(runtime, data); assert.equal(await fs.readFile(path.join(f.root, result.file), 'utf8'), 'original');
-});
-
-for (const kind of ['symlink', 'file', 'managed', 'output']) test(`${kind} upload directory refuses before staging or writes`, async t => {
-  const f = await setup(t), runtime = await f.open(), outside = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-upload-outside-'));
-  t.after(() => fs.rm(outside, { recursive: true, force: true }));
+for (const kind of ['symlink', 'file', 'managed']) test(`a ${kind} sibling assets path is neither read nor used for publication`, async t => {
+  const f = await setup(t), runtime = await f.open(), outside = path.join(f.root, 'outside');
+  await fs.mkdir(outside); await fs.writeFile(path.join(outside, 'foreign'), 'untouched');
   if (kind === 'symlink') await fs.symlink(outside, f.directory);
   else if (kind === 'file') await fs.writeFile(f.directory, 'foreign');
-  else if (kind === 'managed') { await fs.mkdir(f.directory); await fs.writeFile(path.join(f.directory, '.divlet-build.json'), '{}'); }
-  else await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { outputDir: 'assets' } });
-  const contents = () => kind === 'file' ? fs.readFile(f.directory, 'utf8') : fs.readdir(kind === 'symlink' ? outside : f.directory);
-  const before = state(runtime), names = await contents();
-  await assert.rejects(upload(runtime), { code: kind === 'symlink' || kind === 'file' ? 'UNSAFE_PATH' : 'INVALID_ASSET_DIR' });
-  assert.deepEqual(state(runtime), before); assert.deepEqual(await contents(), names);
+  else { await fs.mkdir(f.directory); await fs.writeFile(path.join(f.directory, '.divlet-build.json'), 'foreign'); }
+  await upload(runtime);
+  assert.equal(await fs.readFile(path.join(outside, 'foreign'), 'utf8'), 'untouched');
+  if (kind === 'file') assert.equal(await fs.readFile(f.directory, 'utf8'), 'foreign');
+  if (kind === 'symlink') assert.ok((await fs.lstat(f.directory)).isSymbolicLink());
+  if (kind === 'managed') assert.deepEqual(await fs.readdir(f.directory), ['.divlet-build.json']);
 });
 
-for (const kind of ['changed-bytes', 'replaced-file', 'extra-file', 'replaced-stage']) test(`${kind} after a publication failure is retained, never broadly cleaned`, async t => {
-  const f = await setup(t), runtime = await f.open(); let payload, stage, moved;
-  t.mock.method(fs, 'link', async (from) => {
-    payload = from; stage = path.dirname(from);
-    if (kind === 'changed-bytes') await fs.writeFile(from, 'caller edit');
-    if (kind === 'replaced-file') { await fs.rename(from, from + '-old'); await fs.writeFile(from, 'replacement'); }
-    if (kind === 'extra-file') await fs.writeFile(path.join(stage, 'foreign.txt'), 'foreign');
-    if (kind === 'replaced-stage') { moved = path.join(f.root, 'retained-stage'); await fs.rename(stage, moved); await fs.mkdir(stage); await fs.writeFile(path.join(stage, 'foreign.txt'), 'foreign'); }
-    throw Object.assign(new Error('Synthetic link failure'), { code: 'EIO' });
-  });
-  let error; try { await upload(runtime); assert.fail('upload must fail'); } catch (failure) { error = failure; }
-  assert.equal(error.code, 'EIO'); assert.equal(error.details.asset.published, false); assert.ok(error.details.asset.retained.includes(stage));
-  if (kind === 'changed-bytes' || kind === 'replaced-file') assert.equal(await fs.readFile(payload, 'utf8'), kind === 'changed-bytes' ? 'caller edit' : 'replacement');
-  if (kind === 'extra-file' || kind === 'replaced-stage') assert.equal(await fs.readFile(path.join(stage, 'foreign.txt'), 'utf8'), 'foreign');
-  if (moved) assert.equal(await fs.readFile(path.join(moved, 'image'), 'utf8'), 'image');
-  await assert.rejects(fs.stat(path.join(f.directory, 'photo.png')), { code: 'ENOENT' });
-});
-
-test('a partial descriptor write is closed and conservatively retained with a failed-publication receipt', async t => {
-  const f = await setup(t), runtime = await f.open(), open = fs.open.bind(fs); let payload, closed = 0;
-  t.mock.method(fs, 'open', async (file, ...args) => {
-    const handle = await open(file, ...args); if (!isPayload(file) || !(args[0] & constants.O_CREAT)) return handle;
-    payload = file; const write = handle.writeFile.bind(handle), close = handle.close.bind(handle);
-    handle.writeFile = async () => { await write(Buffer.from('part')); throw Object.assign(new Error('Synthetic short write'), { code: 'EIO' }); };
-    handle.close = async () => { closed++; return close(); }; return handle;
-  });
-  await assert.rejects(upload(runtime, Buffer.from('complete-image')), error => error.code === 'EIO' && error.details.asset.published === false && error.details.asset.retained.includes(payload));
-  assert.equal(closed, 1); assert.equal(await fs.readFile(payload, 'utf8'), 'part');
-});
-
-test('a generated-output marker appearing during the descriptor write revokes publication', async t => {
-  const f = await setup(t), runtime = await f.open(), open = fs.open.bind(fs); let payload;
-  t.mock.method(fs, 'open', async (file, ...args) => {
-    const handle = await open(file, ...args); if (!isPayload(file) || !(args[0] & constants.O_CREAT)) return handle;
-    payload = file; const write = handle.writeFile.bind(handle);
-    handle.writeFile = async bytes => { await write(bytes); await fs.writeFile(path.join(f.directory, '.divlet-build.json'), '{}'); }; return handle;
-  });
-  await assert.rejects(upload(runtime), error => error.code === 'INVALID_ASSET_DIR' && error.details.asset.published === false && error.details.asset.retained.includes(path.dirname(payload)));
-  await assert.rejects(fs.stat(path.join(f.directory, 'photo.png')), { code: 'ENOENT' });
-  assert.equal(await fs.readFile(payload, 'utf8'), 'image');
-});
-
-test('unsupported hardlinks fail rather than using overwrite-prone rename/copy fallbacks', async t => {
+test('a declared file cannot be silently replaced by the upload directory', async t => {
   const f = await setup(t), runtime = await f.open();
-  t.mock.method(fs, 'link', async () => { throw Object.assign(new Error('Unsupported links'), { code: 'ENOTSUP' }); });
-  await assert.rejects(upload(runtime), error => error.code === 'ENOTSUP' && error.details.asset.published === false && error.details.asset.retained.length === 0);
-  assert.deepEqual(await fs.readdir(f.directory), []);
+  await runtime.patchProject({ expectedVersion: 1, patch: { assets: { images: 'data:image/png;base64,AQ==' } } });
+  const before = state(runtime), source = await fs.readFile(runtime.projectPath);
+  await assert.rejects(upload(runtime), { code: 'INVALID_ASSET' });
+  assert.deepEqual(state(runtime), before); assert.deepEqual(await fs.readFile(runtime.projectPath), source);
 });
 
-test('an error after an actual hardlink reports the saved file and never removes or republishes it', async t => {
-  const f = await setup(t), runtime = await f.open(), link = fs.link.bind(fs); let attempts = 0;
-  t.mock.method(fs, 'link', async (...args) => { attempts++; await link(...args); throw Object.assign(new Error('Lost publication acknowledgement'), { code: 'EIO' }); });
-  await assert.rejects(upload(runtime), error => error.code === 'EIO' && error.details.asset.published === true && error.details.asset.file === 'assets/photo.png' && error.details.asset.retained.includes(path.join(f.directory, 'photo.png')));
-  assert.equal(attempts, 1); assert.equal(await fs.readFile(path.join(f.directory, 'photo.png'), 'utf8'), 'image'); await noStages(f.directory);
+test('a pending invalid source or source replacement refuses upload without a second store or partial accepted state', async t => {
+  const f = await setup(t), runtime = await f.open();
+  await fs.writeFile(runtime.projectPath, '{invalid'); await runtime.scan();
+  const before = state(runtime);
+  await assert.rejects(upload(runtime), { code: 'EXTERNAL_PENDING' });
+  assert.equal(await fs.readFile(runtime.projectPath, 'utf8'), '{invalid'); assert.deepEqual(state(runtime), before);
 });
 
-test('a failed acknowledgement plus a replaced candidate remains outcome-unknown, never false unpublished', async t => {
-  const f = await setup(t), runtime = await f.open(), link = fs.link.bind(fs);
-  t.mock.method(fs, 'link', async (from, to) => { await link(from, to); await fs.unlink(to); await fs.writeFile(to, 'foreign'); throw Object.assign(new Error('Ambiguous acknowledgement'), { code: 'EIO' }); });
-  await assert.rejects(upload(runtime), error => error.code === 'EIO' && error.details.asset.published === null && error.details.asset.retained.includes(path.join(f.directory, 'photo.png')));
-  assert.equal(await fs.readFile(path.join(f.directory, 'photo.png'), 'utf8'), 'foreign'); await noStages(f.directory);
-});
-
-test('replacing the newly published file is diagnosed without deleting the replacement', async t => {
-  const f = await setup(t), runtime = await f.open(), link = fs.link.bind(fs);
-  t.mock.method(fs, 'link', async (from, to) => { await link(from, to); await fs.unlink(to); await fs.writeFile(to, 'foreign replacement'); });
-  await assert.rejects(upload(runtime), error => error.code === 'ASSET_CONFLICT' && error.details.asset.published === true);
-  assert.equal(await fs.readFile(path.join(f.directory, 'photo.png'), 'utf8'), 'foreign replacement'); await noStages(f.directory);
-});
-
-test('observed edits to the published inode during cleanup cannot return a false success receipt', async t => {
-  const f = await setup(t), runtime = await f.open(), unlink = fs.unlink.bind(fs);
-  t.mock.method(fs, 'unlink', async file => { if (isPayload(file)) await fs.writeFile(path.join(f.directory, 'photo.png'), 'edited during cleanup'); return unlink(file); });
-  await assert.rejects(upload(runtime), error => error.code === 'ASSET_CONFLICT' && error.details.asset.published === true);
-  assert.equal(await fs.readFile(path.join(f.directory, 'photo.png'), 'utf8'), 'edited during cleanup'); await noStages(f.directory);
-});
-
-test('successful publication reports private cleanup failures without discarding the durable asset', async t => {
-  const f = await setup(t), runtime = await f.open(), unlink = fs.unlink.bind(fs);
-  t.mock.method(fs, 'unlink', async file => { if (isPayload(file)) throw Object.assign(new Error('Cleanup denied'), { code: 'EACCES' }); return unlink(file); });
-  const result = await upload(runtime); assert.equal(result.file, 'assets/photo.png'); assert.equal(result.retained.length, 2);
-  assert.equal(await fs.readFile(path.join(f.root, result.file), 'utf8'), 'image');
-});
-
-test('a parent link introduced during staging cannot authorize cleanup or publication through that link', async t => {
-  const f = await setup(t), runtime = await f.open(), outside = path.join(f.root, 'outside'), retained = path.join(f.root, 'retained-assets');
-  await fs.mkdir(outside); await fs.writeFile(path.join(outside, 'foreign'), 'untouched');
-  t.mock.method(fs, 'link', async () => { await fs.rename(f.directory, retained); await fs.symlink(outside, f.directory); throw Object.assign(new Error('Directory replaced'), { code: 'EIO' }); });
-  await assert.rejects(upload(runtime), error => error.code === 'EIO' && error.details.asset.published === null && error.details.asset.retained.length > 0);
-  assert.deepEqual(await fs.readdir(outside), ['foreign']); assert.equal(await fs.readFile(path.join(outside, 'foreign'), 'utf8'), 'untouched');
-  assert.ok((await fs.readdir(retained)).some(name => name.startsWith('.divlet-upload-')));
-});
-
-test('published upload bytes enter ordinary portable static planning, not a staged or editor-only resource route', async t => {
+test('uploaded images materialize once, retain MIME, export inline and rebuild after deleting the cache', async t => {
   const f = await setup(t), runtime = await f.open(), bytes = Buffer.from([0, 255, 12, 34]);
   const result = await upload(runtime, bytes, 'Photo.png');
-  await runtime.create({ document: decodeHtml(`<main><img src="${result.path}"></main>`, { fallbackId: 'screen' }) });
-  const resource = [...runtime.staticFiles.keys()].find(name => name.startsWith('_assets/') && name.endsWith('-photo.png'));
-  assert.ok(resource); assert.ok(runtime.staticFiles.get('screen.html').includes(resource));
-  assert.ok(!runtime.staticFiles.get('screen.html').includes('.divlet-upload-'));
-  assert.deepEqual(Buffer.from(runtime.staticFiles.get(resource)), bytes);
-  const published = path.join(f.root, 'portable'); await fs.cp(runtime.outputDir, published, { recursive: true });
-  await runtime.close(); await fs.rm(f.directory, { recursive: true }); await fs.rm(runtime.projectPath);
-  assert.deepEqual(await fs.readFile(path.join(published, resource)), bytes);
+  await runtime.create({ document: decodeHtml(`<main><img src="${result.path}"><img src="${result.path}"></main>`, { fallbackId: 'screen' }) });
+  const key = 'assets/images/photo.png';
+  assert.deepEqual(Buffer.from(runtime.publicFiles.get(key)), bytes);
+  assert.equal(runtime.publicMediaTypes.get(key), 'image/png');
+  const exported = await runtime.exportDocument('screen'); assert.ok(exported.html.includes('data:image/png;base64,AP8MIg==')); assert.ok(!exported.html.includes('asset:'));
+  await runtime.close(); await fs.rm(runtime.outputDir, { recursive: true });
+  const reopened = await f.open();
+  assert.deepEqual(Buffer.from(reopened.publicFiles.get(key)), bytes);
+  assert.equal(JSON.parse(await fs.readFile(path.join(reopened.outputDir, '.divlet-build.json'), 'utf8')).mediaTypes[key], 'image/png');
 });
-

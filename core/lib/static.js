@@ -203,7 +203,7 @@ async function rewriteHtml(html, rewrite, fragment = false, withBase, closed = f
   }
   async function visit(node) {
     for (const attr of node.attrs || []) {
-      if (['src', 'href', 'poster'].includes(attr.name)) attr.value = await rewrite(attr.value);
+      if (['src', 'href', 'poster'].includes(attr.name)) attr.value = await rewrite(attr.value, { tag: node.tagName, attribute: attr.name });
       else if (attr.name === 'srcset') attr.value = await rewriteSrcset(attr.value, rewrite);
       else if (attr.name === 'style') attr.value = await rewriteCss(attr.value, rewrite, true, closed, inspectSelectors);
       else if (SVG_RESOURCE_ATTRIBUTES.has(attr.name)) {
@@ -338,7 +338,41 @@ export async function readConfinedResource(projectDir, file, { authorized = new 
 
 
 /** Build a read-only, server-independent static artifact set. */
-export async function buildStatic({ projectDir, frames, frameFiles, site = new Map(), assetBase, siteBase, externalFiles = [], previews = new Map(), mapResources, assets, resourceDirectory = assets === undefined ? '_assets' : 'assets', closedCss = false, stylesheetFrames = new Set() }) {
+/** Standalone clean HTML embeds declared bytes only; legacy URLs and literal Data URLs keep their authored meaning. */
+export async function inlineDeclaredAssets(html, assets, { fragment = false } = {}) {
+  const parsed = readAssets(assets ?? {});
+  if (!parsed.files.size) return html;
+  const completed = new Map();
+  let work = Buffer.byteLength(html);
+  const limit = () => { throw new DivletError('FILE_TOO_LARGE', 'Standalone HTML exceeds its resource byte budget; save a project copy instead.'); };
+  async function fileUrl(key, stack) {
+    if (stack.includes(key)) throw new DivletError('UNSUPPORTED_EXPORT', 'Cyclic declared resources require a project/bundle copy, not one HTML file.');
+    if (completed.has(key)) return completed.get(key);
+    const file = parsed.files.get(key);
+    if (!file) throw new DivletError('INVALID_ASSET', 'Missing declared resource during export.');
+    const text = readAssetText(file), next = [...stack, key];
+    const rewrite = value => url(value, next, key);
+    const bytes = text ? Buffer.from(text.kind === 'css' ? await rewriteCss(text.text, rewrite, false, true) : await rewriteSvgResource(text.text, { url: rewrite, css: (css, inline) => rewriteCss(css, rewrite, inline, true) })) : file.bytes;
+    if (text?.ascii && Buffer.from(bytes).some(byte => byte > 127)) throw new DivletError('INVALID_ASSET', 'Inlining this asset would violate its US-ASCII encoding.');
+    const result = `data:${file.mediaType};base64,${Buffer.from(bytes).toString('base64')}`;
+    completed.set(key, result);
+    return result;
+  }
+  async function url(value, stack = [], base, context) {
+    let reference = readAssetReference(value);
+    if (!reference && base && value && !value.startsWith('#') && !/^(?:data:|https?:|\/\/)/i.test(value)) reference = readAssetReference(resolveAssetDependency(base, value));
+    if (!reference) return value;
+    if (reference.suffix.startsWith('?') || context?.tag === 'use') throw new DivletError('UNSUPPORTED_EXPORT', 'This resource URL requires a project/bundle copy to retain its query or SVG-use semantics.');
+    const result = await fileUrl(reference.path, stack) + reference.suffix;
+    if ((work += result.length + 5 * (result.match(/[<&"\\]/g)?.length || 0)) > MAX_TOTAL) limit();
+    return result;
+  }
+  const result = await rewriteHtml(html, (value, context) => url(value, [], undefined, context), fragment);
+  if (Buffer.byteLength(result) > MAX_TOTAL) limit();
+  return result;
+}
+
+export async function buildStatic({ projectDir, frames, frameFiles, site = new Map(), assetBase, siteBase, externalFiles = [], previews = new Map(), mapResources, assets, resourceDirectory = assets === undefined ? '_assets' : 'assets', closedCss = false, stylesheetFrames = new Set(), previewBase, nativeAssets = false, sitePreviews = new Map() }) {
   if (mapResources !== undefined && typeof mapResources !== 'function') fail('mapResources must be a function');
   if (!['_assets', 'assets'].includes(resourceDirectory)) fail('unsupported resource directory');
   const declared = assets === undefined ? null : readAssets(assets);
@@ -349,7 +383,7 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
   if (!(stylesheetFrames instanceof Set) || [...stylesheetFrames].some(id => !frames.has(id))) fail('stylesheet frames must belong to the complete public frame set');
   stylesheetFrames = new Set(stylesheetFrames);
   const stylesheets = new Map(), generatedStyles = new Map();
-  const rewrittenPreviews = new Map();
+  const rewrittenPreviews = new Map(), rewrittenSitePreviews = new Map();
   const files = new Map();
   const sources = new Map();
   const warnings = [];
@@ -384,7 +418,7 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
   const onClassRename = (from, to) => { for (const selector of sourceSelectors) checkSelector(selector, from, to); classRenames.set(from, to); };
   let allowNewResources = true;
   const budget = { bytes: 0 };
-  for (const base of [assetBase, siteBase]) {
+  for (const base of [assetBase, siteBase, previewBase]) {
     if (base === undefined) continue;
     let parsed;
     try { parsed = new URL(base); } catch { fail('invalid runtime prefix'); }
@@ -434,7 +468,7 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
     files.set(output, bytes);
     // Defer recursive transforms until this source has a stable output identity.
     if (/\.(?:css|svg|html?)$/i.test(source)) pending.push(async () => {
-      const rewrite = (url) => rewriteUrl(url, source, output);
+      const rewrite = (url, context) => rewriteUrl(url, source, output, undefined, context);
       const text = bytes.toString('utf8');
       files.set(output, /\.css$/i.test(source) ? await rewriteCss(text, rewrite, false, closedCss, inspectSelectors) : await rewriteHtml(text, rewrite, /\.svg$/i.test(source), /\.html?$/i.test(source) ? base => baseRewrite(base, source, output) : undefined, closedCss, inspectSelectors));
     });
@@ -454,7 +488,10 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
     assetSources.set(assetReference(key), hash(JSON.stringify([file.mediaType, hash(file.bytes)])));
     files.set(output, Buffer.from(file.bytes));
     if (content) pending.push(async () => {
-      const source = assetReference(key), rewrite = url => rewriteUrl(url, source, output);
+      const source = assetReference(key), rewrite = url => {
+        if (nativeAssets && content.kind === 'svg' && url && !url.startsWith('#') && !/^data:/i.test(url)) throw new DivletError('INVALID_ASSET', 'Native SVG file assets currently require inline or same-document dependencies.');
+        return rewriteUrl(url, source, output);
+      };
       const rewritten = content.kind === 'css'
         ? await rewriteCss(content.text, rewrite, false, true, inspectSelectors)
         : await rewriteSvgResource(content.text, { url: rewrite, css: (text, inline) => rewriteCss(text, rewrite, inline, true, inspectSelectors) });
@@ -478,17 +515,18 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
     if (localBase) decodePath(base.split(/[?#]/)[0]);
     let effective;
     try { effective = new URL(base, pathToFileURL(source)); } catch { fail(`unsupported HTML base ${base}`); }
-    return async value => {
+    return async (value, context) => {
       const localReference = localBase && !absoluteReference(value);
       if (localReference) decodePath(value.split(/[?#]/)[0]);
       let resolved;
       try { resolved = new URL(value, effective); } catch { fail(`unsupported base-relative URL ${value}`); }
-      if (!localReference || resolved.protocol !== 'file:') return rewriteUrl(resolved.href, source, output);
-      return rewriteUrl(fileURLToPath(resolved) + resolved.search + resolved.hash, source, output);
+      if (!localReference || resolved.protocol !== 'file:') return rewriteUrl(resolved.href, source, output, undefined, context);
+      return rewriteUrl(fileURLToPath(resolved) + resolved.search + resolved.hash, source, output, undefined, context);
     };
   }
-  async function rewriteUrl(original, source, output, pageRoute) {
+  async function rewriteUrl(original, source, output, pageRoute, context) {
     const reference = readAssetReference(original);
+    if (reference && nativeAssets && context?.tag === 'use') throw new DivletError('INVALID_ASSET', 'Declared SVG use references cannot load in the sandboxed native preview. Use inline SVG with same-document references.');
     if (reference) return declaredUrl(reference, output);
     const value = original.trim();
     if (!value || value.startsWith('#')) return original;
@@ -548,7 +586,7 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
   }
   for (const [id, html] of frames) {
     const output = outputsById.get(id);
-    const rewritten = await rewriteHtml(html, (url) => rewriteUrl(url, path.join(root, output), output));
+    const rewritten = await rewriteHtml(html, (url, context) => rewriteUrl(url, path.join(root, output), output, undefined, context));
     if (!stylesheetFrames.has(id)) { files.set(output, rewritten); continue; }
     const bundled = preparePublicFrame(rewritten, css => {
       const name = `style-${hash(css).slice(0, 20)}.css`;
@@ -561,7 +599,7 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
   }
   for (const [route, html] of site) {
     const output = routes.get(route);
-    files.set(output, await rewriteHtml(html, (url) => rewriteUrl(url, path.join(root, 'index.html'), output, route)));
+    files.set(output, await rewriteHtml(html, (url, context) => rewriteUrl(url, path.join(root, 'index.html'), output, route, context)));
   }
   // Explicit canonical carriers join the public graph before recursive closure and preview locking.
   const mapped = mapResources ? await mapResources(async (value, kind = 'url', tokens = {}, numericTokens = {}) => {
@@ -605,15 +643,24 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
   if (numericReferences.size && (uninspectedExternal || [...numericReferences].some(name => variableDefinitions.has(name)))) unsupportedSourceCss();
   allowNewResources = false;
   const previewVersion = hash(JSON.stringify([...sources, ...assetSources].sort(([a], [b]) => a.localeCompare(b)))).slice(0, 20);
-  for (const [id, html] of previews) {
-    const output = outputsById.get(id);
-    rewrittenPreviews.set(id, await rewriteHtml(html, async url => {
-      const rewritten = await rewriteUrl(url, path.join(root, output), output);
-      if (!rewritten.startsWith(`${resourceDirectory}/`)) return rewritten;
-      const fragmentAt = rewritten.indexOf('#');
-      const before = fragmentAt < 0 ? rewritten : rewritten.slice(0, fragmentAt);
-      return before + (before.includes('?') ? '&' : '?') + `divlet-resource=${previewVersion}` + (fragmentAt < 0 ? '' : rewritten.slice(fragmentAt));
-    }));
+  async function preview(html, output, route) {
+    return rewriteHtml(html, async (url, context) => {
+      if (route && context?.tag === 'a' && context.attribute === 'href') return url;
+      const rewritten = await rewriteUrl(url, path.join(root, route ? 'index.html' : output), output, route, context);
+      const suffixAt = rewritten.search(/[?#]/), pathname = suffixAt < 0 ? rewritten : rewritten.slice(0, suffixAt);
+      const directory = path.posix.dirname(output).split('/').map(encodeURIComponent).join('/');
+      const rootPath = path.posix.normalize(path.posix.join(directory, pathname));
+      if (!rootPath.startsWith(`${resourceDirectory}/`)) return rewritten;
+      const absolute = previewBase ? previewBase + rootPath + (suffixAt < 0 ? '' : rewritten.slice(suffixAt)) : rewritten;
+      const fragmentAt = absolute.indexOf('#');
+      const before = fragmentAt < 0 ? absolute : absolute.slice(0, fragmentAt);
+      return before + (before.includes('?') ? '&' : '?') + `divlet-resource=${previewVersion}` + (fragmentAt < 0 ? '' : absolute.slice(fragmentAt));
+    });
   }
-  return { files, sources, warnings, stylesheets, ...(declared ? { assetSources, mediaTypes } : {}), previews: rewrittenPreviews, ...(mapResources ? { mapped } : {}) };
+  for (const [id, html] of previews) rewrittenPreviews.set(id, await preview(html, outputsById.get(id)));
+  for (const [route, html] of sitePreviews) {
+    if (!routes.has(route)) fail('site preview has no matching route');
+    rewrittenSitePreviews.set(route, await preview(html, routes.get(route), route));
+  }
+  return { files, sources, warnings, stylesheets, ...(declared ? { assetSources, mediaTypes } : {}), previews: rewrittenPreviews, sitePreviews: rewrittenSitePreviews, ...(mapResources ? { mapped } : {}) };
 }

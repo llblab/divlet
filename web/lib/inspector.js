@@ -412,6 +412,10 @@ function textEditor(model, node) {
 /** URL the board can load for an image source written relative to the project source. */
 function imageUrl(doc, src) {
   if (!src) return '';
+  if (src.startsWith('asset:')) {
+    const at = src.indexOf('#'), before = at < 0 ? src : src.slice(0, at);
+    return apiUrl(`build/assets/${before.slice(6)}${before.includes('?') ? '&' : '?'}divlet-resource=${store.state?.project?.version || 0}${at < 0 ? '' : src.slice(at)}`);
+  }
   if (/^(https?:|data:)/i.test(src)) return src;
   const projectDir = String(store.state?.projectDir || '').replaceAll('\\', '/');
   const html = String(doc.sourcePath || doc.modelPath || '').replaceAll('\\', '/');
@@ -427,11 +431,12 @@ function uploadInto(doc, node) {
     const file = picker.files?.[0];
     if (!file) return;
     try {
-      const response = await fetch(apiUrl(`api/assets?name=${encodeURIComponent(file.name)}&documentId=${encodeURIComponent(doc.id)}`), { method: 'POST', headers: { 'Content-Type': file.type || 'image/png' }, body: file });
+      const group = `image:${crypto.randomUUID()}`;
+      const response = await fetch(apiUrl(`api/assets?name=${encodeURIComponent(file.name)}&documentId=${encodeURIComponent(doc.id)}&group=${encodeURIComponent(group)}`), { method: 'POST', headers: { 'Content-Type': file.type || 'image/png' }, body: file });
       const body = await response.json();
       if (!response.ok) throw new Error(body.message || 'Upload failed');
       const alt = node.attrs.alt || file.name.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ');
-      await refreshed(commit(doc.id, { nodes: { [node.id]: { attrs: { src: body.path, alt } } } }, { label: `image ${body.file}` }));
+      await refreshed(commit(doc.id, { nodes: { [node.id]: { attrs: { src: body.path, alt } } } }, { label: `image ${body.file}`, group }));
       toast(`Added ${body.file}`);
     } catch (error) { toast(error.message); }
   });
@@ -443,7 +448,7 @@ async function assetMenu(doc, node, anchor) {
   try { assets = (await request(`api/assets?documentId=${encodeURIComponent(doc.id)}`)).assets; } catch (error) { toast(error.message); }
   openMenu([
     { heading: assets.length ? 'Images in divlet/' : 'No images in divlet/ yet' },
-    ...assets.slice(0, 40).map(asset => ({ label: asset.path, icon: 'image', checked: asset.path === node.attrs.src, run: () => refreshed(commit(doc.id, { nodes: { [node.id]: { attrs: { src: asset.path } } } }, { label: `image ${asset.file}` })) })),
+    ...assets.slice(0, 40).map(asset => ({ label: asset.file, icon: 'image', checked: asset.path === node.attrs.src, run: () => refreshed(commit(doc.id, { nodes: { [node.id]: { attrs: { src: asset.path } } } }, { label: `image ${asset.file}` })) })),
     '-',
     { label: 'Upload image…', icon: 'upload', run: () => uploadInto(doc, node) },
   ], { anchor, label: 'Image', className: 'menu-assets' });

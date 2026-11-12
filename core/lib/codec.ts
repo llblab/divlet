@@ -9,7 +9,8 @@
 import { parse, parseFragment } from 'parse5';
 import postcss from 'postcss';
 import { serializeDeclarations } from './declarations.ts';
-import { validateDocument, validateHead, DivletError, VOID_TAGS, LIMITS, documentLimits, supportsTag } from './model.ts';
+import { validateDocument, validateHead, safeAttribute, DivletError, VOID_TAGS, LIMITS, documentLimits, supportsTag } from './model.ts';
+import { readAssetReference } from './asset-reference.ts';
 import type { DocumentModel, ElementNode, Limits, Node, NodeId } from './model.ts';
 
 /** A node of the parse5 tree, as this codec needs to read it. */
@@ -211,8 +212,11 @@ export function htmlToSpecs(html: unknown, { limit = 1000 }: { limit?: number } 
         continue;
       }
       if (URL_ATTRIBUTES.test(name)) {
+        if (readAssetReference(item.value)) error('Pasted HTML cannot supply native project asset references. Use a node spec to reference declared resources.', undefined, 'INVALID_DOCUMENT');
         const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(item.value.replace(/[\u0000-\u0020\u007f]+/g, ''))?.[1]?.toLowerCase();
-        if (scheme && !['http', 'https', 'mailto', 'tel'].includes(scheme)) continue;
+        if (scheme === 'data' && /^(src|poster)$/i.test(name)) {
+          try { safeAttribute(name, item.value, 'pasted HTML', true); } catch { continue; }
+        } else if (scheme && !['http', 'https', 'mailto', 'tel'].includes(scheme)) continue;
       }
       attrs[name] = item.value;
     }

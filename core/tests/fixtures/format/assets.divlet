@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "name": "Embedded resources",
+  "assets": {
+    "icons": { "logo.svg": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=" },
+    "copy.svg": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=",
+    "empty": {}
+  },
+  "frames": [{
+    "id": "home",
+    "version": 1,
+    "name": "Resources",
+    "artboard": { "x": 0, "y": 0, "width": 390, "height": 844 },
+    "head": { "icon": "asset:copy.svg" },
+    "rootId": "root",
+    "nodes": {
+      "root": { "id": "root", "type": "element", "tag": "main", "children": ["image", "literal"] },
+      "image": { "id": "image", "type": "element", "tag": "img", "attrs": { "src": "asset:icons/logo.svg?v=%2f#mark" }, "children": [] },
+      "literal": { "id": "literal", "type": "element", "tag": "img", "attrs": { "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciLz4=" }, "children": [] }
+    }
+  }]
+}

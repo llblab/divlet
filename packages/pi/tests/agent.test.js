@@ -156,7 +156,7 @@ test('export produces clean HTML for a node and a standalone page; assets list a
   await legacyProject(path.join(cwd, 'project.divlet'), { demo: true });
   const runtime = await openRuntime({ cwd, watch: false });
   try {
-    const page = runtime.exportDocument('welcome');
+    const page = await runtime.exportDocument('welcome');
     assert.match(page.html, /^<!doctype html>/);
     assert.match(page.html, /--accent: #d7b474;/);
     assert.match(page.html, /\.min-h-screen/);
@@ -172,9 +172,9 @@ test('export produces clean HTML for a node and a standalone page; assets list a
     assert.deepEqual((await runtime.listAssets({ documentId: 'welcome' })).assets.map(item => item.path), ['logo.svg']);
     const upload = await fetch(new URL('api/assets?name=My%20Photo.PNG&documentId=welcome', url), { method: 'POST', headers: { 'Content-Type': 'image/png', Origin: new URL(url).origin }, body: Buffer.from([0x89, 0x50, 0x4e, 0x47]) });
     assert.equal(upload.status, 200);
-    assert.equal((await upload.json()).path, 'assets/my-photo.png');
+    assert.equal((await upload.json()).path, 'asset:images/my-photo.png');
     const second = await (await fetch(new URL('api/assets?name=my-photo.png', url), { method: 'POST', headers: { 'Content-Type': 'image/png', Origin: new URL(url).origin }, body: Buffer.from([1]) })).json();
-    assert.equal(second.path, 'assets/my-photo-2.png');
+    assert.equal(second.path, 'asset:images/my-photo-2.png');
     const rejected = await fetch(new URL('api/assets?name=run.js', url), { method: 'POST', headers: { 'Content-Type': 'image/png', Origin: new URL(url).origin }, body: Buffer.from([1]) });
     assert.equal(rejected.status, 400);
     const listed = await (await fetch(new URL('api/assets?documentId=welcome', url))).json();
