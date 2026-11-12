@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createJsonTransport } from '../lib/http.js';
-import { createHttpReadSession, createHttpSelectionPublisher } from '../lib/http-session.js';
+import { createHttpReadSession, createHttpSelectionPublisher, createHttpObservationPublisher } from '../lib/http-session.js';
 import { createHttpHistoryService, createHttpSourceUpdates } from '../lib/http-services.js';
 
 class Stream {
@@ -42,6 +42,15 @@ test('native selection publisher preserves payload, reply and exact refusal with
   assert.deepEqual(calls, [['api/selection', selection]]);
   const refusal = Object.assign(new Error('Unavailable'), { code: 'OFFLINE' });
   await assert.rejects(createHttpSelectionPublisher(async () => { throw refusal; })(selection), error => error === refusal);
+});
+
+test('native observation publisher preserves the complete report, reply and exact refusal', async () => {
+  const calls = [], reply = { ok: true }, report = { documentId: 'index', version: 7, render: 7, nodes: [{ id: 'root', rect: { x: 1, y: 2, width: 390, height: 800 }, overflowY: true }], contentHeight: 900, scrollHeight: 950 };
+  const publish = createHttpObservationPublisher(async (...args) => { calls.push(args); return reply; });
+  assert.equal(await publish(report), reply);
+  assert.deepEqual(calls, [['api/observations', report]]);
+  const refusal = Object.assign(new Error('Older render'), { code: 'STALE_PREVIEW' });
+  await assert.rejects(createHttpObservationPublisher(async () => { throw refusal; })(report), error => error === refusal);
 });
 
 test('native optional services preserve history and source-update routes, replies and refusals', async () => {

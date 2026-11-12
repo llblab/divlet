@@ -1,6 +1,6 @@
 import { createSnapshotReadSession } from '../lib/board-session.ts';
-import type { BoardReadEvent, BoardReadSession, BoardSelection, BoardSelectionPublisher } from '../lib/board-session.ts';
-import { createHttpReadSession, createHttpSelectionPublisher } from '../../web/lib/http-session.js';
+import type { BoardReadEvent, BoardReadSession, BoardSelection, BoardSelectionPublisher, BoardObservationPublisher } from '../lib/board-session.ts';
+import { createHttpReadSession, createHttpSelectionPublisher, createHttpObservationPublisher } from '../../web/lib/http-session.js';
 import type { BoardHistoryService, BoardSourceUpdates } from '../lib/board-host.ts';
 import { createHttpHistoryService, createHttpSourceUpdates } from '../../web/lib/http-services.js';
 import { createJsonTransport } from '../../web/lib/http.js';
@@ -11,6 +11,7 @@ const snapshot: BoardReadSession = createSnapshotReadSession({ state: {}, frames
 const history: BoardHistoryService = createHttpHistoryService(transport);
 const auditOnly: BoardHistoryService = { readRecent: async () => ({}) };
 const source: BoardSourceUpdates = createHttpSourceUpdates(transport);
+const observe: BoardObservationPublisher = createHttpObservationPublisher(transport.post);
 const publish: BoardSelectionPublisher = createHttpSelectionPublisher(transport.post);
 const selection: BoardSelection = { ids: ['index'], nodes: { documentId: 'index', nodeIds: ['root'] } };
 const event: BoardReadEvent = { type: 'state', value: { projectId: 'demo' } };
@@ -26,6 +27,11 @@ if (false) {
   void incompleteSource;
   // @ts-expect-error a snapshot reader gains no host service dispatch
   void snapshot.historyService.readRecent();
+  void observe({ documentId: 'index', version: 1, render: 1, nodes: [{ id: 'root', rect: { x: 0, y: 0, width: 390, height: 800 } }] });
+  // @ts-expect-error measurements carry an explicit shown-render cursor
+  void observe({ documentId: 'index', nodes: [] });
+  // @ts-expect-error observation publication is not added to the snapshot reader
+  void snapshot.publishObservations({});
   void publish(selection);
   // @ts-expect-error selection publication does not grant project patches
   void publish({ patch: {} });

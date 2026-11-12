@@ -1,4 +1,4 @@
-/* Owns: transport-independent board reads, optional shared-selection publication and immutable snapshots. No project writer authority. */
+/* Owns: transport-independent board reads, optional view-state publication and immutable snapshots. No project writer authority. */
 export type BoardReadEvent =
   | { type: 'connection'; status: 'connected' | 'offline' }
   | { type: 'state'; value: unknown }
@@ -19,6 +19,17 @@ export interface BoardSelection {
   readonly nodes?: { readonly documentId: string; readonly nodeIds: readonly string[] };
 }
 export type BoardSelectionPublisher = (selection: BoardSelection) => Promise<unknown>;
+
+/** Frame measurements already bounded by the preview receiver. `version` and `render` both name the shown render revision. */
+export interface BoardObservation {
+  readonly documentId: string;
+  readonly version: number;
+  readonly render: number;
+  readonly nodes: readonly { readonly id: string; readonly rect: { readonly x: number; readonly y: number; readonly width: number; readonly height: number }; readonly overflowX?: boolean; readonly overflowY?: boolean }[];
+  readonly contentHeight?: number;
+  readonly scrollHeight?: number;
+}
+export type BoardObservationPublisher = (report: BoardObservation) => Promise<unknown>;
 
 /** A host-created snapshot; the caller owns project admission and public-data curation. Not an upload parser. */
 export function createSnapshotReadSession({ state, frames }: { state: unknown; frames: ReadonlyMap<string, unknown> }): BoardReadSession {

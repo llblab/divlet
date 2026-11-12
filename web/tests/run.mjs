@@ -141,7 +141,34 @@ try {
   assert.equal(runtime.info().selection.ids.length, 12);
   await new Promise((resolve) => setTimeout(resolve, 250));
   assert.equal(runtime.info().selection.ids.length, 12);
-  console.log(JSON.stringify({ status: 'passed', checks: ['real Tailwind', 'keyed DOM and iframe identity', 'node reparenting', 'invalid SVG topology rejected', 'local image assets', ...(fontPath ? ['opaque-origin local fonts'] : []), 'selection and observations', 'project file edits sync live', 'invalid project file retains last good preview', 'recovery', 'hand-edited pages are reported, not imported', 'marquee artboard selection', 'fixed iframe viewport', 'negative artboard coordinates', 'visible/selected frames are not capped by the spare-prefetch target', 'multi-selection retained'], screenshot: 'artifacts/board.png' }, null, 2));
+  // A fresh fixed host composition removes only observation publication; all other native services remain real.
+  await page.close();
+  runtime.observations.clear();
+  const local = await browser.newPage({ viewport: { width: 1300, height: 900 } });
+  const localErrors = []; let observationPosts = 0;
+  local.on('pageerror', error => localErrors.push(error.message));
+  local.on('request', request => { if (request.url().endsWith('/api/observations')) observationPosts++; });
+  const hostSource = await readFile(new URL('../lib/host.js', import.meta.url), 'utf8');
+  const nativePublisher = 'export const publishObservations = createHttpObservationPublisher(post);';
+  assert.equal(hostSource.split(nativePublisher).length, 2, 'one fixed native publisher binding is replaced before module execution');
+  await local.route('**/lib/host.js', route => route.fulfill({ contentType: 'text/javascript', body: hostSource.replace(nativePublisher, 'export const publishObservations = undefined;') }));
+  await local.goto(runtime.info().url);
+  await local.waitForSelector('#loading', { state: 'hidden' });
+  await local.evaluate(async () => (await import('./lib/store.js')).selectArtboards(['test-board']));
+  await local.waitForFunction(async () => (await import('./lib/store.js')).store.observations.get('test-board')?.nodes.some(node => node.id === 'a'));
+  const localFrame = local.frameLocator('iframe[data-document-id="test-board"]');
+  await localFrame.locator('[data-divlet-id="a"]').evaluate(node => { node.style.width = '205px'; dispatchEvent(new Event('resize')); });
+  await local.waitForFunction(async () => (await import('./lib/store.js')).store.observations.get('test-board')?.nodes.some(node => node.id === 'a' && Math.round(node.rect.width) === 205));
+  assert.deepEqual(await local.evaluate(async () => {
+    const { entries } = await import('./lib/canvas.js'); const entry = entries.get('test-board');
+    return { timer: entry.reportTimer, queued: entry.latestReport };
+  }), { timer: null, queued: null }, 'measurements stay local without publication bookkeeping');
+  await new Promise(resolve => setTimeout(resolve, 250));
+  assert.equal(observationPosts, 0, 'no raw observations route fallback after the native publication window');
+  assert.equal(runtime.observations.size, 0, 'native observation storage receives no local-only measurements');
+  assert.deepEqual(localErrors, []);
+  await local.close();
+  console.log(JSON.stringify({ status: 'passed', checks: ['real Tailwind', 'keyed DOM and iframe identity', 'node reparenting', 'invalid SVG topology rejected', 'local image assets', ...(fontPath ? ['opaque-origin local fonts'] : []), 'selection and observations', 'project file edits sync live', 'invalid project file retains last good preview', 'recovery', 'hand-edited pages are reported, not imported', 'marquee artboard selection', 'fixed iframe viewport', 'negative artboard coordinates', 'visible/selected frames are not capped by the spare-prefetch target', 'multi-selection retained', 'publisher-less real preview measurements stay local without timers or backend reports'], screenshot: 'artifacts/board.png' }, null, 2));
 } finally {
   await browser?.close();
   await runtime.close();

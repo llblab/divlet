@@ -1,4 +1,5 @@
 import { $, $$, el, icon, clamp, round } from './util.js';
+import { publishObservations } from './host.js';
 import { store, emit, on, documents, descriptor, request, post, apiUrl, commit, edit, idle, undo, newGroup, selectArtboards, selectNodes, toast, viewState, saveViewState } from './store.js';
 
 const PREFETCH_TARGET = 8;
@@ -774,7 +775,7 @@ const validFiles = files => (Array.isArray(files) ? files.filter(file => file in
 const validNodes = nodes => (Array.isArray(nodes) ? nodes.slice(0, 300).filter(node => typeof node.id === 'string' && node.rect && ['x', 'y', 'width', 'height'].every(key => Number.isFinite(node.rect[key]))) : []);
 
 function queueObservation(entry, report) {
-  if (store.expanded?.entry === entry) return;
+  if (!publishObservations || store.expanded?.entry === entry) return;
   entry.latestReport = report;
   if (entry.reportTimer) return;
   entry.reportTimer = setTimeout(() => {
@@ -782,7 +783,7 @@ function queueObservation(entry, report) {
     const latest = entry.latestReport;
     entry.latestReport = null;
     if (!latest || !entry.iframe || store.expanded?.entry === entry) return;
-    post('api/observations', latest).catch(() => {});
+    publishObservations(latest).catch(() => {});
   }, 180);
 }
 

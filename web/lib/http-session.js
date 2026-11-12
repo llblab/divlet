@@ -2,6 +2,7 @@
 /** @typedef {import('../../core/lib/board-session.ts').BoardReadSession} BoardReadSession */
 /** @typedef {import('../../core/lib/board-session.ts').BoardReadEvent} BoardReadEvent */
 /** @typedef {import('../../core/lib/board-session.ts').BoardSelectionPublisher} BoardSelectionPublisher */
+/** @typedef {import('../../core/lib/board-session.ts').BoardObservationPublisher} BoardObservationPublisher */
 /** @typedef {{ addEventListener: (name: string, listener: (event: unknown) => void) => void, close: () => void }} ReadStream */
 
 /** Native ephemeral-selection adapter; absence of this capability means browser-local selection.
@@ -9,6 +10,9 @@
  * @returns {BoardSelectionPublisher}
  */
 export const createHttpSelectionPublisher = post => selection => post('api/selection', selection);
+
+/** @param {(path: string, body: unknown) => Promise<unknown>} post @returns {BoardObservationPublisher} */
+export const createHttpObservationPublisher = post => report => post('api/observations', report);
 
 /**
  * Native HTTP/SSE adapter. Parsing belongs here; model acceptance and bootstrap/plugin ordering stay with the board.
