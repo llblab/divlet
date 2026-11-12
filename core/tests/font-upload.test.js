@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { openRuntime } from '../lib/runtime.js';
-import { decodeHtml } from '../lib/codec.ts';
+import { decodeHtml, layered } from '../lib/codec.ts';
 import { readAssets } from '../lib/assets.ts';
 import { fontFaceRules } from '../lib/font-css.ts';
 import { readFont } from '../lib/font.ts';
@@ -92,6 +92,75 @@ test('Unicode caseless family variants cannot shadow existing faces or rewrite a
   const before = await snapshot(runtime);
   await assert.rejects(upload(runtime, { data: fontBytes(600, { family: 'Unknown \u0378' }) }), { code: 'FONT_CONFLICT' });
   assert.deepEqual(await snapshot(runtime), before, 'unknown host Unicode mappings are refused, never guessed or rewritten');
+});
+
+test('regular, bold and italic companion uploads share an exact family without rewriting earlier faces or bytes', async t => {
+  const runtime = await setup(t);
+  await runtime.create({ document: decodeHtml('<main>Font</main>', { fallbackId: 'faces' }) });
+  const regularBytes = fontBytes(), regular = await upload(runtime), prefix = runtime.settings.css;
+  const boldBytes = fontBytes(900, { weight: 700, subfamily: 'Bold' });
+  const bold = await upload(runtime, { data: boldBytes });
+  assert.ok(runtime.settings.css.startsWith(prefix));
+  const beforeItalic = await snapshot(runtime), italicBytes = fontBytes(1200, { italic: true, subfamily: 'Italic' });
+  const italic = await upload(runtime, { data: italicBytes });
+  assert.deepEqual([regular.file, bold.file, italic.file], ['fonts/device.ttf', 'fonts/device-2.ttf', 'fonts/device-3.ttf']);
+  for (const [result, bytes] of [[regular, regularBytes], [bold, boldBytes], [italic, italicBytes]]) assert.deepEqual(Buffer.from(readAssets(runtime.settings.assets).files.get(result.file).bytes), bytes);
+  assert.equal((runtime.settings.css.match(/@font-face/g) || []).length, 3);
+  await runtime.undo();
+  assert.equal(runtime.settings.css, beforeItalic.state.project.css);
+  assert.equal(readAssets(runtime.settings.assets).files.has(italic.file), false);
+  assert.deepEqual(Buffer.from(readAssets(runtime.settings.assets).files.get(regular.file).bytes), regularBytes);
+  await runtime.redo(); assert.deepEqual(Buffer.from(readAssets(runtime.settings.assets).files.get(italic.file).bytes), italicBytes);
+});
+
+test('companion coverage is inclusive and literal, defaults/keywords agree, conditions and unknown descriptors refuse', () => {
+  const rules = (css, options = {}) => fontFaceRules(readFont(fontBytes(600, options)), 'asset:fonts/new.ttf', { files: new Map(), mediaTypes: new Map(), generated: new Set(), authored: [css] });
+  const face = declarations => `@font-face{font-family:"${fontFamily}";src:local(Original);${declarations}}`;
+  for (const [css, options] of [
+    [face('font-weight:normal'), { weight: 700 }], [face('font-weight:bold'), {}],
+    [face('font-weight:100 500'), { weight: 700 }], [face('font-style:italic'), {}],
+    [face('font-stretch:condensed'), {}], [face('font-stretch:75% 90%'), {}],
+  ]) assert.match(rules(css, options), /@font-face/, css);
+  for (const [css, options] of [
+    [face(''), {}], [face('font-weight:bold'), { weight: 700 }], [face('font-weight:100 700'), { weight: 700 }],
+    [face('font-stretch:normal'), {}], [face('font-stretch:75% 100%'), {}], [face('font-style:oblique'), {}],
+    [face('font-weight:700 100'), { italic: true }], [face('font-weight:var(--weight)'), { italic: true }],
+    [face('font-weight:400;font-weight:700'), { italic: true }], [face('font-weight:400!important'), { italic: true }],
+    [face('font-width:50%'), { italic: true }], [face('font-weight:calc(400)'), { italic: true }],
+    ...['size-adjust', 'font-feature-settings', 'font-variation-settings', 'unicode-range', 'font-display'].map(property => [face(`${property}:var(--value)`), { weight: 700 }]),
+    [face('font-feature-settings:v\\61 r(--value)'), { weight: 700 }],
+    [`@media print{${face('font-weight:400')}}`, { weight: 700 }], [`@layer fonts{${face('font-weight:400')}}`, { weight: 700 }],
+  ]) assert.throws(() => rules(css, options), { code: 'FONT_CONFLICT' }, css);
+  const authored = face('font-weight:400'), incoming = readFont(fontBytes(900, { weight: 700 }));
+  const projected = css => ({ files: new Map([['generated.css', css]]), mediaTypes: new Map(), generated: new Set(['generated.css']), authored: [authored] });
+  assert.match(fontFaceRules(incoming, 'asset:fonts/bold.ttf', projected(layered(authored))), /@font-face/, 'only the real codec-owned projection envelope is recognized');
+  assert.throws(() => rules(layered(authored), { weight: 700 }), { code: 'FONT_CONFLICT' }, 'an authored copy of the core layer is still authored, not a proof of generated provenance');
+  assert.throws(() => fontFaceRules(incoming, 'asset:fonts/bold.ttf', projected(`@media print{${layered(authored)}}`)), { code: 'FONT_CONFLICT' });
+  for (const [name, mime, content] of [['assets/authored.css', 'text/css', layered(authored)], ['assets/authored.html', 'text/html', `<style>${layered(authored)}</style>`]]) {
+    assert.throws(() => fontFaceRules(incoming, 'asset:fonts/bold.ttf', { files: new Map([[name, content]]), mediaTypes: new Map([[name, mime]]), generated: new Set(), authored: [] }), { code: 'FONT_CONFLICT' }, 'declared CSS/HTML is source-owned, not a codec-owned projection');
+  }
+});
+
+test('a declared CSS asset cannot borrow generated-layer provenance through a different resource carrier', async t => {
+  const runtime = await setup(t), css = `@layer components{@font-face{font-family:"${fontFamily}";src:local(Original);font-weight:400}}`;
+  await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { assets: { 'authored.css': `data:text/css;base64,${Buffer.from(css).toString('base64')}` } } });
+  await runtime.create({ document: decodeHtml('<main><img src="asset:authored.css"></main>', { fallbackId: 'carrier' }) });
+  assert.equal(runtime.publicMediaTypes.get('assets/authored.css'), 'text/css');
+  assert.equal(runtime.publicStylesheets.has('assets/authored.css'), false);
+  const before = await snapshot(runtime);
+  await assert.rejects(upload(runtime, { data: fontBytes(900, { weight: 700 }) }), { code: 'FONT_CONFLICT' });
+  assert.deepEqual(await snapshot(runtime), before, 'the inactive image carrier proves refusal integrity, not active stylesheet rendering');
+});
+
+test('variable-range overlap refuses atomically while truly disjoint literal ranges retain their source identity', async t => {
+  const runtime = await setup(t);
+  await upload(runtime, { data: fontBytes(600, { axes: [['wght', 100, 400, 700]] }) });
+  const before = await snapshot(runtime);
+  await assert.rejects(upload(runtime, { data: fontBytes(900, { weight: 700 }) }), { code: 'FONT_CONFLICT' });
+  assert.deepEqual(await snapshot(runtime), before);
+  const upper = await upload(runtime, { data: fontBytes(900, { axes: [['wght', 700.5, 800, 900]] }) });
+  assert.match(runtime.settings.css, /font-weight:700\.5 900/);
+  assert.equal(readAssets(runtime.settings.assets).files.has(upper.file), true);
 });
 
 test('registration scans authored sheets even without pages, actual public CSS and uninspectable imports/links', () => {

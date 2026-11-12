@@ -740,8 +740,9 @@ export async function render({ force = false } = {}) {
   if (!docs.length || store.expanded) { if (ownedMenu) { deferred = false; closeMenu({ restoreFocus: false }); } ++token; panel.hidden = true; panel.replaceChildren(); delete panel.dataset.view; controlContext = null; document.body.classList.remove('has-inspector'); return; }
   if ((!force && (typing() || holding)) || pressing()) { deferred = true; return; }
   // Geometry-only reports must not discard hover/focus and hide an action before it can
-  // receive a press. Keep the real controls and callbacks, never rebase their authority.
-  if (!force && controlContext === contextOf(docs) && (ownedMenu || panel.matches(':hover') || panel.contains(document.activeElement))) { deferred = true; return; }
+  // receive a press. Even a forced measurement refresh waits for an unchanged-context menu to close.
+  // Keep the real controls and callbacks, never rebase their authority.
+  if (controlContext === contextOf(docs) && (ownedMenu || !force && (panel.matches(':hover') || panel.contains(document.activeElement)))) { deferred = true; return; }
   if (ownedMenu) { deferred = false; closeMenu({ restoreFocus: false }); }
   const mine = ++token;
   deferred = false;

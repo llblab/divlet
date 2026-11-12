@@ -92,10 +92,31 @@ try {
     const fonts = await node.ownerDocument.fonts.load('100px "Provider Upload"', 'AA'); return fonts.map(face => face.status);
   });
   assert.deepEqual(providerFont, ['loaded']);
-  await runtime.undo(); await runtime.undo();
+  await deviceUpload(fontBytes(900, { family: 'Provider Upload', weight: 700, subfamily: 'Bold' }), 'provider-bold.ttf');
+  await waitUntil(() => runtime.settings.css.includes('provider-bold.ttf'), 'bold companion registers without replacing the regular face');
+  await deviceUpload(fontBytes(1200, { family: 'Provider Upload', italic: true, subfamily: 'Italic' }), 'provider-italic.ttf');
+  await waitUntil(() => runtime.settings.css.includes('provider-italic.ttf'), 'italic companion joins the same family');
+  const faceMetrics = () => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('body').evaluate(async node => {
+    const doc = node.ownerDocument, results = [];
+    for (const [weight, style] of [[400, 'normal'], [700, 'normal'], [400, 'italic']]) {
+      await doc.fonts.load(`${style} ${weight} 100px "Provider Upload"`, 'AA');
+      const text = doc.createElement('span'); text.textContent = 'AA';
+      text.style.cssText = `display:inline-block;font-family:"Provider Upload";font-size:100px;font-weight:${weight};font-style:${style};letter-spacing:0;font-synthesis:none`;
+      doc.body.append(text); results.push(Math.round(text.getBoundingClientRect().width)); text.remove();
+    }
+    return results;
+  });
+  assert.deepEqual(await faceMetrics(), [120, 180, 240], 'the browser matches three different byte programs, not synthetic styling of one face');
+  await family.click(); assert.equal(await page.getByRole('menuitemradio', { name: '"Provider Upload"', exact: true }).count(), 1); await page.keyboard.press('Escape');
+  const collisionState = { revision: runtime.revision, css: runtime.settings.css, assets: structuredClone(runtime.settings.assets), history: runtime.readHistory() };
+  await deviceUpload(fontBytes(1500, { family: 'Provider Upload', weight: 700 }), 'overlap.ttf');
+  await waitUntil(() => page.locator('#toast').innerText().then(text => text.includes('overlapping face')), 'overlapping companion refuses visibly');
+  assert.deepEqual({ revision: runtime.revision, css: runtime.settings.css, assets: runtime.settings.assets, history: runtime.readHistory() }, collisionState);
+  assert.deepEqual(await faceMetrics(), [120, 180, 240], 'refusal leaves actual matching unchanged');
+  for (let i = 0; i < 4; i++) await runtime.undo();
   await waitUntil(() => !runtime.settings.css.includes('Provider Upload'), 'selection and registration are two explicit gestures; registration itself is one undoable asset/CSS change');
   await select('cta');
-  checks.push('actual device chooser with provider, uploaded menu choice, real font loading and separate selection/registration Undo');
+  checks.push('actual device chooser with provider, one family for regular/bold/italic companions, 120/180/240px matching, overlap refusal and separate selection/registration Undo');
 
   await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { assets: { fonts: { 'proof.ttf': fontDataUrl() } }, css: runtime.settings.css + '\n@font-face{font-family:"Project Face";src:url(asset:fonts/proof.ttf)}' } });
   await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { css: runtime.getEntry('welcome').document.css + '\n@font-face{font-family:"Local (Variant)";src:url(asset:fonts/proof.ttf)}', nodes: { cta: { style: { 'font-family': '"Old Face", serif !important' } } } } });
@@ -142,6 +163,8 @@ try {
   await waitUntil(() => family.locator('.pick-v').innerText().then(text => text === 'monospace'), 'reader-driven family redraw settles before the keyboard menu gesture');
   await family.focus(); await page.keyboard.press('Space');
   await page.getByRole('menu', { name: 'Font family', exact: true }).waitFor();
+  await page.evaluate(async () => (await import('./lib/inspector.js')).render({ force: true }));
+  assert.equal(await page.getByRole('menu', { name: 'Font family', exact: true }).isVisible(), true, 'an unchanged-context forced measurement refresh does not retire an active menu');
   await page.keyboard.press('End'); await page.keyboard.press('Escape');
   assert.equal(await family.evaluate(node => node === document.activeElement), true, 'keyboard Escape restores focus to the font field');
   await page.keyboard.press('Space'); await page.keyboard.press('Home'); await page.keyboard.press('Enter');
@@ -426,19 +449,27 @@ try {
   await waitUntil(() => native.settings.css.includes('Device Font'), 'device font registers with no style engine');
   assert.match(native.settings.css, /font-weight:100 900/, 'variable weight range is registered, not flattened to its default');
   assert.equal(native.getEntry('plain').document.version, nativeVersion, 'upload registers a project face, not a hidden selected-node edit');
+  await deviceUpload(fontBytes(1200, { family: 'Device Font', italic: true, subfamily: 'Italic' }), 'device-italic.ttf');
+  await waitUntil(() => native.settings.css.includes('device-italic.ttf'), 'static italic and normal variable-range faces are disjoint companions without a provider');
+  const italicMetric = await page.locator('iframe[data-document-id="plain"]').contentFrame().locator('body').evaluate(async node => {
+    const doc = node.ownerDocument; await doc.fonts.load('italic 400 100px "Device Font"', 'AA');
+    const text = doc.createElement('span'); text.textContent = 'AA'; text.style.cssText = 'display:inline-block;font-family:"Device Font";font-size:100px;font-weight:400;font-style:italic;font-synthesis:none';
+    doc.body.append(text); const width = Math.round(text.getBoundingClientRect().width); text.remove(); return width;
+  });
+  assert.equal(italicMetric, 240);
   await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('plain', ['first', 'second']));
   await family.click(); await page.getByRole('menuitemradio', { name: '"Device Font"', exact: true }).click();
   await waitUntil(() => ['first', 'second'].every(id => native.getEntry('plain').document.nodes[id].style['font-family'] === '"Device Font"'), 'one mixed selection shares one uploaded resource');
   await waitUntil(() => page.locator('iframe[data-document-id="plain"]').contentFrame().locator('#first').evaluate(node => Math.round(node.getBoundingClientRect().width) === 180), 'uploaded device bytes, not the previous face or fallback, render in the real preview');
-  assert.equal(Object.keys(native.settings.assets.fonts).filter(name => name.startsWith('device')).length, 1);
+  assert.equal(Object.keys(native.settings.assets.fonts).filter(name => name.startsWith('device')).length, 2, 'two distinct faces are stored once each, not once per selected node');
   assert.equal(await page.locator('iframe[data-document-id="plain"]').getAttribute('data-upload-lifetime'), 'retained');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Upload font', exact: true }).click({ trial: true });
   await page.setViewportSize({ width: 1280, height: 900 });
-  await native.undo(); await native.undo();
+  await native.undo(); await native.undo(); await native.undo();
   await waitUntil(() => native.settings.css === nativeCss, 'one registration Undo removes its bytes and CSS together');
   assert.equal(native.settings.assets.fonts['device.ttf'], undefined);
-  await native.redo(); await waitUntil(() => native.settings.css.includes('Device Font'), 'registration Redo restores the same shared bytes and face');
+  await native.redo(); await native.redo(); await waitUntil(() => native.settings.css.includes('Device Font'), 'registration Redo restores the same shared bytes and face');
   await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('plain', ['first']));
   const beforeBad = { revision: native.revision, css: native.settings.css, assets: structuredClone(native.settings.assets) };
   let fontPosts = 0;

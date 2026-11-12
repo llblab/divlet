@@ -115,7 +115,8 @@ export function encodeHtml(input: unknown, { compiledCss = '', parts, instances,
 
 
 
-const LAYERS = '@layer theme, base, components, utilities;\n@layer components {\n';
+export const CUSTOM_CSS_LAYER = 'components';
+const LAYERS = `@layer theme, base, components, utilities;\n@layer ${CUSTOM_CSS_LAYER} {\n`;
 /**
  * Custom CSS sits in Tailwind's components layer: it beats the preflight reset, and the
  * utilities in className beat it — classes stay the last word, as on the board.

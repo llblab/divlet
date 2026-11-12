@@ -1660,7 +1660,7 @@ await this.importProject(project.settings, project.frames, hash);
       const face = readFont(bytes), extension = face.format === 'truetype' ? '.ttf' : '.otf';
       const stem = path.basename(String(name || 'font'), path.extname(String(name || 'font'))).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'font';
       const leaf = allocateAssetLeaf(readAssets(this.settings.assets ?? {}).tree, 'fonts', `${stem}${extension}`), key = `fonts/${leaf}`, reference = assetReference(key);
-      const rules = fontFaceRules(face, reference, { files: this.publicFiles ?? new Map(), mediaTypes: this.publicMediaTypes ?? new Map(), generated: this.publicStylesheets, authored: [this.settings.css, ...[...this.documents.values()].map(entry => entry.document.css)] });
+      const rules = fontFaceRules(face, reference, { files: this.publicFiles ?? new Map(), mediaTypes: this.publicMediaTypes ?? new Map(), generated: new Set([...this.publicStylesheets, ...[...this.documents.values()].map(entry => path.basename(entry.htmlPath))]), authored: [this.settings.css, ...[...this.documents.values()].map(entry => entry.document.css)] });
       const assets = { fonts: { [leaf]: `data:${face.mediaType};base64,${bytes.toString('base64')}` } };
       const result = await this._patchProject({ expectedVersion, patch: { assets, css: [this.settings.css, rules].filter(Boolean).join('\n') }, actor: 'user', label: `upload font ${face.family}` });
       return { ...result, path: reference, file: key, family: face.family, size: bytes.length };
