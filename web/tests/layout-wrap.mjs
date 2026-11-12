@@ -27,11 +27,22 @@ try {
     })[0];
     host.append(layout);
     document.querySelector('#ui').append(host);
+    const selectors = document.createElement('section');
+    selectors.id = 'selectors-fixture';
+    selectors.className = 'layout-box';
+    selectors.style.cssText = 'position:absolute;left:8px;top:80px;background:var(--solid)';
+    const pair = document.createElement('div'); pair.className = 'grid2';
+    const defaults = layoutSections([{ id: 'default', className: '' }], { parent: null, apply() {} });
+    for (const key of ['Display', 'Position']) {
+      const pick = defaults.map(([, , content]) => content.querySelector(`[data-key="pick:${key}"]`)).find(Boolean);
+      pair.append(pick);
+    }
+    selectors.append(pair); document.querySelector('#ui').append(selectors);
     const fields = document.createElement('section');
     fields.id = 'fields-fixture';
     fields.style.cssText = host.style.cssText;
     fields.style.top = '340px';
-    const className = 'absolute top-[123456px] right-[654321px] bottom-[123456px] left-[654321px] opacity-100 z-[999999] blur-[12px] text-[length:24px]';
+    const className = 'absolute top-[123456px] right-[654321px] bottom-[123456px] left-[654321px] opacity-100 z-[999999] blur-[12px] text-[length:24px] font-extrabold';
     for (const [name, , content] of layoutSections([{ id: 'positioned', className }], { parent: null, apply() {} })) {
       if (name !== 'spacing') fields.append(content);
     }
@@ -40,8 +51,8 @@ try {
   let wrapped = 0, together = 0;
   for (const viewport of [390, 768, 1280]) {
     await page.setViewportSize({ width: viewport, height: 800 });
-    for (const width of [170, 220, 260, 280, 300, 320]) {
-      await page.locator('#wrap-fixture, #fields-fixture').evaluateAll((hosts, width) => { for (const host of hosts) host.style.width = width + 'px'; }, width);
+    for (const width of [170, 220, 246, 260, 280, 300, 320]) {
+      await page.locator('#wrap-fixture, #fields-fixture, #selectors-fixture').evaluateAll((hosts, width) => { for (const host of hosts) host.style.width = width + 'px'; }, width);
       const clipped = await page.locator('#fields-fixture').evaluate(host => {
         const context = document.createElement('canvas').getContext('2d');
         const bad = [];
@@ -60,6 +71,18 @@ try {
         return bad;
       });
       assert.deepEqual(clipped, [], `readable numeric grids at viewport ${viewport}, container ${width}`);
+      const selectors = await page.locator('#selectors-fixture, #fields-fixture').evaluateAll(hosts => hosts.flatMap(host => [...host.querySelectorAll('.pick')].map(pick => {
+        const value = pick.querySelector('.pick-v'), label = pick.querySelector('.pick-k'), caret = pick.querySelector('.pick-caret');
+        const box = pick.getBoundingClientRect(), v = value.getBoundingClientRect(), k = label.getBoundingClientRect(), c = caret.getBoundingClientRect();
+        return { key: pick.dataset.key, text: value.textContent, lines: value.clientHeight / parseFloat(getComputedStyle(value).lineHeight), whole: value.scrollWidth <= value.clientWidth + 1, accessible: pick.getAttribute('aria-label') === `${label.textContent}: ${value.textContent}`, inside: v.left >= box.left && v.right <= c.left - 1, separate: k.right <= v.left + 1 };
+      })));
+      for (const pick of selectors) {
+        assert.equal(pick.lines, 1, `${pick.key}: ${pick.text} must not wrap at ${width}px`);
+        assert.equal(pick.whole && pick.accessible && pick.inside && pick.separate, true, `${pick.key}: preserve the value before its caret without overlapping the label at ${width}px`);
+      }
+      const boxes = await page.locator('#selectors-fixture .pick').evaluateAll(nodes => nodes.map(node => { const r = node.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; }));
+      if (width <= 246) assert.ok(boxes[1].top >= boxes[0].bottom, 'the reported Default pair stacks when its contents do not fit');
+      if (width >= 300) assert.equal(boxes[0].top, boxes[1].top, 'the same pair stays side by side when both values fit');
       const groups = await page.locator('#wrap-fixture .align-controls').evaluate(row => ({
         width: row.clientWidth, scroll: row.scrollWidth,
         groups: [...row.children].map(group => {
@@ -77,6 +100,10 @@ try {
   }
   assert.ok(wrapped && together, 'exercise both wrapped and single-line layouts');
   await page.setViewportSize({ width: 1280, height: 800 });
+  await page.locator('#selectors-fixture').evaluate(host => { host.style.width = '246px'; });
+  await fs.mkdir('artifacts', { recursive: true });
+  await page.locator('#selectors-fixture').screenshot({ path: 'artifacts/selectors-default-stacked.png' });
+  await page.locator('#selectors-fixture').evaluate(host => { host.hidden = true; });
   await page.locator('#wrap-fixture').evaluate(host => { host.style.width = '260px'; });
   await page.evaluate(() => { document.documentElement.style.setProperty('--ui', '2'); document.documentElement.dataset.theme = 'dark'; });
   const controls = page.getByRole('group', { name: 'Align self in the parent', exact: true });
@@ -92,7 +119,7 @@ try {
   await fs.mkdir('artifacts', { recursive: true });
   await page.locator('#wrap-fixture').screenshot({ path: 'artifacts/layout-wrap.png' });
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ status: 'passed', checks: ['Text/Self labels wrap with their own buttons', '170–320px rows at 390/768/1280px viewports', 'wide rows retain both groups on one line', '200% UI scale', 'keyboard self-alignment action', 'full numeric values and paired controls without unused tracks across viewport/container widths'], screenshot: 'artifacts/layout-wrap.png' }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', checks: ['Text/Self labels wrap with their own buttons', '170–320px rows at 390/768/1280px viewports', 'Default and long selector values stay on one line; fields stack by content width', 'wide rows retain both groups on one line', '200% UI scale', 'keyboard self-alignment action', 'full numeric values and paired controls without unused tracks across viewport/container widths'], screenshot: 'artifacts/layout-wrap.png' }, null, 2));
 } finally {
   await browser?.close(); await runtime?.close(); await fs.rm(cwd, { recursive: true, force: true });
 }

@@ -787,7 +787,7 @@ try {
   checks.push('no chrome text is clipped at 1280 and 390px wide, at 100% and 200% interface size');
   checks.push('tooltip copy and diagnostic headings wrap whole, including unbroken references, with hover/keyboard activation and viewport-safe placement at edges and 200% size');
 
-  // Labels, multiline values and carets share the vertical centre, including at the actual inspector minimum.
+  // Values stay on one line; whole fields wrap before shrinking data, and labels/carets remain centred.
   {
     await runtime.patch({ documentId: 'welcome', expectedVersion: runtime.read({ view: 'frame', documentId: 'welcome' }).version, patch: { nodes: { nav: { className: 'inline-block relative font-extrabold' } } } });
     await page.evaluate(async () => (await import('./lib/sidebar.js')).close());
@@ -807,7 +807,7 @@ try {
         const box = await grip.boundingBox(), now = Number(await grip.getAttribute('aria-valuenow'));
         await page.mouse.move(box.x + 4, box.y + box.height / 2); await page.mouse.down();
         await page.mouse.move(box.x + 4 + now - 320, box.y + box.height / 2, { steps: 6 }); await page.mouse.up();
-        await waitUntil(() => page.locator('#inspector').evaluate(node => Math.abs(node.getBoundingClientRect().width - 320) < 1), 'the mixed-height selector row really has 320px');
+        await waitUntil(() => page.locator('#inspector').evaluate(node => Math.abs(node.getBoundingClientRect().width - 320) < 1), 'the adaptive selector row really has 320px');
       }
       await waitUntil(async () => (await page.locator('#inspector .pick').count()) > 0, 'the inspector keeps a selector');
       const pick = page.locator('#inspector [data-section="appearance"] [data-key="pick:Weight"]');
@@ -841,10 +841,10 @@ try {
       else assert.ok(geom.gap >= 0, `the value does not stick out of the selector at ${width}px (gap ${geom.gap})`);
       assert.ok(geom.labelLeft <= 12, `the label sits at the left edge at ${width}px (${geom.labelLeft})`);
       assert.equal(geom.clipped, false, `the value is shown whole at ${width}px`);
-      if (width >= 900) assert.equal(geom.multiline, true, 'Extra bold 800 really wraps in its paired typography row without shifting the label off centre');
+      assert.equal(geom.multiline, false, 'Extra bold 800 stays on one line instead of wrapping or abbreviating the value');
       if (width === 900) {
         assert.equal(geom.peerSingleLine, true, 'the neighbouring font-size field retains its single-line height');
-        assert.equal(geom.peerCentred, true, 'the font-size field stays centred in the taller selector row');
+        assert.equal(geom.peerCentred, true, 'the font-size and weight fields stay centred when they fit on the same row');
       }
     }
     await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(100));

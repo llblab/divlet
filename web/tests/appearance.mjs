@@ -121,7 +121,8 @@ try {
   await page.locator('#inspector [data-key="pick:Weight"]').click();
   await page.locator('.menu .menu-item', { hasText: 'Extra bold 800' }).click();
   await waitUntil(() => classesOf('cta').includes('font-extrabold'), 'a long weight option can still be selected');
-  assert.equal(await page.locator('#inspector [data-key="pick:Weight"] .pick-v').evaluate(node => node.scrollWidth <= node.clientWidth + 1), true, 'long selector values wrap inside their own control');
+  await page.waitForFunction(() => document.querySelector('#inspector [data-key="pick:Weight"] .pick-v')?.textContent === 'Extra bold 800');
+  assert.equal(await page.locator('#inspector [data-key="pick:Weight"] .pick-v').evaluate(node => node.scrollWidth <= node.clientWidth + 1 && node.clientHeight <= parseFloat(getComputedStyle(node).lineHeight) + 1), true, 'long selector values stay whole on one line');
   await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', []));
   await page.locator('#inspector [data-key="width"]').waitFor();
   const dimensions = await page.locator('#inspector .geometry-grid').evaluate(node => {
@@ -138,7 +139,7 @@ try {
   assert.deepEqual(dimensions, { paired: true, readable: true }, 'artboard dimensions use two readable columns at minimum panel width');
   await select('cta');
   await page.locator('#inspector [data-key="radius"]').waitFor();
-  checks.push('minimum-width resizing keeps radius/presets and artboard dimensions readable, border widths are linked between Border and Spacing and long dropdown values wrap');
+  checks.push('minimum-width resizing keeps radius/presets and artboard dimensions readable, border widths are linked between Border and Spacing and long dropdown values remain on one line');
 
   // Fill and text colour by typing a hex value: the class that set the colour before is replaced.
   await page.locator('#inspector [data-key="fill"]').fill('#112233'); await page.keyboard.press('Enter');
