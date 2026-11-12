@@ -8,7 +8,8 @@ import { chromium } from 'playwright';
 import { openRuntime } from '../../core/lib/runtime.js';
 import { decodeHtml } from '../../core/lib/codec.ts';
 import { validateSettings, writeProject } from '../../core/lib/project.ts';
-import { fontDataUrl } from '../../core/tests/fixtures/font.js';
+import { fontDataUrl, fontBytes } from '../../core/tests/fixtures/font.js';
+import { readFont } from '../../core/lib/font.ts';
 
 const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-static-browser-'));
 const source = path.join(directory, 'source');
@@ -140,9 +141,27 @@ try {
   const requestStart = requests.length;
   await checkNativeFont(base + 'native-export.html', 120);
   assert.ok(requests.slice(requestStart).every(url => !url.startsWith(nativeUrl)), 'standalone fonts/images require neither canonical source, cache nor live board');
+  // Metadata inspection is not a glyph validator: separately load its descriptors with the browser's font decoder.
+  for (const options of [
+    { family: 'Reader Bold Italic', subfamily: 'Bold Italic', weight: 700, italic: true, width: 3 },
+    { family: 'Reader Oblique', oblique: true, angle: -12 },
+  ]) {
+    const bytes = fontBytes(600, options), metadata = readFont(bytes);
+    const proof = await page.evaluate(async ({ bytes, metadata }) => {
+      const face = new FontFace(metadata.family, Uint8Array.from(atob(bytes), char => char.charCodeAt(0)), { weight: metadata.weight, style: metadata.styles[0], stretch: metadata.stretch });
+      await face.load(); document.fonts.add(face);
+      const text = document.createElement('span'); text.textContent = 'AA';
+      Object.assign(text.style, { fontFamily: JSON.stringify(metadata.family), fontSize: '100px', fontWeight: metadata.weight, fontStyle: metadata.styles[0], fontStretch: metadata.stretch });
+      document.body.append(text);
+      await document.fonts.load(`${metadata.styles[0]} ${metadata.weight} 100px ${JSON.stringify(metadata.family)}`, 'AA');
+      const result = { width: Math.round(text.getBoundingClientRect().width), status: face.status, weight: face.weight, style: face.style, stretch: face.stretch };
+      text.remove(); document.fonts.delete(face); return result;
+    }, { bytes: bytes.toString('base64'), metadata });
+    assert.deepEqual(proof, { width: 120, status: 'loaded', weight: metadata.weight, style: metadata.styles[0], stretch: metadata.stretch });
+  }
   await fs.mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/static.png', fullPage: true });
-  console.log(JSON.stringify({ status: 'passed', checks: ['copied build after editor shutdown and source removal', 'subpath hosting', 'real Tailwind CSS', '1280/768/390px responsive rendering', 'local SVG resources and rendered inline Gaussian blur', ...(font ? ['bundled local font'] : []), 'nested Markdown navigation and fragments', 'no editor traffic or scripts', 'native MIME-aware image/font bytes independent of extension', 'real font loading, render invalidation and Undo', 'standalone embedded font/image HTML after deleting native source/cache'],  screenshot: 'artifacts/static.png' }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', checks: ['copied build after editor shutdown and source removal', 'subpath hosting', 'real Tailwind CSS', '1280/768/390px responsive rendering', 'local SVG resources and rendered inline Gaussian blur', ...(font ? ['bundled local font'] : []), 'nested Markdown navigation and fragments', 'no editor traffic or scripts', 'native MIME-aware image/font bytes independent of extension', 'real font loading, render invalidation and Undo', 'standalone embedded font/image HTML after deleting native source/cache', 'separately browser-decoded SFNT italic/oblique weight/stretch descriptors'],  screenshot: 'artifacts/static.png' }, null, 2));
 } finally {
   await browser?.close();
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }

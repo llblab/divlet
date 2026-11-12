@@ -41,6 +41,8 @@ The read-session gate is `node scripts/source.mjs --test core/tests/board-sessio
 
 `web/tests/appearance.mjs` additionally exercises the native family selector: Default/generics, declared stored faces and real loading, literal comma/parenthesis names, fallback/priority preservation, multi-selection Undo and whole-selection font/all shorthand refusal (including important resets), plus effective computed-family checks under an important stylesheet without silent priority escalation and keyboard menu/focus recovery. It opens a separately owned project with no style engine and proves actual font rendering, plus phone/200% exact-value keyboard panning. This is not device-upload or far-zoom-font evidence.
 
+`node scripts/source.mjs --test core/tests/font.test.js` checks SFNT metadata with generated CC0 fixtures: Unicode name precedence, weight/style/width and variable ranges, table/name/axis offsets, overlap/version/count bounds, hostile byte-view shapes, source-byte isolation and unsupported/container/embedding refusals. `web/tests/static.mjs` separately loads static italic/oblique descriptors through the real browser font decoder and measures the synthetic glyph advance; metadata parsing alone is not font-program validation. Local system-font probes may inspect additional TTF/OTF/variable files without vendoring them, but are environment evidence, not portable fixtures or compressed-format acceptance.
+
 ## Format candidate
 
 Run these from a source checkout:

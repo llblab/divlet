@@ -131,6 +131,7 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `core/lib/model-styles.ts`, `browser-styles.ts` | Node lowering binding and explicit absent browser capability. |
 | `core/lib/asset-reference.ts` | Portable declared paths and explicit URI/dependency codec; not project storage. |
 | `core/lib/assets.ts` | Canonical stored/sparse-patch resource trees and MIME-based text decoding. |
+| `core/lib/font.ts` | Bounded SFNT face metadata and CSS descriptors; not glyph validation, upload or font storage. |
 | `core/lib/media-type.ts` | Canonical bounded MIME syntax; no byte sniffing or serving authority. |
 | `core/lib/svg-resource.ts` | Strict XML SVG resource projection, not HTML parsing or publication. |
 | `core/lib/project.ts` | Project settings/read/write and component expansion/listing. |
