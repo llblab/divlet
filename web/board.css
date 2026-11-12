@@ -214,14 +214,18 @@ body.has-sidebar .tab { border-color: transparent; border-radius: var(--radius-i
 .tab:hover { background: var(--field-hover); color: var(--ink); }
 .tab.on { background: var(--accent-soft); color: var(--accent); }
 .tab .icon { width: 15px; height: 15px; }
-.tab-mark { display: inline-flex; flex: none; align-items: center; gap: 3px; }
+.tab-mark { display: inline-flex; flex: none; align-items: center; }
+.tab-copy { display: flex; flex-wrap: wrap; align-items: center; min-width: 0; column-gap: 3px; }
 .tab .badge { position: static; flex: none; min-width: 14px; padding: 0 4px; font-size: 9.5px; line-height: 14px; pointer-events: none; }
 .tab .tool-label { flex: none; line-height: 16px; }
-/* The tabs own their density, even while the pane is folded. Icons/counts share the top line instead of clipping names. */
+/* Icons always precede the full label; only a count may wrap within the text column. Folding does not change density. */
 @container sidebar-tabs (max-width: 340px) {
-  .tab { flex-direction: column; gap: 0; padding: 0 2px; }
-  .tab-mark { height: 14px; }
+  .tab { gap: 3px; padding: 0 2px; }
   .tab .icon { width: 13px; height: 13px; }
+}
+@container sidebar-tabs (max-width: 220px) {
+  .tab { gap: 2px; padding: 0 1px; font-size: 11px; }
+  .tab .icon { width: 12px; height: 12px; }
 }
 .tab .spinner { width: 10px; height: 10px; }
 /* Working: a band sweeps across the tab, over the surface it already has. No spinner, so the label never shifts or runs out of

@@ -109,7 +109,9 @@ try {
       await page.evaluate(() => { for (const [id, count] of [['diag-count', '1234'], ['agent-count', '99+']]) { const n = document.getElementById(id); n.hidden = false; n.textContent = count; } });
       const tabIssues = await page.evaluate(() => [...document.querySelectorAll('#side-tabs .tab')].flatMap(tab => {
         const box = tab.getBoundingClientRect(), label = tab.querySelector('.tool-label');
-        return [...tab.querySelectorAll('.icon, .tool-label, .badge:not([hidden])')].some(n => { const r = n.getBoundingClientRect(); return r.left < box.left - 1 || r.right > box.right + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1; }) || label.scrollWidth > label.clientWidth + 1 ? [label.textContent] : [];
+        const icon = tab.querySelector('.icon').getBoundingClientRect(), text = label.getBoundingClientRect();
+        const iconLeft = icon.right <= text.left + 0.5 && icon.top < text.bottom && icon.bottom > text.top;
+        return !iconLeft || [...tab.querySelectorAll('.icon, .tool-label, .badge:not([hidden])')].some(n => { const r = n.getBoundingClientRect(); return r.left < box.left - 1 || r.right > box.right + 1 || r.top < box.top - 1 || r.bottom > box.bottom + 1; }) || label.scrollWidth > label.clientWidth + 1 ? [label.textContent] : [];
       }));
       assert.deepEqual(tabIssues, [], `whole tab labels at ${width}px/${size}% ${name}`);
       if (name === 'agent') {
@@ -175,7 +177,7 @@ try {
   checks.push('inspector, layers, history, agent, shortcuts and palette never overflow sideways at 390px, 390px/200% and 820px; keys, counts, times and tags are never clipped');
   checks.push('numeric fields show their whole current/default values for element and artboard inspection, including at 200% UI size');
   checks.push('long agent activity uses a 5×3 grid with a readable timer and Stop in the bottom-right corner, including phone/200%');
-  checks.push('tab labels, icons and counters fit open/folded; whole-board and node context text stays separate from the prompt, including phone/200%');
+  checks.push('tab icons stay left of complete labels with unclipped counters, open/folded and phone/200%; context text stays separate from the prompt');
   checks.push('folded activity matches the remembered sidebar width above unmoved tabs, with one reachable Stop, bounded long-text scrolling and phone inspector clearance at 100/200%');
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'passed', checks }, null, 2));

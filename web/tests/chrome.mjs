@@ -39,8 +39,9 @@ try {
 
   const readTabs = page => page.evaluate(() => [...document.querySelectorAll('#side-tabs .tab')].map(tab => {
     const box = tab.getBoundingClientRect(), label = tab.querySelector('.tool-label'), r = label.getBoundingClientRect();
+    const icon = tab.querySelector('.icon').getBoundingClientRect();
     const parts = [...tab.querySelectorAll('.icon, .tool-label, .badge:not([hidden])')].map(node => node.getBoundingClientRect());
-    return { text: label.textContent, x: r.x, y: r.y, clipped: label.scrollWidth > label.clientWidth + 1 || parts.some(p => p.left < box.left - 1 || p.right > box.right + 1 || p.top < box.top - 1 || p.bottom > box.bottom + 1),
+    return { text: label.textContent, iconLeft: icon.right <= r.left + .5 && icon.top < r.bottom && icon.bottom > r.top, x: r.x, y: r.y, clipped: label.scrollWidth > label.clientWidth + 1 || parts.some(p => p.left < box.left - 1 || p.right > box.right + 1 || p.top < box.top - 1 || p.bottom > box.bottom + 1),
       overlap: parts.some((a, i) => parts.slice(i + 1).some(b => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1)) };
   }));
 
@@ -99,10 +100,11 @@ try {
     assert.ok(scope.contained && scope.described && scope.gap >= 4, `the ${mode} context has intrinsic height and stays clear of the input: ${JSON.stringify(scope)}`);
   }
   const narrowOpen = await readTabs(page);
-  assert.deepEqual(narrowOpen.map(({ text, clipped, overlap }) => ({ text, clipped, overlap })), ['Layers', 'History', 'Agent'].map(text => ({ text, clipped: false, overlap: false })), 'full labels, icons and counters fit the narrow open tabs');
+  assert.deepEqual(narrowOpen.map(({ text, iconLeft, clipped, overlap }) => ({ text, iconLeft, clipped, overlap })), ['Layers', 'History', 'Agent'].map(text => ({ text, iconLeft: true, clipped: false, overlap: false })), 'full labels, icons and counters fit the narrow open tabs');
   await page.locator('#open-agent').click();
   const narrowFolded = await readTabs(page);
   for (let i = 0; i < 3; i++) {
+    assert.equal(narrowFolded[i].iconLeft, true, 'folded tabs keep icons to the left, never above the text');
     assert.equal(narrowFolded[i].clipped || narrowFolded[i].overlap, false);
     assert.ok(Math.abs(narrowOpen[i].x - narrowFolded[i].x) < .6 && Math.abs(narrowOpen[i].y - narrowFolded[i].y) < .6, 'folding does not reset the tab layout or move its label');
   }
