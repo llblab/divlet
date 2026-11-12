@@ -278,6 +278,20 @@ export function selectParent() {
   return true;
 }
 
+/** Select the shown artboard's root; a late read cannot take selection back after navigation. */
+export async function selectRoot(id) {
+  if (store.selected.size !== 1 || !store.selected.has(id) || selection()) return;
+  let changed = false;
+  const stop = on('selection', () => { changed = true; });
+  try {
+    const model = await modelOf(id);
+    if (changed || !descriptor(id) || model !== cachedModel(id) || store.selected.size !== 1 || !store.selected.has(id) || selection() || store.expanded) return;
+    if (store.mode !== 'select') canvas.setMode('select');
+    selectNodes(id, [model.rootId]);
+  } catch (error) { if (!changed && descriptor(id)) toast(error.message); }
+  finally { stop(); }
+}
+
 /** Into the selection: its first child element; with `edit`, text-only elements start text editing instead. */
 export async function selectChild({ edit: editText = true } = {}) {
   const current = selection();
@@ -290,10 +304,7 @@ export async function selectChild({ edit: editText = true } = {}) {
     return;
   }
   if (store.selected.size !== 1) return;
-  const id = [...store.selected][0];
-  const model = await modelOf(id);
-  if (store.mode !== 'select') canvas.setMode('select');
-  selectNodes(id, [model.rootId]);
+  return selectRoot([...store.selected][0]);
 }
 
 /**
@@ -353,9 +364,6 @@ export function artboardItems(id) {
   const ids = store.selected.has(id) ? [...store.selected] : [id];
   const one = ids.length === 1;
   return [
-    one && { label: 'Select root element', icon: 'inspect', keys: keys('Enter'), run: () => { selectArtboards([id]); return selectChild(); } },
-    one && { label: 'Rename', icon: 'pencil', keys: 'R', run: () => renameArtboard(id) },
-    '-',
     one && { label: 'Fit height to content', icon: 'hug', disabled: !canFitHeight(id), run: () => fitHeightToContent(id) },
     one && { label: 'Rotate', icon: 'rotate', run: () => rotateArtboard(id) },
     !one && { label: 'Tidy up in a row', icon: 'tidy', run: () => tidyArtboards(ids) },

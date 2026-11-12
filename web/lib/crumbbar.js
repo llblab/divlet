@@ -30,7 +30,8 @@ function place() {
   const width = b.left / scale - 10 - left;
   bar.style.left = `${left}px`;
   bar.style.width = `${Math.max(0, width)}px`;
-  bar.classList.toggle('cramped', width < MIN_WIDTH);
+  const minimum = track.querySelector('.root-entry') ? track.scrollWidth + 2 : MIN_WIDTH;
+  bar.classList.toggle('cramped', width < minimum);
 }
 
 function paint() {
@@ -40,8 +41,10 @@ function paint() {
   bar.hidden = false;
   if (key !== shown || !track.childElementCount) {
     shown = key;
+    const focused = track.contains(document.activeElement);
     track.replaceChildren();
     pathInto(track, ctx, { all: true, repaint: () => { shown = ''; paint(); } });
+    if (focused) (track.querySelector('.crumb.current') ?? track.querySelector('.crumb'))?.focus({ preventScroll: true });
   }
   place();
 }

@@ -2,7 +2,7 @@
 // and the selection path in the bottom row between them — on a desktop window and on a phone.
 import assert from 'node:assert/strict';
 import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
-import { cp, mkdtemp, rm } from 'node:fs/promises';
+import { cp, mkdtemp, rm, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -47,6 +47,7 @@ try {
 
   /* ---- desktop ------------------------------------------------------------ */
   const page = await open(1400, 860);
+  await mkdir('artifacts', { recursive: true });
   for (const selector of ['#status-dot svg', '#empty svg']) {
     const paint = await page.locator(selector).evaluate(svg => {
       const [bracket, wedge] = svg.querySelectorAll('path'), a = getComputedStyle(bracket), b = getComputedStyle(wedge);
@@ -56,6 +57,45 @@ try {
   }
   assert.equal(await page.locator('#status-dot svg path').nth(1).evaluate(path => path.isPointInFill(new DOMPoint(13, 10))), true, 'the D interior is really painted, not just outlined');
   checks.push('the divlet mark pairs an outlined bracket and filled D/play wedge with one inherited colour, including the empty-state mark');
+  const rootId = runtime.read({ view: 'document', documentId: 'welcome' }).rootId;
+  const versionBeforeNavigation = runtime.read({ view: 'document', documentId: 'welcome' }).version;
+  await page.evaluate(async () => (await import('./lib/store.js')).selectArtboards(['welcome']));
+  const rootEntry = page.locator('#crumbs button[aria-label="Select root element"]');
+  await rootEntry.waitFor();
+  assert.equal(await page.locator('#crumbs .crumb').count(), 1, 'a selected artboard folds to a single root icon');
+  assert.equal(await rootEntry.innerText(), '', 'the collapsed path is really icon-only');
+  assert.equal(await rootEntry.locator('svg').count(), 1, 'the root action has a visible icon');
+  await page.locator('#crumbs .crumbs-track').screenshot({ path: 'artifacts/root-crumb-folded.png' });
+  await rootEntry.focus(); await page.keyboard.press('Enter');
+  await waitUntil(() => page.evaluate(async root => (await import('./lib/store.js')).store.node?.nodeIds[0] === root, rootId), 'keyboard activation selects the actual model root');
+  await waitUntil(async () => await page.locator('#crumbs .crumb').count() === 2, 'root selection opens artboard and root breadcrumbs');
+  assert.equal(await page.locator('#crumbs .crumb.current').evaluate(node => document.activeElement === node), true, 'expanding the path preserves keyboard focus on its current crumb');
+  await page.locator('#crumbs .crumbs-track').screenshot({ path: 'artifacts/root-crumb-expanded.png' });
+  await page.locator('#crumbs .home').click();
+  await rootEntry.waitFor();
+  assert.equal(await rootEntry.evaluate(node => document.activeElement === node), true, 'the artboard crumb folds back to the focused root icon');
+  await rootEntry.click();
+  await waitUntil(() => page.evaluate(async root => (await import('./lib/store.js')).store.node?.nodeIds[0] === root, rootId), 'pointer activation also enters the root');
+  assert.equal(runtime.read({ view: 'document', documentId: 'welcome' }).version, versionBeforeNavigation, 'breadcrumb navigation changes no content');
+
+  // A cold root read cannot reclaim selection after the user leaves and comes back to the same artboard.
+  let releaseRoot, rootRequested;
+  const coldRequest = new Promise(resolve => { rootRequested = resolve; });
+  const rootGate = new Promise(resolve => { releaseRoot = resolve; });
+  await page.route('**/api/documents/welcome', async route => { rootRequested(); await rootGate; await route.continue(); });
+  try {
+    await page.evaluate(async () => { const m = await import('./lib/store.js'); m.store.models.delete('welcome'); m.selectArtboards(['welcome']); });
+    await coldRequest;
+    await page.evaluate(async () => { window.__rootAttempt = (await import('./lib/actions.js')).selectRoot('welcome'); });
+    await page.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['pricing']); m.selectArtboards(['welcome']); });
+    releaseRoot();
+    await page.evaluate(() => window.__rootAttempt);
+    assert.deepEqual(await page.evaluate(async () => { const m = await import('./lib/store.js'); return { ids: [...m.store.selected], node: m.store.node }; }), { ids: ['welcome'], node: null }, 'a late root read does not undo a later navigation, even back to the same frame');
+  } finally { releaseRoot(); await page.unroute('**/api/documents/welcome'); }
+  await page.evaluate(async () => (await import('./lib/store.js')).selectArtboards(['welcome', 'pricing']));
+  await waitUntil(async () => await page.locator('#crumbs').innerText() === '2 artboards', 'multiple artboards keep their aggregate path');
+  assert.equal(await rootEntry.count(), 0, 'multiple artboards do not offer an ambiguous root action');
+  checks.push('the bottom root icon unfolds the real path by mouse/keyboard, folds back without losing focus and refuses stale cold-read navigation');
   await select(page);
   const brand = await rect(page, '#brand'), tabs = await rect(page, '#side-tabs'), dock = await rect(page, '#dock');
   assert.ok(brand && tabs && dock);
@@ -157,6 +197,17 @@ try {
   assert.ok(pt3.bottom > 800 - 24, `with a sidebar open the tabs sit at the bottom edge (${pt3.bottom})`);
   await phone.locator('#open-layers').click();
   checks.push('on a phone the dock is the base row, the tabs sit above it (and stay the sidebar footer when one is open), and the sidebar fills the screen between the logo row and the tabs');
+  await phone.evaluate(async () => { (await import('./lib/help.js')).setUiSize(200); (await import('./lib/store.js')).selectArtboards(['welcome']); });
+  await phone.locator('#inspector [data-key="name"]').waitFor();
+  const actionRow = await phone.locator('#inspector .smart-bar').evaluate(bar => ({ height: bar.offsetHeight, scrollHeight: bar.scrollHeight, flexShrink: getComputedStyle(bar).flexShrink }));
+  assert.ok(actionRow.height >= 24, `the scrollable inspector must not shrink its action row out of reach: ${JSON.stringify(actionRow)}`);
+  await phone.locator('#inspector button[aria-label="More"]:not([hidden])').click();
+  const compactActions = await phone.locator('.menu .menu-label').allTextContents();
+  assert.ok(compactActions.includes('Delete artboard'), 'the real narrow inspector overflow is open');
+  assert.ok(!compactActions.includes('Rename') && !compactActions.includes('Select root element'), 'phone/200% overflow has neither removed action');
+  await phone.locator('.menu').screenshot({ path: 'artifacts/root-crumb-phone-menu.png' });
+  await phone.keyboard.press('Escape');
+  checks.push('the real phone/200% frame-inspector overflow omits Rename and Select root element');
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'passed', checks }, null, 2));
 } finally { await browser?.close(); await runtime.close(); await rm(cwd, { recursive: true, force: true }); }

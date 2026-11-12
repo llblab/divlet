@@ -49,6 +49,15 @@ try {
   const frameOf = id => page.frames().find(frame => frame.url().includes(`/preview/${id}`));
   const camera = () => page.evaluate(() => ({ zoom: document.querySelector('#zoom-value').textContent }));
   const menuItem = text => page.locator('.menu .menu-item', { hasText: text }).first();
+  const inspectorAction = async label => {
+    const direct = page.locator(`#inspector .smart-bar button[aria-label^="${label}"]`);
+    const more = page.locator('#inspector button[aria-label="More"]');
+    await waitUntil(async () => await direct.isVisible() || await more.isVisible(), `inspector ${label} is rendered in the row or overflow`);
+    if (await direct.isVisible()) return direct.click();
+    await more.click();
+    assert.deepEqual(await page.locator('.menu .menu-label').allTextContents().then(labels => labels.filter(item => ['Rename', 'Select root element'].includes(item))), [], 'frame overflow excludes rename and root entry');
+    return menuItem(label).click();
+  };
   /** Screen point of a node inside an artboard iframe (the iframe is scaled with the canvas). */
   const nodePoint = async (documentId, nodeId) => {
     const frame = frameOf(documentId);
@@ -231,6 +240,7 @@ try {
   // more menu, duplicate, delete with undo toast
   await board(fresh).hover();
   await board(fresh).locator('.ab-more').click();
+  assert.deepEqual(await page.locator('.menu .menu-label').allTextContents().then(labels => labels.filter(label => ['Rename', 'Select root element'].includes(label))), [], 'frame menu leaves rename to direct name editing and root entry to breadcrumbs');
   const idsBeforeMenu = ids();
   await menuItem('Duplicate').click();
   await waitUntil(() => ids().length === before + 2, 'duplicate from the more menu');
@@ -267,7 +277,9 @@ try {
   await waitUntil(() => ids().length === before + 3, 'duplicate button');
   const welcomeCopy = ids().find(id => !idsBeforeCopy.includes(id));
   await waitUntil(() => runtime.info().selection.ids[0] === welcomeCopy, 'the copy is selected');
-  await page.locator('#inspector button[aria-label="More"]').click(); await menuItem('Delete artboard').click();
+  assert.equal(await page.locator('#inspector .smart-bar button[aria-label^="Rename"], #inspector .smart-bar button[aria-label^="Select root element"]').count(), 0, 'no duplicate rename/root buttons in the frame inspector');
+  assert.deepEqual(await page.evaluate(async () => (await import('./lib/actions.js')).artboardItems([...((await import('./lib/store.js')).store.selected)][0]).filter(item => item && item !== '-' && ['Rename', 'Select root element'].includes(item.label)).map(item => item.label)), [], 'the inspector action source has no rename/root items, whether fitted or overflowed');
+  await inspectorAction('Delete artboard');
   await waitUntil(() => !ids().includes(welcomeCopy), 'delete button');
   await showAll();
   await page.locator('.artboard[data-artboard-id="welcome"] .ab-label').click();
@@ -313,7 +325,7 @@ try {
   await menuItem('New artboard here').click();
   await waitUntil(() => ids().length === count + 1, 'new artboard from the canvas menu');
   const placed = runtime.info().selection.ids[0];
-  await page.locator('#inspector button[aria-label="More"]').click(); await menuItem('Delete artboard').click();
+  await inspectorAction('Delete artboard');
   await waitUntil(() => !ids().includes(placed), 'cleanup');
   check('canvas context menu → new artboard here');
 

@@ -568,7 +568,7 @@ textarea.field { overflow: auto; }
 .count { display: flex; align-items: baseline; gap: 8px; color: var(--muted); }
 .count b { font: 600 20px var(--mono); color: var(--ink); }
 .actions { display: flex; flex-wrap: wrap; gap: 2px; margin: 0 -4px; }
-.actions.smart-bar { flex-wrap: nowrap; overflow: hidden; margin: 0; }
+.actions.smart-bar { flex-shrink: 0; flex-wrap: nowrap; overflow: hidden; margin: 0; }
 .tool[hidden] { display: none; }
 
 /* ---- floating hints ------------------------------------------------------- */

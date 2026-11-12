@@ -1465,7 +1465,7 @@ viewport.addEventListener('contextmenu', event => {
     const id = wrapper.dataset.artboardId;
     const entry = entries.get(id);
     // The menu is about what is selected: with the artboard itself selected (or nothing yet) it is the
-    // artboard's menu (Delete, Duplicate, Rename…); once an element of it is selected, right-clicking
+    // artboard's menu (Delete, Duplicate…); once an element of it is selected, right-clicking
     // the page opens that element's menu (the page selects what is under the pointer and answers).
     const inside = store.node?.documentId === id && store.node.nodeIds.length > 0;
     const at = inside && event.target.closest('.frame-cover') && store.mode === 'select' ? framePoint(entry, event) : null;

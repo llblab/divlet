@@ -3,12 +3,12 @@
 import { el, icon } from './util.js';
 import { cachedModel, loadModel, descriptor, ancestorsOf, selectNodes, selectArtboards } from './store.js';
 import { openMenu } from './menu.js';
+import { selectRoot } from './actions.js';
 
 /**
- * Fill `container` with the path for `ctx` ({ ids, nodes? }). The same everywhere it is shown (above the
- * dock, inside the Ask box): click a container to select it, click the artboard to go back up to it —
- * from there the path is gone and a request is about the whole artboard. `after()` runs after a crumb was
- * used; `repaint()` is called when the element data arrived late.
+ * Fill the bottom path for `ctx` ({ ids, nodes? }). A selected artboard collapses to its root-entry icon;
+ * selecting that root opens the path. Container crumbs select ancestors; the artboard crumb folds it again.
+ * `after()` runs after activation; `repaint()` is called when element data arrives late.
  */
 export function pathInto(container, ctx, { after, repaint, all = false } = {}) {
   const model = ctx.nodes ? cachedModel(ctx.nodes.documentId) : null;
@@ -23,9 +23,10 @@ export function pathInto(container, ctx, { after, repaint, all = false } = {}) {
   const sep = () => el('i', 'crumb-sep');
   if (!ctx.nodes) {
     if (ctx.ids.length === 1) {
-      const home = crumb('', () => selectArtboards(ctx.ids), 'The artboard', 'home current');
-      home.append(icon('artboard'), el('span', '', descriptor(ctx.ids[0])?.name || ctx.ids[0]));
-      container.append(home);
+      const root = crumb('', () => selectRoot(ctx.ids[0]), `Select root element · ${descriptor(ctx.ids[0])?.name || ctx.ids[0]}`, 'root-entry');
+      root.setAttribute('aria-label', 'Select root element');
+      root.append(icon('inspect'));
+      container.append(root);
     } else container.append(crumb(`${ctx.ids.length} artboards`, () => {}, 'These artboards', 'current'));
     return;
   }

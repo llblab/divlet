@@ -282,7 +282,7 @@ try {
         radii, pills,
         family: {
           dockTools: family('#dock .tool'), picks: family('#inspector .pick'), chips: family('#inspector .chip'),
-          fields: family('#inspector .vf:not(.bm-field)'), boxFields: family('#inspector .bm-field'),
+          fields: family('#inspector .vf:not(.boxmodel .vf)'), boxFields: family('#inspector .boxmodel .vf'),
           nums: family('#inspector .num'), segs: family('#inspector .seg'),
         },
         disabled: [...new Set([...document.querySelectorAll('button:disabled')].map(node => getComputedStyle(node).opacity))],
@@ -291,6 +291,8 @@ try {
     assert.deepEqual(design.radii.filter(radius => radius !== '0px'), ['11px', '14px', '6px', '9px'], `controls use three radii (${design.radii.join(', ')})`);
     assert.ok(design.pills.every(height => height <= 24), `the only 11px radius is a pill (${design.pills.join(', ')})`);
     for (const [name, heights] of Object.entries(design.family)) assert.ok(heights.length <= 1, `${name} share one height (${heights.join(', ')})`);
+    assert.deepEqual(design.family.fields, [28], 'standard fields keep the full control height');
+    assert.deepEqual(design.family.boxFields, [18], 'all compact box-model fields, including offsets, borders and dimensions, share their own height');
     assert.deepEqual(design.disabled, ['0.4'], `disabled controls share one step (${design.disabled.join(', ')})`);
 
     // One ring, declared once: every focus rule reads the same token, and a field wrapper rings instead of its input (which
@@ -787,11 +789,11 @@ try {
 
   // Labels, multiline values and carets share the vertical centre, including at the actual inspector minimum.
   {
-    await runtime.patch({ documentId: 'welcome', expectedVersion: runtime.read({ view: 'frame', documentId: 'welcome' }).version, patch: { nodes: { nav: { className: 'inline-block relative' } } } });
+    await runtime.patch({ documentId: 'welcome', expectedVersion: runtime.read({ view: 'frame', documentId: 'welcome' }).version, patch: { nodes: { nav: { className: 'inline-block relative font-extrabold' } } } });
     await page.evaluate(async () => (await import('./lib/sidebar.js')).close());
     await select(['welcome']);
     await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', ['nav']));
-    await page.waitForFunction(() => document.querySelector('#inspector [data-key="pick:Display"] .pick-v')?.textContent === 'Inline block');
+    await page.waitForFunction(() => document.querySelector('#inspector [data-key="pick:Weight"] .pick-v')?.textContent === 'Extra bold 800');
     const grip = page.locator('.resize-handle[data-panel="inspector"]'), edge = await grip.boundingBox();
     const current = Number(await grip.getAttribute('aria-valuenow'));
     await page.mouse.move(edge.x + 4, edge.y + edge.height / 2); await page.mouse.down();
@@ -808,7 +810,7 @@ try {
         await waitUntil(() => page.locator('#inspector').evaluate(node => Math.abs(node.getBoundingClientRect().width - 320) < 1), 'the mixed-height selector row really has 320px');
       }
       await waitUntil(async () => (await page.locator('#inspector .pick').count()) > 0, 'the inspector keeps a selector');
-      const pick = page.locator('#inspector [data-section="layout"] .pick').first();
+      const pick = page.locator('#inspector [data-section="appearance"] [data-key="pick:Weight"]');
       // The inspector may replace the panel between two reads: wait for an attached selector, then measure it.
       const geom = await waitUntil(async () => {
         const measured = await pick.evaluate(node => {
@@ -822,14 +824,15 @@ try {
             return [...pick.querySelectorAll('.pick-k, .pick-v, .pick-caret')].every(child => { const r = child.getBoundingClientRect(); return Math.abs(r.top + r.height / 2 - box.top - box.height / 2) < 1; });
           });
           return {
-            centred, peerSingleLine: node.parentElement.lastElementChild.querySelector('.pick-v').getBoundingClientRect().height / scale <= 20,
+            centred, peerSingleLine: node.parentElement.querySelector('.vf').getBoundingClientRect().height / scale <= 30,
+            peerCentred: Math.abs(node.parentElement.querySelector('.vf').getBoundingClientRect().top + node.parentElement.querySelector('.vf').getBoundingClientRect().height / 2 - b.top - b.height / 2) < 1,
             hierarchy: getComputedStyle(label).color !== getComputedStyle(value).color && Number(getComputedStyle(label).fontWeight) > Number(getComputedStyle(value).fontWeight),
             multiline: v.height / scale > 20, gap: Math.round((b.right - v.right) / scale), alignment: getComputedStyle(value).textAlign,
             clipped: value.scrollWidth > value.clientWidth + 1, labelLeft: Math.round((l.left - b.left) / scale),
           };
         }).catch(() => null);
         return measured && measured.alignment === 'right' ? measured : null;
-      }, `the Layout selector is measured at ${width}px`);
+      }, `the typography selector is measured at ${width}px`);
       assert.equal(geom.alignment, 'right', `the value is right-aligned at ${width}px`);
       assert.equal(geom.centred, true, `selector text is vertically centred at ${width}px`);
       assert.equal(geom.hierarchy, true, 'the label has stronger colour and weight than the value');
@@ -838,8 +841,11 @@ try {
       else assert.ok(geom.gap >= 0, `the value does not stick out of the selector at ${width}px (gap ${geom.gap})`);
       assert.ok(geom.labelLeft <= 12, `the label sits at the left edge at ${width}px (${geom.labelLeft})`);
       assert.equal(geom.clipped, false, `the value is shown whole at ${width}px`);
-      if (width >= 900) assert.equal(geom.multiline, true, 'Inline block really wraps at narrow widths without shifting the label off centre');
-      if (width === 900) assert.equal(geom.peerSingleLine, true, 'the neighbouring single-line Position stays centred in the same taller row');
+      if (width >= 900) assert.equal(geom.multiline, true, 'Extra bold 800 really wraps in its paired typography row without shifting the label off centre');
+      if (width === 900) {
+        assert.equal(geom.peerSingleLine, true, 'the neighbouring font-size field retains its single-line height');
+        assert.equal(geom.peerCentred, true, 'the font-size field stays centred in the taller selector row');
+      }
     }
     await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(100));
     await page.setViewportSize({ width: 1500, height: 900 });
