@@ -12,6 +12,18 @@ export interface AssetText { readonly kind: 'css' | 'svg'; readonly text: string
 /** Compare validated names/paths for portable collisions; never rewrite their authored spelling or identity. */
 export function assetCollisionKey(value: string): string { return value.normalize('NFC').toLowerCase(); }
 
+/** Allocate one new upload leaf, reserving directory identities and portable aliases as well as files. */
+export function allocateAssetLeaf(tree: AssetTree, directory: string, basename: string): string {
+  validateAssetName(directory); validateAssetName(basename);
+  if (Object.keys(tree).some(name => name !== directory && assetCollisionKey(name) === assetCollisionKey(directory)) || typeof tree[directory] === 'string') fail('The upload directory conflicts with a declared resource.');
+  const occupied = new Set(Object.keys(tree[directory] ?? {}).map(assetCollisionKey));
+  const dot = basename.lastIndexOf('.'), stem = dot > 0 ? basename.slice(0, dot) : basename, extension = dot > 0 ? basename.slice(dot) : '';
+  let leaf = basename, index = 1;
+  while (occupied.has(assetCollisionKey(leaf))) leaf = `${stem}-${++index}${extension}`;
+  validateAssetName(leaf);
+  return leaf;
+}
+
 /** Interpret declared text by MIME, not its filename; unsupported encodings must not be silently transcoded. */
 export function readAssetText(file: AssetFile): AssetText | null {
   const mime = canonicalMediaType(file.mediaType);

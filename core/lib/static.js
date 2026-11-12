@@ -10,6 +10,7 @@ import { readAssets, readAssetText } from './assets.ts';
 import { assetReference, readAssetReference, resolveAssetDependency } from './asset-reference.ts';
 import { DivletError } from './validation.ts';
 import { rewriteSvgResource, SVG_RESOURCE_ATTRIBUTES } from './svg-resource.ts';
+import { decodeCss, cssString } from './css-literals.ts';
 
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const fail = (message, details) => { throw Object.assign(new Error(`Static bundle: ${message}`), details ? { details } : {}); };
@@ -72,17 +73,6 @@ function routeOutput(route) {
   safeParts(decoded);
   return `${decoded.slice(1)}index.html`;
 }
-
-function decodeCss(value) {
-  return value.replace(/\\(?:([0-9a-f]{1,6})(?:\r\n|[\t\n\f\r ])?|(\r\n|[\n\r\f])|([^\n\r\f]))/gi, (_, hex, newline, char) => {
-    if (hex) {
-      const code = parseInt(hex, 16);
-      return code === 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff) ? '\ufffd' : String.fromCodePoint(code);
-    }
-    return newline ? '' : char;
-  });
-}
-const cssString = (value) => value.replace(/[<"\\\n\r\f\0]/g, char => `\\${char.codePointAt(0).toString(16)} `);
 
 // Rewrites only URL tokens, never declaration selectors (including Tailwind selectors).
 const literalCssFunctions = new Set('rgb rgba hsl hsla hwb lab lch oklab oklch color color-mix calc min max clamp round mod rem abs sign sin cos tan asin acos atan atan2 pow sqrt hypot log exp linear-gradient radial-gradient conic-gradient repeating-linear-gradient repeating-radial-gradient repeating-conic-gradient matrix matrix3d translate translateX translateY translateZ translate3d scale scaleX scaleY scaleZ scale3d rotate rotateX rotateY rotateZ rotate3d skew skewX skewY perspective blur brightness contrast drop-shadow grayscale hue-rotate invert opacity saturate sepia cubic-bezier steps format tech local'.toLowerCase().split(' '));

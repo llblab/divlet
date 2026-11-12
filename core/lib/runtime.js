@@ -17,7 +17,9 @@ import { HistoryLine } from './history.ts';
 import { expandPath, inspectPath, initProject, resolveProject, isProjectFile } from './projects.ts';
 import { OutputStore, safeDirectory } from './output.ts';
 import { buildStatic, inlineDeclaredAssets, readResourceBytes, normalizeExternalFiles } from './static.js';
-import { readAssets, assetCollisionKey } from './assets.ts';
+import { readAssets, allocateAssetLeaf } from './assets.ts';
+import { readFont, FONT_LIMITS } from './font.ts';
+import { fontFaceRules } from './font-css.ts';
 import { assetReference } from './asset-reference.ts';
 import { canonicalMediaType } from './media-type.ts';
 import { readProject, writeProject, validateSettings, patchSettings, expandFrame, listComponents, instancesOf } from './project.ts';
@@ -124,6 +126,7 @@ export class DivletRuntime extends EventEmitter {
     this.output = new OutputStore(this.projectPath);
     this.externalFiles = Object.freeze(normalizeExternalFiles(this.projectDir, externalFiles));
     this.staticFiles = null;
+    this.publicStylesheets = new Set();
     this.publicFiles = null;
     this.staticSources = new Map();
     this.pendingGeneration = null;
@@ -284,7 +287,7 @@ export class DivletRuntime extends EventEmitter {
       outputDir: this.outputDir,
       url: this.url,
       revision: this.revision,
-      project: { file: this.projectPath, format: 'divlet', capabilities: { properties: !this.diagnostics.has(this.projectPath), settings: !this.diagnostics.has(this.projectPath), frames: !this.diagnostics.has(this.projectPath), saveAs: !this.diagnostics.has(this.projectPath) }, name: this.settings.name, version: this.settings.version, tokens: this.settings.tokens, css: this.settings.css, metadata: this.settings.metadata, outputDir: this.settings.outputDir, resources: this.resourceList() },
+      project: { file: this.projectPath, format: 'divlet', capabilities: { properties: !this.diagnostics.has(this.projectPath), settings: !this.diagnostics.has(this.projectPath), frames: !this.diagnostics.has(this.projectPath), saveAs: !this.diagnostics.has(this.projectPath), ...(!this.diagnostics.has(this.projectPath) && !this.site ? { fontUpload: { maxBytes: FONT_LIMITS.bytes } } : {}) }, name: this.settings.name, version: this.settings.version, tokens: this.settings.tokens, css: this.settings.css, metadata: this.settings.metadata, outputDir: this.settings.outputDir, resources: this.resourceList() },
       documents: [...this.documents.values()].map(entry => this.describe(entry)),
       diagnostics: [...this.diagnostics.values()],
       selection: structuredClone(this.selection),
@@ -681,6 +684,7 @@ export class DivletRuntime extends EventEmitter {
     this.staticFiles = generation.files;
     this.publicFiles = generation.publicFiles;
     this.publicMediaTypes = generation.mediaTypes ?? new Map();
+    this.publicStylesheets = new Set(generation.stylesheets.values());
     this.staticSources = generation.sources;
     this.diagnostics.delete('outputs');
   }
@@ -1622,15 +1626,34 @@ await this.importProject(project.settings, project.frames, hash);
       this.documentDir(documentId);
       const stem = path.basename(String(name), path.extname(String(name))).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'image';
       const tree = readAssets(this.settings.assets ?? {}).tree;
-      if (typeof tree.images === 'string') fail('INVALID_ASSET', 'The upload directory is already a declared file.');
-      const occupied = new Set(Object.keys(tree.images ?? {}).map(assetCollisionKey));
-      let leaf = `${stem}${extension}`, index = 1;
-      while (occupied.has(assetCollisionKey(leaf))) leaf = `${stem}-${++index}${extension}`;
+      const leaf = allocateAssetLeaf(tree, 'images', `${stem}${extension}`);
       const key = `images/${leaf}`, assets = { images: { [leaf]: `data:${type};base64,${bytes.toString('base64')}` } };
       // Validate an uploaded SVG in its eventual image context even before a node references it.
       await buildStatic({ projectDir: this.projectDir, frames: new Map([['upload', `<img src="${assetReference(key)}">`]]), assets, nativeAssets: true });
       const result = await this._patchProject({ expectedVersion: expectedVersion ?? this.settings.version, patch: { assets }, actor: 'user', group, label: `upload ${leaf}` });
       return { ...result, path: assetReference(key), file: key, size: bytes.length };
+    });
+  }
+
+  /** Register one device font as common bytes plus ordinary CSS in a single accepted project change.
+   * Browser callers separately decode the program; this path validates metadata, collisions and the whole candidate.
+   * @param {{name: string, data: Buffer, expectedVersion: number}} input
+   */
+  async saveFont({ name, data, expectedVersion }) {
+    this.assertWritable();
+    if (!Buffer.isBuffer(data) || !data.length || data.length > FONT_LIMITS.bytes) fail('INVALID_FONT', 'A font must contain at most 20 MiB of bytes.');
+    const bytes = Buffer.from(data);
+    return this.enqueue(async () => {
+      this.assertWritable();
+      if (!Number.isInteger(expectedVersion) || expectedVersion !== this.settings.version) fail('REVISION_CONFLICT', 'The project changed while preparing the font upload. Read it again before retrying.');
+      if (this.site) fail('FONT_CONFLICT', 'Device font registration for mutable site inputs is not supported yet. Edit the project font CSS explicitly.');
+      const face = readFont(bytes), extension = face.format === 'truetype' ? '.ttf' : '.otf';
+      const stem = path.basename(String(name || 'font'), path.extname(String(name || 'font'))).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'font';
+      const leaf = allocateAssetLeaf(readAssets(this.settings.assets ?? {}).tree, 'fonts', `${stem}${extension}`), key = `fonts/${leaf}`, reference = assetReference(key);
+      const rules = fontFaceRules(face, reference, { files: this.publicFiles ?? new Map(), mediaTypes: this.publicMediaTypes ?? new Map(), generated: this.publicStylesheets, authored: [this.settings.css, ...[...this.documents.values()].map(entry => entry.document.css)] });
+      const assets = { fonts: { [leaf]: `data:${face.mediaType};base64,${bytes.toString('base64')}` } };
+      const result = await this._patchProject({ expectedVersion, patch: { assets, css: [this.settings.css, rules].filter(Boolean).join('\n') }, actor: 'user', label: `upload font ${face.family}` });
+      return { ...result, path: reference, file: key, family: face.family, size: bytes.length };
     });
   }
 

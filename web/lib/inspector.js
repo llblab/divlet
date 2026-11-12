@@ -1,5 +1,5 @@
 import { $, el, icon, button, clamp, round, debounce, keys, pressGuard } from './util.js';
-import { store, on, documents, descriptor, loadModel, cachedModel, commit, edit, toast, newGroup, selectNodes, parentOf, textChild, whenVersion, request, apiUrl } from './store.js';
+import { store, on, documents, descriptor, loadModel, cachedModel, commit, edit, toast, newGroup, selectNodes, parentOf, textChild, whenVersion, request, apiUrl, receiveState } from './store.js';
 import { fit, rectOf, postToFrame, measuredBox } from './canvas.js';
 import * as actions from './actions.js';
 import { openMenu, menuAnchor, closeMenu } from './menu.js';
@@ -20,6 +20,12 @@ let token = 0;
 let deferred = false;
 let holding = 0;
 let controlContext = null;
+// The operation outlives any selected-node control; replacement views reflect this same pending state.
+const fontUpload = { pending: false, run: uploadFont };
+function paintFontUpload() {
+  const button = panel.querySelector('[data-key="font-upload"]');
+  if (button) { button.disabled = fontUpload.pending; button.setAttribute('aria-busy', String(fontUpload.pending)); }
+}
 
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 const COLORISH = /^(#[0-9a-f]{3,8}|rgba?\(.+\)|hsla?\(.+\)|oklch\(.+\))$/i;
@@ -539,6 +545,25 @@ function instanceEditor(doc, node) {
   return box;
 }
 
+async function uploadFont(file) {
+  if (fontUpload.pending) return;
+  fontUpload.pending = true; paintFontUpload();
+  try {
+    const { version, capabilities } = store.state.project;
+    if (!capabilities.fontUpload || !file.size || file.size > capabilities.fontUpload.maxBytes) throw new Error('Choose a nonempty TTF/OTF font of at most 20 MiB.');
+    const bytes = await file.arrayBuffer();
+    try { await new FontFace('divlet-device-probe', bytes).load(); }
+    catch { throw new Error('The browser could not decode this font. Nothing was uploaded.'); }
+    const response = await fetch(apiUrl(`api/fonts?name=${encodeURIComponent(file.name)}&expectedVersion=${version}`), { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: bytes });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.message || 'Font upload failed');
+    try { receiveState(await request('api/project')); await render({ force: true }); }
+    catch { toast(`Added ${body.family}; refresh the board to see its family.`); return; }
+    toast(`Added ${body.family}. Choose it in Family.`);
+  } catch (error) { toast(error.message); }
+  finally { fontUpload.pending = false; paintFontUpload(); }
+}
+
 /** Sections the registered panels (plugins) contribute for a selection; each change is one undo step for all selected elements. */
 function panelFolds(kind, doc, nodes, parent) {
   // `refresh: false` is for an edit that lands while a field is being typed into: the panel must not replace the input
@@ -578,7 +603,7 @@ function panelFolds(kind, doc, nodes, parent) {
     },
   };
   const sections = panelSections(kind, ctx);
-  const family = fontFamilyControl(nodes, { css: [store.state?.project?.css, cachedModel(doc.id)?.css], apply: applyClasses });
+  const family = fontFamilyControl(nodes, { css: [store.state?.project?.css, cachedModel(doc.id)?.css], apply: applyClasses, upload: store.state?.project?.capabilities?.fontUpload ? fontUpload : undefined });
   const appearance = sections.find(item => item.name === 'appearance');
   if (appearance) (appearance.content.querySelector('[data-inspector-slot="typography"]') ?? appearance.content).prepend(family);
   else {

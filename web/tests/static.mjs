@@ -121,9 +121,9 @@ try {
   await native.undo();
   await liveDocument.waitForFunction(() => Math.round(document.querySelector('#font-proof').getBoundingClientRect().width) === 120);
   assert.equal(await page.locator('iframe[data-document-id="native"]').getAttribute('data-lifetime-proof'), 'retained', 'font byte changes and Undo keep the same iframe');
-  async function checkNativeFont(url, width) {
+  async function checkNativeFont(url, width, family = 'NativeAsset') {
     await page.goto(url);
-    assert.equal(await page.evaluate(async () => (await document.fonts.load('100px NativeAsset')).length), 1);
+    assert.equal(await page.evaluate(async family => (await document.fonts.load('100px ' + JSON.stringify(family))).length, family), 1);
     assert.equal(await page.locator('#font-proof').evaluate(node => Math.round(node.getBoundingClientRect().width)), width);
     await page.locator('#native-logo').evaluate(image => image.decode());
     assert.equal(await page.locator('#native-logo').evaluate(image => image.naturalWidth), 32);
@@ -134,12 +134,17 @@ try {
   assert.ok(native.getEntry('native').render > initialRender);
   await checkNativeFont(nativeUrl + 'preview/native', 180);
   await native.undo(); await checkNativeFont(nativeUrl + 'preview/native', 120);
+  const registered = await native.saveFont({ name: 'portable-device.ttf', data: fontBytes(600, { family: 'UploadedStatic' }), expectedVersion: native.settings.version });
+  await native.patchProject({ expectedVersion: native.settings.version, patch: { css: native.settings.css + '\nmain{font-family:UploadedStatic}' } });
+  assert.ok(native.settings.css.includes(registered.path));
   const exported = await native.exportDocument('native');
+  assert.match(exported.html, /UploadedStatic/, 'the actual font-upload writer reaches portable single-page export');
   assert.ok(exported.html.includes(fontDataUrl()));
   await fs.writeFile(path.join(output, 'native-export.html'), exported.html);
   await native.close(); await fs.rm(nativeDirectory, { recursive: true });
   const requestStart = requests.length;
-  await checkNativeFont(base + 'native-export.html', 120);
+  await checkNativeFont(base + 'native-export.html', 120, 'UploadedStatic');
+  assert.equal(await page.locator('#font-proof').evaluate(node => getComputedStyle(node).fontFamily), 'UploadedStatic');
   assert.ok(requests.slice(requestStart).every(url => !url.startsWith(nativeUrl)), 'standalone fonts/images require neither canonical source, cache nor live board');
   // Metadata inspection is not a glyph validator: separately load its descriptors with the browser's font decoder.
   for (const options of [

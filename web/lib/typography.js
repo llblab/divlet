@@ -64,7 +64,7 @@ export function familyPatch(node, next, families) {
   return { 'font-family': value + (current.getPropertyPriority('font-family') ? ' !important' : '') };
 }
 
-export function fontFamilyControl(nodes, { css, apply }) {
+export function fontFamilyControl(nodes, { css, apply, upload }) {
   const families = declaredFamilies(css);
   const values = nodes.map(node => ['font', 'all'].some(name => Object.hasOwn(node.style, name)) ? 'Font shorthand' : node.style['font-family'] ?? null);
   const mixed = !values.every(value => value === values[0]);
@@ -96,6 +96,25 @@ export function fontFamilyControl(nodes, { css, apply }) {
   const note = el('small', 'caption font-family-note', 'Edits set inline CSS; stylesheet priority still applies.');
   note.id = 'font-family-cascade-note';
   button.setAttribute('aria-describedby', note.id);
-  control.append(scroll, note);
+  const row = el('div', 'font-family-row');
+  row.append(scroll);
+  if (upload) {
+    row.classList.add('with-upload');
+    const picker = document.createElement('input');
+    picker.type = 'file'; picker.accept = '.ttf,.otf,font/ttf,font/otf'; picker.hidden = true;
+    const add = el('button', 'tool mini font-upload');
+    add.type = 'button'; add.dataset.key = 'font-upload'; add.setAttribute('aria-label', 'Upload font');
+    add.dataset.tip = 'Add a TTF/OTF font to project CSS, then choose it in Family. Existing family declarations are never replaced.';
+    add.append(icon('upload'));
+    add.disabled = upload.pending; add.setAttribute('aria-busy', String(upload.pending));
+    add.addEventListener('click', () => picker.click());
+    picker.addEventListener('change', async () => {
+      const file = picker.files?.[0]; picker.value = '';
+      if (!file || upload.pending) return;
+      await upload.run(file);
+    });
+    row.append(add, picker);
+  }
+  control.append(row, note);
   return control;
 }

@@ -6,7 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { openRuntime } from '../../core/lib/runtime.js';
-import { fontDataUrl } from '../../core/tests/fixtures/font.js';
+import { fontDataUrl, fontBytes } from '../../core/tests/fixtures/font.js';
 import { setStyleEngines } from '../../core/lib/engine.ts';
 import { decodeHtml } from '../../core/lib/codec.ts';
 
@@ -79,6 +79,24 @@ try {
   await runtime.undo(); await waitUntil(() => inlineFamily() === 'monospace', 'one Undo restores the prior native family');
   await runtime.redo(); await waitUntil(() => inlineFamily() === undefined, 'Redo restores inheritance');
 
+  const deviceUpload = async (bytes, name = 'device.ttf') => {
+    const chooser = page.waitForEvent('filechooser');
+    await page.getByRole('button', { name: 'Upload font', exact: true }).click();
+    await (await chooser).setFiles({ name, mimeType: 'font/ttf', buffer: bytes });
+  };
+  await deviceUpload(fontBytes(600, { family: 'Provider Upload' }));
+  await waitUntil(() => runtime.settings.css.includes('Provider Upload'), 'device upload registers ordinary project CSS with the optional provider enabled');
+  await chooseFamily('"Provider Upload"');
+  await waitUntil(() => inlineFamily() === '"Provider Upload"', 'uploaded family becomes a real menu choice');
+  const providerFont = await page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('body').evaluate(async node => {
+    const fonts = await node.ownerDocument.fonts.load('100px "Provider Upload"', 'AA'); return fonts.map(face => face.status);
+  });
+  assert.deepEqual(providerFont, ['loaded']);
+  await runtime.undo(); await runtime.undo();
+  await waitUntil(() => !runtime.settings.css.includes('Provider Upload'), 'selection and registration are two explicit gestures; registration itself is one undoable asset/CSS change');
+  await select('cta');
+  checks.push('actual device chooser with provider, uploaded menu choice, real font loading and separate selection/registration Undo');
+
   await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { assets: { fonts: { 'proof.ttf': fontDataUrl() } }, css: runtime.settings.css + '\n@font-face{font-family:"Project Face";src:url(asset:fonts/proof.ttf)}' } });
   await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { css: runtime.getEntry('welcome').document.css + '\n@font-face{font-family:"Local (Variant)";src:url(asset:fonts/proof.ttf)}', nodes: { cta: { style: { 'font-family': '"Old Face", serif !important' } } } } });
   await select('cta');
@@ -121,6 +139,7 @@ try {
   assert.equal(await actualFamily(), 'serif', 'the explicit important stylesheet still wins');
   assert.match(await page.locator('.font-family-note').innerText(), /inline CSS.*stylesheet priority/);
   assert.equal(await family.getAttribute('aria-describedby'), 'font-family-cascade-note', 'the always-visible cascade disclosure describes this authored-value control');
+  await waitUntil(() => family.locator('.pick-v').innerText().then(text => text === 'monospace'), 'reader-driven family redraw settles before the keyboard menu gesture');
   await family.focus(); await page.keyboard.press('Space');
   await page.getByRole('menu', { name: 'Font family', exact: true }).waitFor();
   await page.keyboard.press('End'); await page.keyboard.press('Escape');
@@ -401,12 +420,64 @@ try {
   await family.click(); await page.getByRole('menuitemradio', { name: '"No Engine Face"', exact: true }).click();
   await waitUntil(() => native.getEntry('plain').document.nodes.first.style['font-family'] === '"No Engine Face"', 'family edits have no engine requirement');
   await waitUntil(() => page.locator('iframe[data-document-id="plain"]').contentFrame().locator('#first').evaluate(node => Math.round(node.getBoundingClientRect().width) === 120), 'stored face actually renders with no style engine');
+  const nativeCss = native.settings.css, nativeVersion = native.getEntry('plain').document.version;
+  await page.locator('iframe[data-document-id="plain"]').evaluate(node => { node.dataset.uploadLifetime = 'retained'; });
+  await deviceUpload(fontBytes(900, { family: 'Device Font', axes: [['wght', 100, 400, 900]] }));
+  await waitUntil(() => native.settings.css.includes('Device Font'), 'device font registers with no style engine');
+  assert.match(native.settings.css, /font-weight:100 900/, 'variable weight range is registered, not flattened to its default');
+  assert.equal(native.getEntry('plain').document.version, nativeVersion, 'upload registers a project face, not a hidden selected-node edit');
+  await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('plain', ['first', 'second']));
+  await family.click(); await page.getByRole('menuitemradio', { name: '"Device Font"', exact: true }).click();
+  await waitUntil(() => ['first', 'second'].every(id => native.getEntry('plain').document.nodes[id].style['font-family'] === '"Device Font"'), 'one mixed selection shares one uploaded resource');
+  await waitUntil(() => page.locator('iframe[data-document-id="plain"]').contentFrame().locator('#first').evaluate(node => Math.round(node.getBoundingClientRect().width) === 180), 'uploaded device bytes, not the previous face or fallback, render in the real preview');
+  assert.equal(Object.keys(native.settings.assets.fonts).filter(name => name.startsWith('device')).length, 1);
+  assert.equal(await page.locator('iframe[data-document-id="plain"]').getAttribute('data-upload-lifetime'), 'retained');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Upload font', exact: true }).click({ trial: true });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await native.undo(); await native.undo();
+  await waitUntil(() => native.settings.css === nativeCss, 'one registration Undo removes its bytes and CSS together');
+  assert.equal(native.settings.assets.fonts['device.ttf'], undefined);
+  await native.redo(); await waitUntil(() => native.settings.css.includes('Device Font'), 'registration Redo restores the same shared bytes and face');
+  await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('plain', ['first']));
+  const beforeBad = { revision: native.revision, css: native.settings.css, assets: structuredClone(native.settings.assets) };
+  let fontPosts = 0;
+  page.on('request', request => { if (new URL(request.url()).pathname.endsWith('/api/fonts')) fontPosts++; });
+  await deviceUpload(Buffer.from('not a font'));
+  await waitUntil(() => page.locator('#toast').innerText().then(text => text.includes('could not decode')), 'undecodable bytes fail visibly before an upload request');
+  assert.equal(fontPosts, 0); assert.deepEqual({ revision: native.revision, css: native.settings.css, assets: native.settings.assets }, beforeBad);
+  await page.evaluate(() => {
+    const load = FontFace.prototype.load;
+    FontFace.prototype.load = async function () { const face = await load.call(this); if (this.family === 'divlet-device-probe') { window.deviceProbeLoads = (window.deviceProbeLoads || 0) + 1; await new Promise(resolve => { window.releaseDeviceFont = resolve; }); } return face; };
+  });
+  const idleUpload = await page.getByRole('button', { name: 'Upload font', exact: true }).boundingBox();
+  await deviceUpload(fontBytes(600, { family: 'Stale Device' }));
+  await waitUntil(() => page.evaluate(() => !!window.releaseDeviceFont), 'hold a decoded device font before its accepted request');
+  assert.equal(await page.getByRole('button', { name: 'Upload font', exact: true }).getAttribute('aria-busy'), 'true');
+  assert.deepEqual(await page.getByRole('button', { name: 'Upload font', exact: true }).boundingBox(), idleUpload, 'decode progress stays on a stable-size button');
+  const pendingButton = await page.getByRole('button', { name: 'Upload font', exact: true }).elementHandle();
+  await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('plain', ['second']));
+  await waitUntil(() => pendingButton.evaluate(node => !node.isConnected), 'selection changes recreate the inspector while decoding is held');
+  assert.equal(await page.getByRole('button', { name: 'Upload font', exact: true }).isDisabled(), true, 'replacement control reflects the same pending project operation');
+  assert.equal(await page.getByRole('button', { name: 'Upload font', exact: true }).getAttribute('aria-busy'), 'true');
+  await page.locator('.font-family-control input[type="file"]').setInputFiles({ name: 'duplicate.ttf', mimeType: 'font/ttf', buffer: fontBytes(600, { family: 'Duplicate Device' }) });
+  assert.equal(await page.evaluate(() => window.deviceProbeLoads), 1, 'even programmatic duplicate input cannot start another decode');
+  await native.patchProject({ expectedVersion: native.settings.version, patch: { css: native.settings.css + '\n/* concurrent author edit */' } });
+  const afterAuthor = { revision: native.revision, css: native.settings.css, assets: structuredClone(native.settings.assets) };
+  await page.evaluate(() => window.releaseDeviceFont());
+  await waitUntil(() => page.locator('#toast').innerText().then(text => text.includes('project changed')), 'stale upload refuses rather than rebasing or retrying');
+  assert.equal(fontPosts, 1); assert.deepEqual({ revision: native.revision, css: native.settings.css, assets: native.settings.assets }, afterAuthor);
+  await waitUntil(() => page.getByRole('button', { name: 'Upload font', exact: true }).isEnabled(), 'settlement clears the current replacement control, not only its detached predecessor');
+  await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('plain', ['first']));
+  checks.push('provider-free device decoding, one shared face across mixed selection, actual 180px glyphs, registration Undo/Redo, invalid-no-POST and stale-no-partial-state');
+
   const longFamily = '"A deliberately long declared family with spaces (and a comma, inside)"';
   await native.patchProject({ expectedVersion: native.settings.version, patch: { css: native.settings.css + `\n@font-face{font-family:${longFamily};src:url(asset:fonts/plain.ttf)}` } });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(200));
   await family.click(); await page.getByRole('menuitemradio', { name: longFamily, exact: true }).click();
   await waitUntil(() => native.getEntry('plain').document.nodes.first.style['font-family']?.startsWith(longFamily), 'a long comma-bearing family is one literal choice');
+  await waitUntil(() => family.locator('.pick-v').innerText().then(text => text === longFamily), 'accepted family reaches the inspector before measuring its whole label');
   const geometry = await family.evaluate(button => { const box = button.parentElement; return { fieldWidth: box.clientWidth, contentsWidth: box.scrollWidth, inspectorWidth: document.querySelector('#inspector').clientWidth, text: button.querySelector('.pick-v').textContent, nowrap: getComputedStyle(button.querySelector('.pick-v')).whiteSpace }; });
   assert.equal(geometry.text, longFamily);
   assert.equal(geometry.nowrap, 'nowrap');
@@ -418,6 +489,9 @@ try {
   assert.equal(native.getEntry('plain').document.version, beforePan, 'panning a value never invokes canvas nudge shortcuts');
   await family.click({ trial: true });
   await mkdir('artifacts', { recursive: true });
+  const uploadBox = await page.getByRole('button', { name: 'Upload font', exact: true }).boundingBox(), inspectorBox = await page.locator('#inspector').boundingBox();
+  assert.ok(uploadBox.width >= 48 && uploadBox.height >= 48 && uploadBox.x >= inspectorBox.x && uploadBox.x + uploadBox.width <= inspectorBox.x + inspectorBox.width + 1, 'small upload target remains whole and usable at phone/200%');
+  await page.getByRole('button', { name: 'Upload font', exact: true }).click({ trial: true });
   await page.locator('#inspector').screenshot({ path: 'artifacts/font-family-no-engine-phone-200.png' });
   checks.push('provider-free native family choice and real embedded face loading, narrow/200% whole-value keyboard panning');
   assert.deepEqual(errors, []);

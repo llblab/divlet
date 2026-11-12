@@ -9,6 +9,7 @@ import type { HistoryNavigation } from './history.ts';
 import { fileURLToPath } from 'node:url';
 import { previewBridge } from './bridge.js';
 import { clientPluginFile } from './engine.ts';
+import { FONT_LIMITS } from './font.ts';
 /**
  * What the HTTP layer needs from a board. Every method is the runtime's own; naming them here keeps this file checkable while
  * the runtime itself is still JavaScript, and states exactly how much of the board the transport depends on.
@@ -38,6 +39,7 @@ export interface BoardApi extends BoardRuntime {
   patchProject(body: Record<string, unknown>): Promise<any>;
   listAssets(query: Record<string, unknown>): Promise<any>;
   saveAsset(body: Record<string, unknown>): Promise<any>;
+  saveFont(body: Record<string, unknown>): Promise<any>;
   patch(body: Record<string, unknown>): Promise<any>;
   edit(body: Record<string, unknown>): Promise<any>;
   undo(body: Record<string, unknown>): Promise<any>;
@@ -214,6 +216,11 @@ export async function startServer(runtime: BoardApi, { port = 0 }: { port?: numb
         return json(res, 200, await runtime.patchProject({ expectedVersion: body.expectedVersion, patch: body.patch, actor: 'user', label: typeof body.label === 'string' ? body.label.slice(0, 200) : undefined }));
       }
       if (req.method === 'GET' && route === 'api/assets') return json(res, 200, await runtime.listAssets({ documentId: url.searchParams.get('documentId') || undefined }));
+      if (req.method === 'POST' && route === 'api/fonts') {
+        if (req.headers['content-type'] !== 'application/octet-stream') throw Object.assign(new Error('Expected binary font bytes'), { code: 'CONTENT_TYPE' });
+        const data = await readRaw(req, FONT_LIMITS.bytes);
+        return json(res, 200, await runtime.saveFont({ name: url.searchParams.get('name'), expectedVersion: Number(url.searchParams.get('expectedVersion')), data }));
+      }
       if (req.method === 'POST' && route === 'api/assets') {
         if (!String(req.headers['content-type'] || '').startsWith('image/')) throw Object.assign(new Error('Expected an image upload'), { code: 'CONTENT_TYPE' });
         const data = await readRaw(req, 12 * 1024 * 1024);

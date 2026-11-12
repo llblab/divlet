@@ -20,6 +20,9 @@ export function fontBytes(advance = 600, { family = fontFamily, subfamily = 'Reg
     const fvar = Buffer.alloc(16 + axes.length * 20); u32(fvar, 0, 0x10000); u16(fvar, 4, 16); u16(fvar, 6, 2); u16(fvar, 8, axes.length); u16(fvar, 10, 20); u16(fvar, 14, 4 + axes.length * 4);
     axes.forEach(([tag, min, initial, max], i) => { const at = 16 + 20 * i; fvar.write(tag, at); fvar.writeInt32BE(Math.round(min * 65536), at + 4); fvar.writeInt32BE(Math.round(initial * 65536), at + 8); fvar.writeInt32BE(Math.round(max * 65536), at + 12); u16(fvar, at + 18, 256 + i); });
     tables.set('fvar', fvar);
+    // A valid variable outline table with no deltas: every axis keeps the same synthetic triangle/advance.
+    const gvar = Buffer.alloc(26); u16(gvar, 0, 1); u16(gvar, 4, axes.length); u32(gvar, 8, 26); u16(gvar, 12, 2); u32(gvar, 16, 26);
+    tables.set('gvar', gvar);
   }
   const strings = names.map(([, text]) => Buffer.from(text, 'utf16le').swap16());
   const name = Buffer.alloc(6 + 12 * names.length + (nameFormat === 1 ? 2 : 0)); u16(name, 0, nameFormat); u16(name, 2, names.length); u16(name, 4, name.length); let start = 0;
