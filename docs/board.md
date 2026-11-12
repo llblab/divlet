@@ -14,7 +14,7 @@ The interface uses few permanent labels. Hover for tooltips with keyboard shortc
 
 ### Artboards
 
-Drag the label or body in Select mode, with snapping to neighbors (`Alt` disables snapping; `Esc` cancels). Resize handles snap to device widths. Double-click the name or press `R` to rename; double-click the size above an artboard to edit it (`390 × 800`, `1280`, `16:9`). The same fields, aspect-ratio lock and 1:1 · 4:3 · 3:2 · 16:9 · 9:16 buttons are in the inspector. Groups support alignment, distribution and Tidy up.
+Drag the label or body in Select mode, with snapping to neighbors (`Alt` disables snapping; `Esc` cancels). Resize handles snap to device widths. Double-click the name or press `R` to rename; double-click the size above an artboard to edit it (`390 × 800`, `1280`, `16:9`). The same fields, aspect-ratio lock and 1:1 · 4:3 · 3:2 · 16:9 · 9:16 buttons are in the inspector. Groups support alignment, distribution and Tidy up. **Fit height to content** lives in the inspector's lower action row, not as a duplicate button in the geometry block; the normal height input remains available.
 
 ### Pi
 

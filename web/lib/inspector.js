@@ -281,17 +281,7 @@ function artboardView(doc, model) {
     chip.addEventListener('click', () => quiet(commit(id, { artboard: { height: Math.max(1, Math.round(a.width * h / w)) } }, { label: `ratio ${name}` })));
     ratios.append(chip);
   }
-  const seen = store.observations.get(id);
-  let hug = null;
-  if (actions.canFitHeight(id)) {
-    hug = el('div', 'note');
-    const fitButton = el('button', 'link-button', 'Fit height');
-    fitButton.type = 'button';
-    fitButton.dataset.key = 'fit-height';
-    fitButton.addEventListener('click', () => actions.fitHeightToContent(id));
-    hug.append(icon('hug'), el('span', '', `Content is ${seen.contentHeight} px tall`), fitButton);
-  }
-  view.push(section('geometry', geometry, presets, ratios, hug));
+  view.push(section('geometry', geometry, presets, ratios));
 
   const tokens = model?.tokens || {};
   const tokenBox = el('div', 'rows');
@@ -790,7 +780,7 @@ panel.addEventListener('focusout', () => { setTimeout(() => { if (deferred && !t
 const schedule = (() => { let frame = 0; return () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => render()); }; })();
 panel.addEventListener('divlet:menu-close', () => { if (deferred) schedule(); });
 panel.addEventListener('pointerleave', () => { if (deferred) schedule(); });
-let lastHeight = new Map();
+const lastMeasurement = new Map();
 on('selection', () => { invalidateMenu(true); schedule(); });
 // Warm the component list so an instance never shows up without its name and texts.
 on('state', () => { invalidateMenu(); if (documents().some(doc => doc.components?.length)) componentList(); schedule(); });
@@ -811,9 +801,11 @@ on('spacing-box', ({ documentId, nodeId }) => {
 });
 on('observations', report => {
   if (typing() || !store.selected.has(report.documentId)) return;
-  const heightChanged = lastHeight.get(report.documentId) !== report.contentHeight;
-  lastHeight.set(report.documentId, report.contentHeight);
-  if (store.node || heightChanged) schedule();
+  // The same height from a fresh render can make Fit height available again after an edit or Undo.
+  const measurement = `${report.render}:${report.contentHeight}`;
+  const changed = lastMeasurement.get(report.documentId) !== measurement;
+  lastMeasurement.set(report.documentId, measurement);
+  if (store.node || changed) schedule();
 });
 on('live-rect', ({ id, rect }) => {
   if (store.selected.size !== 1 || !store.selected.has(id)) return;

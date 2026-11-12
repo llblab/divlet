@@ -706,7 +706,7 @@ html.w440 .shortcut-group dd { text-align: left; padding-bottom: 5px; white-spac
 /* the context of a request is a path, like the layers tree: artboard › container › element */
 .ask-about { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; min-width: 0; margin: 0; }
 .ask-about .crumb { height: 24px; }
-.crumbs-bar { position: fixed; z-index: 19; bottom: max(var(--edge), env(safe-area-inset-bottom)); min-height: var(--chrome-h); display: flex; align-items: flex-end; justify-content: center; margin: 0; pointer-events: none; }
+.crumbs-bar { position: fixed; z-index: 14; bottom: max(var(--edge), env(safe-area-inset-bottom)); min-height: var(--chrome-h); display: flex; align-items: flex-end; justify-content: center; margin: 0; pointer-events: none; }
 .crumbs-bar.cramped { visibility: hidden; }
 .crumbs-track { display: flex; align-items: center; flex-wrap: wrap; justify-content: center; gap: 2px; max-width: 100%; padding: 3px 5px; border: 1px solid var(--hair); border-radius: 10px; background: var(--panel); backdrop-filter: blur(16px); box-shadow: var(--shadow); pointer-events: auto; }
 .crumbs-bar .crumb { height: 24px; flex: none; max-width: 100%; }
