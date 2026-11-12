@@ -1,5 +1,5 @@
-// Layout, spacing and effects for selected elements — quick hands-on tools that write Tailwind
-// classes (so the agent sees the same thing). With several elements selected, a change applies
+// Layout, spacing, border and appearance for selected elements — controls write Tailwind classes
+// or explicit native CSS. With several elements selected, a change applies
 // to all of them and differing values show as "Mixed".
 import { el, icon, clamp } from '../../lib/util.js';
 import { toast, newGroup } from '../../lib/store.js';
@@ -109,6 +109,14 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
     input.addEventListener('blur', sync);
   }
   let current = shown;
+  input.addEventListener('divlet:field-value', event => {
+    if (document.activeElement === input || wrap.classList.contains('scrubbing')) return;
+    const { value, placeholder } = event.detail;
+    current = input.value = value === MIXED || value == null ? '' : String(value);
+    input.placeholder = value === MIXED ? '—' : placeholder;
+    wrap.classList.toggle('mixed', value === MIXED);
+    syncUnit();
+  });
   // Typing commits too: a short pause after a valid value sends it, so the board follows the field without Enter. All the
   // commits of one focus session share a group (one undo step); text the parser rejects waits for Enter or blur, where it is
   // reported as before.
@@ -270,8 +278,10 @@ function colorField({ key, label, tip, group, prefix, value, run, computed, toke
   return wrap;
 }
 
-function appearanceFold(nodes, { value, run, measured, tokens }) {
-  const box = el('div', 'appearance-box');
+const BORDER_STYLES = ['solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset', 'none', 'hidden'].map(name => [name, name[0].toUpperCase() + name.slice(1)]);
+
+function borderFold(nodes, { value, run, measured, tokens, widthField }) {
+  const box = el('div', 'border-box');
   const radiusClass = value(cls => tw.get(cls, 'radius'));
   const radiusPx = radiusClass === MIXED ? MIXED : radiusClass == null ? null : radiusClass === 'rounded-full' ? 'Full' : RADIUS_PX[radiusClass] ?? (/^rounded-\[(\d+(?:\.\d+)?)px\]$/.exec(radiusClass)?.[1] ?? radiusClass);
   const computedRadius = measured?.colors?.radius ? String(Math.round(parseFloat(measured.colors.radius) || 0)) : '0';
@@ -289,6 +299,31 @@ function appearanceFold(nodes, { value, run, measured, tokens }) {
     chip.addEventListener('click', () => run(cls => tw.set(cls, 'radius', name), `radius ${text}`));
     presets.append(chip);
   }
+  const widths = el('div', 'grid2 border-widths');
+  for (const side of ['t', 'r', 'b', 'l']) widths.append(widthField(side));
+  const authoredStyle = same(nodes.map(node => {
+    if (Object.keys(node.style ?? {}).some(property => /^border-(top|right|bottom|left)-style$/.test(property))) return MIXED;
+    const styleClass = tw.get(node.className, 'borderStyle');
+    return node.style?.['border-style'] ?? styleClass?.replace(/^border-|^\[border-style:|\]$/g, '') ?? null;
+  }));
+  const effectiveStyle = measured?.colors?.borderStyle ?? authoredStyle;
+  const style = effectiveStyle === MIXED || effectiveStyle && !BORDER_STYLES.some(([key]) => key === effectiveStyle) ? MIXED : effectiveStyle;
+  const geometry = el('div', 'border-geometry');
+  geometry.append(radius, presets);
+  box.append(
+    pick('Style', style, BORDER_STYLES, next => run(cls => cls, `border style ${next ?? 'default'}`, { style: {
+      'border-style': next,
+      ...(next === null ? {} : Object.fromEntries(['top', 'right', 'bottom', 'left'].map(side => [`border-${side}-style`, null]))),
+    } })),
+    widths,
+    colorField({ key: 'stroke', label: 'Colour', tip: 'Border colour', group: 'borderColor', prefix: 'border', value, run, computed: measured?.colors?.borderColor, tokens }),
+    geometry,
+  );
+  return box;
+}
+
+function appearanceFold({ value, run, measured, tokens }) {
+  const box = el('div', 'appearance-box');
   // Typography: size (Tailwind steps or any px) and weight.
   const FONT_STEPS = { 'text-xs': 12, 'text-sm': 14, 'text-base': 16, 'text-lg': 18, 'text-xl': 20, 'text-2xl': 24, 'text-3xl': 30, 'text-4xl': 36, 'text-5xl': 48, 'text-6xl': 60, 'text-7xl': 72, 'text-8xl': 96, 'text-9xl': 128 };
   const sizeClass = value(cls => tw.get(cls, 'fontSize'));
@@ -303,12 +338,8 @@ function appearanceFold(nodes, { value, run, measured, tokens }) {
     }),
     pick('Weight', weight, WEIGHTS, next => run(cls => tw.set(cls, 'fontWeight', next ? `font-${next}` : null), next ? `weight ${next}` : 'default weight'), { tip: 'Font weight' }),
   );
-  const geometry = el('div', 'appearance-geometry');
-  geometry.append(radius, presets);
   box.append(
-    geometry,
     colorField({ key: 'fill', label: 'Fill', tip: 'Background colour', group: 'bgColor', prefix: 'bg', value, run, computed: measured?.colors?.background, tokens }),
-    colorField({ key: 'stroke', label: 'Border', tip: 'Border colour', group: 'borderColor', prefix: 'border', value, run, computed: measured?.colors?.borderColor, tokens }),
     colorField({ key: 'ink', label: 'Text', tip: 'Text colour', group: 'textColor', prefix: 'text', value, run, computed: measured?.colors?.color, tokens }),
     type,
   );
@@ -347,7 +378,7 @@ function labeledSegments(label, control) {
  * `nodes` are the selected elements (one or more), `parent` the single selection's parent (or
  * null), `apply(transform, label)` rewrites each element's className and commits once.
  */
-export function layoutSections(nodes, { parent, apply, spacingFocus, measured = null, readMeasured = () => measured, tokens = [] }) {
+export function layoutSections(nodes, { parent, apply, spacingFocus, measured = null, readMeasured = () => measured, readNodes = () => nodes, tokens = [] }) {
   tw.setColorNames(tokens.map(([name]) => name.replace(/^--color-/, '')));
   const classes = nodes.map(node => node.className || '');
   const value = fn => same(classes.map(fn));
@@ -477,6 +508,35 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
     node.classList.add('bm-value');
     return node;
   };
+  const borderFields = new Map(), borderEdits = new Map();
+  const widthField = (side, { diagram = false } = {}) => {
+    const property = `border-${sideNames[side]}-width`, index = 'trbl'.indexOf(side);
+    const authored = same(nodes.map(node => node.style?.[property] ?? null));
+    const shown = authored === MIXED ? MIXED : authored?.replace(/px$/, '');
+    const placeholder = number(measured?.border?.[index]);
+    const commitWidth = next => {
+      const sequence = (borderEdits.get(side) ?? 0) + 1;
+      borderEdits.set(side, sequence);
+      const result = run(cls => cls, `${property} ${next ?? 'default'}`, { style: { [property]: next === null ? null : `${next}px` } });
+      if (!result?.then) return;
+      const sync = async result => {
+        if (borderEdits.get(side) !== sequence) return;
+        const current = await readNodes(result?.version ?? result?.details?.actualVersion);
+        const raw = same(current.map(node => node.style?.[property] ?? null));
+        const box = raw === null ? await readMeasured() : null;
+        if (borderEdits.get(side) !== sequence) return;
+        for (const input of borderFields.get(side) ?? []) if (input.isConnected) input.dispatchEvent(new CustomEvent('divlet:field-value', { detail: {
+          value: raw === MIXED ? MIXED : raw?.replace(/px$/, ''), placeholder: number(box?.border?.[index]),
+        } }));
+      };
+      result.then(sync, sync).catch(() => {}); // The writer reports refusals; restore inactive peers from accepted state too.
+    };
+    const node = diagram
+      ? bareField(`border-${side}`, `Border ${sideNames[side]}, px`, shown, placeholder, commitWidth)
+      : field(`border-width-${side}`, sideNames[side][0].toUpperCase() + sideNames[side].slice(1), shown, commitWidth, { tip: `Border ${sideNames[side]}, px`, placeholder, unit: 'px', min: 0, parse: nonnegative });
+    borderFields.set(side, [...(borderFields.get(side) ?? []), node.querySelector('input')]);
+    return node;
+  };
   const edge = (kind, side, index) => {
     if (kind === 'margin' || kind === 'padding') return spaceField(kind, kind === 'margin' ? 'm' : 'p', side);
     if (kind === 'position') {
@@ -486,11 +546,7 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
       node.classList.add('bm-offset');
       return node;
     }
-    const property = `border-${sideNames[side]}-width`;
-    const authored = same(nodes.map(node => node.style?.[property] ?? null));
-    return bareField(`border-${side}`, `Border ${sideNames[side]}, px`, authored === MIXED ? MIXED : authored?.replace(/px$/, ''), number(measured?.border?.[index]), next => {
-      run(cls => cls, `${property} ${next ?? 'default'}`, { style: { [property]: next === null ? null : `${next}px` } });
-    });
+    return widthField(side, { diagram: true });
   };
   const square = (kind, inner) => {
     const sq = el('div', `bm-sq bm-${kind}`);
@@ -522,6 +578,7 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
       input.addEventListener('input', fitValues);
       input.addEventListener('keydown', fitValues);
       input.addEventListener('change', fitValues);
+      input.addEventListener('divlet:field-value', fitValues);
     }
     fitValues();
     return sq;
@@ -567,6 +624,5 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
     field('blur', 'Blur', blur, next => run(cls => tw.set(cls, 'blur', next), `blur ${next ?? 'none'}`), { tip: 'Blur, px', unit: 'px', placeholder: '0', min: 0, max: 200, parse: raw => tw.classFor('blur', raw) }),
   );
 
-  // Fold order in the inspector: Appearance sits last, under Spacing and Effects.
-  return [['layout', 'Layout', layout], ['spacing', 'Spacing', spacing], ['effects', 'Effects', effects], ['appearance', 'Appearance', appearanceFold(nodes, { value, run, measured, tokens })]];
+  return [['layout', 'Layout', layout], ['spacing', 'Spacing', spacing], ['border', 'Border', borderFold(nodes, { value, run, measured, tokens, widthField })], ['effects', 'Effects', effects], ['appearance', 'Appearance', appearanceFold({ value, run, measured, tokens })]];
 }

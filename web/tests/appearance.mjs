@@ -1,7 +1,7 @@
-// Appearance and Effects in the inspector: colours, radius, numeric gestures and one-click centring.
+// Border, Appearance and Effects: linked border widths, line styles, colours, radius and numeric gestures.
 import assert from 'node:assert/strict';
 import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
-import { cp, mkdtemp, rm } from 'node:fs/promises';
+import { cp, mkdtemp, rm, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -37,7 +37,13 @@ try {
   await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), actor: 'user', patch: { tokens: { '--color-brand': '#5b5bf0' } } });
   await select('cta');
   await page.waitForSelector('#inspector [data-section="appearance"] [data-key="fill"]');
-  checks.push('the inspector has an Appearance fold with radius, fill and text colour');
+  assert.equal(await page.locator('#inspector [data-section="border"] [data-key="radius"]').count(), 1, 'radius belongs to Border');
+  assert.equal(await page.locator('#inspector [data-section="border"] [data-key="stroke"]').count(), 1, 'border colour belongs to Border');
+  assert.equal(await page.locator('#inspector [data-section="border"] [data-key^="border-width-"]').count(), 4, 'Border has four independent edge widths');
+  assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key="radius"], #inspector [data-section="appearance"] [data-key="stroke"]').count(), 0, 'no third home in Appearance');
+  const sectionOrder = await page.locator('#inspector [data-section]').evaluateAll(nodes => nodes.map(node => node.dataset.section));
+  assert.equal(sectionOrder.indexOf('border'), sectionOrder.indexOf('spacing') + 1, 'Border is a vertical disclosure directly after Spacing, not another tab');
+  checks.push('Border owns four widths, line style, colour and radius; Appearance keeps fill and typography');
 
   // Use the real resize control, not an artificial viewport breakpoint: the desktop floor is 280px.
   const handle = page.locator('.resize-handle[data-panel="inspector"]');
@@ -47,7 +53,7 @@ try {
   await page.mouse.move(edge.x + 240, edge.y + edge.height / 2, { steps: 6 });
   await page.mouse.up();
   await waitUntil(() => page.locator('#inspector').evaluate(node => Math.round(node.getBoundingClientRect().width) === 280), 'the inspector reaches its actual resize minimum');
-  assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key="border-width"]').count(), 0, 'border widths have one home in the box model');
+  assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key^="border-width"]').count(), 0, 'only Border and the box model edit widths');
   await page.locator('#inspector [data-key="radius"]').focus();
   await page.keyboard.press('Tab');
   assert.equal(await page.evaluate(() => document.activeElement?.closest('.radius-presets') !== null), true, 'Tab reaches radius presets after the radius field');
@@ -55,9 +61,63 @@ try {
   await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-width': '3px' } } } } });
   await page.evaluate(() => document.activeElement?.blur()); await page.mouse.move(5, 5);
   await waitUntil(async () => await page.locator('#inspector [data-key="border-t"]').getAttribute('placeholder') === '3', 'the box model reads a declarative width back from the actual page');
-  await page.locator('#inspector [data-key="border-t"]').fill('2'); await page.keyboard.press('Enter');
+  await page.locator('#inspector [data-key="border-t"]').fill('2'); await page.keyboard.press('Tab');
+  await waitUntil(async () => await page.locator('#inspector [data-key="border-width-t"]').inputValue() === '2', 'a box-model edit updates Border while keyboard focus stays in the diagram');
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.key), 'border-r');
   const borderWidths = () => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => { const cs = getComputedStyle(node); return ['Top', 'Right', 'Bottom', 'Left'].map(side => cs[`border${side}Width`]); });
   await waitUntil(async () => JSON.stringify(await borderWidths()) === JSON.stringify(['2px', '3px', '3px', '3px']), 'one edge changes without rewriting its peers or the utility');
+  await page.locator('#inspector [data-key="border-width-r"]').fill('4'); await page.keyboard.press('Tab');
+  await waitUntil(async () => await page.locator('#inspector [data-key="border-r"]').inputValue() === '4', 'a Border edit updates the diagram while focus stays in Border');
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.key), 'border-width-b');
+
+  const beforeClear = afterVersion();
+  for (const [key, other, next] of [['border-width-t', 'border-t', '2'], ['border-r', 'border-width-r', '4']]) {
+    await page.locator(`#inspector [data-key="${key}"]`).fill(''); await page.keyboard.press('Tab');
+    await waitUntil(async () => await page.locator(`#inspector [data-key="${key}"]`).inputValue() === '' && await page.locator(`#inspector [data-key="${other}"]`).inputValue() === '' && await page.locator(`#inspector [data-key="${key}"]`).getAttribute('placeholder') === '3' && await page.locator(`#inspector [data-key="${other}"]`).getAttribute('placeholder') === '3', 'clearing either copy synchronizes the fresh computed fallback without leaving the inspector');
+    await page.locator(`#inspector [data-key="${other}"]`).fill(next); await page.keyboard.press('Tab');
+    await waitUntil(async () => await page.locator(`#inspector [data-key="${key}"]`).inputValue() === next, 'the other copy restores the same authored value');
+  }
+  assert.equal(afterVersion() - beforeClear, 4, 'two clears and two restores make exactly four content commits');
+  assert.deepEqual(await borderWidths(), ['2px', '4px', '3px', '3px'], 'clearing does not change unrelated border sides');
+
+  // Two copies of one property share writer intent; an older completion cannot overwrite a later draft.
+  let release, arrived;
+  const blocked = new Promise(resolve => { arrived = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  let firstWidth = true;
+  await page.route('**/api/patch', async route => { if (firstWidth) { firstWidth = false; arrived(); await gate; } await route.continue(); });
+  try {
+    await page.locator('#inspector [data-key="border-l"]').fill('5'); await page.keyboard.press('Tab');
+    await blocked;
+    await page.locator('#inspector [data-key="border-width-l"]').fill('7'); await page.keyboard.press('Tab');
+    release();
+    await page.evaluate(async () => (await import('./lib/store.js')).idle('welcome'));
+    await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '7' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '7', 'the latest accepted edit synchronizes both copies');
+  } finally { release(); await page.unroute('**/api/patch'); }
+  await page.locator('#viewport').focus(); await page.keyboard.press('Control+z');
+  await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '5' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '5', 'one Undo restores both copies');
+  await page.keyboard.press('Control+z');
+  await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').getAttribute('placeholder') === '3' && await page.locator('#inspector [data-key="border-width-l"]').getAttribute('placeholder') === '3', 'Undo returns both copies to the same computed fallback');
+  const beforeRefusal = afterVersion();
+  await page.route('**/api/patch', route => route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'REVISION_CONFLICT', message: 'Linked border write refused', details: { actualVersion: beforeRefusal } }) }));
+  try {
+    await page.locator('#inspector [data-key="border-l"]').fill('9'); await page.keyboard.press('Tab');
+    await waitUntil(async () => /Linked border write refused/.test(await page.locator('#toast').innerText()), 'a refused linked edit reports the writer refusal');
+    await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '', 'a refused edit restores inactive copies from accepted state');
+    assert.equal(afterVersion(), beforeRefusal, 'the refusal does not advance content');
+  } finally { await page.unroute('**/api/patch'); }
+  await page.locator('#viewport').focus(); await page.mouse.move(5, 5);
+  checks.push('widths synchronize both ways without replacing focused fields; held writes, Undo and refusals preserve one shared property');
+
+  for (const line of ['Dashed', 'Dotted', 'Double', 'Groove', 'Ridge', 'Inset', 'Outset', 'None', 'Hidden', 'Solid']) {
+    await page.locator('#inspector [data-key="pick:Style"]').click();
+    await page.locator('.menu .menu-item', { hasText: new RegExp(`^${line}$`) }).click();
+    await waitUntil(async () => await page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate((node, line) => { const cs = getComputedStyle(node); return ['Top', 'Right', 'Bottom', 'Left'].every(side => cs[`border${side}Style`] === line.toLowerCase()); }, line), `${line} reaches every actual border side`);
+  }
+  assert.deepEqual(await borderWidths(), ['2px', '4px', '3px', '3px'], 'hiding and showing the border preserves authored widths');
+  await page.locator('#inspector [data-key="stroke"]').fill('#cc3344'); await page.keyboard.press('Enter');
+  await waitUntil(async () => await page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => getComputedStyle(node).borderTopColor === 'rgb(204, 51, 68)'), 'Border colour reaches the actual page');
+  checks.push('Border styles change all four sides without dropping widths; its colour field changes the actual border');
   await page.locator('#inspector [data-key="pick:Weight"]').click();
   await page.locator('.menu .menu-item', { hasText: 'Extra bold 800' }).click();
   await waitUntil(() => classesOf('cta').includes('font-extrabold'), 'a long weight option can still be selected');
@@ -78,7 +138,7 @@ try {
   assert.deepEqual(dimensions, { paired: true, readable: true }, 'artboard dimensions use two readable columns at minimum panel width');
   await select('cta');
   await page.locator('#inspector [data-key="radius"]').waitFor();
-  checks.push('minimum-width resizing keeps radius/presets and artboard dimensions readable, border widths live only in Spacing and long dropdown values wrap');
+  checks.push('minimum-width resizing keeps radius/presets and artboard dimensions readable, border widths are linked between Border and Spacing and long dropdown values wrap');
 
   // Fill and text colour by typing a hex value: the class that set the colour before is replaced.
   await page.locator('#inspector [data-key="fill"]').fill('#112233'); await page.keyboard.press('Enter');
@@ -108,7 +168,7 @@ try {
   await waitUntil(() => classesOf('cta').includes('rounded-xl'), 'the 12 preset sets rounded-xl');
   await page.locator('#inspector [data-key="radius"]').fill('10'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('rounded-[10px]') && !classesOf('cta').includes('rounded-xl'), 'a typed number sets an arbitrary radius and replaces the preset');
-  assert.deepEqual(await borderWidths(), ['2px', '3px', '3px', '3px'], 'changing radius does not change border widths');
+  assert.deepEqual(await borderWidths(), ['2px', '4px', '3px', '3px'], 'changing radius does not change border widths');
   await page.locator('#inspector [data-key="radius"]').fill('full'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('rounded-full'), 'typing Full sets rounded-full');
   await page.locator('#inspector [data-key="radius"]').fill(''); await page.keyboard.press('Enter');
@@ -192,6 +252,34 @@ try {
   await page.locator('#inspector [data-key="center-element"]').click();
   await waitUntil(() => classesOf(plain).includes('mx-auto'), 'Center element adds auto side margins');
   checks.push('one-click centring of the content or of the element itself');
+
+  await select('cta');
+  await page.locator('#inspector [data-section="border"]').waitFor();
+  await mkdir('artifacts', { recursive: true });
+  for (const [width, size] of [[1280, 100], [390, 100], [390, 200]]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate(async size => (await import('./lib/help.js')).setUiSize(size), size);
+    await waitUntil(() => page.evaluate(() => {
+      const summary = document.querySelector('#inspector [data-section="border"] summary');
+      if (!summary) return false;
+      summary.scrollIntoView({ block: 'start', behavior: 'instant' });
+      return true;
+    }), 'the current Border section exists after resizing');
+    await sleep(700);
+    const layoutErrors = await page.locator('#inspector [data-section="border"]').evaluate(section => {
+      const bad = [], context = document.createElement('canvas').getContext('2d');
+      if (section.scrollWidth > section.clientWidth + 1) bad.push('horizontal overflow');
+      if (getComputedStyle(section.querySelector('.border-widths')).gridTemplateColumns.split(' ').length > 2) bad.push('edge widths need at most two columns');
+      for (const input of section.querySelectorAll('.vf-input')) {
+        const style = getComputedStyle(input); context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        if (context.measureText(input.value || input.placeholder).width > input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1) bad.push(`${input.dataset.key} clips`);
+      }
+      return bad;
+    });
+    assert.deepEqual(layoutErrors, [], `Border controls at ${width}px/${size}%`);
+    if (size === 100) await page.locator('#inspector [data-section="border"]').screenshot({ path: `artifacts/border-section-${width}-${size}.png` });
+  }
+  checks.push('Border stays readable without horizontal overflow on desktop, phone and phone/200%');
 
   await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(200));
   await select('cta'); await effect('z').waitFor();

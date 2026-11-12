@@ -564,6 +564,7 @@ function panelFolds(kind, doc, nodes, parent) {
       return Object.keys(patch).length ? { nodes: patch } : null;
     }, { label, group });
     if (refresh) refreshed(result); else quiet(result);
+    return result;
   };
   const ctx = {
     doc, nodes, node: nodes[0], parent, applyClasses,

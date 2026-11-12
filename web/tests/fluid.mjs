@@ -46,7 +46,7 @@ try {
     await page.locator('#inspector [data-key="opacity"]').waitFor();
     assert.deepEqual(await readableNumbers(`${width}px@${size}% element`), []);
     const compactShape = await page.evaluate(() => {
-      const node = document.querySelector('#inspector .appearance-geometry');
+      const node = document.querySelector('#inspector .border-geometry');
       const radius = node.querySelector('[data-key="radius"]'), style = getComputedStyle(radius);
       const context = document.createElement('canvas').getContext('2d');
       context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;

@@ -925,7 +925,7 @@ function handlePreviewMessage(entry, data) {
       if (Number.isInteger(data.version)) box.render = data.version;
       if (Array.isArray(source.inset) && source.inset.length === 4 && source.inset.every(value => typeof value === 'string' && value.length <= 64)) box.inset = [...source.inset];
       if (source.content && ['width', 'height'].every(key => source.content[key] === null || Number.isFinite(source.content[key]) && source.content[key] >= 0)) box.content = { width: source.content.width, height: source.content.height };
-      if (source.colors && typeof source.colors === 'object') box.colors = Object.fromEntries(['background', 'color', 'radius', 'fontSize', 'borderColor'].filter(key => typeof source.colors[key] === 'string' && source.colors[key].length <= 64).map(key => [key, source.colors[key]]));
+      if (source.colors && typeof source.colors === 'object') box.colors = Object.fromEntries(['background', 'color', 'radius', 'fontSize', 'borderColor', 'borderStyle'].filter(key => typeof source.colors[key] === 'string' && source.colors[key].length <= 64).map(key => [key, source.colors[key]]));
     }
     const changed = JSON.stringify(box) !== JSON.stringify(entry.box ?? null);
     entry.box = box;

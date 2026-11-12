@@ -395,7 +395,7 @@ try {
   const activeKey = () => page.evaluate(() => document.activeElement?.dataset.key);
   await page.locator('#inspector [data-key="pick:Position"]').focus();
   for (const key of fieldOrder) { await page.keyboard.press('Tab'); assert.equal(await activeKey(), key, `Tab reaches ${key}`); }
-  await page.keyboard.press('Tab'); assert.equal(await page.evaluate(() => document.activeElement?.closest('[data-section]')?.dataset.section), 'effects', 'Tab leaves the last value for the next section');
+  await page.keyboard.press('Tab'); assert.equal(await page.evaluate(() => document.activeElement?.closest('[data-section]')?.dataset.section), 'border', 'Tab leaves the last value for the next section');
   for (const key of [...fieldOrder].reverse()) { await page.keyboard.press('Shift+Tab'); assert.equal(await activeKey(), key, `Shift+Tab reaches ${key}`); }
   await page.keyboard.press('Shift+Tab'); assert.equal(await activeKey(), 'pick:Position', 'Shift+Tab leaves the first value for position mode');
   checks.push('Tab and Shift+Tab traverse position mode, all 18 values and the section boundaries in native DOM order');
@@ -458,14 +458,14 @@ try {
   await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); assert.equal(await activeKey(), 'content-width');
   await page.keyboard.insertText('90'); await page.keyboard.press('Tab');
   await page.keyboard.insertText('45'); await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
-  assert.equal(await activeKey(), 'opacity', 'native Tab leaves the widget and reaches the next field');
+  assert.equal(await activeKey(), 'pick:Style', 'native Tab leaves the widget and reaches the Border section');
   release();
   await page.evaluate(async id => (await import('./lib/store.js')).idle(id), probe.id);
   await page.unroute('**/api/patch');
   assert.deepEqual(await probeFrame.locator('[data-divlet-id="box-other"]').evaluate(node => { const cs = getComputedStyle(node); return ['Top', 'Right', 'Bottom', 'Left'].map(side => cs[`margin${side}`]); }), ['11px', '12px', '13px', '14px'], 'all queued side edits survive');
   await waitUntil(async () => /90 by 45/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? '') || await probeFrame.locator('[data-divlet-id="box-other"]').evaluate(node => { const cs = getComputedStyle(node); return parseFloat(cs.width) - parseFloat(cs.paddingRight) - parseFloat(cs.borderLeftWidth) === 90 && parseFloat(cs.height) === 45; }), 'queued content edits use the newly accepted padding/border measurement');
   assert.equal(await probeFrame.locator('[data-divlet-id="box-other"]').evaluate(node => getComputedStyle(node).paddingRight), '8px');
-  assert.equal(await activeKey(), 'opacity', 'accepted writes do not steal the next field focus');
+  assert.equal(await activeKey(), 'pick:Style', 'accepted writes do not steal the next field focus');
   await page.evaluate(async id => (await import('./lib/store.js')).selectNodes(id, ['box-probe']), probe.id);
   await page.evaluate(() => document.activeElement?.blur());
   await page.mouse.move(5, 5);

@@ -52,6 +52,7 @@ export const GROUPS = {
   fontWeight: /^font-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black|\[\d+\])$/,
   // `[border-width:Npx]` is what a declarative `border-width` style becomes; it is the same property as `border-N`.
   borderWidth: /^(?:border(?:-(?:0|2|4|8|\[\d+(?:\.\d+)?px\]))?|\[border-width:\d+(?:\.\d+)?px\])$/,
+  borderStyle: /^(?:border-(?:solid|dashed|dotted|double|hidden|none)|\[border-style:(?:solid|dashed|dotted|double|groove|ridge|inset|outset|none|hidden)\])$/,
   borderColor: colorGroup('border', /^border-(?:transparent|current|white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}(?:\/\d+)?|\[(?:#|rgb|hsl|oklch|var\(--color)[^\]]*\])$/),
   textColor: colorGroup('text', /^text-(?:transparent|current|inherit|white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}(?:\/\d+)?|\[(?:#|rgb|hsl|oklch|var\(--color|color:)[^\]]*\])$/),
   translateX: /^-?translate-x-(.+)$/,

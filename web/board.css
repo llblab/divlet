@@ -903,12 +903,15 @@ body.is-expanded .brand, body.is-expanded .sidebar-foot, body.is-expanded .panel
   .swatch:not(.plain) { width: 28px; height: 28px; }
 }
 
-/* Appearance fold: radius, fill and text colour. */
-.appearance-box { display: grid; gap: 8px; }
+/* Border owns its line, edge widths, colour and radius; Appearance keeps fill and typography. */
+.appearance-box, .border-box { display: grid; gap: 8px; }
+.border-widths { --control-min: max(106px, calc(50% - 3px)); }
+.border-box .color-field { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 6px; padding: 4px 6px; }
+.border-box .color-field > .vf-k { grid-column: 1 / -1; justify-self: start; min-width: 0; padding-left: 0; cursor: default; }
 .appearance-box > .grid2 { align-items: center; }
-.appearance-geometry { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.appearance-geometry > .vf { flex: 0 1 84px; }
-.appearance-geometry > .radius-presets { flex: 1 1 130px; }
+.border-geometry { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.border-geometry > .vf { flex: 0 1 84px; }
+.border-geometry > .radius-presets { flex: 1 1 130px; }
 .radius-presets { display: flex; flex-wrap: wrap; gap: 4px; }
 .radius-presets .chip.on { background: var(--accent-soft); color: var(--accent-ink); }
 .color-field { position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 28px; padding: 0 4px 0 0; border-radius: var(--radius-inner); background: var(--field); }

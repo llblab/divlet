@@ -15,6 +15,13 @@ test('groups read and replace only base classes, in place', () => {
   assert.equal(tw.get('gap-x-4 gap-2', 'gap'), 'gap-2');
 });
 
+test('border line styles are distinct from widths and colours, including arbitrary CSS and variants', () => {
+  assert.equal(tw.get('border-2 border-red-500 hover:border-dashed border-dotted', 'borderStyle'), 'border-dotted');
+  assert.equal(tw.get('[border-style:groove] border-4', 'borderStyle'), '[border-style:groove]');
+  assert.equal(tw.get('border-2 border-red-500', 'borderStyle'), null);
+  assert.deepEqual(tw.variantsOf('border-solid hover:border-dashed md:[border-style:double]', 'borderStyle'), ['hover:border-dashed', 'md:[border-style:double]']);
+});
+
 test('spacing tokens convert between Tailwind and px', () => {
   assert.equal(tw.toPx('4'), 16);
   assert.equal(tw.toPx('px'), 1);
