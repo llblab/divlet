@@ -130,6 +130,7 @@
   },
   "dependencies": {
     "@tailwindcss/node": "^4.1.0",
+    "@xmldom/xmldom": "0.9.12",
     "lucide-static": "1.67.0",
     "marked": "^18.1.2",
     "parse5": "^8.0.0",

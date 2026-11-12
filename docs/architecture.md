@@ -130,7 +130,8 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `web/lib/project.js`, `help.js` | Open/copy and Settings policy, writes and modal lifetime. |
 | `core/lib/model-styles.ts`, `browser-styles.ts` | Node lowering binding and explicit absent browser capability. |
 | `core/lib/asset-reference.ts` | Portable declared paths and explicit URI codec; not activated. |
-| `core/lib/assets.ts` | Bounded Data-URL tree decoding; not native source admission. |
+| `core/lib/assets.ts` | Bounded Data-URL tree and MIME-based text decoding; not source admission. |
+| `core/lib/svg-resource.ts` | Strict XML SVG resource projection, not HTML parsing or publication. |
 | `core/lib/project.ts` | Project settings/read/write and component expansion/listing. |
 | `core/lib/codec.ts` | Strict native model ↔ HTML codec and `renderFile`. |
 | `core/lib/html-import.ts` | Loss-aware external HTML admission, separate from the strict codec. |
@@ -143,7 +144,7 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `core/lib/history.ts` | Session point identity/lineage, not replay or persistence. |
 | `core/lib/contract.ts` | Host-neutral operations, schemas, result shaping and sessions. |
 | `core/lib/output.ts` | Generated-file provenance, collision checks and safe publication. |
-| `core/lib/static.js` | Portable static build/resource closure. |
+| `core/lib/static.js` | Static closure, including the unactivated declared-resource build seam. |
 | `core/lib/server.ts` | Token-scoped board HTTP and preview boundary. |
 | `core/lib/boards.ts` | Live-owner registry and attached-client transport. |
 | `core/lib/projects.ts` | Project discovery and creation. |

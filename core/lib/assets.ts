@@ -7,6 +7,23 @@ import { ASSET_REFERENCE_LIMITS, validateAssetName } from './asset-reference.ts'
 /** Native payloads retain the existing 20 MiB resource ceiling and 32 MiB source envelope. */
 export const ASSET_LIMITS = Object.freeze({ files: 400, fileBytes: 20 * 1024 * 1024, encodedBytes: SOURCE_LIMITS.bytes, nodes: SOURCE_LIMITS.nodes, depth: ASSET_REFERENCE_LIMITS.depth, path: ASSET_REFERENCE_LIMITS.path, mediaType: 1024 });
 export interface ParsedAssets { readonly tree: AssetTree; readonly files: ReadonlyMap<string, AssetFile> }
+export interface AssetText { readonly kind: 'css' | 'svg'; readonly text: string; readonly ascii: boolean }
+
+/** Interpret declared text by MIME, not its filename; unsupported encodings must not be silently transcoded. */
+export function readAssetText(file: AssetFile): AssetText | null {
+  const mime = new MIMEType(file.mediaType), kind = mime.essence === 'text/css' ? 'css' : mime.essence === 'image/svg+xml' ? 'svg' : null;
+  if (['text/html', 'application/xhtml+xml'].includes(mime.essence)) fail('Declared HTML asset closure is not supported.');
+  if (!kind) return null;
+  const charset = mime.params.get('charset')?.toLowerCase();
+  if (charset && !['utf-8', 'us-ascii'].includes(charset)) fail('Declared text assets require UTF-8 or US-ASCII.');
+  if (charset === 'us-ascii' && file.bytes.some(byte => byte > 127)) fail('A US-ASCII asset contains non-ASCII bytes.');
+  let text: string;
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(file.bytes); } catch { fail('Declared text assets contain invalid UTF-8.'); }
+  const encoding = kind === 'css' ? /^@charset\s+['"]([^'"]+)['"]\s*;/i.exec(text)?.[1] : /^\s*<\?xml\b[^?]*\bencoding\s*=\s*['"]([^'"]+)['"]/i.exec(text)?.[1];
+  if (encoding && !['utf-8', 'us-ascii'].includes(encoding.toLowerCase())) fail('Declared text asset encoding conflicts with its UTF-8 interpretation.');
+  if (encoding?.toLowerCase() === 'us-ascii' && file.bytes.some(byte => byte > 127)) fail('A US-ASCII asset contains non-ASCII bytes.');
+  return { kind, text, ascii: charset === 'us-ascii' || encoding?.toLowerCase() === 'us-ascii' };
+}
 function fail(message: string): never { throw new DivletError('INVALID_ASSET', message); }
 
 function directory(input: unknown, where: string): Record<string, unknown> {

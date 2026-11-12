@@ -6,13 +6,16 @@ import { parse, parseFragment, serialize } from 'parse5';
 import postcss from 'postcss';
 import valueParser from 'postcss-value-parser';
 import { createClassResourceMapper } from './engine.ts';
+import { readAssets, readAssetText } from './assets.ts';
+import { assetReference, readAssetReference, resolveAssetDependency } from './asset-reference.ts';
+import { DivletError } from './validation.ts';
+import { rewriteSvgResource, SVG_RESOURCE_ATTRIBUTES } from './svg-resource.ts';
 
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const fail = (message, details) => { throw Object.assign(new Error(`Static bundle: ${message}`), details ? { details } : {}); };
 export const MAX_RESOURCE_FILES = 400;
 const MAX_FILE = 20 * 1024 * 1024;
 const MAX_TOTAL = 64 * 1024 * 1024;
-const SVG_RESOURCE_ATTRIBUTES = new Set('fill stroke filter mask clip-path marker marker-start marker-mid marker-end cursor color-profile'.split(' '));
 
 /** Descriptor/byte safety only; callers must establish source-path authority before reading. */
 export async function readResourceBytes(file, budget = { bytes: 0 }) {
@@ -107,12 +110,15 @@ function validateSourceCssValue(value, publicVariables = false) {
 
 async function rewriteCss(css, rewrite, inline = false, closed = false, inspectSelectors) {
   let root;
-  try { root = postcss.parse(inline ? `x{${css}}` : css); }
+  try { root = postcss.parse(inline ? `x{${css}}` : css, { map: false }); }
   catch (error) { if (closed) unsupportedSourceCss(); throw error; }
   inspectSelectors?.(root);
+  // PostCSS can split an escaped at-keyword into name + params; never silently miss a browser-recognized import.
+  root.walkAtRules(rule => { if (rule.raws.afterName === '' && rule.params.startsWith('\\')) unsupportedSourceCss(); });
   if (closed) {
     root.walkDecls(decl => validateSourceCssValue(decl.value));
-    root.walkAtRules('import', rule => {
+    root.walkAtRules(rule => {
+      if (decodeCss(rule.name).toLowerCase() !== 'import') return;
       const first = valueParser(rule.params).nodes.find(node => node.type !== 'space' && node.type !== 'comment');
       if (!first || first.type !== 'string' && !(first.type === 'function' && decodeCss(first.value).toLowerCase() === 'url')) unsupportedSourceCss();
       validateSourceCssValue(rule.params);
@@ -120,15 +126,18 @@ async function rewriteCss(css, rewrite, inline = false, closed = false, inspectS
   }
   const jobs = [];
   root.walkDecls((decl) => jobs.push((async () => { decl.value = await values(decl.value); })()));
-  root.walkAtRules('import', (rule) => jobs.push((async () => {
-    const parsed = valueParser(rule.params);
-    const first = parsed.nodes.find((node) => node.type !== 'space' && node.type !== 'comment');
-    if (first?.type === 'string') {
-      first.value = cssString(await rewrite(decodeCss(first.value)));
-      first.quote = '"';
-    } else await rewriteNodes(parsed.nodes);
-    rule.params = parsed.toString();
-  })()));
+  root.walkAtRules(rule => {
+    if (decodeCss(rule.name).toLowerCase() !== 'import') return;
+    jobs.push((async () => {
+      const parsed = valueParser(rule.params);
+      const first = parsed.nodes.find((node) => node.type !== 'space' && node.type !== 'comment');
+      if (first?.type === 'string') {
+        first.value = cssString(await rewrite(decodeCss(first.value)));
+        first.quote = '"';
+      } else await rewriteNodes(parsed.nodes);
+      rule.params = parsed.toString();
+    })());
+  });
   async function rewriteNodes(nodes) {
     for (const node of nodes) {
       if (node.type !== 'function') continue;
@@ -250,7 +259,7 @@ function preparePublicFrame(html, publish) {
     if (node.content) pending.push(node.content);
     for (const attr of node.attrs || []) {
       if (attr.name.toLowerCase() === 'data-pen-style' || /^on/i.test(attr.name)) publicDomFailure();
-      if (attr.name === 'style') postcss.parse(`x{${attr.value}}`).walkDecls(decl => checkEditorObservers(decl.value));
+      if (attr.name === 'style') postcss.parse(`x{${attr.value}}`, { map: false }).walkDecls(decl => checkEditorObservers(decl.value));
       else if (node.namespaceURI === 'http://www.w3.org/2000/svg' && checkAttributeConsumers(attr.value) && /data-divlet-/i.test(decodeCss(attr.value))) publicDomFailure();
     }
     if (node.attrs) node.attrs = node.attrs.filter(attr => !/^data-divlet-/i.test(attr.name));
@@ -259,7 +268,7 @@ function preparePublicFrame(html, publish) {
   const first = head.childNodes.indexOf(styles[0]), last = head.childNodes.indexOf(styles.at(-1));
   if (head.childNodes.slice(first, last + 1).some(node => node.tagName !== 'style' && (node.nodeName !== '#text' || node.value.trim()))) stylesheetFailure();
   const css = styles.map(node => node.childNodes.map(child => child.value || '').join('')).join('\n');
-  const rules = postcss.parse(css);
+  const rules = postcss.parse(css, { map: false });
   const checkSelector = value => { checkEditorObservers(value); const selector = decodeCss(value); if (/:has\s*\(/i.test(selector) || /(?:^|[\s,>+~(])(?:head|style|link)(?=[\s.#[:>,+~)]|$)/i.test(selector)) stylesheetFailure(); };
   rules.walkAtRules(rule => { checkEditorObservers(rule.params); if (['charset', 'namespace', 'import'].includes(rule.name.toLowerCase())) stylesheetFailure(); if (rule.name.toLowerCase() === 'scope') checkSelector(rule.params); });
   rules.walkRules(rule => checkSelector(rule.selector));
@@ -329,9 +338,11 @@ export async function readConfinedResource(projectDir, file, { authorized = new 
 
 
 /** Build a read-only, server-independent static artifact set. */
-export async function buildStatic({ projectDir, frames, frameFiles, site = new Map(), assetBase, siteBase, externalFiles = [], previews = new Map(), mapResources, resourceDirectory = '_assets', closedCss = false, stylesheetFrames = new Set() }) {
+export async function buildStatic({ projectDir, frames, frameFiles, site = new Map(), assetBase, siteBase, externalFiles = [], previews = new Map(), mapResources, assets, resourceDirectory = assets === undefined ? '_assets' : 'assets', closedCss = false, stylesheetFrames = new Set() }) {
   if (mapResources !== undefined && typeof mapResources !== 'function') fail('mapResources must be a function');
   if (!['_assets', 'assets'].includes(resourceDirectory)) fail('unsupported resource directory');
+  const declared = assets === undefined ? null : readAssets(assets);
+  if (declared && resourceDirectory !== 'assets') fail('declared assets require the assets/ resource directory');
   const root = path.resolve(projectDir);
   // Local projects are trusted to name filesystem dependencies; no manual file grants are required.
   const authorized = null;
@@ -348,7 +359,7 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
   frameFiles = frameFiles === undefined ? undefined : new Map(frameFiles);
   const foldedNames = new Set();
   const occupied = new Set();
-  const resources = new Map();
+  const resources = new Map(), declaredResources = new Map(), assetSources = new Map(), mediaTypes = new Map();
   const pending = [];
   const classRenames = new Map(), sourceSelectors = new Set();
   const numericReferences = new Set(), variableDefinitions = new Set();
@@ -406,7 +417,7 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
   async function resource(source) {
     if (resources.has(source)) return resources.get(source);
     if (!allowNewResources) fail('preview references a resource absent from the public artifact graph');
-    if (resources.size >= MAX_RESOURCE_FILES) fail('resource count limit exceeded');
+    if (resources.size + declaredResources.size >= MAX_RESOURCE_FILES) fail('resource count limit exceeded');
     const relative = path.relative(root, source).split(path.sep).join('/');
     const basename = path.basename(source).replace(/[^a-zA-Z0-9_.-]/g, '_');
     const output = `${resourceDirectory}/${hash(relative).slice(0, 20)}-${basename}`;
@@ -429,6 +440,34 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
     });
     return output;
   }
+  async function declaredResource(key) {
+    if (declaredResources.has(key)) return;
+    if (!allowNewResources) fail('preview references a resource absent from the public artifact graph');
+    const file = declared?.files.get(key);
+    if (!file) throw new DivletError('INVALID_ASSET', `Missing declared asset: ${key}`);
+    if (resources.size + declaredResources.size >= MAX_RESOURCE_FILES) fail('resource count limit exceeded');
+    if ((budget.bytes += file.bytes.byteLength) > MAX_TOTAL) fail('resource byte limit exceeded');
+    const output = `assets/${key}`, content = readAssetText(file);
+    reserve(output);
+    declaredResources.set(key, output);
+    mediaTypes.set(output, file.mediaType);
+    assetSources.set(assetReference(key), hash(JSON.stringify([file.mediaType, hash(file.bytes)])));
+    files.set(output, Buffer.from(file.bytes));
+    if (content) pending.push(async () => {
+      const source = assetReference(key), rewrite = url => rewriteUrl(url, source, output);
+      const rewritten = content.kind === 'css'
+        ? await rewriteCss(content.text, rewrite, false, true, inspectSelectors)
+        : await rewriteSvgResource(content.text, { url: rewrite, css: (text, inline) => rewriteCss(text, rewrite, inline, true, inspectSelectors) });
+      if (content.ascii && /[^\x00-\x7f]/.test(rewritten)) throw new DivletError('INVALID_ASSET', 'Rewriting this asset would violate its US-ASCII encoding.');
+      files.set(output, rewritten);
+    });
+  }
+  async function declaredUrl(reference, output) {
+    await declaredResource(reference.path);
+    // Go via the artifact root: comparing raw paths with encoded names can alias literal percent components.
+    const up = path.posix.relative(path.posix.dirname(output), '.');
+    return `${up ? up + '/' : ''}assets/${assetReference(reference.path).slice(6)}${reference.suffix}`;
+  }
   function relativeUrl(from, to) {
     const relative = path.posix.relative(path.posix.dirname(from), to) || path.posix.basename(to);
     return /^[^/]*:/.test(relative) ? `./${relative}` : relative;
@@ -449,6 +488,8 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
     };
   }
   async function rewriteUrl(original, source, output, pageRoute) {
+    const reference = readAssetReference(original);
+    if (reference) return declaredUrl(reference, output);
     const value = original.trim();
     if (!value || value.startsWith('#')) return original;
     let kind;
@@ -476,6 +517,8 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
     }
     else if (/^(?:https?:|data:|mailto:|tel:)/i.test(value) || value.startsWith('//')) { if (/^(?:https?:|data:|\/\/)/i.test(value)) uninspectedExternal = true; return original; }
     else if (/^[a-z][a-z0-9+.-]*:/i.test(value)) fail(`unsafe URL ${value}`);
+    const baseAsset = readAssetReference(source);
+    if (baseAsset) return declaredUrl(readAssetReference(resolveAssetDependency(baseAsset.path, value)), output);
     const suffixAt = local.search(/[?#]/);
     const suffix = suffixAt < 0 ? '' : local.slice(suffixAt);
     const pathname = suffixAt < 0 ? local : local.slice(0, suffixAt);
@@ -522,7 +565,11 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
   }
   // Explicit canonical carriers join the public graph before recursive closure and preview locking.
   const mapped = mapResources ? await mapResources(async (value, kind = 'url', tokens = {}, numericTokens = {}) => {
-    const rewrite = url => rewriteUrl(url, path.join(root, '__divlet_source__.html'), '__divlet_source__.html');
+    const rewrite = async url => {
+      const reference = readAssetReference(url);
+      if (reference) { await declaredResource(reference.path); return url; } // canonical copies retain declared identity, not cache paths
+      return rewriteUrl(url, path.join(root, '__divlet_source__.html'), '__divlet_source__.html');
+    };
     if (kind === 'url') return rewrite(value);
     if (kind === 'className') {
       if (classMapper && tokens !== classTokens && JSON.stringify(tokens) !== classTheme) unsupportedSourceCss();
@@ -557,7 +604,7 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
   for (let i = 0; i < pending.length; i++) await pending[i]();
   if (numericReferences.size && (uninspectedExternal || [...numericReferences].some(name => variableDefinitions.has(name)))) unsupportedSourceCss();
   allowNewResources = false;
-  const previewVersion = hash(JSON.stringify([...sources].sort(([a], [b]) => a.localeCompare(b)))).slice(0, 20);
+  const previewVersion = hash(JSON.stringify([...sources, ...assetSources].sort(([a], [b]) => a.localeCompare(b)))).slice(0, 20);
   for (const [id, html] of previews) {
     const output = outputsById.get(id);
     rewrittenPreviews.set(id, await rewriteHtml(html, async url => {
@@ -568,5 +615,5 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
       return before + (before.includes('?') ? '&' : '?') + `divlet-resource=${previewVersion}` + (fragmentAt < 0 ? '' : rewritten.slice(fragmentAt));
     }));
   }
-  return { files, sources, warnings, stylesheets, previews: rewrittenPreviews, ...(mapResources ? { mapped } : {}) };
+  return { files, sources, warnings, stylesheets, ...(declared ? { assetSources, mediaTypes } : {}), previews: rewrittenPreviews, ...(mapResources ? { mapped } : {}) };
 }

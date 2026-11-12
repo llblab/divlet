@@ -1,5 +1,5 @@
 /*
- * Owns: portable declared-asset paths and explicit URI syntax.
+ * Owns: portable declared-asset paths, explicit URI syntax and relative dependency URLs.
  * Excludes: project admission, byte decoding, dependency traversal and publication.
  */
 import { DivletError, withinUtf8Budget } from './validation.ts';
@@ -46,4 +46,26 @@ export function readAssetReference(input: unknown): AssetReference | null {
   // Re-encoding also refuses encoded separators: a decoded slash must have been a literal directory separator.
   if (assetReference(path, suffix) !== input) fail('Asset reference path encoding is not canonical.');
   return { path, suffix };
+}
+
+/** Resolve a relative URL inside a declared text asset, never against a filesystem or network base. */
+export function resolveAssetDependency(basePath: unknown, input: unknown): string {
+  validateAssetPath(basePath);
+  if (typeof input !== 'string' || input.length > ASSET_REFERENCE_LIMITS.encoded || input !== input.trim() || /[\\\u0000-\u001f\u007f]/.test(input)) fail('Invalid relative asset dependency.');
+  const explicit = readAssetReference(input);
+  if (explicit) return input;
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(input)) fail('Asset dependencies require a declared or relative URL.');
+  const at = input.search(/[?#]/), pathname = at < 0 ? input : input.slice(0, at), suffix = at < 0 ? '' : input.slice(at);
+  if (!pathname) return assetReference(basePath, suffix);
+  const names = basePath.split('/');
+  names.pop();
+  for (const name of pathname.split('/')) {
+    if (name === '.') continue;
+    if (name === '..') { if (!names.length) fail('Asset dependency escapes its declared namespace.'); names.pop(); continue; }
+    let decoded: string;
+    try { decoded = decodeURIComponent(name); } catch { fail('Invalid asset dependency path encoding.'); }
+    validateAssetName(decoded);
+    names.push(decoded);
+  }
+  return assetReference(names.join('/'), suffix);
 }

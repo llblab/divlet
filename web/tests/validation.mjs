@@ -10,6 +10,8 @@ import * as nodeModel from '../../core/lib/model.ts';
 import { captureFrame, frameCases } from '../../core/tests/fixtures/frame-portability.js';
 import { bundleBrowserModel } from '../../scripts/browser-model.mjs';
 import { landingDemoSnapshot } from '../../scripts/landing-demo.mjs';
+import { buildStatic } from '../../core/lib/static.js';
+import { svgResourceCases } from '../../core/tests/fixtures/svg-resources.js';
 
 const prefix = '/divlet-kernel/';
 const bundle = await bundleBrowserModel(fileURLToPath(new URL('../../', import.meta.url)), { source: true });
@@ -50,6 +52,21 @@ for (const mode of ['absent', 'audit', 'services']) {
     'chat.js': 'export const render = () => {}; export const note = () => {};',
   })) files.set(`${prefix}${mode}/${file}`, ['text/javascript', source]);
 }
+const dataUrl = (value, mime) => `data:${mime};base64,${Buffer.from(value).toString('base64')}`;
+const proof = await buildStatic({ projectDir: '/no-original-resources', assets: {
+  styles: { 'main.css': dataUrl('@IMPORT "other.css";', 'text/css'), 'other.css': dataUrl('.asset-proof{color:#123}', 'text/css') },
+  icon: dataUrl('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><title aria-label="&lt;brand&gt;" data-line="one&#10;two">&#160;</title><rect width="20" height="20" fill="#123"/></svg>', 'image/svg+xml'),
+}, frames: new Map([['asset-proof', '<link rel="stylesheet" href="asset:styles/main.css"><p class="asset-proof">proof</p><img src="asset:icon">']]) });
+for (const [name, body] of proof.files) files.set(`${prefix}${name}`, [proof.mediaTypes.get(name) || 'text/html', body]);
+const svgProfile = [];
+for (const { name, text, accepted, expectedText } of svgResourceCases) {
+  try {
+    const prepared = await buildStatic({ projectDir: '/no-original-resources', assets: { icon: dataUrl(text, 'image/svg+xml') }, frames: new Map([['proof', '<img src="asset:icon">']]) });
+    assert.equal(accepted, true, name);
+    svgProfile.push({ name, xml: prepared.files.get('assets/icon'), expectedText: expectedText ?? null });
+  } catch (error) { assert.equal(accepted, false, name); assert.equal(error.code, 'INVALID_ASSET', name); }
+}
+files.set(`${prefix}svg-profile.json`, ['application/json', JSON.stringify(svgProfile)]);
 const requests = [];
 const server = http.createServer((request, response) => {
   requests.push(request.url);
@@ -102,6 +119,21 @@ try {
       lowering: captureFrame(frameApi, api => api.applyDocumentPatch(sampleFrame(), { nodes: { root: { styles: { color: 'red' } } } })),
     };
   });
+  const assetProof = await page.evaluate(async () => {
+    const iframe = document.createElement('iframe');
+    const loaded = new Promise((resolve, reject) => { iframe.onload = resolve; iframe.onerror = reject; });
+    iframe.src = new URL('asset-proof.html', location.href).href; document.body.append(iframe); await loaded;
+    const childDocument = iframe.contentDocument, image = childDocument.querySelector('img'); await image.decode();
+    const xml = new DOMParser().parseFromString(await (await fetch(new URL('assets/icon', location.href))).text(), 'image/svg+xml');
+    const result = { color: iframe.contentWindow.getComputedStyle(childDocument.querySelector('.asset-proof')).color, imageWidth: image.naturalWidth, xmlErrors: xml.querySelectorAll('parsererror').length, title: xml.querySelector('title')?.textContent, label: xml.querySelector('title')?.getAttribute('aria-label'), line: xml.querySelector('title')?.getAttribute('data-line') };
+    iframe.remove(); return result;
+  });
+  const svgProfileResults = await page.evaluate(async () => (await (await fetch(new URL('svg-profile.json', location.href))).json()).map(({ name, xml, expectedText }) => {
+    const parsed = new DOMParser().parseFromString(xml, 'image/svg+xml');
+    return { name, errors: parsed.querySelectorAll('parsererror').length, textMatches: expectedText === null || parsed.querySelector('text')?.textContent === expectedText };
+  }));
+  for (const row of svgProfileResults) assert.deepEqual(row, { name: row.name, errors: 0, textMatches: true }, row.name);
+  assert.deepEqual(assetProof, { color: 'rgb(17, 34, 51)', imageWidth: 20, xmlErrors: 0, title: '\u00a0', label: '<brand>', line: 'one\ntwo' }, 'actual browser XML/image and case-insensitive CSS import rendering under a prefix');
   assert.deepEqual(result.nodeGlobals, [], 'no Node globals/polyfills supply the kernel');
   assert.ok(result.cases.length > 25, 'the shared acceptance/refusal regions are exercised');
   for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.references, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
@@ -114,7 +146,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.references.length} asset-reference + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.references.length} asset-reference + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

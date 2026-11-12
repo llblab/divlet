@@ -30,6 +30,15 @@ const capture = (api, call) => {
 const refused = { code: 'INVALID_ASSET', domainError: true };
 const longestPath = [...Array(8).fill('a'.repeat(226)), 'b'.repeat(232)].join('/');
 export const assetReferenceCases = [
+  ...[
+    ['styles/main.css', '../fonts/Foo Regular.woff2?#face', 'asset:fonts/Foo%20Regular.woff2?#face'],
+    ['styles/main.css', './nested/a.css', 'asset:styles/nested/a.css'],
+    ['styles/main.css', '../icons/雪.svg#mark', 'asset:icons/%E9%9B%AA.svg#mark'],
+    ['styles/main.css', '../percent/%252F.bin', 'asset:percent/%252F.bin'],
+    ['styles/main.css', '?v=1#mark', 'asset:styles/main.css?v=1#mark'],
+    ['styles/main.css', 'asset:font#face', 'asset:font#face'],
+  ].map(([base, input, expected], i) => ({ name: `declared dependency ${i + 1}`, expected, run: api => api.resolveAssetDependency(base, input) })),
+  ...['../../escape.png', '/root.png', '//example.invalid/file', 'file:///private', 'https://example.invalid/file', '%2e%2e/file', '..%2ffile', 'a%5cb', 'a//b', 'a/', 'a\\\\b', 'a?x=%GG', 'a#raw space', 'a\\n', 'a%FF'].map((input, i) => ({ name: `dependency refusal ${i + 1}`, expected: refused, run: api => capture(api, () => api.resolveAssetDependency('styles/main.css', input)) })),
   { name: 'exact path limit', expected: longestPath, run: api => api.readAssetReference(api.assetReference(longestPath)).path },
   { name: 'over path limit', expected: refused, run: api => capture(api, () => api.assetReference(longestPath + 'c')) },
   { name: 'exact multibyte component limit', expected: 'é'.repeat(127) + 'a', run: api => api.readAssetReference(api.assetReference('é'.repeat(127) + 'a')).path },
