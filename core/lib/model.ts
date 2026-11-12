@@ -7,6 +7,7 @@
  * allowed to trust nothing.
  */
 import { applyStyles } from './model-styles.ts';
+import { readAssetReference } from './asset-reference.ts';
 import postcssParse from 'postcss/lib/parse';
 import type postcss from 'postcss';
 import { DivletError, fail, object, string, keys, json, withinUtf8Budget } from './validation.ts';
@@ -147,15 +148,24 @@ export function metadata(value: unknown, label: string): Metadata {
   return structuredClone(record) as Metadata;
 }
 
-export function safeAttribute(name: string, value: string, nodeId: string, dataResource = false): void {
+/** Resource URL syntax is distinct from project declaration/byte resolution. Boolean callers retain the Data-URL contract. */
+export interface ResourceAttributeContext { readonly data?: boolean; readonly asset?: boolean }
+export function safeAttribute(name: string, value: string, nodeId: string, resource: boolean | ResourceAttributeContext = false): void {
   if (!/^[A-Za-z_:][A-Za-z0-9_.:-]*$/.test(name) || /^on/i.test(name)) fail(`Unsupported attribute ${name} on ${nodeId}`);
   if (/^(data-divlet-|style$|class$|srcdoc$)/i.test(name)) fail(`Reserved attribute ${name} on ${nodeId}`);
   string(value, `attribute ${name}`, 65536);
   if (/^(href|src|action|formaction|poster|xlink:href)$/i.test(name)) {
     const compact = value.replace(/[\u0000-\u0020\u007f]+/g, '');
     const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(compact)?.[1]?.toLowerCase();
-    // Resource elements consume data as images/media, not as an active document or form destination.
-    if (scheme === 'data' && (dataResource || /^(src|poster)$/i.test(name))) return;
+    // Declared resources may be consumed, not navigated to or submitted as form destinations.
+    const media = /^(src|poster)$/i.test(name), href = /^(href|xlink:href)$/i.test(name);
+    const dataResource = typeof resource === 'boolean' ? resource : resource.data === true;
+    const assetResource = typeof resource === 'boolean' ? resource : resource.asset === true;
+    if (readAssetReference(value)) {
+      if (media || href && assetResource) return;
+      fail(`Unsupported URL scheme in ${name} on ${nodeId}`);
+    }
+    if (scheme === 'data' && (dataResource || media)) return;
     if (scheme && !['http', 'https', 'mailto', 'tel'].includes(scheme)) fail(`Unsupported URL scheme in ${name} on ${nodeId}`);
   }
 }
@@ -192,7 +202,7 @@ function validOverrides(input: unknown, id: string): Record<string, Override> {
     if (override.style !== undefined) override.style = validStyle(override.style, `${id} → ${address}`, true);
     if (override.attrs !== undefined) {
       const attrs = object(override.attrs, `${id} → ${address}.attrs`);
-      for (const [name, value] of Object.entries(attrs)) if (value !== null) safeAttribute(name, value as string, `${id} → ${address}`);
+      for (const [name, value] of Object.entries(attrs)) if (value !== null) safeAttribute(name, value as string, `${id} → ${address}`, { asset: true }); // the expanded target validates href context
     }
     if (override.metadata !== undefined) override.metadata = metadata(override.metadata, `${id} → ${address}.metadata`);
   }
@@ -259,7 +269,7 @@ export function validateDocument(input: unknown, { limits = LIMITS }: { limits?:
     if (!HTML_TAGS.has(node.tag) && !SVG_TAGS.has(node.tag)) fail(`Unsupported tag on ${id}: ${node.tag}`);
     const attrs = structuredClone(object(node.attrs ?? {}, `${id}.attrs`)) as Attrs;
     for (const [name, value] of Object.entries(attrs)) {
-      safeAttribute(name, value, id);
+      safeAttribute(name, value, id, { asset: node.tag === 'use' });
       attrs[name] = string(value, `attribute ${name}`);
     }
     const style = validStyle(node.style ?? {}, id);

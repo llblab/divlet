@@ -7,7 +7,8 @@ import { stripTypeScriptTypes } from 'node:module';
 import { chromium } from 'playwright';
 import { fileURLToPath } from 'node:url';
 import * as nodeModel from '../../core/lib/model.ts';
-import { captureFrame, frameCases } from '../../core/tests/fixtures/frame-portability.js';
+import { captureFrame, frameCases, resourceFrame } from '../../core/tests/fixtures/frame-portability.js';
+import { prepareFrame } from '../../core/lib/render.ts';
 import { bundleBrowserModel } from '../../scripts/browser-model.mjs';
 import { landingDemoSnapshot } from '../../scripts/landing-demo.mjs';
 import { buildStatic } from '../../core/lib/static.js';
@@ -53,10 +54,12 @@ for (const mode of ['absent', 'audit', 'services']) {
   })) files.set(`${prefix}${mode}/${file}`, ['text/javascript', source]);
 }
 const dataUrl = (value, mime) => `data:${mime};base64,${Buffer.from(value).toString('base64')}`;
+const nativeImage = await prepareFrame({ ...resourceFrame('img', { src: 'asset:icon' }), id: 'native-image', head: { icon: 'asset:icon' } });
+const nativeUse = await prepareFrame({ ...resourceFrame('use', { href: 'asset:icon#mark' }, true), id: 'native-use' });
 const proof = await buildStatic({ projectDir: '/no-original-resources', assets: {
   styles: { 'main.css': dataUrl('@IMPORT "other.css";', 'text/css'), 'other.css': dataUrl('.asset-proof{color:#123}', 'text/css') },
-  icon: dataUrl('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><title aria-label="&lt;brand&gt;" data-line="one&#10;two">&#160;</title><rect width="20" height="20" fill="#123"/></svg>', 'image/svg+xml'),
-}, frames: new Map([['asset-proof', '<link rel="stylesheet" href="asset:styles/main.css"><p class="asset-proof">proof</p><img src="asset:icon">']]) });
+  icon: dataUrl('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><title aria-label="&lt;brand&gt;" data-line="one&#10;two">&#160;</title><rect id="mark" width="20" height="20" fill="#123"/></svg>', 'image/svg+xml'),
+}, frames: new Map([['asset-proof', '<link rel="stylesheet" href="asset:styles/main.css"><p class="asset-proof">proof</p><img src="asset:icon">'], ['native-image', nativeImage.fileHtml], ['native-use', nativeUse.fileHtml]]) });
 for (const [name, body] of proof.files) files.set(`${prefix}${name}`, [proof.mediaTypes.get(name) || 'text/html', body]);
 const svgProfile = [];
 for (const { name, text, accepted, expectedText } of svgResourceCases) {
@@ -128,6 +131,26 @@ try {
     const result = { color: iframe.contentWindow.getComputedStyle(childDocument.querySelector('.asset-proof')).color, imageWidth: image.naturalWidth, xmlErrors: xml.querySelectorAll('parsererror').length, title: xml.querySelector('title')?.textContent, label: xml.querySelector('title')?.getAttribute('aria-label'), line: xml.querySelector('title')?.getAttribute('data-line') };
     iframe.remove(); return result;
   });
+  const nativeResources = await page.evaluate(async () => {
+    const results = [];
+    for (const name of ['native-image', 'native-use']) {
+      const iframe = document.createElement('iframe');
+      const loaded = new Promise((resolve, reject) => { iframe.onload = resolve; iframe.onerror = reject; });
+      iframe.src = new URL(`${name}.html`, location.href).href; document.body.append(iframe); await loaded;
+      const childDocument = iframe.contentDocument;
+      if (name === 'native-image') {
+        const image = childDocument.querySelector('img'); await image.decode();
+        results.push({ name, width: image.naturalWidth, icon: childDocument.querySelector('link[rel="icon"]').getAttribute('href') });
+      } else {
+        const use = childDocument.querySelector('use');
+        for (let i = 0; i < 100 && !use.getBBox().width; i++) await new Promise(resolve => setTimeout(resolve, 20));
+        results.push({ name, width: use.getBBox().width, href: use.getAttribute('href') });
+      }
+      iframe.remove();
+    }
+    return results;
+  });
+  assert.deepEqual(nativeResources, [{ name: 'native-image', width: 20, icon: 'assets/icon' }, { name: 'native-use', width: 20, href: 'assets/icon#mark' }], 'native validated models survive strict preparation, declared closure and real browser image/SVG-use loading');
   const svgProfileResults = await page.evaluate(async () => (await (await fetch(new URL('svg-profile.json', location.href))).json()).map(({ name, xml, expectedText }) => {
     const parsed = new DOMParser().parseFromString(xml, 'image/svg+xml');
     return { name, errors: parsed.querySelectorAll('parsererror').length, textMatches: expectedText === null || parsed.querySelector('text')?.textContent === expectedText };
@@ -146,7 +169,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.references.length} asset-reference + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.references.length} asset-reference + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

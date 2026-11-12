@@ -119,7 +119,7 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 
 | Module | Responsibility |
 | --- | --- |
-| `core/lib/model.ts` | Native document/node vocabulary, validation, limits and patches. |
+| `core/lib/model.ts` | Native vocabulary, validation/resource URL contexts, limits and patches. |
 | `core/lib/validation.ts` | Host-free JSON/text/UTF-8 checks and the shared domain error. |
 | `core/lib/board-session.ts` | Opaque reads/snapshots and optional view-state publication; no project writes. |
 | `core/lib/board-host.ts` | Optional History and native source-update service contracts. |
@@ -129,7 +129,7 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `web/lib/file-picker.js` | Reusable read-only path/list/keyboard UI and request lifetime. |
 | `web/lib/project.js`, `help.js` | Open/copy and Settings policy, writes and modal lifetime. |
 | `core/lib/model-styles.ts`, `browser-styles.ts` | Node lowering binding and explicit absent browser capability. |
-| `core/lib/asset-reference.ts` | Portable declared paths and explicit URI codec; not activated. |
+| `core/lib/asset-reference.ts` | Portable declared paths and explicit URI/dependency codec; not project storage. |
 | `core/lib/assets.ts` | Bounded Data-URL tree and MIME-based text decoding; not source admission. |
 | `core/lib/media-type.ts` | Canonical bounded MIME syntax; no byte sniffing or serving authority. |
 | `core/lib/svg-resource.ts` | Strict XML SVG resource projection, not HTML parsing or publication. |

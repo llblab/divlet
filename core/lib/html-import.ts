@@ -3,7 +3,8 @@ import path from 'node:path';
 import { parse, defaultTreeAdapter as tree } from 'parse5';
 import type { DefaultTreeAdapterMap } from 'parse5';
 import { decodeHtml } from './codec.ts';
-import { object, validateDocument, VOID_TAGS } from './model.ts';
+import { object, validateDocument, VOID_TAGS, DivletError } from './model.ts';
+import { readAssetReference } from './asset-reference.ts';
 import type { DocumentModel } from './model.ts';
 import { validateSettings, writeProject } from './project.ts';
 
@@ -80,6 +81,10 @@ function sanitize(html: string): SanitizedPage {
 
 function frameOf({ page, title, dropped }: SanitizedPage, { fallbackId, name, source, format }: PageOptions & { name?: string }): DocumentModel {
   const decoded = decodeHtml(page, { fallbackId });
+  // Native resource syntax in strict HTML is not a foreign page's grant to another project's namespace.
+  const urls = Object.values(decoded.nodes).flatMap(node => node.type === 'element' ? Object.entries(node.attrs).filter(([name]) => /^(src|poster|href|xlink:href)$/i.test(name)).map(([, value]) => value) : []);
+  if (decoded.head?.icon !== undefined) urls.push(decoded.head.icon);
+  if (urls.some(value => readAssetReference(value))) throw new DivletError('INVALID_DOCUMENT', 'External page URL attributes cannot supply native project asset declarations. Import the resource bytes explicitly.');
   const metadata = source ? { import: { source, format, dropped } } : {};
   return validateDocument({ schemaVersion: 1, id: decoded.id, name: title || name || fallbackId, ...(decoded.head !== undefined ? { head: decoded.head } : {}), version: 1, rootId: decoded.rootId, artboard: decoded.artboard, tokens: decoded.tokens, css: decoded.css, metadata, nodes: decoded.nodes });
 }

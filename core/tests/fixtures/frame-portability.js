@@ -3,6 +3,13 @@ export function sampleFrame() {
   return { schemaVersion: 1, id: 'test', name: 'A test', version: 1, artboard: { x: 0, y: 0, width: 390, height: 844 }, rootId: 'root', nodes: { root: { id: 'root', type: 'element', tag: 'main', children: ['label'] }, label: { id: 'label', type: 'text', content: 'Hello' } } };
 }
 
+export function resourceFrame(tag, attrs, svg = false) {
+  const frame = sampleFrame();
+  if (svg) frame.nodes.root.tag = 'svg';
+  frame.nodes.label = { id: 'label', type: 'element', tag, attrs, children: [] };
+  return frame;
+}
+
 export const sourceMapCss = 'a{color:red}/*# sourceMappingURL=data:application/json;base64,bm90LWpzb24= */';
 const invalid = (name, change, error = 'INVALID_DOCUMENT') => ({ name, error, run: api => { const frame = sampleFrame(); change(frame); return api.validateDocument(frame); } });
 function byteBoundaryFrame(api, extra) {
@@ -56,6 +63,36 @@ export const frameCases = [
     const frame = sampleFrame(); frame.nodes.root.children = ['t0', 't1', 't2']; delete frame.nodes.label;
     for (const id of frame.nodes.root.children) frame.nodes[id] = { id, type: 'text', content: '字'.repeat(api.LIMITS.text) };
     return api.validateDocument(frame);
+  } },
+  ...[
+    ['img', { src: 'asset:icons/logo.svg?theme=dark&x=%2f#mark' }],
+    ['video', { poster: 'asset:images/Regular%20Preview.png' }],
+    ['source', { src: 'asset:media/movie.webm' }],
+    ['use', { href: 'asset:icons/logo.svg#mark' }, true],
+    ['use', { 'xlink:href': 'asset:icons/logo.svg#mark' }, true],
+  ].map(([tag, attrs, svg], i) => ({ name: `declared resource attribute ${i + 1}`, run: api => api.validateDocument(resourceFrame(tag, attrs, svg)) })),
+  { name: 'declared head icon preserves exact URI spelling', run: api => api.validateDocument({ ...sampleFrame(), head: { icon: 'asset:icons/logo.svg?v=%2f#mark' } }) },
+  { name: 'resource-looking inert values remain opaque', run: api => { const frame = sampleFrame(); frame.metadata = { note: 'asset:../not-a-reference' }; frame.nodes.root.attrs = { title: 'asset:../not-a-reference' }; frame.nodes.label.content = 'asset:../not-a-reference'; return api.validateDocument(frame); } },
+  ...[
+    ['a', { href: 'asset:icons/logo.svg' }],
+    ['a', { href: 'asset:icons/logo.svg' }, true],
+    ['form', { action: 'asset:icons/logo.svg' }],
+    ['button', { formaction: 'asset:icons/logo.svg' }],
+    ['svg', { href: 'asset:icons/logo.svg' }, true],
+    ['linearGradient', { href: 'asset:icons/logo.svg#paint' }, true],
+    ['image', { href: 'asset:icons/logo.svg' }, true],
+    ['feImage', { href: 'asset:icons/logo.svg' }, true],
+  ].map(([tag, attrs, svg], i) => ({ name: `declared resource context refusal ${i + 1}`, error: 'INVALID_DOCUMENT', run: api => api.validateDocument(resourceFrame(tag, attrs, svg)) })),
+  ...['ASSET:icons/logo.svg', ' asset:icons/logo.svg', '\u00a0asset:icons/logo.svg', '\ufeffasset:icons/logo.svg', 'asset:icons/%2E%2E/logo.svg', 'asset:icons/%FF', 'asset:icons/雪.svg', 'asset:icons/logo.svg#raw space'].map((src, i) => ({ name: `declared resource syntax refusal ${i + 1}`, error: 'INVALID_ASSET', run: api => api.validateDocument(resourceFrame('img', { src })) })),
+  { name: 'resource scheme cannot be assembled with control whitespace', error: 'INVALID_DOCUMENT', run: api => api.validateDocument(resourceFrame('img', { src: 'ass\net:icons/logo.svg' })) },
+  { name: 'resource href cannot survive a non-resource tag patch', run: api => {
+    const source = api.validateDocument(resourceFrame('use', { href: 'asset:icons/logo.svg#mark' }, true)), before = JSON.stringify(source);
+    try { api.applyDocumentPatch(source, { nodes: { label: { tag: 'g' } } }); } catch (error) {
+      if (JSON.stringify(source) !== before) throw new Error('Refused resource context patch mutated source');
+      if (error.code !== 'INVALID_DOCUMENT' || !(error instanceof api.DivletError)) throw error;
+      return { code: error.code, domainError: true };
+    }
+    throw new Error('A resource href survived an unproven consumer tag');
   } },
   invalid('unsupported schema marker', frame => { frame.schemaVersion = 2; }),
   invalid('duplicate tree ownership', frame => { frame.nodes.root.children = ['label', 'label']; }),
