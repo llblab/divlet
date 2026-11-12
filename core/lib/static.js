@@ -11,6 +11,7 @@ import { assetReference, readAssetReference, resolveAssetDependency } from './as
 import { DivletError } from './validation.ts';
 import { rewriteSvgResource, SVG_RESOURCE_ATTRIBUTES } from './svg-resource.ts';
 import { decodeCss, cssString } from './css-literals.ts';
+import { resourceMediaTypeForExtension } from './media-type.ts';
 
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const fail = (message, details) => { throw Object.assign(new Error(`Static bundle: ${message}`), details ? { details } : {}); };
@@ -457,11 +458,18 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
     sources.set(source, hash(bytes));
     files.set(output, bytes);
     // Defer recursive transforms until this source has a stable output identity.
-    if (/\.(?:css|svg|html?)$/i.test(source)) pending.push(async () => {
-      const rewrite = (url, context) => rewriteUrl(url, source, output, undefined, context);
-      const text = bytes.toString('utf8');
-      files.set(output, /\.css$/i.test(source) ? await rewriteCss(text, rewrite, false, closedCss, inspectSelectors) : await rewriteHtml(text, rewrite, /\.svg$/i.test(source), /\.html?$/i.test(source) ? base => baseRewrite(base, source, output) : undefined, closedCss, inspectSelectors));
-    });
+    if (/\.(?:css|svg|html?)$/i.test(source)) {
+      // A suffix cannot authorize lossy text interpretation. Binary fonts/images may have misleading names.
+      const text = bytes.includes(0) ? null : bytes.toString('utf8');
+      if (text === null || !Buffer.from(text).equals(bytes)) {
+        if (closedCss) unsupportedSourceCss(); // Canonical relocation still requires proven text dependency semantics.
+        mediaTypes.set(output, resourceMediaTypeForExtension(path.extname(source).toLowerCase()));
+      }
+      else pending.push(async () => {
+        const rewrite = (url, context) => rewriteUrl(url, source, output, undefined, context);
+        files.set(output, /\.css$/i.test(source) ? await rewriteCss(text, rewrite, false, closedCss, inspectSelectors) : await rewriteHtml(text, rewrite, /\.svg$/i.test(source), /\.html?$/i.test(source) ? base => baseRewrite(base, source, output) : undefined, closedCss, inspectSelectors));
+      });
+    }
     return output;
   }
   async function declaredResource(key) {
@@ -652,5 +660,5 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
     if (!routes.has(route)) fail('site preview has no matching route');
     rewrittenSitePreviews.set(route, await preview(html, routes.get(route), route));
   }
-  return { files, sources, warnings, stylesheets, ...(declared ? { assetSources, mediaTypes } : {}), previews: rewrittenPreviews, sitePreviews: rewrittenSitePreviews, ...(mapResources ? { mapped } : {}) };
+  return { files, sources, warnings, stylesheets, mediaTypes, ...(declared ? { assetSources } : {}), previews: rewrittenPreviews, sitePreviews: rewrittenSitePreviews, ...(mapResources ? { mapped } : {}) };
 }

@@ -4,8 +4,10 @@ import type { DefaultTreeAdapterMap } from 'parse5';
 import postcss from 'postcss';
 import type { ChildNode } from 'postcss';
 import valueParser from 'postcss-value-parser';
+import path from 'node:path';
+import { mediaTypeForExtension } from './media-type.ts';
+import { decodeCss, cssString } from './css-literals.ts';
 import { inlineDeclaredAssets } from './static.js';
-import { decodeCss } from './css-literals.ts';
 import { DivletError, SOURCE_LIMITS } from './model.ts';
 import type { AssetTree } from './model.ts';
 
@@ -21,7 +23,14 @@ function styles(html: string): string[] {
   return result;
 }
 
-export async function captureFontCSS(html: string, assets: AssetTree): Promise<string> {
+/** The accepted public graph, never the disk-publication/repair plan or a filesystem resolver. */
+export interface CaptureFontResources {
+  readonly files: ReadonlyMap<string, string | Uint8Array>;
+  readonly mediaTypes?: ReadonlyMap<string, string>;
+  readonly documentPath: string;
+}
+
+export async function captureFontCSS(html: string, assets: AssetTree, resources?: CaptureFontResources): Promise<string> {
   const faces: string[] = [];
   for (const css of styles(html)) {
     const root = postcss.parse(css);
@@ -41,16 +50,40 @@ export async function captureFontCSS(html: string, assets: AssetTree): Promise<s
   // Images/unreferenced project leaves never enter this font-only closure.
   const embedded = await inlineDeclaredAssets(`<html><head><style>${faces.join('\n')}</style></head><body></body></html>`, assets);
   const css = styles(embedded).join('\n');
-  if (Buffer.byteLength(css) > SOURCE_LIMITS.bytes) fail();
-  postcss.parse(css).walkDecls(decl => {
-    valueParser(decl.value).walk(node => {
+  let expandedBytes = Buffer.byteLength(css);
+  if (expandedBytes > SOURCE_LIMITS.bytes) fail();
+  const root = postcss.parse(css);
+  root.walkDecls(decl => {
+    const parsed = valueParser(decl.value);
+    parsed.walk(node => {
       if (node.type === 'function' && decodeCss(node.value).toLowerCase() === 'url') {
         const nodes = node.nodes.filter(child => child.type !== 'space' && child.type !== 'comment');
-        if (nodes.length !== 1 || !['string', 'word'].includes(nodes[0]!.type) || !decodeCss(nodes[0]!.value).toLowerCase().startsWith('data:')) fail();
+        const first = nodes[0];
+        if (node.unclosed || nodes.length !== 1 || !first || first.type !== 'string' && first.type !== 'word' || 'unclosed' in first && first.unclosed) fail();
+        const value = decodeCss(first.value);
+        if (!value.toLowerCase().startsWith('data:')) {
+          if (!resources || !value || /^[a-z][a-z0-9+.-]*:|^\//i.test(value) || /[\\\\\0]/.test(value)) fail();
+          const url = new URL(value, 'https://capture.invalid/' + resources.documentPath);
+          if (/[?#]/.test(value)) fail(); // Even empty authored delimiters carry suffix semantics; URL.search/hash erase them.
+          let key: string;
+          try { key = decodeURIComponent(url.pathname.slice(1)); } catch { fail(); }
+          if (!/^(?:_assets|assets)\//.test(key) || /[\\\\\0]/.test(key)) fail();
+          const contents = resources.files.get(key);
+          if (contents === undefined) fail();
+          const length = typeof contents === 'string' ? Buffer.byteLength(contents) : contents.byteLength;
+          const mediaType = resources.mediaTypes?.get(key) ?? mediaTypeForExtension(path.posix.extname(key).toLowerCase()) ?? 'application/octet-stream';
+          const prefix = cssString('data:' + mediaType + ';base64,');
+          // Reserve conservative total serialized growth before byte/base64 allocation; never scan unrelated graph entries.
+          expandedBytes += Buffer.byteLength(prefix) + 4 * Math.ceil(length / 3) + 16;
+          if (expandedBytes > SOURCE_LIMITS.bytes) fail();
+          const bytes = typeof contents === 'string' ? Buffer.from(contents) : Buffer.from(contents.buffer, contents.byteOffset, contents.byteLength);
+          node.nodes = [{ ...first, type: 'string', quote: '"', value: prefix + bytes.toString('base64') }];
+        }
         return false;
       }
-      if (node.type === 'function' && decodeCss(node.value).toLowerCase() === 'var') fail();
+      if (node.type === 'function' && ['var', 'env', 'attr'].includes(decodeCss(node.value).toLowerCase())) fail();
     });
+    decl.value = parsed.toString();
   });
-  return css;
+  return root.toString();
 }

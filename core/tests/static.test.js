@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { buildStatic, normalizeExternalFiles } from '../lib/static.js';
+import { fontBytes } from './fixtures/font.js';
 
 const assetBase = 'http://127.0.0.1:123/token/files/';
 const siteBase = 'http://127.0.0.1:123/token/site/';
@@ -19,6 +20,19 @@ async function fixture(t, entries = {}) {
 }
 const build = (projectDir, html, extra = {}) => buildStatic({ projectDir, frames: new Map([['home', html]]), assetBase, siteBase, ...extra });
 function resourceName(result, suffix) { return [...result.files.keys()].find((key) => key.startsWith('_assets/') && key.endsWith(suffix)); }
+
+test('binary resources with text suffixes retain bytes and canonical HTTP defaults instead of lossy parsing', async t => {
+  const font = fontBytes(600, { cff: true }), invalidUtf8 = Buffer.from([0xff, 0xfe, 0xfd]);
+  const directory = await fixture(t, { 'font.html': font, 'opaque.css': invalidUtf8 });
+  const result = await build(directory, '<style>@font-face{font-family:Proof;src:url(font.html)}body{background:url(opaque.css)}</style>', { previews: new Map([['home', '<style>@font-face{font-family:Proof;src:url(font.html)}</style>']]), previewBase: 'http://127.0.0.1:123/token/build/' });
+  const fontKey = resourceName(result, '-font.html'), opaqueKey = resourceName(result, '-opaque.css');
+  assert.deepEqual(result.files.get(fontKey), font); assert.deepEqual(result.files.get(opaqueKey), invalidUtf8);
+  assert.equal(result.mediaTypes.get(fontKey), 'text/html;charset=utf-8');
+  assert.equal(result.mediaTypes.get(opaqueKey), 'text/css;charset=utf-8');
+  assert.ok(result.previews.get('home').includes('build/' + fontKey + '?divlet-resource='));
+  assert.equal(result.sources.get(path.join(directory, 'font.html')), createHash('sha256').update(font).digest('hex'));
+  await assert.rejects(build(directory, '<link rel="stylesheet" href="opaque.css">', { closedCss: true }), { code: 'COPY_UNSUPPORTED_RESOURCE' }, 'closed canonical relocation must not bypass text dependency validation by calling unknown bytes opaque');
+});
 
 test('external grant normal forms are set-equivalent and idempotent with native filesystem paths', async t => {
   const root = await fixture(t);

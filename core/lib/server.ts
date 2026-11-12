@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { previewBridge } from './bridge.js';
 import { clientPluginFile } from './engine.ts';
 import { FONT_LIMITS } from './font.ts';
+import { mediaTypeForExtension } from './media-type.ts';
 /**
  * What the HTTP layer needs from a board. Every method is the runtime's own; naming them here keeps this file checkable while
  * the runtime itself is still JavaScript, and states exactly how much of the board the transport depends on.
@@ -64,7 +65,6 @@ export interface BoardServer {
 }
 
 const WEB_ROOT = fileURLToPath(new URL('../../web/', import.meta.url));
-const MIME: Record<string, string> = { '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.html': 'text/html; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.gif': 'image/gif', '.avif': 'image/avif', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
 
 /*
  * `siteBridge` is serialized with `Function#toString` and runs inside the site page, so it may not reference anything from this
@@ -298,7 +298,7 @@ export async function startServer(runtime: BoardApi, { port = 0 }: { port?: numb
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Content-Security-Policy': `sandbox allow-scripts; default-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data: https:; script-src 'nonce-${nonce}'; connect-src 'none'; base-uri 'none'; form-action 'none'` });
           return res.end(html);
         }
-        res.writeHead(200, { 'Content-Type': MIME[extension] || 'application/octet-stream', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data: https:" });
+        res.writeHead(200, { 'Content-Type': mediaTypeForExtension(extension) || 'application/octet-stream', 'Cache-Control': 'no-store', 'Access-Control-Allow-Origin': '*', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data: https:" });
         return res.end(contents);
       }
       if (req.method === 'GET' && route.startsWith('files/')) {
@@ -310,18 +310,18 @@ export async function startServer(runtime: BoardApi, { port = 0 }: { port?: numb
         if (rel === '..' || rel.startsWith('..' + path.sep) || path.isAbsolute(rel)) return json(res, 403, { error: 'UNSAFE_PATH' });
         const stat = await fs.stat(real);
         if (!stat.isFile() || stat.size > 20 * 1024 * 1024) return json(res, 404, { error: 'NOT_FOUND' });
-        res.writeHead(200, { 'Content-Type': MIME[path.extname(real).toLowerCase()] || 'application/octet-stream', 'Access-Control-Allow-Origin': '*', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data: https:" });
+        res.writeHead(200, { 'Content-Type': mediaTypeForExtension(path.extname(real).toLowerCase()) || 'application/octet-stream', 'Access-Control-Allow-Origin': '*', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data: https:" });
         return res.end(await fs.readFile(real));
       }
       if (req.method === 'GET' && /^((?:lib\/)?[A-Za-z0-9_-]+\.(?:js|css|html|svg)|)$/.test(route)) {
         const file = route || 'index.html';
-        res.writeHead(200, { 'Content-Type': MIME[path.extname(file)], 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+        res.writeHead(200, { 'Content-Type': mediaTypeForExtension(path.extname(file)), 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
         return res.end(await fs.readFile(path.join(WEB_ROOT, file)));
       }
       const plugin = req.method === 'GET' && /^plugins\/([a-z0-9-]+)\/([A-Za-z0-9_-]+\.js)$/.exec(route);
       const pluginFile = plugin ? clientPluginFile(plugin[1] as string, plugin[2] as string) : null;
       if (pluginFile) {
-        res.writeHead(200, { 'Content-Type': MIME['.js'], 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+        res.writeHead(200, { 'Content-Type': mediaTypeForExtension('.js'), 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
         return res.end(await fs.readFile(pluginFile));
       }
       return json(res, 404, { error: 'NOT_FOUND' });

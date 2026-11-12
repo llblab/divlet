@@ -370,8 +370,11 @@ export class DivletRuntime extends EventEmitter {
   async captureFonts(id, expectedRender) {
     const entry = this.getEntry(id), settings = this.settings;
     if (!Number.isSafeInteger(expectedRender) || expectedRender !== entry.render) fail('STALE_PREVIEW', 'The frame changed before snapshot font preparation.');
-    const css = await captureFontCSS(entry.html, settings.assets ?? {});
-    if (this.documents.get(id) !== entry || this.settings !== settings) fail('STALE_PREVIEW', 'The frame changed during snapshot font preparation.');
+    const files = this.publicFiles, mediaTypes = this.publicMediaTypes;
+    if (!files) fail('CAPTURE_UNAVAILABLE', 'This frame’s font resources cannot be embedded faithfully. Keep its live preview.');
+    // File HTML already names the accepted public graph; do not re-decode or borrow unreferenced source assets.
+    const css = await captureFontCSS(entry.fileHtml, {}, { files, mediaTypes, documentPath: path.basename(entry.htmlPath) });
+    if (this.documents.get(id) !== entry || this.settings !== settings || this.publicFiles !== files || this.publicMediaTypes !== mediaTypes) fail('STALE_PREVIEW', 'The frame changed during snapshot font preparation.');
     return { documentId: id, render: entry.render, css };
   }
 
@@ -631,13 +634,13 @@ export class DivletRuntime extends EventEmitter {
     const site = new Map([...(candidate.site?.pages ?? [])].map(([route, page]) => [route, page.fileHtml]));
     let generation;
     const declared = Object.keys(settings.assets ?? {}).length > 0;
-    try { generation = await buildStatic({ projectDir: this.projectDir, frames, site, assetBase: this.url + 'files/', siteBase: this.url + 'site/', externalFiles: this.externalFiles, ...(declared ? { assets: settings.assets, nativeAssets: true, previewBase: this.url + 'build/', previews: new Map([...entries].map(([id, entry]) => [id, entry.html])), sitePreviews: new Map([...(candidate.site?.pages ?? [])].map(([route, page]) => [route, page.html])) } : {}) }); }
+    try { generation = await buildStatic({ projectDir: this.projectDir, frames, site, assetBase: this.url + 'files/', siteBase: this.url + 'site/', externalFiles: this.externalFiles, previewBase: this.url + 'build/', previews: new Map([...entries].map(([id, entry]) => [id, entry.html])), ...(declared ? { assets: settings.assets, nativeAssets: true, sitePreviews: new Map([...(candidate.site?.pages ?? [])].map(([route, page]) => [route, page.html])) } : {}) }); }
     catch (error) { failStaticBuild(error, this.projectPath, this.externalFiles); }
     const inputs = [...generation.sources.keys(), ...(candidate.site?.routes ?? []).map(route => route.sourcePath)];
     if (inputs.some(file => inside(destination, file))) fail('INVALID_OUTPUT_DIR', 'The output directory cannot contain authored resources or Markdown sources used by this project.');
     for (const [id, entry] of entries) {
       const fileHtml = String(generation.files.get(path.basename(entry.htmlPath)));
-      const previewHtml = declared ? generation.previews.get(id) : undefined;
+      const previewHtml = generation.previews.get(id);
       const previous = this.documents.get(id);
       const changedPreview = previous && (previous.previewHtml ?? previous.html) !== (previewHtml ?? entry.html);
       const render = changedPreview && entry.render === previous.render ? ++this.renderSeq : entry.render;
