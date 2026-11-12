@@ -375,7 +375,7 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .html-presentation:disabled { opacity: var(--disabled); }
 .html-scope-toggle { justify-self: start; height: auto; min-height: 30px; padding: 5px 8px; white-space: normal; text-align: left; }
 .grid2, .box3, .box4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--control-min, 140px)), 1fr)); gap: 6px; }
-.geometry-grid, .box3, .box4, .layout-box > .grid2, .appearance-box > .grid2 { --control-min: 120px; }
+.geometry-grid, .box3, .box4, .layout-box > .grid2, .appearance-box > .grid2, .typography-controls > .grid2 { --control-min: 120px; }
 /* Selectors wrap as whole fields according to their label/value widths, not a shared numeric-field minimum. */
 .grid2:has(> .pick) { display: flex; flex-wrap: wrap; }
 .grid2:has(> .pick) > * { flex: 1 1 var(--control-min, 140px); }
@@ -912,7 +912,11 @@ body.is-expanded .brand, body.is-expanded .sidebar-foot, body.is-expanded .panel
 .border-widths { --control-min: max(106px, calc(50% - 3px)); }
 .border-box .color-field { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 6px; padding: 4px 6px; }
 .border-box .color-field > .vf-k { grid-column: 1 / -1; justify-self: start; min-width: 0; padding-left: 0; cursor: default; }
-.appearance-box > .grid2 { align-items: center; }
+.appearance-box > .grid2, .typography-controls > .grid2 { align-items: center; }
+.typography-controls { display: grid; gap: 8px; min-width: 0; }
+.font-family-control { display: grid; gap: 4px; min-width: 0; }
+.font-family-scroll { min-width: 0; max-width: 100%; overflow-x: auto; border-radius: var(--radius-inner); }
+.font-family { width: 100%; min-width: max-content; }
 .border-geometry { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .border-geometry > .vf { flex: 0 1 84px; }
 .border-geometry > .radius-presets { flex: 1 1 130px; }

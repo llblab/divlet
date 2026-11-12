@@ -341,11 +341,13 @@ function appearanceFold({ value, run, measured, tokens }) {
   const text = value(cls => tw.get(cls, 'textAlign')?.slice(5) ?? null);
   const textRow = el('div', 'segs-row align-controls');
   textRow.append(labeledSegments('Text', segmented('Text align', text === MIXED ? null : text, [['left', 'textL', 'Align left'], ['center', 'textC', 'Align center'], ['right', 'textR', 'Align right'], ['justify', 'textJ', 'Justify']], next => run(cls => tw.set(cls, 'textAlign', next ? `text-${next}` : null), next ? `text ${next}` : 'default text align'))));
+  const typography = el('div', 'typography-controls');
+  typography.dataset.inspectorSlot = 'typography';
+  typography.append(type, textRow);
   box.append(
     colorField({ key: 'fill', label: 'Fill', tip: 'Background colour', group: 'bgColor', prefix: 'bg', value, run, computed: measured?.colors?.background, tokens }),
     colorField({ key: 'ink', label: 'Text', tip: 'Text colour', group: 'textColor', prefix: 'text', value, run, computed: measured?.colors?.color, tokens }),
-    type,
-    textRow,
+    typography,
   );
   return box;
 }

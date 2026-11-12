@@ -39,6 +39,8 @@ The read-session gate is `node scripts/source.mjs --test core/tests/board-sessio
 
 `node scripts/source.mjs --test core/tests/source-assets.test.js core/tests/asset-upload.test.js` checks schema-1 source/patches, aliases and literals, MIME-before-extension delivery, render invalidation, guarded Undo/Redo, foreign CSS/srcset/compiler/fragment namespace closure, literal clipboard retention, missing/unsafe-reference and collision refusal, unused-byte copy isolation, source-envelope bounds and cache deletion/rebuild. The synthetic CC0 TrueType fixture owns no third-party font bytes. `web/tests/static.mjs` loads it through the real sandboxed board preview and direct preview route, checks changed glyph advances and Undo, then loads a standalone embedded-font/image export after source/cache removal. `features.mjs` covers grouped upload/node history and byte-bearing image clipboard HTML. Font family/upload controls and far-zoom capture remain separate acceptance work.
 
+`web/tests/appearance.mjs` additionally exercises the native family selector: Default/generics, declared stored faces and real loading, literal comma/parenthesis names, fallback/priority preservation, multi-selection Undo and whole-selection font/all shorthand refusal (including important resets), plus effective computed-family checks under an important stylesheet without silent priority escalation and keyboard menu/focus recovery. It opens a separately owned project with no style engine and proves actual font rendering, plus phone/200% exact-value keyboard panning. This is not device-upload or far-zoom-font evidence.
+
 ## Format candidate
 
 Run these from a source checkout:

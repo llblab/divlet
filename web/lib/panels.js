@@ -10,6 +10,8 @@
  *   Linked property views may observe completion to refresh inactive controls, never to commit a second copy.
  *   freshMeasuredBox waits for the current render's geometry and refuses if it never arrives.
  * section = { name, title?, content }: with a title the content is a fold, without one it is the bare section.
+ * Appearance may expose a [data-inspector-slot="typography"] element; the core inserts native family controls there.
+ * Without that slot it prepends them to Appearance; without a provider it owns a minimal Appearance section.
  */
 const panels = [];
 

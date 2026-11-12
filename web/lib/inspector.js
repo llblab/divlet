@@ -5,6 +5,7 @@ import * as actions from './actions.js';
 import { openMenu, menuAnchor, closeMenu } from './menu.js';
 import { overflowBar } from './toolbar.js';
 import { panelSections } from './panels.js';
+import { fontFamilyControl } from './typography.js';
 import { attributesEditor } from './attrs.js';
 import { formatCss, highlightCss } from './css.js';
 import { attachSuggest, filterLocal } from './suggest.js';
@@ -576,7 +577,16 @@ function panelFolds(kind, doc, nodes, parent) {
       });
     },
   };
-  return panelSections(kind, ctx).map(({ name, title, content }) => section(name, title ? details(title, content, true) : content));
+  const sections = panelSections(kind, ctx);
+  const family = fontFamilyControl(nodes, { css: [store.state?.project?.css, cachedModel(doc.id)?.css], apply: applyClasses });
+  const appearance = sections.find(item => item.name === 'appearance');
+  if (appearance) (appearance.content.querySelector('[data-inspector-slot="typography"]') ?? appearance.content).prepend(family);
+  else {
+    const content = el('div', 'appearance-box');
+    content.append(family);
+    sections.push({ name: 'appearance', title: 'Appearance', content });
+  }
+  return sections.map(({ name, title, content }) => section(name, title ? details(title, content, true) : content));
 }
 
 function idField(doc, node) {

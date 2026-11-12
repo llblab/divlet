@@ -1,11 +1,14 @@
 // Border, Appearance and Effects: linked border widths, line styles, colours, radius and numeric gestures.
 import assert from 'node:assert/strict';
 import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
-import { cp, mkdtemp, rm, mkdir } from 'node:fs/promises';
+import { cp, mkdtemp, rm, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { openRuntime } from '../../core/lib/runtime.js';
+import { fontDataUrl } from '../../core/tests/fixtures/font.js';
+import { setStyleEngines } from '../../core/lib/engine.ts';
+import { decodeHtml } from '../../core/lib/codec.ts';
 
 const playwright = await import('playwright');
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -23,7 +26,7 @@ const waitUntil = async (fn, label, timeout = 8000) => {
   throw new Error(`Timed out: ${label}${last instanceof Error ? ` (${last.message})` : ''}`);
 };
 const classesOf = id => runtime.read({ view: 'document', documentId: 'welcome' }).nodes[id].className.split(' ');
-let browser;
+let browser, native;
 try {
   browser = await playwright.chromium.launch(launch);
   const page = await (await browser.newContext({ viewport: { width: 1500, height: 900 } })).newPage();
@@ -58,6 +61,84 @@ try {
   await waitUntil(() => classesOf('cta').join(' ') === beforeTextAlign, 'one Undo restores the previous text alignment and unrelated classes');
   await runtime.queue;
   checks.push('text alignment has one home in Appearance, edits the actual page and remains independently undoable');
+
+  const family = page.locator('#inspector [data-key="font-family"]');
+  const inlineFamily = () => runtime.getEntry('welcome').document.nodes.cta.style['font-family'];
+  const chooseFamily = async name => { await family.click(); await page.getByRole('menuitemradio', { name, exact: true }).click(); await runtime.queue; };
+  assert.equal(await family.count(), 1);
+  assert.equal(await family.evaluate(node => node.closest('[data-inspector-slot="typography"]') !== null), true, 'native family is adjacent to size, weight and alignment, not another section');
+  const classesBeforeFamily = classesOf('cta').join(' ');
+  for (const name of ['system-ui', 'sans-serif', 'serif', 'monospace']) {
+    await chooseFamily(name);
+    await waitUntil(() => inlineFamily() === name, `native ${name} family`);
+    await waitUntil(() => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate((node, name) => getComputedStyle(node).fontFamily === name, name), 'chosen family reaches the real iframe');
+    assert.equal(classesOf('cta').join(' '), classesBeforeFamily, 'family edits do not require utility normalization');
+  }
+  await chooseFamily('Default (stylesheet / inherited)');
+  await waitUntil(() => inlineFamily() === undefined, 'Default clears the inline override');
+  await runtime.undo(); await waitUntil(() => inlineFamily() === 'monospace', 'one Undo restores the prior native family');
+  await runtime.redo(); await waitUntil(() => inlineFamily() === undefined, 'Redo restores inheritance');
+
+  await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { assets: { fonts: { 'proof.ttf': fontDataUrl() } }, css: runtime.settings.css + '\n@font-face{font-family:"Project Face";src:url(asset:fonts/proof.ttf)}' } });
+  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { css: runtime.getEntry('welcome').document.css + '\n@font-face{font-family:"Local (Variant)";src:url(asset:fonts/proof.ttf)}', nodes: { cta: { style: { 'font-family': '"Old Face", serif !important' } } } } });
+  await select('cta');
+  await waitUntil(() => family.getAttribute('aria-label').then(value => value.includes('Old Face')), 'the authored family is shown');
+  await chooseFamily('"Project Face"');
+  await waitUntil(() => inlineFamily() === '"Project Face", "Old Face", serif !important', 'declared family retains fallback spelling and importance');
+  await chooseFamily('"Local (Variant)"');
+  await waitUntil(() => inlineFamily() === '"Local (Variant)", "Old Face", serif !important', 'changing declared family replaces just its head, not the fallback stack');
+  await waitUntil(() => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('body').evaluate(async () => (await document.fonts.load('16px "Local (Variant)"', 'A')).length === 1), 'the declared stored face actually loads');
+  await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', ['cta', 'hero']));
+  await waitUntil(() => family.getAttribute('aria-label').then(value => value.includes('Mixed')), 'mixed selection is explicit');
+  await chooseFamily('serif');
+  await waitUntil(() => ['cta', 'hero'].every(id => runtime.getEntry('welcome').document.nodes[id].style['font-family']?.startsWith('serif')), 'one shared native write edits all selected elements');
+  await runtime.undo();
+  assert.equal(runtime.getEntry('welcome').document.nodes.hero.style['font-family'], undefined);
+  assert.equal(inlineFamily(), '"Local (Variant)", "Old Face", serif !important');
+
+  await select('cta');
+  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { nodes: { cta: { style: { 'font-family': null, font: 'italic 600 16px serif' } } } } });
+  await waitUntil(() => family.getAttribute('aria-label').then(value => value.includes('Inline shorthand')), 'ambiguous shorthand is named instead of guessed');
+  const shorthandVersion = afterVersion();
+  await chooseFamily('monospace'); await sleep(150);
+  assert.equal(afterVersion(), shorthandVersion, 'refused shorthand edit changes neither source content nor version');
+  assert.equal(runtime.getEntry('welcome').document.nodes.cta.style.font, 'italic 600 16px serif');
+  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { nodes: { cta: { style: { font: null } } } } });
+  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { nodes: { cta: { style: { all: 'initial !important' } } } } });
+  await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', ['hero', 'cta']));
+  await waitUntil(() => page.locator('#inspector .count').innerText().then(value => value.includes('2')), 'both reset-conflict targets reach the inspector');
+  const beforeReset = runtime.read({ view: 'frame', documentId: 'welcome' }), resetSource = await readFile(runtime.projectPath), resetHistory = runtime.readHistory();
+  const actualFamily = () => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => getComputedStyle(node).fontFamily);
+  const resetFamily = await actualFamily();
+  await chooseFamily('monospace'); await sleep(150);
+  assert.deepEqual(runtime.read({ view: 'frame', documentId: 'welcome' }), beforeReset, 'one shorthand conflict refuses every selected node, including the earlier safe prefix');
+  assert.deepEqual(await readFile(runtime.projectPath), resetSource); assert.deepEqual(runtime.readHistory(), resetHistory);
+  assert.equal(await actualFamily(), resetFamily, 'the all !important witness refuses without changing effective family');
+  await select('cta');
+  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { css: runtime.getEntry('welcome').document.css + '\n.font-lock{font-family:serif!important}', nodes: { cta: { className: classesBeforeFamily + ' font-lock', style: { all: null } } } } });
+  await waitUntil(() => actualFamily().then(value => value === 'serif'), 'important stylesheet family is effective');
+  await chooseFamily('monospace'); await waitUntil(() => inlineFamily() === 'monospace', 'the authored inline value is saved without silent priority escalation');
+  assert.equal(await actualFamily(), 'serif', 'the explicit important stylesheet still wins');
+  assert.match(await page.locator('.font-family-note').innerText(), /inline CSS.*stylesheet priority/);
+  assert.equal(await family.getAttribute('aria-describedby'), 'font-family-cascade-note', 'the always-visible cascade disclosure describes this authored-value control');
+  await family.focus(); await page.keyboard.press('Space');
+  await page.getByRole('menu', { name: 'Font family', exact: true }).waitFor();
+  await page.keyboard.press('End'); await page.keyboard.press('Escape');
+  assert.equal(await family.evaluate(node => node === document.activeElement), true, 'keyboard Escape restores focus to the font field');
+  await page.keyboard.press('Space'); await page.keyboard.press('Home'); await page.keyboard.press('Enter');
+  await waitUntil(() => inlineFamily() === undefined, 'keyboard Default clears only the inline value');
+  assert.equal(await actualFamily(), 'serif');
+  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { nodes: { cta: { className: classesBeforeFamily } } } });
+  const semanticChecks = await page.evaluate(async () => {
+    const { familyPatch } = await import('./lib/typography.js');
+    const named = '"Project Face"';
+    const inherited = familyPatch({ style: { 'font-family': 'inherit !important' } }, named, [named]);
+    let refused = false;
+    try { familyPatch({ style: { 'font-family': 'var(--family, serif)' } }, named, [named]); } catch { refused = true; }
+    return { inherited, refused, generic: familyPatch({ style: { 'font-family': 'var(--family, serif)' } }, 'serif', [named]) };
+  });
+  assert.deepEqual(semanticChecks, { inherited: { 'font-family': '"Project Face" !important' }, refused: true, generic: { 'font-family': 'serif' } });
+  checks.push('native family generics/declared loading, fallback/priority retention, multi-selection history, font/all refusal and honest important-stylesheet disclosure with keyboard menu recovery');
 
   // Use the real resize control, not an artificial viewport breakpoint: the desktop floor is 280px.
   const handle = page.locator('.resize-handle[data-panel="inspector"]');
@@ -305,6 +386,40 @@ try {
   await select('cta'); await effect('z').waitFor();
   await typeZ('auto'); await scrub('z', 6);
   await waitUntil(() => classesOf('cta').includes('z-2'), 'z-index scrubbing works at 200% interface size');
+  await runtime.close();
+  setStyleEngines([]);
+  native = await openRuntime({ file: path.join(cwd, 'no-engine.divlet'), watch: false, createDemo: false });
+  await native.patchProject({ expectedVersion: 1, patch: { assets: { fonts: { 'plain.ttf': fontDataUrl() } }, css: '@font-face{font-family:"No Engine Face";src:url(asset:fonts/plain.ttf)}main{font-family:serif}p{font-size:100px;display:inline-block}' } });
+  await native.create({ document: decodeHtml('<main><p id="first">AA</p><p id="second">BB</p></main>', { fallbackId: 'plain' }) });
+  assert.deepEqual(native.info().clientPlugins, []);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(native.url);
+  await page.evaluate(async () => { const store = await import('./lib/store.js'); store.selectArtboards(['plain']); store.selectNodes('plain', ['first']); });
+  await family.waitFor();
+  assert.equal(await page.locator('#inspector [data-section="appearance"]').count(), 1, 'core supplies one minimal Appearance without a provider');
+  assert.equal(await page.locator('#inspector [data-section="classes"]').count(), 0);
+  await family.click(); await page.getByRole('menuitemradio', { name: '"No Engine Face"', exact: true }).click();
+  await waitUntil(() => native.getEntry('plain').document.nodes.first.style['font-family'] === '"No Engine Face"', 'family edits have no engine requirement');
+  await waitUntil(() => page.locator('iframe[data-document-id="plain"]').contentFrame().locator('#first').evaluate(node => Math.round(node.getBoundingClientRect().width) === 120), 'stored face actually renders with no style engine');
+  const longFamily = '"A deliberately long declared family with spaces (and a comma, inside)"';
+  await native.patchProject({ expectedVersion: native.settings.version, patch: { css: native.settings.css + `\n@font-face{font-family:${longFamily};src:url(asset:fonts/plain.ttf)}` } });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(200));
+  await family.click(); await page.getByRole('menuitemradio', { name: longFamily, exact: true }).click();
+  await waitUntil(() => native.getEntry('plain').document.nodes.first.style['font-family']?.startsWith(longFamily), 'a long comma-bearing family is one literal choice');
+  const geometry = await family.evaluate(button => { const box = button.parentElement; return { fieldWidth: box.clientWidth, contentsWidth: box.scrollWidth, inspectorWidth: document.querySelector('#inspector').clientWidth, text: button.querySelector('.pick-v').textContent, nowrap: getComputedStyle(button.querySelector('.pick-v')).whiteSpace }; });
+  assert.equal(geometry.text, longFamily);
+  assert.equal(geometry.nowrap, 'nowrap');
+  assert.ok(geometry.fieldWidth <= geometry.inspectorWidth && geometry.contentsWidth > geometry.fieldWidth, 'only the overlong whole control pans, not the inspector');
+  const beforePan = native.getEntry('plain').document.version;
+  await page.locator('.font-family-scroll').evaluate(node => { node.scrollLeft = 0; });
+  await page.locator('.font-family-scroll').focus(); await page.keyboard.press('ArrowRight');
+  await waitUntil(() => page.locator('.font-family-scroll').evaluate(node => node.scrollLeft > 0), 'long values are keyboard-scrollable, not ellipsized or reduced');
+  assert.equal(native.getEntry('plain').document.version, beforePan, 'panning a value never invokes canvas nudge shortcuts');
+  await family.click({ trial: true });
+  await mkdir('artifacts', { recursive: true });
+  await page.locator('#inspector').screenshot({ path: 'artifacts/font-family-no-engine-phone-200.png' });
+  checks.push('provider-free native family choice and real embedded face loading, narrow/200% whole-value keyboard panning');
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'passed', checks }, null, 2));
-} finally { await browser?.close(); await runtime.close(); await rm(cwd, { recursive: true, force: true }); }
+} finally { await browser?.close(); await native?.close(); await runtime.close(); await rm(cwd, { recursive: true, force: true }); }
