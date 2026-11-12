@@ -130,14 +130,16 @@ test('the generated page keeps crawler metadata, real section links and a self-c
   assert.equal(/two-way sync|One click in History reverts/.test(html), false, 'no claims of unimplemented reverse editing or row navigation');
 });
 
-test('installation examples distinguish packages, commands and unpublished status', async () => {
+test('installation examples distinguish released packages, commands and draft-format status', async () => {
   const html = await read('index.html');
   const pkg = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
   const wrapper = JSON.parse(await fs.readFile(path.join(root, 'packages/pi/package.json'), 'utf8'));
   assert.ok(html.includes('npx -y @divlet/cli ./my-project'));
   assert.ok(html.includes('npx -y @divlet/mcp --cwd ./my-project'));
   assert.ok(html.includes(`pi install npm:${wrapper.name}`));
-  assert.match(html, /not yet published/);
+  assert.ok(html.includes(`Version ${pkg.version} is an early release`));
+  assert.match(html, /pre-freeze draft/);
+  assert.doesNotMatch(html, /not yet published/);
 });
 
 test('freshness refuses source/embedded-resource drift and metadata-only rebuilds do not change the public fingerprint', async t => {

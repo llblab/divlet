@@ -4,7 +4,7 @@
 
 Pi and MCP expose the same seven tools, validation rules and domain errors. Pi additionally owns the running session, so it can advertise model and thinking-level controls to the board. MCP can answer requests from the board when its client supports sampling.
 
-The first npm release is still in preparation. The checkout instructions work now; npm examples below apply only after publication.
+Use the npm adapters for an installed setup, or the checkout paths below for development. All three adapters depend on the exact matching product version.
 
 ## Pi from a checkout
 
@@ -58,7 +58,7 @@ Diagnostics go to stderr; stdin/stdout carry MCP only. If the client advertises 
 
 A board is the **single writer** of its project. A second client attaches to the existing board over its token-scoped local API, sharing revisions instead of opening another writer. Closing an attached client leaves the owner's board running; closing the owner's process stops it, and the next client can open it again.
 
-## After npm publication
+## npm installation
 
 The product library is `divlet`. The [CLI adapter](https://github.com/llblab/divlet/blob/main/packages/cli/README.md), [MCP adapter](https://github.com/llblab/divlet/blob/main/packages/mcp/README.md) and [Pi adapter](https://github.com/llblab/divlet/blob/main/packages/pi/README.md) are published as `@divlet/cli`, `@divlet/mcp` and `@divlet/pi`. They own their implementations, not wrappers, and depend on the exact matching `divlet` version.
 

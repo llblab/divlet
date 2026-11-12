@@ -1,6 +1,6 @@
 # npm publication
 
-The first release, **0.0.1**, is in preparation and has not been published. This guide describes the intended publication, not permission to run it. Publishing packages, pushing release refs and deploying the landing page require explicit maintainer authorization. This packaging change does not freeze or cut over the native schema.
+This guide owns the guarded first-publication procedure for **0.0.1** and is not permission to run it. A prepared release tree or versioned changelog is not evidence of a completed registry publication. Publishing packages, pushing release refs and deploying the landing page require explicit maintainer authorization. This packaging change does not freeze or cut over the native schema.
 
 ## Package identity
 
@@ -33,7 +33,7 @@ Shared configurations should pin `@divlet/cli@0.0.1`, `@divlet/mcp@0.0.1` and `n
 - Run the checks in [Testing](testing.md): `npm test`, `npm run test:browser:all`, `npm run test:mcp`, `npm run test:contract`, `npm run test:pi` and `npm run test:release`. A skipped Pi check is not proof that Pi installation works.
 - Inspect four tarballs: the root product and `packages/cli`, `packages/mcp`, `packages/pi`. Use `npm pack --dry-run --json` at the root and for each package path. Check exports, bins, manifests, declarations and documentation closure. The product excludes adapter packages, so shipped documentation links to their READMEs must use absolute GitHub URLs. Never publish unverified or stale generated output; the release smoke check installs local tarballs, not unpublished registry names.
 - Recheck the registry immediately before publication with `npm view <name> version --registry=https://registry.npmjs.org/` for all four names. An `E404` does not establish reservation or entitlement. Unexpected existing packages require an ownership decision.
-- **Namespace entitlement remains unverified.** The maintainer must control `divlet` and the `@divlet` scope, have permission to publish all three scoped packages publicly, and satisfy current npm authentication/2FA policy. Never add a token to the repository. No automatic npm publication is authorized by this guide.
+- **Verify namespace entitlement immediately before publication.** The maintainer must control `divlet` and the `@divlet` scope, have permission to publish all three scoped packages publicly, and satisfy current npm authentication/2FA policy. Never add a token to the repository. No automatic npm publication is authorized by this guide.
 - The configured GitHub origin and Pages homepage do not prove push access, Pages activation or a live deployment.
 
 ## First-publication sequence
@@ -55,7 +55,7 @@ Only after explicit authorization, from the built, frozen and validated candidat
    pi install npm:@divlet/pi@0.0.1
    ```
    Open a scratch project and check board serving and MCP tools; help output alone does not prove them. In a clean Pi profile, check `/divlet`, all seven tools and the shared skill without also loading a local adapter.
-6. After all installations pass, create `v0.0.1` on the candidate commit and push only if separately authorized. Remove pre-publication notices only when the documented npm paths are usable; reconcile [BACKLOG.md](../BACKLOG.md) and [CHANGELOG.md](../CHANGELOG.md) with the real outcome.
+6. After all installations pass, create `v0.0.1` on the candidate commit and push only if separately authorized. Prepare npm-facing usage in the validated release candidate, but announce completed publication only after the documented registry paths and installations are verified; reconcile [BACKLOG.md](../BACKLOG.md) and [CHANGELOG.md](../CHANGELOG.md) with the real outcome.
 
 npm publication is not atomic across four names. If any adapter fails after the product succeeds, report that partial state and resume only the remaining publications; do not republish or unpublish successful packages to simulate atomicity. Defective immutable bytes require a new aligned release version and exact adapter dependencies.
 

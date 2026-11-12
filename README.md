@@ -6,7 +6,7 @@ A local layout board for coding agents. Work with real HTML in live artboards, r
 
 [Quick start](#quick-start) · [Connect an agent](#connect-an-agent) · [Board guide](docs/board.md) · [Documentation](docs/README.md)
 
-> **Pre-release · 0.0.1 is in preparation.** No npm release has been published yet. Start from a checkout below; npm instructions are marked separately.
+> **0.0.1 · early release.** The native project format remains a pre-freeze draft. Keep backups; future versions may require explicit conversion.
 
 ## Real pages, not pictures of pages
 
@@ -19,7 +19,13 @@ A local layout board for coding agents. Work with real HTML in live artboards, r
 
 Requires **Node.js 22.19 or later**. Pi is optional.
 
-From a source checkout:
+Open a standalone board:
+
+```bash
+npx -y @divlet/cli@0.0.1 /absolute/path/to/workspace
+```
+
+Or run from a source checkout:
 
 ```bash
 cd /path/to/divlet
@@ -37,7 +43,13 @@ Open the URL printed in the terminal. An empty workspace gets `project.divlet` w
 
 ### Pi
 
-Load the source adapter for a one-off session (no build needed):
+Install the Pi adapter:
+
+```bash
+pi install npm:@divlet/pi@0.0.1
+```
+
+For checkout development, load the source adapter for a one-off session instead (no build needed):
 
 ```bash
 NODE_OPTIONS=--conditions=divlet-source pi -e /absolute/path/to/divlet/packages/pi/index.js
@@ -65,19 +77,14 @@ npx skills add llblab/divlet --skill divlet --global
 
 Drop `--global` to install into the current project only. Skip this step under Pi: the extension below already registers the same bundled skill, and installing it twice makes two copies compete.
 
-**2. Register the server.** Pointing at a checkout works today:
+**2. Register the server.** Use the npm adapter:
 
 ```json
 {
   "mcpServers": {
     "divlet": {
-      "command": "node",
-      "args": [
-        "--conditions=divlet-source",
-        "/absolute/path/to/divlet/packages/mcp/index.js",
-        "--cwd",
-        "/absolute/path/to/workspace"
-      ]
+      "command": "npx",
+      "args": ["-y", "@divlet/mcp@0.0.1", "--cwd", "/absolute/path/to/workspace"]
     }
   }
 }
@@ -88,7 +95,7 @@ Call `open_divlet` and open its returned URL. No Pi installation is needed. Clie
 [Agent integration guide](docs/agents.md) → Alternative Pi installation, MCP options, the workflow skill and JavaScript entry points.
 
 <details>
-<summary><strong>npm installation — after the first publication</strong></summary>
+<summary><strong>Package roles and alternative installation</strong></summary>
 
 The **`divlet`** package is the library, board, built-in plugins and shared workflow skill. Three real adapter packages own their implementation and commands: **`@divlet/cli`**, **`@divlet/mcp`** and **`@divlet/pi`**. Each depends on the exact matching product version.
 
@@ -103,7 +110,7 @@ npx -y @divlet/mcp --cwd ./workspace
 npm install -g @divlet/cli @divlet/mcp
 ```
 
-For Pi, run `pi install npm:@divlet/pi` after publication. Shared setups should pin `@divlet/cli@0.0.1`, `@divlet/mcp@0.0.1` and `npm:@divlet/pi@0.0.1`. The root package has no commands or Pi manifest; there is no wrapper layer.
+For Pi, run `pi install npm:@divlet/pi@0.0.1`. Shared setups should pin `@divlet/cli@0.0.1`, `@divlet/mcp@0.0.1` and `npm:@divlet/pi@0.0.1`. The root package has no commands or Pi manifest; there is no wrapper layer.
 
 See [npm publication](docs/publishing.md) for version pinning, package identity and release gates.
 

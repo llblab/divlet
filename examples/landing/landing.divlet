@@ -1834,7 +1834,7 @@
         "text-188": {
           "id": "text-188",
           "type": "text",
-          "content": ", provides the board, CLI and MCP server. Requires Node.js 22.19 or later.\n      Version 0.0.1 is in preparation, not yet published; these npm commands become available after the first release.",
+          "content": ", provides the board, CLI and MCP server. Requires Node.js 22.19 or later.\n      Version 0.0.1 is an early release; the native project format remains a pre-freeze draft.",
           "metadata": {}
         },
         "text-189": {
