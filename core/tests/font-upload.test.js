@@ -10,6 +10,7 @@ import { fontFaceRules } from '../lib/font-css.ts';
 import { readFont } from '../lib/font.ts';
 import { fontBytes, fontFamily } from './fixtures/font.js';
 import { woffBytes } from './fixtures/font-woff.js';
+import { woff2Bytes } from './fixtures/font-woff2.js';
 import { legacyProject } from './fixtures/legacy-project.js';
 
 async function setup(t) {
@@ -50,7 +51,7 @@ test('font allocation preserves directories, unused bytes and portable aliases; 
 
 test('invalid/stale/concurrent font registrations retain the last accepted source and history', async t => {
   const runtime = await setup(t), before = await snapshot(runtime);
-  for (const extra of [{ expectedVersion: undefined }, { expectedVersion: 0 }, { data: Buffer.from('bad font') }]) {
+  for (const extra of [{ expectedVersion: undefined }, { expectedVersion: 0 }, { data: Buffer.from('bad font') }, { data: woff2Bytes() }]) {
     await assert.rejects(upload(runtime, extra)); assert.deepEqual(await snapshot(runtime), before);
   }
   const version = runtime.settings.version;

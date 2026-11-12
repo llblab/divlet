@@ -51,6 +51,8 @@ Font companion coverage in `core/tests/font-upload.test.js` proves regular/bold/
 
 `core/tests/font-woff.test.js` checks WOFF 1 raw/compressed tables, directory/aggregate/decompression/stream-consumption/checksum/padding bounds and inherited SFNT refusals. Upload lifecycle tests retain exact compressed MIME/bytes through Undo/Redo, export, capture preparation and deleted-cache reopening. Appearance exercises actual WOFF variable/italic device choices without a provider; Snapshots combines TTF regular and WOFF bold faces and measures raster glyphs through byte changes, stale preparation and Undo. These do not establish WOFF2, collection selection, optional WOFF blocks, installed-host or arbitrary-font acceptance.
 
+The CC0 `core/tests/fixtures/font-woff2.js` is a real WOFF2 encoded by pinned `wawoff2@2.0.1`, with encoder integrity recorded beside the fixture; it adds no runtime dependency. Metadata and upload tests refuse it without source/state/history changes. Appearance forces it past the picker filter, proves browser decoding reaches exactly one POST, then requires the unsupported-container refusal and released operation guard. This is refusal evidence, not WOFF2 admission. The WOFF2 gate in the [format reference](format.md#woff2-admission-gate) separates advisory header size, actual output bounds, decoder working memory and future null-transform support.
+
 ## Format candidate
 
 Run these from a source checkout:

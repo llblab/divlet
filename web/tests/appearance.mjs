@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { openRuntime } from '../../core/lib/runtime.js';
 import { fontDataUrl, fontBytes } from '../../core/tests/fixtures/font.js';
 import { woffBytes } from '../../core/tests/fixtures/font-woff.js';
+import { woff2Bytes } from '../../core/tests/fixtures/font-woff2.js';
 import { setStyleEngines } from '../../core/lib/engine.ts';
 import { decodeHtml } from '../../core/lib/codec.ts';
 
@@ -83,7 +84,7 @@ try {
   const deviceUpload = async (bytes, name = 'device.ttf') => {
     const chooser = page.waitForEvent('filechooser');
     await page.getByRole('button', { name: 'Upload font', exact: true }).click();
-    await (await chooser).setFiles({ name, mimeType: name.endsWith('.woff') ? 'font/woff' : 'font/ttf', buffer: bytes });
+    await (await chooser).setFiles({ name, mimeType: name.endsWith('.woff2') ? 'font/woff2' : name.endsWith('.woff') ? 'font/woff' : 'font/ttf', buffer: bytes });
   };
   await deviceUpload(fontBytes(600, { family: 'Provider Upload' }));
   await waitUntil(() => runtime.settings.css.includes('Provider Upload'), 'device upload registers ordinary project CSS with the optional provider enabled');
@@ -474,6 +475,16 @@ try {
   assert.equal(native.settings.assets.fonts['device.woff'], undefined);
   await native.redo(); await native.redo(); await waitUntil(() => native.settings.css.includes('Device Font'), 'registration Redo restores the same shared bytes and face');
   await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('plain', ['first']));
+  const unsupportedState = { revision: native.revision, css: native.settings.css, assets: structuredClone(native.settings.assets), history: native.readHistory() };
+  let unsupportedPosts = 0;
+  const countUnsupported = request => { if (new URL(request.url()).pathname.endsWith('/api/fonts')) unsupportedPosts++; };
+  page.on('request', countUnsupported);
+  await deviceUpload(woff2Bytes(), 'unsupported.woff2');
+  await waitUntil(() => page.locator('#toast').innerText().then(text => text.includes('WOFF2')), 'a real browser-decodable WOFF2 still refuses at metadata admission');
+  page.off('request', countUnsupported);
+  assert.equal(unsupportedPosts, 1, 'browser decoding succeeded before the writer refused the unsupported container');
+  assert.deepEqual({ revision: native.revision, css: native.settings.css, assets: native.settings.assets, history: native.readHistory() }, unsupportedState);
+  await waitUntil(() => page.getByRole('button', { name: 'Upload font', exact: true }).isEnabled(), 'unsupported container refusal releases the existing operation guard');
   const beforeBad = { revision: native.revision, css: native.settings.css, assets: structuredClone(native.settings.assets) };
   let fontPosts = 0;
   page.on('request', request => { if (new URL(request.url()).pathname.endsWith('/api/fonts')) fontPosts++; });
