@@ -21,11 +21,11 @@ try {
     const host = document.createElement('section');
     host.id = 'wrap-fixture';
     host.style.cssText = 'position:absolute;left:10px;top:80px;padding:12px;box-sizing:content-box;background:var(--panel);border:1px solid var(--hair);border-radius:12px';
-    const [, , layout] = layoutSections([{ id: 'item', className: '' }], {
+    const sections = layoutSections([{ id: 'item', className: '' }], {
       parent: { className: 'flex' },
       apply: transform => { window.wrapClasses = transform(window.wrapClasses || ''); },
-    })[0];
-    host.append(layout);
+    });
+    host.append(sections.find(([name]) => name === 'layout')[2], sections.find(([name]) => name === 'appearance')[2]);
     document.querySelector('#ui').append(host);
     const selectors = document.createElement('section');
     selectors.id = 'selectors-fixture';
@@ -41,14 +41,16 @@ try {
     const fields = document.createElement('section');
     fields.id = 'fields-fixture';
     fields.style.cssText = host.style.cssText;
-    fields.style.top = '340px';
+    fields.style.top = '600px';
     const className = 'absolute top-[123456px] right-[654321px] bottom-[123456px] left-[654321px] opacity-100 z-[999999] blur-[12px] text-[length:24px] font-extrabold';
     for (const [name, , content] of layoutSections([{ id: 'positioned', className }], { parent: null, apply() {} })) {
       if (name !== 'spacing') fields.append(content);
     }
     document.querySelector('#ui').append(fields);
   });
-  let wrapped = 0, together = 0;
+  assert.equal(await page.locator('#wrap-fixture .layout-box [aria-label="Text align"]').count(), 0, 'Layout does not own text alignment');
+  assert.equal(await page.locator('#wrap-fixture .appearance-box [aria-label="Text align"]').count(), 1, 'typography owns one text-alignment group');
+  assert.equal(await page.locator('#wrap-fixture .layout-box [aria-label="Align self in the parent"]').count(), 1, 'item alignment stays in Layout');
   for (const viewport of [390, 768, 1280]) {
     await page.setViewportSize({ width: viewport, height: 800 });
     for (const width of [170, 220, 246, 260, 280, 300, 320]) {
@@ -83,22 +85,17 @@ try {
       const boxes = await page.locator('#selectors-fixture .pick').evaluateAll(nodes => nodes.map(node => { const r = node.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; }));
       if (width <= 246) assert.ok(boxes[1].top >= boxes[0].bottom, 'the reported Default pair stacks when its contents do not fit');
       if (width >= 300) assert.equal(boxes[0].top, boxes[1].top, 'the same pair stays side by side when both values fit');
-      const groups = await page.locator('#wrap-fixture .align-controls').evaluate(row => ({
-        width: row.clientWidth, scroll: row.scrollWidth,
-        groups: [...row.children].map(group => {
-          const caption = group.querySelector('.caption').getBoundingClientRect();
-          const controls = group.querySelector('.segs').getBoundingClientRect();
-          return { label: group.querySelector('.caption').textContent, captionY: caption.y + caption.height / 2, controlsY: controls.y + controls.height / 2, top: controls.top };
-        }),
+      const groups = await page.locator('#wrap-fixture .labeled-segs').evaluateAll(nodes => nodes.map(group => {
+        const caption = group.querySelector('.caption').getBoundingClientRect(), controls = group.querySelector('.segs').getBoundingClientRect();
+        return { label: group.querySelector('.caption').textContent, captionY: caption.y + caption.height / 2, controlsY: controls.y + controls.height / 2, fits: group.parentElement.scrollWidth <= group.parentElement.clientWidth + 1 };
       }));
-      assert.equal(groups.groups.length, 2);
-      for (const group of groups.groups) assert.ok(Math.abs(group.captionY - group.controlsY) < 1, `${group.label} detached at viewport ${viewport}, row ${width}`);
-      assert.ok(groups.scroll <= groups.width + 1, 'control groups do not overflow the row');
-      if (Math.abs(groups.groups[0].top - groups.groups[1].top) < 1) together++;
-      else wrapped++;
+      assert.equal(groups.length, 2);
+      for (const group of groups) {
+        assert.ok(Math.abs(group.captionY - group.controlsY) < 1, `${group.label} detached at viewport ${viewport}, row ${width}`);
+        assert.equal(group.fits, true, `${group.label} fits in its owning section`);
+      }
     }
   }
-  assert.ok(wrapped && together, 'exercise both wrapped and single-line layouts');
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.locator('#selectors-fixture').evaluate(host => { host.style.width = '246px'; });
   await fs.mkdir('artifacts', { recursive: true });
@@ -110,6 +107,9 @@ try {
   await controls.getByRole('button', { name: 'Self: center', exact: true }).focus();
   await page.keyboard.press('Enter');
   assert.equal(await page.evaluate(() => window.wrapClasses), 'self-center');
+  const text = page.locator('#wrap-fixture .appearance-box').getByRole('group', { name: 'Text align', exact: true });
+  await text.getByRole('button', { name: 'Align center', exact: true }).focus(); await page.keyboard.press('Enter');
+  assert.deepEqual(await page.evaluate(() => window.wrapClasses.split(' ')), ['self-center', 'text-center'], 'text and item alignment retain independent keyboard edits');
   const aligned = await page.locator('#wrap-fixture .labeled-segs').evaluateAll(groups => groups.every(group => {
     const label = group.querySelector('.caption').getBoundingClientRect(), buttons = group.querySelector('.segs').getBoundingClientRect();
     return Math.abs(label.y + label.height / 2 - buttons.y - buttons.height / 2) < 1;
@@ -119,7 +119,7 @@ try {
   await fs.mkdir('artifacts', { recursive: true });
   await page.locator('#wrap-fixture').screenshot({ path: 'artifacts/layout-wrap.png' });
   assert.deepEqual(errors, []);
-  console.log(JSON.stringify({ status: 'passed', checks: ['Text/Self labels wrap with their own buttons', '170–320px rows at 390/768/1280px viewports', 'Default and long selector values stay on one line; fields stack by content width', 'wide rows retain both groups on one line', '200% UI scale', 'keyboard self-alignment action', 'full numeric values and paired controls without unused tracks across viewport/container widths'], screenshot: 'artifacts/layout-wrap.png' }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', checks: ['text alignment belongs to Appearance; item alignment stays in Layout', '170–320px rows at 390/768/1280px viewports', 'Default and long selector values stay on one line; fields stack by content width', 'wide selector pairs stay on one line', '200% UI scale', 'keyboard self-alignment action', 'full numeric values and paired controls without unused tracks across viewport/container widths'], screenshot: 'artifacts/layout-wrap.png' }, null, 2));
 } finally {
   await browser?.close(); await runtime?.close(); await fs.rm(cwd, { recursive: true, force: true });
 }

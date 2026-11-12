@@ -338,10 +338,14 @@ function appearanceFold({ value, run, measured, tokens }) {
     }),
     pick('Weight', weight, WEIGHTS, next => run(cls => tw.set(cls, 'fontWeight', next ? `font-${next}` : null), next ? `weight ${next}` : 'default weight'), { tip: 'Font weight' }),
   );
+  const text = value(cls => tw.get(cls, 'textAlign')?.slice(5) ?? null);
+  const textRow = el('div', 'segs-row align-controls');
+  textRow.append(labeledSegments('Text', segmented('Text align', text === MIXED ? null : text, [['left', 'textL', 'Align left'], ['center', 'textC', 'Align center'], ['right', 'textR', 'Align right'], ['justify', 'textJ', 'Justify']], next => run(cls => tw.set(cls, 'textAlign', next ? `text-${next}` : null), next ? `text ${next}` : 'default text align'))));
   box.append(
     colorField({ key: 'fill', label: 'Fill', tip: 'Background colour', group: 'bgColor', prefix: 'bg', value, run, computed: measured?.colors?.background, tokens }),
     colorField({ key: 'ink', label: 'Text', tip: 'Text colour', group: 'textColor', prefix: 'text', value, run, computed: measured?.colors?.color, tokens }),
     type,
+    textRow,
   );
   return box;
 }
@@ -466,15 +470,13 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
     layout.append(row);
   }
 
-  const text = value(cls => tw.get(cls, 'textAlign')?.slice(5) ?? null);
-  const textRow = el('div', 'segs-row align-controls');
-  textRow.append(labeledSegments('Text', segmented('Text align', text === MIXED ? null : text, [['left', 'textL', 'Align left'], ['center', 'textC', 'Align center'], ['right', 'textR', 'Align right'], ['justify', 'textJ', 'Justify']], next => run(cls => tw.set(cls, 'textAlign', next ? `text-${next}` : null), next ? `text ${next}` : 'default text align'))));
   const parentFlow = parent ? tw.get(parent.className || '', 'display') : null;
   if (parentFlow && /flex|grid/.test(parentFlow) && !pinned) {
     const self = value(cls => tw.get(cls, 'self')?.slice(5) ?? null);
-    textRow.append(labeledSegments('Self', segmented('Align self in the parent', self === MIXED ? null : self, [['start', 'alignT', 'Self: start'], ['center', 'alignCV', 'Self: center'], ['end', 'alignB', 'Self: end'], ['stretch', 'distV', 'Self: stretch']], next => run(cls => tw.set(cls, 'self', next ? `self-${next}` : null), next ? `self ${next}` : 'default self'))));
+    const selfRow = el('div', 'segs-row align-controls');
+    selfRow.append(labeledSegments('Self', segmented('Align self in the parent', self === MIXED ? null : self, [['start', 'alignT', 'Self: start'], ['center', 'alignCV', 'Self: center'], ['end', 'alignB', 'Self: end'], ['stretch', 'distV', 'Self: stretch']], next => run(cls => tw.set(cls, 'self', next ? `self-${next}` : null), next ? `self ${next}` : 'default self'))));
+    layout.append(selfRow);
   }
-  layout.append(textRow);
 
   /* One developer-tools-style box model; the existing margin/padding and offset editors live on their actual edges. */
   const spacing = el('div', 'spacing-box');

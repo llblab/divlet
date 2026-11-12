@@ -45,6 +45,20 @@ try {
   assert.equal(sectionOrder.indexOf('border'), sectionOrder.indexOf('spacing') + 1, 'Border is a vertical disclosure directly after Spacing, not another tab');
   checks.push('Border owns four widths, line style, colour and radius; Appearance keeps fill and typography');
 
+  const textAlign = page.locator('#inspector [data-section="appearance"]').getByRole('group', { name: 'Text align', exact: true });
+  assert.equal(await textAlign.count(), 1, 'text alignment sits beside font and text colour');
+  assert.equal(await page.locator('#inspector [data-section="layout"] [aria-label="Text align"]').count(), 0, 'there is no duplicate in Layout');
+  assert.equal(await page.locator('#inspector [aria-label="Text align"]').count(), 1, 'one inspector home for text alignment');
+  const beforeTextAlign = classesOf('cta').join(' '), alignment = classesOf('cta').includes('text-right') ? 'left' : 'right';
+  await textAlign.getByRole('button', { name: `Align ${alignment}`, exact: true }).click();
+  await waitUntil(() => classesOf('cta').includes(`text-${alignment}`), 'the moved text control edits the accepted model');
+  await runtime.queue;
+  await waitUntil(async () => await page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate((node, alignment) => getComputedStyle(node).textAlign === alignment, alignment), 'text alignment reaches the actual page');
+  await page.locator('#viewport').focus(); await page.keyboard.press('Control+z');
+  await waitUntil(() => classesOf('cta').join(' ') === beforeTextAlign, 'one Undo restores the previous text alignment and unrelated classes');
+  await runtime.queue;
+  checks.push('text alignment has one home in Appearance, edits the actual page and remains independently undoable');
+
   // Use the real resize control, not an artificial viewport breakpoint: the desktop floor is 280px.
   const handle = page.locator('.resize-handle[data-panel="inspector"]');
   const edge = await handle.boundingBox();
@@ -278,6 +292,11 @@ try {
       return bad;
     });
     assert.deepEqual(layoutErrors, [], `Border controls at ${width}px/${size}%`);
+    assert.equal(await textAlign.evaluate(group => group.scrollWidth <= group.clientWidth + 1 && group.closest('.appearance-box') !== null), true, `typography alignment remains together at ${width}px/${size}%`);
+    if (size === 200) {
+      await textAlign.getByRole('button', { name: 'Justify', exact: true }).click({ trial: true });
+      await page.locator('#inspector').screenshot({ path: 'artifacts/text-alignment-appearance-phone-200.png' });
+    }
     if (size === 100) await page.locator('#inspector [data-section="border"]').screenshot({ path: `artifacts/border-section-${width}-${size}.png` });
   }
   checks.push('Border stays readable without horizontal overflow on desktop, phone and phone/200%');
