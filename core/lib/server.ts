@@ -40,6 +40,7 @@ export interface BoardApi extends BoardRuntime {
   listAssets(query: Record<string, unknown>): Promise<any>;
   saveAsset(body: Record<string, unknown>): Promise<any>;
   saveFont(body: Record<string, unknown>): Promise<any>;
+  captureFonts(id: string, expectedRender: number): Promise<{ documentId: string; render: number; css: string }>;
   patch(body: Record<string, unknown>): Promise<any>;
   edit(body: Record<string, unknown>): Promise<any>;
   undo(body: Record<string, unknown>): Promise<any>;
@@ -169,6 +170,7 @@ export async function startServer(runtime: BoardApi, { port = 0 }: { port?: numb
       if (req.method === 'POST' && req.headers.origin && req.headers.origin !== origin) return json(res, 403, { error: 'ORIGIN_NOT_ALLOWED' });
       if (req.method === 'GET' && route === 'api/project') return json(res, 200, runtime.info());
       if (req.method === 'GET' && route.startsWith('api/documents/')) return json(res, 200, runtime.read({ view: 'document', documentId: route.slice('api/documents/'.length) }));
+      if (req.method === 'GET' && route.startsWith('api/capture-fonts/')) return json(res, 200, await runtime.captureFonts(route.slice('api/capture-fonts/'.length), Number(url.searchParams.get('render'))));
       if (req.method === 'GET' && route.startsWith('api/render/')) return json(res, 200, runtime.render(route.slice('api/render/'.length)));
       if (req.method === 'POST' && route === 'api/tool') {
         // The shared capability contract, for a client that attached to this board instead of opening its own writer.

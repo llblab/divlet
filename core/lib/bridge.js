@@ -630,12 +630,29 @@ export function previewBridge(documentId, initialVersion, bridgeToken, readOnly 
   }, { passive: false });
 
   // A picture of this page for the board's far-zoom view: the page serializes itself into an SVG foreignObject and rasterizes it.
-  // Images and CSS url() resources are inlined through CORS-enabled image loads (no fetch, so the preview CSP stays closed).
-  async function capture() {
+  // Font bytes arrive only from the accepted host closure over this authenticated document port; no preview fetch authority.
+  // Image resources still use CORS-enabled image loads. Unproven web fonts refuse rather than paint fallback thumbnails.
+  async function capture(fontCSS) {
+    if (fontCSS !== undefined && (typeof fontCSS !== 'string' || fontCSS.length > 32 * 1024 * 1024)) return null;
+    if (fontCSS === undefined && document.fonts?.size) return null;
+    await document.fonts?.ready;
     const width = Math.ceil(innerWidth), height = Math.ceil(innerHeight);
     if (!width || !height || width > 4096 || height > 4096) return null;
     const root = document.documentElement.cloneNode(true);
     for (const node of root.querySelectorAll('script, link, #divlet-boxes, #divlet-inspector-style')) node.remove();
+    if (typeof fontCSS === 'string') {
+      const removeFaces = container => {
+        for (let i = container.cssRules.length - 1; i >= 0; i--) {
+          const rule = container.cssRules[i];
+          if (rule.type === CSSRule.FONT_FACE_RULE) container.deleteRule(i);
+          else if (rule.cssRules && rule.deleteRule) removeFaces(rule);
+        }
+      };
+      for (const style of root.querySelectorAll('style')) {
+        const sheet = new CSSStyleSheet(); sheet.replaceSync(style.textContent); removeFaces(sheet);
+        style.textContent = [...sheet.cssRules].map(rule => rule.cssText).join('\n');
+      }
+    }
     const cache = new Map();
     const inline = url => {
       if (!cache.has(url)) cache.set(url, new Promise(resolve => {
@@ -653,7 +670,7 @@ export function previewBridge(documentId, initialVersion, bridgeToken, readOnly 
     const absolute = value => { try { return new URL(value, document.baseURI).href; } catch { return null; } };
     for (const image of root.querySelectorAll('img[src]')) {
       const url = image.getAttribute('src');
-      if (url.startsWith('data:')) continue;
+      if (/^data:/i.test(url)) continue;
       const data = absolute(url) ? await inline(absolute(url)) : null;
       if (data) image.setAttribute('src', data); else image.removeAttribute('src');
     }
@@ -663,12 +680,13 @@ export function previewBridge(documentId, initialVersion, bridgeToken, readOnly 
       let text = style ? node.textContent : node.getAttribute('style');
       for (const match of [...text.matchAll(urls)].slice(0, 60)) {
         const url = match[2];
-        if (url.startsWith('data:') || url.startsWith('#')) continue;
+        if (/^data:/i.test(url) || url.startsWith('#')) continue;
         const data = absolute(url) ? await inline(absolute(url)) : null;
         text = text.split(match[0]).join(data ? `url(${data})` : 'none');
       }
       if (style) node.textContent = text; else node.setAttribute('style', text);
     }
+    if (fontCSS) { const style = document.createElement('style'); style.textContent = fontCSS; root.querySelector('head').append(style); }
     const markup = new XMLSerializer().serializeToString(root);
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject x="0" y="0" width="${width}" height="${height}">${markup}</foreignObject></svg>`;
     const picture = new Image();
@@ -696,7 +714,13 @@ export function previewBridge(documentId, initialVersion, bridgeToken, readOnly 
       if (mode !== 'inspect') { setHover(null, true); endEdit(true); }
       paintBoxes();
     }
-    if (data.type === 'divlet:capture') capture().then(result => { if (result) send({ type: 'divlet:snapshot', ...result }); else send({ type: 'divlet:snapshot-failed' }); }).catch(() => send({ type: 'divlet:snapshot-failed' }));
+    if (data.type === 'divlet:capture' && typeof data.captureId === 'string' && data.captureId.length <= 128) {
+      const captureVersion = version, captureId = data.captureId;
+      capture(data.fontCSS).then(result => {
+        if (result && version === captureVersion) send({ type: 'divlet:snapshot', captureId, ...result });
+        else send({ type: 'divlet:snapshot-failed', captureId });
+      }).catch(() => send({ type: 'divlet:snapshot-failed', captureId }));
+    }
     if (data.type === 'divlet:handles-enabled') { handlesOn = data.enabled !== false; paintBoxes(); }
     if (data.type === 'divlet:space-drag' && typeof data.phase === 'string') {
       if (data.phase === 'start' && typeof data.id === 'string') beginSpaceDrag(data.id);

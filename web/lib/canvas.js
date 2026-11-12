@@ -57,7 +57,7 @@ function place(entry) {
 }
 
 /*
- * Far zoom: each frame photographs itself (the bridge rasterizes the page in the browser, nothing is fetched from the server)
+ * Far zoom: each frame photographs itself in the browser; an optional host prepares only its accepted font closure.
  * and the board keeps the picture; a frame drawn narrower than LOD_WIDTH shows it instead of the live page, which stays loaded
  * but is not painted. Zoom in, select or expand and the same page is simply shown again, so nothing reloads or flashes.
  * Pictures are taken one at a time while the browser is idle, as soon as a page has rendered.
@@ -74,29 +74,45 @@ function pumpCapture() {
   const entry = captureQueue.shift();
   if (!entry) return;
   capturing = entry;
-  (window.requestIdleCallback ?? (run => setTimeout(run, 60)))(() => {
-    if (!entry.port || !entry.loaded) { finishCapture(entry); return; }
-    entry.port.postMessage({ type: 'divlet:capture' });
-    entry.captureTimer = setTimeout(() => finishCapture(entry), 8000);
+  const captureId = entry.captureId = crypto.randomUUID();
+  (window.requestIdleCallback ?? (run => setTimeout(run, 60)))(async () => {
+    if (capturing !== entry || entry.captureId !== captureId) return;
+    const port = entry.port, render = entry.renderedVersion, generation = entry.deliveryGeneration;
+    if (!port || !entry.loaded || render !== entry.doc.render || store.expanded?.entry === entry) { finishCapture(entry, captureId); return; }
+    const abort = entry.captureAbort = new AbortController();
+    entry.captureTimer = setTimeout(() => finishCapture(entry, captureId), 8000);
+    try {
+      let fontCSS;
+      const capability = store.state?.project?.capabilities?.captureFonts;
+      if (capability?.maxBytes > 0) {
+        const result = await request(`api/capture-fonts/${encodeURIComponent(entry.doc.id)}?render=${render}`, { signal: abort.signal });
+        if (result.documentId !== entry.doc.id || result.render !== render || typeof result.css !== 'string' || result.css.length > capability.maxBytes) throw new Error('Invalid snapshot font response');
+        fontCSS = result.css;
+      }
+      if (capturing !== entry || entry.captureId !== captureId || entry.port !== port || entry.deliveryGeneration !== generation || entry.doc.render !== render || store.expanded?.entry === entry) { finishCapture(entry, captureId); return; }
+      port.postMessage({ type: 'divlet:capture', captureId, fontCSS });
+    } catch { finishCapture(entry, captureId); }
   }, { timeout: 2000 });
 }
-function finishCapture(entry) {
+function finishCapture(entry, captureId = entry.captureId) {
+  if (capturing !== entry || entry.captureId !== captureId) return;
   clearTimeout(entry.captureTimer);
-  if (capturing === entry) capturing = null;
+  entry.captureAbort?.abort(); entry.captureAbort = null; entry.captureId = null;
+  capturing = null;
   pumpCapture();
 }
 function receiveShot(entry, data) {
-  if (data.blob instanceof Blob && data.version >= (entry.shot?.render ?? 0)) {
+  if (capturing !== entry || data.captureId !== entry.captureId) return;
+  if (!store.expanded && data.blob instanceof Blob && data.version === entry.doc.render && data.version === entry.renderedVersion) {
     if (entry.shot) URL.revokeObjectURL(entry.shot.url);
     entry.shot = { render: data.version, url: URL.createObjectURL(data.blob) };
     syncLod(entry);
-    if (entry.shot.render < entry.doc.render) queueCapture(entry);
   }
-  finishCapture(entry);
+  finishCapture(entry, data.captureId);
 }
 
 function syncLod(entry, screenWidth = entry.el.getBoundingClientRect().width) {
-  const show = !store.expanded && !store.selected.has(entry.doc.id) && !entry.name.querySelector('input') && screenWidth < LOD_WIDTH && !!entry.iframe && !!entry.shot;
+  const show = !store.expanded && !store.selected.has(entry.doc.id) && !entry.name.querySelector('input') && screenWidth < LOD_WIDTH && !!entry.iframe && entry.shot?.render === entry.doc.render;
   if (show) {
     const image = entry.shotImage ??= Object.assign(new Image(), { className: 'frame-snapshot', alt: '', draggable: false });
     if (image.dataset.url !== entry.shot.url) { image.dataset.url = entry.shot.url; image.src = entry.shot.url; }
@@ -533,7 +549,7 @@ function unmount(entry) {
   entry.shotImage?.remove();
   if (entry.shot) URL.revokeObjectURL(entry.shot.url);
   entry.shot = null;
-  clearTimeout(entry.captureTimer);
+  finishCapture(entry);
   if (!entry.iframe) return;
   entry.deliveryGeneration++;
   entry.abort?.abort();
@@ -847,6 +863,8 @@ function followLink(entry, href) {
 
 function handlePreviewMessage(entry, data) {
   if (!data || typeof data !== 'object') return;
+  if (data.type === 'divlet:snapshot') { receiveShot(entry, data); return; }
+  if (data.type === 'divlet:snapshot-failed') { finishCapture(entry, data.captureId); return; }
   if (store.expanded?.entry === entry) {
     if (data.type === 'divlet:escape') closeExpanded();
     return;
@@ -869,8 +887,6 @@ function handlePreviewMessage(entry, data) {
     if (files.length) emit('images', { documentId: entry.doc.id, files, nodeId: typeof data.nodeId === 'string' ? data.nodeId : null });
     return;
   }
-  if (data.type === 'divlet:snapshot') { receiveShot(entry, data); return; }
-  if (data.type === 'divlet:snapshot-failed') { finishCapture(entry); return; }
   if (data.type === 'divlet:escape') { handleKey({ key: 'Escape' }); return; }
   if (data.type === 'divlet:edit-step' && (data.dir === 1 || data.dir === -1)) { emit('edit-step', { documentId: entry.doc.id, dir: data.dir, create: !!data.create, nodeId: typeof data.nodeId === 'string' ? data.nodeId : null }); return; }
   if (data.type === 'divlet:edit-fallback' && typeof data.nodeId === 'string' && typeof data.tag === 'string') { emit('edit-fallback', { documentId: entry.doc.id, nodeId: data.nodeId, tag: data.tag.slice(0, 20) }); return; }

@@ -20,6 +20,7 @@ import { buildStatic, inlineDeclaredAssets, readResourceBytes, normalizeExternal
 import { readAssets, allocateAssetLeaf } from './assets.ts';
 import { readFont, FONT_LIMITS } from './font.ts';
 import { fontFaceRules } from './font-css.ts';
+import { captureFontCSS } from './capture.ts';
 import { assetReference } from './asset-reference.ts';
 import { canonicalMediaType } from './media-type.ts';
 import { readProject, writeProject, validateSettings, patchSettings, expandFrame, listComponents, instancesOf } from './project.ts';
@@ -287,7 +288,7 @@ export class DivletRuntime extends EventEmitter {
       outputDir: this.outputDir,
       url: this.url,
       revision: this.revision,
-      project: { file: this.projectPath, format: 'divlet', capabilities: { properties: !this.diagnostics.has(this.projectPath), settings: !this.diagnostics.has(this.projectPath), frames: !this.diagnostics.has(this.projectPath), saveAs: !this.diagnostics.has(this.projectPath), ...(!this.diagnostics.has(this.projectPath) && !this.site ? { fontUpload: { maxBytes: FONT_LIMITS.bytes } } : {}) }, name: this.settings.name, version: this.settings.version, tokens: this.settings.tokens, css: this.settings.css, metadata: this.settings.metadata, outputDir: this.settings.outputDir, resources: this.resourceList() },
+      project: { file: this.projectPath, format: 'divlet', capabilities: { captureFonts: { maxBytes: MAX_PROJECT_BYTES }, properties: !this.diagnostics.has(this.projectPath), settings: !this.diagnostics.has(this.projectPath), frames: !this.diagnostics.has(this.projectPath), saveAs: !this.diagnostics.has(this.projectPath), ...(!this.diagnostics.has(this.projectPath) && !this.site ? { fontUpload: { maxBytes: FONT_LIMITS.bytes } } : {}) }, name: this.settings.name, version: this.settings.version, tokens: this.settings.tokens, css: this.settings.css, metadata: this.settings.metadata, outputDir: this.settings.outputDir, resources: this.resourceList() },
       documents: [...this.documents.values()].map(entry => this.describe(entry)),
       diagnostics: [...this.diagnostics.values()],
       selection: structuredClone(this.selection),
@@ -363,6 +364,15 @@ export class DivletRuntime extends EventEmitter {
   render(id) {
     const entry = this.getEntry(id);
     return { documentId: id, version: entry.document.version, render: entry.render, html: entry.previewHtml ?? entry.html };
+  }
+
+  /** Byte-bearing snapshot preparation is explicit and render-guarded, never part of ordinary state/model reads. */
+  async captureFonts(id, expectedRender) {
+    const entry = this.getEntry(id), settings = this.settings;
+    if (!Number.isSafeInteger(expectedRender) || expectedRender !== entry.render) fail('STALE_PREVIEW', 'The frame changed before snapshot font preparation.');
+    const css = await captureFontCSS(entry.html, settings.assets ?? {});
+    if (this.documents.get(id) !== entry || this.settings !== settings) fail('STALE_PREVIEW', 'The frame changed during snapshot font preparation.');
+    return { documentId: id, render: entry.render, css };
   }
 
   siteInfo() {
