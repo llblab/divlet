@@ -101,10 +101,10 @@ export function fontFamilyControl(nodes, { css, apply, upload }) {
   if (upload) {
     row.classList.add('with-upload');
     const picker = document.createElement('input');
-    picker.type = 'file'; picker.accept = '.ttf,.otf,.woff,font/ttf,font/otf,font/woff'; picker.hidden = true;
+    picker.type = 'file'; picker.accept = '.ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2'; picker.hidden = true;
     const add = el('button', 'tool mini font-upload');
     add.type = 'button'; add.dataset.key = 'font-upload'; add.setAttribute('aria-label', 'Upload font');
-    add.dataset.tip = 'Add a TTF/OTF/WOFF font to project CSS, then choose it in Family. Existing family declarations are never replaced.';
+    add.dataset.tip = 'Add a TTF/OTF/WOFF or null-transform WOFF2 font to project CSS, then choose it in Family. Existing family declarations are never replaced.';
     add.append(icon('upload'));
     add.disabled = upload.pending; add.setAttribute('aria-busy', String(upload.pending));
     add.addEventListener('click', () => picker.click());

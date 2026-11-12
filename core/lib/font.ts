@@ -3,12 +3,13 @@ import { ASSET_LIMITS } from './assets.ts';
 import { DivletError } from './model.ts';
 import { string } from './validation.ts';
 import { unpackWoff } from './font-woff.ts';
+import { unpackWoff2 } from './font-woff2.ts';
 
 export interface FontFaceMetadata {
   readonly family: string;
   readonly subfamily: string;
-  readonly format: 'truetype' | 'opentype' | 'woff';
-  readonly mediaType: 'font/ttf' | 'font/otf' | 'font/woff';
+  readonly format: 'truetype' | 'opentype' | 'woff' | 'woff2';
+  readonly mediaType: 'font/ttf' | 'font/otf' | 'font/woff' | 'font/woff2';
   readonly weight: string;
   readonly stretch: string;
   readonly styles: readonly string[];
@@ -27,15 +28,16 @@ export function readFont(input: unknown): FontFaceMetadata {
   const size = byteLengthOf.call(input) as number;
   if (!size || size > FONT_LIMITS.bytes) fail('A font must contain at most 20 MiB of bytes.');
   let bytes = new Uint8Array(input);
-  const woff = bytes.length >= 4 && new DataView(bytes.buffer).getUint32(0) === 0x774f4646;
-  if (woff) bytes = unpackWoff(bytes, FONT_LIMITS);
+  const magic = bytes.length >= 4 ? new DataView(bytes.buffer).getUint32(0) : 0;
+  const container = magic === 0x774f4646 ? 'woff' : magic === 0x774f4632 ? 'woff2' : null;
+  if (container) bytes = container === 'woff' ? unpackWoff(bytes, FONT_LIMITS) : unpackWoff2(bytes, FONT_LIMITS);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const range = (offset: number, length: number, end = bytes.length): void => {
     if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length < 0 || offset > end - length) fail('Font table data is truncated or out of range.');
   };
   range(0, 12);
   const signature = view.getUint32(0), format = signature === 0x00010000 ? 'truetype' : signature === 0x4f54544f ? 'opentype' : null;
-  if (!format) fail('Upload a TTF, OTF or supported WOFF 1 face. WOFF2 and collections are not supported by this reader.');
+  if (!format) fail('Upload a TTF, OTF, WOFF 1 or null-transform WOFF2 face. Collections and transformed WOFF2 are not supported.');
   const count = view.getUint16(4), directoryEnd = 12 + count * 16;
   if (!count || count > FONT_LIMITS.tables) fail('The font table count is unsupported.');
   range(0, directoryEnd);
@@ -128,5 +130,5 @@ export function readFont(input: unknown): FontFaceMetadata {
     if (angle < -90 || angle > 90) fail('The oblique angle exceeds CSS bounds.');
     styles = [`oblique ${number(angle)}deg`];
   } else styles = ['normal'];
-  return { family, subfamily, format: woff ? 'woff' : format, mediaType: woff ? 'font/woff' : format === 'truetype' ? 'font/ttf' : 'font/otf', weight: interval(weight.min, weight.max), stretch: interval(stretch.min, stretch.max, '%'), styles };
+  return { family, subfamily, format: container ?? format, mediaType: container === 'woff2' ? 'font/woff2' : container === 'woff' ? 'font/woff' : format === 'truetype' ? 'font/ttf' : 'font/otf', weight: interval(weight.min, weight.max), stretch: interval(stretch.min, stretch.max, '%'), styles };
 }

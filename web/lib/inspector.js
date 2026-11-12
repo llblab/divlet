@@ -550,7 +550,7 @@ async function uploadFont(file) {
   fontUpload.pending = true; paintFontUpload();
   try {
     const { version, capabilities } = store.state.project;
-    if (!capabilities.fontUpload || !file.size || file.size > capabilities.fontUpload.maxBytes) throw new Error('Choose a nonempty TTF/OTF/WOFF font of at most 20 MiB.');
+    if (!capabilities.fontUpload || !file.size || file.size > capabilities.fontUpload.maxBytes) throw new Error('Choose a nonempty TTF/OTF/WOFF or null-transform WOFF2 font of at most 20 MiB.');
     const bytes = await file.arrayBuffer();
     try { await new FontFace('divlet-device-probe', bytes).load(); }
     catch { throw new Error('The browser could not decode this font. Nothing was uploaded.'); }

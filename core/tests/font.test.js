@@ -54,7 +54,7 @@ test('unsupported containers, budgets, embedding restrictions and invalid static
   const shadowed = fontBytes(); Object.defineProperty(shadowed, 'byteLength', { get() { throw new Error('Must use byte-array internal length'); } });
   assert.equal(readFont(shadowed).family, fontFamily);
   const oversized = Buffer.alloc(FONT_LIMITS.bytes + 1); Object.defineProperty(oversized, 'byteLength', { value: 1 }); reject(oversized);
-  reject(woff2Bytes(), 'a real independently encoded WOFF2 is still outside metadata admission, not only a forged magic prefix');
+  reject(woff2Bytes(), 'a real independently encoded transformed WOFF2 stays outside null-transform admission, not only a forged magic prefix');
   for (const magic of ['wOFF', 'wOF2', 'ttcf', 'true', 'NOPE']) { const bytes = fontBytes(); bytes.write(magic); reject(bytes); }
   for (const options of [{ weight: 0 }, { weight: 1001 }, { width: 0 }, { width: 10 }, { restricted: true }, { oblique: true, angle: 91 }]) reject(fontBytes(600, options));
   const otf = fontBytes(); otf.write('OTTO'); reject(otf, 'OTF flavor is not permission to reinterpret glyf outlines as CFF');
