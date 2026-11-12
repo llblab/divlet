@@ -117,6 +117,7 @@
     "test:static": "node scripts/source.mjs web/tests/static.mjs",
     "test:source": "node scripts/source.mjs web/tests/native-collections.mjs && node scripts/source.mjs web/tests/native-default.mjs",
     "test:release": "node core/tests/release/install-smoke.mjs",
+    "test:release:pi": "node core/tests/release/install-smoke.mjs --pi",
     "test:pen-fidelity": "node scripts/source.mjs plugins/pen/tests/fidelity.mjs",
     "test:pi": "node scripts/source.mjs packages/pi/tests/e2e/pi.mjs",
     "test:mcp": "node scripts/source.mjs --test packages/mcp/tests/*.test.js",
