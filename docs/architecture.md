@@ -129,6 +129,8 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `web/lib/file-picker.js` | Reusable read-only path/list/keyboard UI and request lifetime. |
 | `web/lib/project.js`, `help.js` | Open/copy and Settings policy, writes and modal lifetime. |
 | `core/lib/model-styles.ts`, `browser-styles.ts` | Node lowering binding and explicit absent browser capability. |
+| `core/lib/asset-reference.ts` | Portable declared paths and explicit URI codec; not activated. |
+| `core/lib/assets.ts` | Bounded Data-URL tree decoding; not native source admission. |
 | `core/lib/project.ts` | Project settings/read/write and component expansion/listing. |
 | `core/lib/codec.ts` | Strict native model ↔ HTML codec and `renderFile`. |
 | `core/lib/html-import.ts` | Loss-aware external HTML admission, separate from the strict codec. |

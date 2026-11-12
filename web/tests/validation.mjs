@@ -17,7 +17,9 @@ const expectedFrames = frameCases.map(({ name, run }) => ({ name, result: captur
 const publicSnapshot = await landingDemoSnapshot();
 const files = new Map([
   [prefix, ['text/html', '<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><title>Portable validation</title>']],
-  [`${prefix}validation.js`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/validation.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}validation.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/validation.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}asset-reference.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/asset-reference.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}asset-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/asset-references.js', import.meta.url), 'utf8')]],
   [`${prefix}cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/validation.js', import.meta.url), 'utf8')]],
   [`${prefix}model.js`, ['text/javascript', bundle.code]],
   [`${prefix}frames.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/frame-portability.js', import.meta.url), 'utf8')]],
@@ -65,12 +67,17 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}${prefix}`);
   const result = await page.evaluate(async () => {
     const [api, { validationCases, utf8BudgetCases, captureValidation }, frameApi, { frameCases, captureFrame, sampleFrame }] = await Promise.all([
-      import(new URL('validation.js', location.href).href), import(new URL('cases.js', location.href).href),
+      import(new URL('validation.ts', location.href).href), import(new URL('cases.js', location.href).href),
       import(new URL('model.js', location.href).href), import(new URL('frames.js', location.href).href),
     ]);
     const [{ createSnapshotReadSession }, { snapshotCases }] = await Promise.all([
       import(new URL('read-session.js', location.href).href), import(new URL('session-cases.js', location.href).href),
     ]);
+    const [assetApi, { assetReferenceCases }] = await Promise.all([
+      import(new URL('asset-reference.ts', location.href).href), import(new URL('asset-cases.js', location.href).href),
+    ]);
+    const referenceApi = { ...assetApi, DivletError: api.DivletError };
+    const references = assetReferenceCases.map(({ name, run, expected }) => ({ name, actual: run(referenceApi), expected }));
     const sessions = [];
     for (const { name, run, expected } of snapshotCases) sessions.push({ name, actual: await run(createSnapshotReadSession), expected });
     const data = await (await fetch(new URL('public-snapshot.json', location.href))).json();
@@ -84,6 +91,7 @@ try {
     const services = await serviceCases();
     return {
       selection,
+      references,
       services,
       publicPage,
       sessions,
@@ -96,7 +104,7 @@ try {
   });
   assert.deepEqual(result.nodeGlobals, [], 'no Node globals/polyfills supply the kernel');
   assert.ok(result.cases.length > 25, 'the shared acceptance/refusal regions are exercised');
-  for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
+  for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.references, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
   assert.deepEqual(result.frames, expectedFrames, 'the same full-frame validation, patch and inspection semantics run in Node and browser');
   assert.deepEqual(result.publicPage.keys.sort(), ['clientPlugins', 'diagnostics', 'documents', 'project', 'projectId', 'revision', 'selection', 'stateVersion', 'work']);
   assert.equal(result.publicPage.descriptor.viewUrl, 'index.html');
@@ -106,7 +114,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.references.length} asset-reference + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

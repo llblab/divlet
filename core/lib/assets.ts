@@ -2,11 +2,11 @@
 import { MIMEType } from 'node:util';
 import { DivletError, SOURCE_LIMITS } from './model.ts';
 import type { AssetFile, AssetTree } from './model.ts';
+import { ASSET_REFERENCE_LIMITS, validateAssetName } from './asset-reference.ts';
 
 /** Native payloads retain the existing 20 MiB resource ceiling and 32 MiB source envelope. */
-export const ASSET_LIMITS = Object.freeze({ files: 400, fileBytes: 20 * 1024 * 1024, encodedBytes: SOURCE_LIMITS.bytes, nodes: SOURCE_LIMITS.nodes, depth: SOURCE_LIMITS.depth, path: 2048, mediaType: 1024 });
+export const ASSET_LIMITS = Object.freeze({ files: 400, fileBytes: 20 * 1024 * 1024, encodedBytes: SOURCE_LIMITS.bytes, nodes: SOURCE_LIMITS.nodes, depth: ASSET_REFERENCE_LIMITS.depth, path: ASSET_REFERENCE_LIMITS.path, mediaType: 1024 });
 export interface ParsedAssets { readonly tree: AssetTree; readonly files: ReadonlyMap<string, AssetFile> }
-const reserved = new Set(['__proto__', 'constructor', 'prototype']);
 function fail(message: string): never { throw new DivletError('INVALID_ASSET', message); }
 
 function directory(input: unknown, where: string): Record<string, unknown> {
@@ -16,11 +16,6 @@ function directory(input: unknown, where: string): Record<string, unknown> {
     if (typeof key !== 'string' || !descriptor.enumerable || !Object.hasOwn(descriptor, 'value')) fail(`${where} must contain only enumerable JSON data properties.`);
   }
   return input as Record<string, unknown>;
-}
-
-function segment(name: string): void {
-  // One tree key is one portable filesystem component; URL escaping happens at the reference boundary.
-  if (!name || !name.isWellFormed() || name.startsWith('.') || reserved.has(name) || /[\u0000-\u001f\u007f/\\<>:"|?*]/.test(name) || /[. ]$/.test(name) || Buffer.byteLength(name) > 255 || /^(?:con|prn|aux|nul|conin\$|conout\$|com[1-9¹²³]|lpt[1-9¹²³])(?:\.|$)/i.test(name)) fail(`Invalid asset key: ${JSON.stringify(name)}.`);
 }
 
 function decode(value: string, where: string): AssetFile {
@@ -53,7 +48,7 @@ export function readAssets(input: unknown): ParsedAssets {
     const tree: AssetTree = {};
     for (const [name, value] of Object.entries(source)) {
       if (++nodes > ASSET_LIMITS.nodes) fail('Asset directories exceed the entry limit.');
-      segment(name);
+      validateAssetName(name);
       const relative = parent ? `${parent}/${name}` : name;
       if (relative.length > ASSET_LIMITS.path) fail('Asset paths exceed the path-length limit.');
       const portable = relative.normalize('NFC').toLowerCase();

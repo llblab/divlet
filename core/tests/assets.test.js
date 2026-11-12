@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readAssets, ASSET_LIMITS } from '../lib/assets.ts';
+import { assetReference, readAssetReference, validateAssetName } from '../lib/asset-reference.ts';
+import { readProject } from '../lib/project.ts';
 
 const url = (bytes, mediaType = 'application/octet-stream') => `data:${mediaType};base64,${Buffer.from(bytes).toString('base64')}`;
 const invalid = input => assert.throws(() => readAssets(input), { code: 'INVALID_ASSET' });
@@ -21,6 +23,30 @@ test('hierarchical assets preserve authored keys, exact bytes and canonical Data
   assert.deepEqual(input, before, 'named duplicates are not renamed, collapsed or rewritten');
   assert.equal(parsed.tree.unique, data);
   assert.deepEqual(readAssets(Object.create(null)).tree, {});
+});
+
+test('declared keys and explicit references share exact identity without decoding literal percent names twice', () => {
+  const parsed = readAssets({ fonts: { "O'Brien (Italic).woff2": url([1], 'font/woff2'), '雪.woff2': url([2], 'font/woff2') }, '%2F': { 'a#b': url([3]) } });
+  for (const [path, file] of parsed.files) {
+    const ref = readAssetReference(assetReference(path, '?v=1#mark'));
+    assert.equal(parsed.files.get(ref.path), file);
+    assert.equal(ref.suffix, '?v=1#mark');
+  }
+  assert.equal(parsed.files.get('%2F/a#b').bytes[0], 3);
+});
+
+test('portable component byte admission agrees with an independent Node UTF-8 oracle', () => {
+  for (const char of ['a', 'é', '雪', '🎵']) for (let count = 60; count < 258; count++) {
+    const name = char.repeat(count), fits = Buffer.byteLength(name) <= 255;
+    if (fits) { validateAssetName(name); assert.ok(readAssets({ [name]: url([]) }).files.has(name)); }
+    else { assert.throws(() => validateAssetName(name), { code: 'INVALID_ASSET' }); invalid({ [name]: url([]) }); }
+  }
+});
+
+test('asset codecs do not silently activate an unsupported native project field', () => {
+  const project = { schemaVersion: 1, frames: [] };
+  assert.doesNotThrow(() => readProject(project));
+  assert.throws(() => readProject({ ...project, assets: { font: url([1], 'font/woff2') } }), { code: 'INVALID_PROJECT', message: 'Unsupported project field: assets. Put application data under metadata.' });
 });
 
 test('asset keys cannot escape, alias or create private or nonportable output names', () => {
