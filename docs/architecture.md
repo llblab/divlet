@@ -131,7 +131,8 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `core/lib/model-styles.ts`, `browser-styles.ts` | Node lowering binding and explicit absent browser capability. |
 | `core/lib/asset-reference.ts` | Portable declared paths and explicit URI/dependency codec; not project storage. |
 | `core/lib/assets.ts` | Canonical stored/sparse-patch resource trees and MIME-based text decoding. |
-| `core/lib/font.ts` | Bounded SFNT face metadata and CSS descriptors; not glyph validation, upload or font storage. |
+| `core/lib/font.ts` | Bounded face metadata and CSS descriptors; not glyph validation, upload or font storage. |
+| `core/lib/font-woff.ts` | Bounded WOFF 1 table unpacking into the shared SFNT metadata path; no source conversion. |
 | `core/lib/font-css.ts` | Non-shadowing face registration against closed, source-owned public styles; no write authority. |
 | `core/lib/capture.ts` | Bounded, self-contained frame font CSS for browser rasterization; no filesystem/publication authority. |
 | `core/lib/css-literals.ts` | Shared CSS escape decoding and quoted-string contents for projection and registration. |

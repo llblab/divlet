@@ -1657,7 +1657,7 @@ await this.importProject(project.settings, project.frames, hash);
       this.assertWritable();
       if (!Number.isInteger(expectedVersion) || expectedVersion !== this.settings.version) fail('REVISION_CONFLICT', 'The project changed while preparing the font upload. Read it again before retrying.');
       if (this.site) fail('FONT_CONFLICT', 'Device font registration for mutable site inputs is not supported yet. Edit the project font CSS explicitly.');
-      const face = readFont(bytes), extension = face.format === 'truetype' ? '.ttf' : '.otf';
+      const face = readFont(bytes), extension = face.format === 'woff' ? '.woff' : face.format === 'truetype' ? '.ttf' : '.otf';
       const stem = path.basename(String(name || 'font'), path.extname(String(name || 'font'))).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'font';
       const leaf = allocateAssetLeaf(readAssets(this.settings.assets ?? {}).tree, 'fonts', `${stem}${extension}`), key = `fonts/${leaf}`, reference = assetReference(key);
       const rules = fontFaceRules(face, reference, { files: this.publicFiles ?? new Map(), mediaTypes: this.publicMediaTypes ?? new Map(), generated: new Set([...this.publicStylesheets, ...[...this.documents.values()].map(entry => path.basename(entry.htmlPath))]), authored: [this.settings.css, ...[...this.documents.values()].map(entry => entry.document.css)] });

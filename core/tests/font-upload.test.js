@@ -9,6 +9,7 @@ import { readAssets } from '../lib/assets.ts';
 import { fontFaceRules } from '../lib/font-css.ts';
 import { readFont } from '../lib/font.ts';
 import { fontBytes, fontFamily } from './fixtures/font.js';
+import { woffBytes } from './fixtures/font-woff.js';
 import { legacyProject } from './fixtures/legacy-project.js';
 
 async function setup(t) {
@@ -199,6 +200,32 @@ test('reopening the canonical project rebuilds uploaded font bytes and CSS after
     assert.equal(response.headers.get('content-type'), 'font/ttf');
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes);
     assert.deepEqual(Buffer.from(readAssets(rebuilt.settings.assets).files.get(result.file).bytes), bytes);
+  } finally { await rebuilt.close(); }
+});
+
+test('WOFF registration retains compressed source bytes through Undo, export, capture and cache reconstruction', async t => {
+  const runtime = await setup(t);
+  await runtime.create({ document: decodeHtml('<main>AA</main>', { fallbackId: 'woff' }) });
+  const bytes = woffBytes(fontBytes(900, { family: 'WOFF Lifecycle', weight: 700 }));
+  const before = await snapshot(runtime), result = await upload(runtime, { name: 'Misleading.otf', data: bytes });
+  assert.equal(result.file, 'fonts/misleading.woff');
+  const data = `data:font/woff;base64,${bytes.toString('base64')}`;
+  assert.equal(runtime.settings.assets.fonts['misleading.woff'], data);
+  assert.ok(!JSON.stringify(runtime.info()).includes(';base64,'));
+  assert.ok((await runtime.exportDocument('woff')).html.includes(data));
+  assert.ok((await runtime.captureFonts('woff', runtime.getEntry('woff').render)).css.includes(data));
+  await runtime.undo(); assert.equal(readAssets(runtime.settings.assets).files.has(result.file), false); assert.equal(runtime.settings.css, before.state.project.css);
+  await runtime.redo(); assert.equal(runtime.settings.assets.fonts['misleading.woff'], data);
+  const bad = Buffer.from(bytes); bad[bad.readUInt32BE(48)] ^= 1;
+  const accepted = await snapshot(runtime); await assert.rejects(upload(runtime, { data: bad }), { code: 'INVALID_FONT' }); assert.deepEqual(await snapshot(runtime), accepted);
+  const file = runtime.projectPath, output = runtime.output.directory;
+  await runtime.close(); await fs.rm(output, { recursive: true });
+  const rebuilt = await openRuntime({ file, watch: false, createDemo: false });
+  try {
+    assert.equal(rebuilt.settings.assets.fonts['misleading.woff'], data);
+    const response = await fetch(rebuilt.url + 'build/assets/' + result.file);
+    assert.equal(response.headers.get('content-type'), 'font/woff'); assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes);
+    assert.ok((await rebuilt.exportDocument('woff')).html.includes(data));
   } finally { await rebuilt.close(); }
 });
 

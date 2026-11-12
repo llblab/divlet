@@ -49,6 +49,8 @@ The read-session gate is `node scripts/source.mjs --test core/tests/board-sessio
 
 Font companion coverage in `core/tests/font-upload.test.js` proves regular/bold/italic byte retention, one-step companion Undo/Redo, inclusive variable ranges, defaults/keywords, width separation, overlap/condition/alias/unknown refusal and the codec-owned projection-layer distinction. Appearance uploads actual companion files with and without a provider and measures 120/180/240px glyph advances, checks one family menu entry and verifies overlap refusal leaves source/history and actual matching unchanged. Declared CSS/HTML with an empty generated set, an inactive image carrier and five non-matching dynamic descriptors exercise refusal integrity separately from browser rendering. A deterministic forced inspector refresh while the family menu is open must preserve the live menu and Escape focus anchor. These checks do not authorize arbitrary authored layered/conditional merging.
 
+`core/tests/font-woff.test.js` checks WOFF 1 raw/compressed tables, directory/aggregate/decompression/stream-consumption/checksum/padding bounds and inherited SFNT refusals. Upload lifecycle tests retain exact compressed MIME/bytes through Undo/Redo, export, capture preparation and deleted-cache reopening. Appearance exercises actual WOFF variable/italic device choices without a provider; Snapshots combines TTF regular and WOFF bold faces and measures raster glyphs through byte changes, stale preparation and Undo. These do not establish WOFF2, collection selection, optional WOFF blocks, installed-host or arbitrary-font acceptance.
+
 ## Format candidate
 
 Run these from a source checkout:

@@ -7,6 +7,7 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { openRuntime } from '../../core/lib/runtime.js';
 import { fontDataUrl, fontBytes } from '../../core/tests/fixtures/font.js';
+import { woffBytes } from '../../core/tests/fixtures/font-woff.js';
 import { setStyleEngines } from '../../core/lib/engine.ts';
 import { decodeHtml } from '../../core/lib/codec.ts';
 
@@ -82,7 +83,7 @@ try {
   const deviceUpload = async (bytes, name = 'device.ttf') => {
     const chooser = page.waitForEvent('filechooser');
     await page.getByRole('button', { name: 'Upload font', exact: true }).click();
-    await (await chooser).setFiles({ name, mimeType: 'font/ttf', buffer: bytes });
+    await (await chooser).setFiles({ name, mimeType: name.endsWith('.woff') ? 'font/woff' : 'font/ttf', buffer: bytes });
   };
   await deviceUpload(fontBytes(600, { family: 'Provider Upload' }));
   await waitUntil(() => runtime.settings.css.includes('Provider Upload'), 'device upload registers ordinary project CSS with the optional provider enabled');
@@ -161,6 +162,7 @@ try {
   assert.match(await page.locator('.font-family-note').innerText(), /inline CSS.*stylesheet priority/);
   assert.equal(await family.getAttribute('aria-describedby'), 'font-family-cascade-note', 'the always-visible cascade disclosure describes this authored-value control');
   await waitUntil(() => family.locator('.pick-v').innerText().then(text => text === 'monospace'), 'reader-driven family redraw settles before the keyboard menu gesture');
+  await page.evaluate(async () => { const state = await import('./lib/store.js'); await state.idle('welcome'); await state.freshModel('welcome'); await (await import('./lib/inspector.js')).render({ force: true }); });
   await family.focus(); await page.keyboard.press('Space');
   await page.getByRole('menu', { name: 'Font family', exact: true }).waitFor();
   await page.evaluate(async () => (await import('./lib/inspector.js')).render({ force: true }));
@@ -445,12 +447,13 @@ try {
   await waitUntil(() => page.locator('iframe[data-document-id="plain"]').contentFrame().locator('#first').evaluate(node => Math.round(node.getBoundingClientRect().width) === 120), 'stored face actually renders with no style engine');
   const nativeCss = native.settings.css, nativeVersion = native.getEntry('plain').document.version;
   await page.locator('iframe[data-document-id="plain"]').evaluate(node => { node.dataset.uploadLifetime = 'retained'; });
-  await deviceUpload(fontBytes(900, { family: 'Device Font', axes: [['wght', 100, 400, 900]] }));
+  assert.ok((await page.locator('.font-family-control input[type="file"]').getAttribute('accept')).includes('.woff'));
+  await deviceUpload(woffBytes(fontBytes(900, { family: 'Device Font', axes: [['wght', 100, 400, 900]] })), 'device.woff');
   await waitUntil(() => native.settings.css.includes('Device Font'), 'device font registers with no style engine');
   assert.match(native.settings.css, /font-weight:100 900/, 'variable weight range is registered, not flattened to its default');
   assert.equal(native.getEntry('plain').document.version, nativeVersion, 'upload registers a project face, not a hidden selected-node edit');
-  await deviceUpload(fontBytes(1200, { family: 'Device Font', italic: true, subfamily: 'Italic' }), 'device-italic.ttf');
-  await waitUntil(() => native.settings.css.includes('device-italic.ttf'), 'static italic and normal variable-range faces are disjoint companions without a provider');
+  await deviceUpload(woffBytes(fontBytes(1200, { family: 'Device Font', italic: true, subfamily: 'Italic' })), 'device-italic.woff');
+  await waitUntil(() => native.settings.css.includes('device-italic.woff'), 'static italic and normal variable-range faces are disjoint companions without a provider');
   const italicMetric = await page.locator('iframe[data-document-id="plain"]').contentFrame().locator('body').evaluate(async node => {
     const doc = node.ownerDocument; await doc.fonts.load('italic 400 100px "Device Font"', 'AA');
     const text = doc.createElement('span'); text.textContent = 'AA'; text.style.cssText = 'display:inline-block;font-family:"Device Font";font-size:100px;font-weight:400;font-style:italic;font-synthesis:none';
@@ -468,7 +471,7 @@ try {
   await page.setViewportSize({ width: 1280, height: 900 });
   await native.undo(); await native.undo(); await native.undo();
   await waitUntil(() => native.settings.css === nativeCss, 'one registration Undo removes its bytes and CSS together');
-  assert.equal(native.settings.assets.fonts['device.ttf'], undefined);
+  assert.equal(native.settings.assets.fonts['device.woff'], undefined);
   await native.redo(); await native.redo(); await waitUntil(() => native.settings.css.includes('Device Font'), 'registration Redo restores the same shared bytes and face');
   await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('plain', ['first']));
   const beforeBad = { revision: native.revision, css: native.settings.css, assets: structuredClone(native.settings.assets) };
