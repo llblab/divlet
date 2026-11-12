@@ -6,7 +6,7 @@ A local layout board for coding agents. Work with real HTML in live artboards, r
 
 [Quick start](#quick-start) · [Connect an agent](#connect-an-agent) · [Board guide](docs/board.md) · [Documentation](docs/README.md)
 
-> **0.0.1 · early release.** The native project format remains a pre-freeze draft. Keep backups; future versions may require explicit conversion.
+> **0.0.1 · release candidate.** npm publication is awaiting maintainer 2FA approval. The native project format remains a pre-freeze draft; keep backups because future versions may require explicit conversion.
 
 ## Real pages, not pictures of pages
 
