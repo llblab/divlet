@@ -15,7 +15,7 @@ Development runs source files, not `dist/`. Root `npm test`, start/demo and Pi/M
 
 Frontend unit suites (`icons.test.js`, `modules.test.js`, `http-session.test.js`) and the Chromium entry scripts belong to `web/tests/`. Server/model unit suites and shared core fixture builders remain in `core/tests/`. `npm test` discovers both domains' unit suites; `test:browser:all` runs each Chromium entry. Frontend tests are excluded from served modules and published build assets.
 
-`npm test` starts with `npm run typecheck`: the Node/core profile remains strict, with `checkJs: false` and most browser code excluded. A separate `tsconfig.web.json` uses DOM libraries, no Node ambient types and `checkJs: true` for `http.js`, `http-session.js` and `host.js` only. The read-session type fixture also checks imported adapter types under the Node profile. This is not full-client JavaScript checking.
+`npm test` starts with `npm run typecheck`: the Node/core profile remains strict, with `checkJs: false` and most browser code excluded. A separate `tsconfig.web.json` uses DOM libraries, no Node ambient types and `checkJs: true` for `http.js`, `http-session.js`, `http-services.js` and `host.js` only. The read-session type fixture also checks imported adapter types under the Node profile. This is not full-client JavaScript checking.
 
 ## Portable kernel slice
 
