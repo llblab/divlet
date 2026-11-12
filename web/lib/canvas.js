@@ -798,7 +798,7 @@ function queueObservation(entry, report) {
     entry.reportTimer = null;
     const latest = entry.latestReport;
     entry.latestReport = null;
-    if (!latest || !entry.iframe || store.expanded?.entry === entry) return;
+    if (!latest || !entry.iframe || store.expanded?.entry === entry || !descriptor(entry.doc.id)) return; // a deleted (or leaving) artboard has no document left to report on
     publishObservations(latest).catch(() => {});
   }, 180);
 }

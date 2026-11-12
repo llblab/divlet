@@ -431,6 +431,8 @@ try {
   assert.ok(!(await readdir(path.join(cwd, 'assets')).catch(error => { if (error.code === 'ENOENT') return []; throw error; })).includes('dropped-photo.png'));
   assert.equal(runtime.settings.assets.images['dropped-photo.png'], `data:image/png;base64,${PNG}`);
   const uploadedId = Object.values(doc('plain-css').nodes).find(node => node.attrs?.src === 'asset:images/dropped-photo.png').id;
+  const uploadedPreview = page.locator('iframe[data-document-id="plain-css"]:not(.frame-ghost)').contentFrame().locator(`[data-divlet-id="${uploadedId}"]`);
+  await waitUntil(() => uploadedPreview.evaluate(image => image.complete && image.naturalWidth > 0), 'the actual uploaded preview image decodes before Undo removes its bytes');
   await focusCanvas(); await page.keyboard.press('Control+z');
   await waitUntil(() => !doc('plain-css').nodes[uploadedId] && !runtime.settings.assets.images?.['dropped-photo.png'], 'one Undo removes the image and its new project bytes');
   await page.keyboard.press('Control+Shift+z');

@@ -225,11 +225,14 @@ on('sidebar', ({ open, tab }) => {
 // A narrow sidebar changes what fits: the placeholder and the key hints are re-chosen, and the textarea re-fits its value.
 on('sidebar-width', () => { paintStatus(); grow(); });
 
-function armWatchdog() {
+function armWatchdog(delay = 9000, waits = 6) {
   clearTimeout(watchdog);
   watchdog = setTimeout(() => {
-    if (!agent().busy && available()) toast('Pi has not started yet. Check the Pi terminal — it needs a model and an API key.');
-  }, 9000);
+    if (agent().busy || !available()) return;
+    // A notice the user can still act on (Undo after a delete) keeps its window: this one waits its turn instead of replacing it.
+    if (waits > 0 && document.querySelector('#toast:not([hidden]) .toast-action')) { armWatchdog(2000, waits - 1); return; }
+    toast('Pi has not started yet. Check the Pi terminal — it needs a model and an API key.');
+  }, delay);
 }
 
 /** Keys typed in a preview frame while focus is still moving to the field: keep them as text. */

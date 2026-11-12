@@ -802,8 +802,9 @@ export function previewBridge(documentId, initialVersion, bridgeToken, readOnly 
     const href = link?.getAttribute('href');
     if (!href || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
     if (href[0] === '#') { event.preventDefault(); scrollToFragment(href); return; }
-    // A scheme or a network-path reference is not a page of this project; leave it to the browser and its CSP.
-    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href) || href.length > 2048) return;
+    // The accepted projection can spell local links as absolute build URLs; other schemes/origins stay with the browser/CSP.
+    if (href.length > 2048) return;
+    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href) && !href.startsWith(new URL('../build/', window.location.href).href)) return;
     event.preventDefault();
     send({ type: 'divlet:link', href });
   });

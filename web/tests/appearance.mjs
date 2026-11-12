@@ -163,6 +163,11 @@ try {
   assert.match(await page.locator('.font-family-note').innerText(), /inline CSS.*stylesheet priority/);
   assert.equal(await family.getAttribute('aria-describedby'), 'font-family-cascade-note', 'the always-visible cascade disclosure describes this authored-value control');
   await waitUntil(() => family.locator('.pick-v').innerText().then(text => text === 'monospace'), 'reader-driven family redraw settles before the keyboard menu gesture');
+  const acceptedContext = { version: afterVersion(), render: runtime.getEntry('welcome').render };
+  await waitUntil(() => page.evaluate(async expected => {
+    const current = (await import('./lib/store.js')).descriptor('welcome');
+    return current?.version === expected.version && current.render === expected.render && document.querySelector('.artboard[data-artboard-id="welcome"]')?.dataset.renderedVersion === String(expected.render);
+  }, acceptedContext), 'the unchanged-context menu witness starts from the accepted model and preview render');
   await page.evaluate(async () => { const state = await import('./lib/store.js'); await state.idle('welcome'); await state.freshModel('welcome'); await (await import('./lib/inspector.js')).render({ force: true }); });
   await family.focus(); await page.keyboard.press('Space');
   await page.getByRole('menu', { name: 'Font family', exact: true }).waitFor();

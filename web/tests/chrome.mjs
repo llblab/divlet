@@ -199,7 +199,10 @@ try {
   checks.push('on a phone the dock is the base row, the tabs sit above it (and stay the sidebar footer when one is open), and the sidebar fills the screen between the logo row and the tabs');
   await phone.evaluate(async () => { (await import('./lib/help.js')).setUiSize(200); (await import('./lib/store.js')).selectArtboards(['welcome']); });
   await phone.locator('#inspector [data-key="name"]').waitFor();
-  const actionRow = await phone.locator('#inspector .smart-bar').evaluate(bar => ({ height: bar.offsetHeight, scrollHeight: bar.scrollHeight, flexShrink: getComputedStyle(bar).flexShrink }));
+  const actionRow = await phone.evaluate(() => {
+    const bar = document.querySelector('#inspector .smart-bar');
+    return { height: bar?.offsetHeight ?? 0, scrollHeight: bar?.scrollHeight ?? 0, flexShrink: bar ? getComputedStyle(bar).flexShrink : '', connected: bar?.isConnected ?? false };
+  });
   assert.ok(actionRow.height >= 24, `the scrollable inspector must not shrink its action row out of reach: ${JSON.stringify(actionRow)}`);
   await phone.locator('#inspector button[aria-label="More"]:not([hidden])').click();
   const compactActions = await phone.locator('.menu .menu-label').allTextContents();

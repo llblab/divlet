@@ -80,7 +80,7 @@ try {
   // Closing full screen swaps in a fresh authenticated frame behind the old page; re-acquire it once the ghost is gone.
   const reframe = async () => { await page.waitForFunction(() => !document.querySelector('.frame-ghost')); frame = await (await iframe.elementHandle()).contentFrame(); };
   await frame.locator('#label').waitFor();
-  await page.waitForFunction(() => document.querySelector('.artboard[data-artboard-id="original"]')?.dataset.renderedVersion === '1');
+  await page.waitForFunction(render => document.querySelector('.artboard[data-artboard-id="original"]')?.dataset.renderedVersion === render, String(runtime.getEntry('original').render));
   await iframe.evaluate(element => { element.dataset.qaIdentity = 'original-frame'; });
   await page.locator('[data-mode="select"]').click();
   const beforeScroll = await card.boundingBox();
