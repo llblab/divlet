@@ -47,23 +47,17 @@ try {
   await page.mouse.move(edge.x + 240, edge.y + edge.height / 2, { steps: 6 });
   await page.mouse.up();
   await waitUntil(() => page.locator('#inspector').evaluate(node => Math.round(node.getBoundingClientRect().width) === 280), 'the inspector reaches its actual resize minimum');
-  const shape = await page.locator('#inspector .appearance-geometry').evaluate(node => {
-    const radius = node.querySelector('[data-key="radius"]').closest('.vf').getBoundingClientRect();
-    const border = node.querySelector('[data-key="border-width"]').closest('.vf').getBoundingClientRect();
-    return { sameRow: Math.abs(radius.top - border.top) < 1, sideBySide: radius.right < border.left, halfWidth: radius.width < node.clientWidth * 0.55 && border.width < node.clientWidth * 0.55 };
-  });
-  assert.deepEqual(shape, { sameRow: true, sideBySide: true, halfWidth: true }, 'radius and border width stay adjacent at the minimum');
+  assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key="border-width"]').count(), 0, 'border widths have one home in the box model');
   await page.locator('#inspector [data-key="radius"]').focus();
   await page.keyboard.press('Tab');
-  assert.equal(await page.locator('#inspector [data-key="border-width"]').evaluate(node => document.activeElement === node), true, 'Tab follows the paired fields before their optional presets');
-  await page.locator('#inspector [data-key="border-width"]').fill('2'); await page.keyboard.press('Enter');
-  await waitUntil(() => classesOf('cta').includes('border-2'), 'the adjacent border field edits its own property');
-  // A declarative border-width is stored as `[border-width:3px]`; the same field must read it back, not fall back to 0.
+  assert.equal(await page.evaluate(() => document.activeElement?.closest('.radius-presets') !== null), true, 'Tab reaches radius presets after the radius field');
+  // A compiler-lowered border width remains visible as the measured fallback, then one edge can override it.
   await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-width': '3px' } } } } });
-  await waitUntil(() => classesOf('cta').includes('[border-width:3px]'), 'a declarative border-width becomes an arbitrary-property class');
-  await waitUntil(async () => await page.locator('#inspector [data-key="border-width"]').inputValue() === '3', 'Appearance reads the declarative border width back');
-  await page.locator('#inspector [data-key="border-width"]').fill('2'); await page.keyboard.press('Enter');
-  await waitUntil(() => { const names = classesOf('cta'); return names.includes('border-2') && !names.includes('[border-width:3px]'); }, 'editing the width replaces the declarative spelling instead of stacking another');
+  await page.evaluate(() => document.activeElement?.blur()); await page.mouse.move(5, 5);
+  await waitUntil(async () => await page.locator('#inspector [data-key="border-t"]').getAttribute('placeholder') === '3', 'the box model reads a declarative width back from the actual page');
+  await page.locator('#inspector [data-key="border-t"]').fill('2'); await page.keyboard.press('Enter');
+  const borderWidths = () => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => { const cs = getComputedStyle(node); return ['Top', 'Right', 'Bottom', 'Left'].map(side => cs[`border${side}Width`]); });
+  await waitUntil(async () => JSON.stringify(await borderWidths()) === JSON.stringify(['2px', '3px', '3px', '3px']), 'one edge changes without rewriting its peers or the utility');
   await page.locator('#inspector [data-key="pick:Weight"]').click();
   await page.locator('.menu .menu-item', { hasText: 'Extra bold 800' }).click();
   await waitUntil(() => classesOf('cta').includes('font-extrabold'), 'a long weight option can still be selected');
@@ -84,7 +78,7 @@ try {
   assert.deepEqual(dimensions, { paired: true, readable: true }, 'artboard dimensions use two readable columns at minimum panel width');
   await select('cta');
   await page.locator('#inspector [data-key="radius"]').waitFor();
-  checks.push('real minimum-width resizing keeps radius/border and artboard dimensions in readable pairs, including long dropdown values');
+  checks.push('minimum-width resizing keeps radius/presets and artboard dimensions readable, border widths live only in Spacing and long dropdown values wrap');
 
   // Fill and text colour by typing a hex value: the class that set the colour before is replaced.
   await page.locator('#inspector [data-key="fill"]').fill('#112233'); await page.keyboard.press('Enter');
@@ -114,7 +108,7 @@ try {
   await waitUntil(() => classesOf('cta').includes('rounded-xl'), 'the 12 preset sets rounded-xl');
   await page.locator('#inspector [data-key="radius"]').fill('10'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('rounded-[10px]') && !classesOf('cta').includes('rounded-xl'), 'a typed number sets an arbitrary radius and replaces the preset');
-  assert.ok(classesOf('cta').includes('border-2'), 'changing radius does not change the adjacent border value');
+  assert.deepEqual(await borderWidths(), ['2px', '3px', '3px', '3px'], 'changing radius does not change border widths');
   await page.locator('#inspector [data-key="radius"]').fill('full'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('rounded-full'), 'typing Full sets rounded-full');
   await page.locator('#inspector [data-key="radius"]').fill(''); await page.keyboard.press('Enter');

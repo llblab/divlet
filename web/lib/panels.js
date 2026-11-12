@@ -4,8 +4,10 @@
  * names a plugin. With no panel registered the inspector still edits tags, text, attributes and inline style.
  *
  * panel = { id, node?(ctx) → sections, nodes?(ctx) → sections }
- *   node:  one selected element.  ctx = { doc, node, parent, saveClasses(list, label), applyClasses(transform, label), spacingFocus(focus) }
- *   nodes: two or more selected elements. ctx = { doc, nodes, applyClasses(transform, label) }
+ *   node:  one selected element.  ctx = { doc, node, parent, saveClasses(list, label), applyClasses(transform, label, { group?, refresh?, style? }), spacingFocus(focus), measuredBox(id), freshMeasuredBox(id) }
+ *   nodes: two or more selected elements. ctx = { doc, nodes, applyClasses(transform, label, options) }
+ *   applyClasses derives from queued accepted nodes; optional style is an inline patch or async node → patch.
+ *   freshMeasuredBox waits for the current render's geometry and refuses if it never arrives.
  * section = { name, title?, content }: with a title the content is a fold, without one it is the bare section.
  */
 const panels = [];

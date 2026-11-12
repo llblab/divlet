@@ -921,6 +921,8 @@ function handlePreviewMessage(entry, data) {
     if (box) {
       if (sides('border') && source.border.every(value => value >= 0)) box.border = [...source.border];
       if (['static', 'relative', 'absolute', 'fixed', 'sticky'].includes(source.position)) box.position = source.position;
+      if (['content-box', 'border-box'].includes(source.boxSizing)) box.boxSizing = source.boxSizing;
+      if (Number.isInteger(data.version)) box.render = data.version;
       if (Array.isArray(source.inset) && source.inset.length === 4 && source.inset.every(value => typeof value === 'string' && value.length <= 64)) box.inset = [...source.inset];
       if (source.content && ['width', 'height'].every(key => source.content[key] === null || Number.isFinite(source.content[key]) && source.content[key] >= 0)) box.content = { width: source.content.width, height: source.content.height };
       if (source.colors && typeof source.colors === 'object') box.colors = Object.fromEntries(['background', 'color', 'radius', 'fontSize', 'borderColor'].filter(key => typeof source.colors[key] === 'string' && source.colors[key].length <= 64).map(key => [key, source.colors[key]]));

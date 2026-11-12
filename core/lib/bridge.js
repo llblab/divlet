@@ -143,7 +143,7 @@ export function previewBridge(documentId, initialVersion, bridgeToken, readOnly 
         handleBox = { nodeId: id,
           margin: edges.map(edge => parseFloat(cs.getPropertyValue(`margin-${edge}`)) || 0),
           padding: [p.t, p.r, p.b, p.l], border: [b.t, b.r, b.b, b.l],
-          position: cs.position, inset: edges.map(edge => cs.getPropertyValue(edge)),
+          position: cs.position, boxSizing: cs.boxSizing, inset: edges.map(edge => cs.getPropertyValue(edge)),
           content: { width: contentSize('width', p.l + p.r, b.l + b.r), height: contentSize('height', p.t + p.b, b.t + b.b) },
           colors: { background: cs.backgroundColor, color: cs.color, radius: cs.borderTopLeftRadius, fontSize: cs.fontSize, borderColor: cs.borderTopColor } };
       }

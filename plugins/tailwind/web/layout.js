@@ -136,7 +136,8 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
   input.addEventListener('change', () => commit(input.value));
   input.addEventListener('keydown', event => {
     event.stopPropagation();
-    if (event.key === 'Enter') { event.preventDefault(); commit(input.value); input.blur(); }
+    if (event.key === 'Tab') commit(input.value, { live: true }); // Let native focus order run without replacing the departing input.
+    else if (event.key === 'Enter') { event.preventDefault(); commit(input.value); input.blur(); }
     else if (event.key === 'Escape') { input.value = current; input.blur(); }
     else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
       const number = stepFrom(input.value || placeholder || '0');
@@ -302,26 +303,8 @@ function appearanceFold(nodes, { value, run, measured, tokens }) {
     }),
     pick('Weight', weight, WEIGHTS, next => run(cls => tw.set(cls, 'fontWeight', next ? `font-${next}` : null), next ? `weight ${next}` : 'default weight'), { tip: 'Font weight' }),
   );
-  // Border: width presets or any px, and a colour.
-  const BORDER_STEPS = [['0', 'border-0'], ['1', 'border'], ['2', 'border-2'], ['4', 'border-4']];
-  const borderClass = value(cls => tw.get(cls, 'borderWidth'));
-  const borderPx = borderClass === MIXED ? MIXED : borderClass == null ? null : borderClass === 'border' ? 1 : borderClass === 'border-0' ? 0 : /^border-(\d+)$/.exec(borderClass)?.[1] ?? /^border-\[(\d+(?:\.\d+)?)px\]$/.exec(borderClass)?.[1] ?? /^\[border-width:(\d+(?:\.\d+)?)px\]$/.exec(borderClass)?.[1] ?? borderClass;
-  const border = field('border-width', 'B', borderPx, next => run(cls => tw.set(cls, 'borderWidth', next), `border ${next ? '' : 'none'}`.trim()), {
-    tip: 'Border width, px', unit: 'px', placeholder: '0', min: 0, max: 64,
-    parse: raw => { const t = raw.trim(); if (!t) return null; if (!/^\d+(?:\.\d+)?$/.test(t)) return undefined; return Number(t) === 1 ? 'border' : Number(t) === 0 ? 'border-0' : [2, 4, 8].includes(Number(t)) ? `border-${Number(t)}` : `border-[${Number(t)}px]`; },
-  });
-  const borderPresets = el('div', 'radius-presets');
-  borderPresets.setAttribute('role', 'group');
-  borderPresets.setAttribute('aria-label', 'Border width presets');
-  for (const [text, name] of BORDER_STEPS) {
-    const chip = el('button', `chip${borderClass === name ? ' on' : ''}`, text);
-    chip.type = 'button';
-    chip.dataset.tip = `${text}px border`;
-    chip.addEventListener('click', () => run(cls => tw.set(cls, 'borderWidth', name), `border ${text}px`));
-    borderPresets.append(chip);
-  }
   const geometry = el('div', 'appearance-geometry');
-  geometry.append(radius, border, presets, borderPresets);
+  geometry.append(radius, presets);
   box.append(
     geometry,
     colorField({ key: 'fill', label: 'Fill', tip: 'Background colour', group: 'bgColor', prefix: 'bg', value, run, computed: measured?.colors?.background, tokens }),
@@ -364,13 +347,13 @@ function labeledSegments(label, control) {
  * `nodes` are the selected elements (one or more), `parent` the single selection's parent (or
  * null), `apply(transform, label)` rewrites each element's className and commits once.
  */
-export function layoutSections(nodes, { parent, apply, spacingFocus, measured = null, tokens = [] }) {
+export function layoutSections(nodes, { parent, apply, spacingFocus, measured = null, readMeasured = () => measured, tokens = [] }) {
   tw.setColorNames(tokens.map(([name]) => name.replace(/^--color-/, '')));
   const classes = nodes.map(node => node.className || '');
   const value = fn => same(classes.map(fn));
   const variants = test => [...new Set(classes.flatMap(cls => tw.variantsOf(cls, test)))].slice(0, 4);
   const subject = nodes.length === 1 ? `#${nodes[0].id}` : `${nodes.length} elements`;
-  const run = (fn, label) => apply(fn, `${label} on ${subject}`, { group: sessionGroup, refresh: !typingLive });
+  const run = (fn, label, options = {}) => apply(fn, `${label} on ${subject}`, { ...options, group: sessionGroup, refresh: !typingLive });
 
   /* layout */
   const display = value(cls => tw.get(cls, 'display'));
@@ -379,7 +362,6 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
   const top = el('div', 'grid2');
   top.append(
     pick('Display', display, DISPLAY, next => run(cls => tw.set(cls, 'display', next), next ? `display ${next}` : 'default display'), { variants: variants('display') }),
-    pick('Position', position, POSITION, next => run(cls => tw.set(cls, 'position', next), next ? next : 'default position'), { variants: variants('position') }),
   );
   layout.append(top);
 
@@ -465,6 +447,7 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
 
   /* One developer-tools-style box model; the existing margin/padding and offset editors live on their actual edges. */
   const spacing = el('div', 'spacing-box');
+  spacing.append(pick('Position', position, POSITION, next => run(cls => tw.set(cls, 'position', next), next ? next : 'default position'), { variants: variants('position') }));
   const model = el('div', 'boxmodel');
   model.setAttribute('role', 'group');
   model.setAttribute('aria-label', 'CSS box model in pixels');
@@ -487,21 +470,27 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
     return node;
   };
   const number = value => Number.isFinite(value) ? String(Math.round(value * 1000) / 1000) : '—';
-  const positionValue = position === MIXED ? MIXED : measured?.position ?? position ?? null;
-  const positioned = ['relative', 'absolute', 'fixed', 'sticky'].includes(positionValue);
+  const nonnegative = raw => raw === '' ? null : /^(?:\d+(?:\.\d+)?|\.\d+)(?:px)?$/.test(raw) && Number.isFinite(parseFloat(raw)) ? parseFloat(raw) : undefined;
+  const bareField = (key, label, shown, placeholder, onCommit) => {
+    const node = field(key, '', shown, onCommit, { tip: label, placeholder, min: 0, parse: nonnegative });
+    node.querySelector('.vf-k').remove();
+    node.classList.add('bm-value');
+    return node;
+  };
   const edge = (kind, side, index) => {
     if (kind === 'margin' || kind === 'padding') return spaceField(kind, kind === 'margin' ? 'm' : 'p', side);
-    if (kind === 'position' && positioned) {
+    if (kind === 'position') {
       const token = value(cls => tw.sides(cls, 'inset')[side]);
       const node = field(`inset-${side}`, '', token === MIXED ? MIXED : tw.display(token), next => run(cls => tw.setSide(cls, 'inset', side, next), `${sideNames[side]} ${next ?? 'auto'}`), { tip: `${sideNames[side][0].toUpperCase()}${sideNames[side].slice(1)} offset, px`, placeholder: measured?.inset?.[index]?.replace(/px$/, '') ?? 'auto', parse: tw.fromInput });
       node.querySelector('.vf-k')?.remove();
       node.classList.add('bm-offset');
       return node;
     }
-    const shown = kind === 'border' ? number(measured?.border?.[index]) : positionValue === MIXED || positionValue === null ? '—' : measured?.inset?.[index]?.replace(/px$/, '') ?? 'auto';
-    const node = el('span', 'bm-readout', shown);
-    node.setAttribute('aria-label', `${kind} ${sideNames[side]}: ${shown}${kind === 'border' ? ' px' : ''}`);
-    return node;
+    const property = `border-${sideNames[side]}-width`;
+    const authored = same(nodes.map(node => node.style?.[property] ?? null));
+    return bareField(`border-${side}`, `Border ${sideNames[side]}, px`, authored === MIXED ? MIXED : authored?.replace(/px$/, ''), number(measured?.border?.[index]), next => {
+      run(cls => cls, `${property} ${next ?? 'default'}`, { style: { [property]: next === null ? null : `${next}px` } });
+    });
   };
   const square = (kind, inner) => {
     const sq = el('div', `bm-sq bm-${kind}`);
@@ -541,7 +530,27 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
   core.setAttribute('role', 'group');
   const width = number(measured?.content?.width), height = number(measured?.content?.height);
   core.setAttribute('aria-label', `Content size: ${width} by ${height} CSS px`);
-  core.append(el('span', 'bm-dimension', width), el('span', 'bm-times', '×'), el('span', 'bm-dimension', height));
+  for (const [index, axis] of ['width', 'height'].entries()) {
+    if (index) core.append(el('span', 'bm-times', '×'));
+    const dimension = axis === 'width' ? width : height;
+    const authored = nodes.length === 1 && Object.hasOwn(nodes[0].style ?? {}, axis);
+    const size = bareField(`content-${axis}`, `Content ${axis}, px`, authored ? dimension : null, dimension, next => {
+      run(cls => cls, `content ${axis} ${next ?? 'default'}`, { style: async () => {
+        if (next === null) return { [axis]: null };
+        const box = await readMeasured();
+        if (nodes.length !== 1 || !Number.isFinite(box?.content?.[axis])) throw new Error('Select one visible element to edit its content size.');
+        const sides = axis === 'width' ? [1, 3] : [0, 2];
+        const extra = box.boxSizing === 'border-box' ? sides.reduce((sum, side) => sum + box.padding[side] + box.border[side], 0) : 0;
+        return { [axis]: `${next + extra}px` };
+      } });
+    });
+    size.classList.add('bm-dimension');
+    const input = size.querySelector('input');
+    const fit = () => size.style.setProperty('--bm-value-width', `calc(${(input.value || input.placeholder).length}ch + 4px)`);
+    for (const event of ['input', 'keydown', 'change']) input.addEventListener(event, fit);
+    fit();
+    core.append(size);
+  }
   const unit = el('span', 'bm-unit', 'px');
   unit.setAttribute('aria-hidden', 'true');
   model.append(square('position', square('margin', square('border', square('padding', core)))), unit);

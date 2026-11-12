@@ -86,7 +86,8 @@ try {
       tips: [...box.querySelectorAll('.bm-field')].filter(field => field.querySelector('.vf-k')?.dataset.tip || field.dataset.tip).length,
       labels: [...box.querySelectorAll('.bm-field')].map(field => field.getAttribute('aria-label')),
       captions: [...box.querySelectorAll('.bm-caption')].map(node => node.textContent),
-      border: box.querySelectorAll('.bm-border > .bm-cell .bm-readout').length,
+      border: box.querySelectorAll('.bm-border > .bm-cell input').length,
+      outline: getComputedStyle(box.querySelector('.bm-position')).borderStyle,
       switches: box.querySelectorAll('button, .bm-legend').length,
       height: box.getBoundingClientRect().height,
     };
@@ -95,7 +96,9 @@ try {
   assert.equal(sized.keys, 0, 'no letter keys: the square a number sits on says which side it is');
   assert.equal(sized.tips, 0, 'side captions do not add tooltip noise');
   assert.deepEqual(sized.captions, ['position', 'margin', 'border', 'padding']);
-  assert.equal(sized.border, 4, 'computed per-side borders are read-only, not a duplicate width editor');
+  assert.equal(sized.border, 4, 'all four border widths are editable');
+  assert.equal(sized.outline, 'none', 'the position band has no outer outline');
+  assert.equal(await page.locator('#inspector [data-section="layout"] [data-key="pick:Position"]').count(), 0, 'position mode has one home, with its offsets in Spacing');
   assert.equal(sized.switches, 0, 'no linking switches or separate legend');
   assert.ok(sized.height <= 225, `the four-layer widget stays compact (${sized.height})`);
   assert.deepEqual(sized.labels, ['Margin top, px', 'Margin right, px', 'Margin bottom, px', 'Margin left, px', 'Padding top, px', 'Padding right, px', 'Padding bottom, px', 'Padding left, px'], 'the accessible name still says which side and unit');
@@ -117,7 +120,7 @@ try {
   assert.deepEqual(tight.clipped, [], 'and no value is cut off, even a word like auto');
   await page.evaluate(() => { document.querySelector('#inspector').style.width = ''; });
   await sleep(300);
-  checks.push('four named bands retain eight independent spacing editors without linking modes or duplicate border editors');
+  checks.push('four named bands retain eight independent spacing editors, editable borders and no outer outline');
 
   const paddingValues = () => frame.locator('[data-divlet-id="nav"]').evaluate(node => {
     const style = getComputedStyle(node);
@@ -264,6 +267,8 @@ try {
     await page.keyboard.press('Escape');
     await page.mouse.up();
     await waitUntil(() => kids().join() === orderNow, `Escape restores the order (${kids().join()})`);
+    // Candidate state is visible inside replay before its final persistence/stack transfer finishes.
+    await runtime.queue;
     assert.equal(runtime.undoStack.length, depth, 'the cancelled drag leaves no undo step behind');
     assert.equal(kids().length, 4, 'and loses no child');
   }
@@ -377,7 +382,7 @@ try {
   await waitUntil(async () => /65\.328 by 34/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'actual fractional content dimensions');
   assert.equal(await page.locator('#inspector [data-key="inset-t"]').count(), 1, 'offset has one home in the outer position band');
   assert.equal(await page.locator('#inspector [data-section="layout"] [data-key="inset-t"]').count(), 0, 'no duplicate layout offset editor');
-  assert.deepEqual(await page.locator('#inspector .bm-border > .bm-cell').allTextContents(), ['1', '1', '1', '1']);
+  assert.deepEqual(await page.locator('#inspector .bm-border > .bm-cell input').evaluateAll(inputs => inputs.map(input => input.value || input.placeholder)), ['1', '1', '1', '1']);
   assert.equal(await page.locator('#inspector .bm-padding [data-key="p-t"]').getAttribute('placeholder'), '4');
   await page.locator('#inspector [data-key="inset-t"]').fill('8');
   await page.keyboard.press('Enter');
@@ -385,12 +390,93 @@ try {
   await page.mouse.move(5, 5);
   await page.keyboard.press('Control+z');
   await waitUntil(() => !runtime.read({ view: 'document', documentId: probe.id }).nodes['box-probe'].className.includes('top-2'), 'position edge edit remains undoable');
+  // Native DOM order is the complete outside-in editing path; no positive tabindex or focus trap.
+  const fieldOrder = ['inset-t', 'inset-r', 'inset-b', 'inset-l', 'm-t', 'm-r', 'm-b', 'm-l', 'border-t', 'border-r', 'border-b', 'border-l', 'p-t', 'p-r', 'p-b', 'p-l', 'content-width', 'content-height'];
+  const activeKey = () => page.evaluate(() => document.activeElement?.dataset.key);
+  await page.locator('#inspector [data-key="pick:Position"]').focus();
+  for (const key of fieldOrder) { await page.keyboard.press('Tab'); assert.equal(await activeKey(), key, `Tab reaches ${key}`); }
+  await page.keyboard.press('Tab'); assert.equal(await page.evaluate(() => document.activeElement?.closest('[data-section]')?.dataset.section), 'effects', 'Tab leaves the last value for the next section');
+  for (const key of [...fieldOrder].reverse()) { await page.keyboard.press('Shift+Tab'); assert.equal(await activeKey(), key, `Shift+Tab reaches ${key}`); }
+  await page.keyboard.press('Shift+Tab'); assert.equal(await activeKey(), 'pick:Position', 'Shift+Tab leaves the first value for position mode');
+  checks.push('Tab and Shift+Tab traverse position mode, all 18 values and the section boundaries in native DOM order');
+
+  await page.locator('#inspector [data-key="border-r"]').fill('4'); await page.keyboard.press('Enter');
+  await waitUntil(async () => await probeFrame.locator('[data-divlet-id="box-probe"]').evaluate(node => getComputedStyle(node).borderRightWidth === '4px'), 'per-side border editing changes the actual page');
+  assert.equal(await probeFrame.locator('[data-divlet-id="box-probe"]').evaluate(node => getComputedStyle(node).borderLeftWidth), '1px', 'the other border is untouched');
+  await waitUntil(async () => await page.locator('#inspector [data-key="content-width"]').getAttribute('placeholder') === '62.328', 'new border reaches the content measurement');
+  await page.locator('#inspector [data-key="content-width"]').fill('80'); await page.keyboard.press('Enter');
+  await waitUntil(async () => /80 by 34/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'content width edits account for border-box padding and asymmetric borders');
+  await page.locator('#inspector [data-key="content-height"]').fill('40'); await page.keyboard.press('Enter');
+  await waitUntil(async () => /80 by 40/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'content height edits reach the page');
+  await waitUntil(async () => await page.locator('#inspector [data-key="content-width"]').inputValue() === '80', 'authored content size is a value, not an un-clearable placeholder');
+  await page.locator('#inspector [data-key="content-width"]').fill(''); await page.keyboard.press('Tab');
+  await waitUntil(() => !Object.hasOwn(runtime.read({ view: 'document', documentId: probe.id }).nodes['box-probe'].style, 'width'), 'Tab clears authored inline width');
+  await page.locator('#inspector [data-key="content-height"]').fill(''); await page.keyboard.press('Enter');
+  await waitUntil(() => !Object.hasOwn(runtime.read({ view: 'document', documentId: probe.id }).nodes['box-probe'].style, 'height'), 'Enter clears authored inline height');
+  await page.locator('#viewport').focus(); await page.keyboard.press('Control+z');
+  await waitUntil(() => runtime.read({ view: 'document', documentId: probe.id }).nodes['box-probe'].style.height === '50px', 'undo restores fixed height after clearing');
+  await page.keyboard.press('Control+z');
+  await waitUntil(async () => /80 by 40/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'undo restores fixed width after clearing');
+  for (const expected of [/80 by 34/, /62\.328 by 34/, /65\.328 by 34/]) {
+    await page.locator('#viewport').focus(); await page.keyboard.press('Control+z');
+    await waitUntil(async () => expected.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'one undo per edited value restores the measured size');
+  }
+  checks.push('border sides and both content dimensions edit the actual inline-styled page with undo and correct border-box semantics');
+
+  // Hold the first write: several Tab commits must compose against accepted state rather than the panel's old class string.
+  await page.evaluate(async id => (await import('./lib/store.js')).selectNodes(id, ['box-other']), probe.id);
+  await page.locator('#inspector [data-key="m-t"]').waitFor();
+  await page.locator('#inspector [data-key="pick:Position"]').click();
+  await page.locator('.menu .menu-item', { hasText: 'Static' }).click();
+  await waitUntil(() => runtime.read({ view: 'document', documentId: probe.id }).nodes['box-other'].className.split(' ').includes('static'), 'position mode is editable in Spacing');
+  assert.equal(await page.locator('#inspector .bm-position > .bm-cell input').count(), 4, 'static offsets are still editable');
+  await page.locator('#inspector [data-key="inset-t"]').fill('6.5'); await page.keyboard.press('Tab');
+  await waitUntil(() => runtime.read({ view: 'document', documentId: probe.id }).nodes['box-other'].className.includes('top-[6.5px]'), 'a static offset is authored');
+  assert.equal(await probeFrame.locator('[data-divlet-id="box-other"]').evaluate(node => getComputedStyle(node).position), 'static', 'editing an offset never silently changes positioning mode');
+  await page.locator('#inspector [data-key="pick:Position"]').evaluate(node => { node.dataset.beforeOffset = '1'; });
+  await page.locator('#viewport').focus(); await page.mouse.move(5, 5);
+  await waitUntil(async () => await page.locator('#inspector [data-key="pick:Position"]').getAttribute('data-before-offset') === null, 'flush the deferred offset panel before opening its mode menu');
+  await page.locator('#inspector [data-key="pick:Position"]').click();
+  await page.locator('.menu .menu-item', { hasText: 'Relative' }).click();
+  await waitUntil(async () => await probeFrame.locator('[data-divlet-id="box-other"]').evaluate(node => getComputedStyle(node).position === 'relative' && getComputedStyle(node).top === '6.5px'), 'choosing Relative activates the authored offset');
+  let release, held;
+  const arrived = new Promise(resolve => { held = resolve; });
+  const gate = new Promise(resolve => { release = resolve; });
+  let firstWrite = true;
+  await page.route('**/api/patch', async route => { if (firstWrite) { firstWrite = false; held(); await gate; } await route.continue(); });
+  await page.locator('#inspector [data-key="m-t"]').fill('11'); await page.keyboard.press('Tab');
+  await arrived;
+  for (const [key, text] of [['m-r', '12'], ['m-b', '13'], ['m-l', '14']]) {
+    assert.equal(await activeKey(), key, 'committing the prior value keeps the next field focused');
+    await page.keyboard.insertText(text); await page.keyboard.press('Tab');
+  }
+  for (let i = 0; i < 3; i++) await page.keyboard.press('Tab');
+  assert.equal(await activeKey(), 'border-l');
+  await page.keyboard.insertText('4'); await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab'); assert.equal(await activeKey(), 'p-r');
+  await page.keyboard.insertText('8'); await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); assert.equal(await activeKey(), 'content-width');
+  await page.keyboard.insertText('90'); await page.keyboard.press('Tab');
+  await page.keyboard.insertText('45'); await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
+  assert.equal(await activeKey(), 'opacity', 'native Tab leaves the widget and reaches the next field');
+  release();
+  await page.evaluate(async id => (await import('./lib/store.js')).idle(id), probe.id);
+  await page.unroute('**/api/patch');
+  assert.deepEqual(await probeFrame.locator('[data-divlet-id="box-other"]').evaluate(node => { const cs = getComputedStyle(node); return ['Top', 'Right', 'Bottom', 'Left'].map(side => cs[`margin${side}`]); }), ['11px', '12px', '13px', '14px'], 'all queued side edits survive');
+  await waitUntil(async () => /90 by 45/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? '') || await probeFrame.locator('[data-divlet-id="box-other"]').evaluate(node => { const cs = getComputedStyle(node); return parseFloat(cs.width) - parseFloat(cs.paddingRight) - parseFloat(cs.borderLeftWidth) === 90 && parseFloat(cs.height) === 45; }), 'queued content edits use the newly accepted padding/border measurement');
+  assert.equal(await probeFrame.locator('[data-divlet-id="box-other"]').evaluate(node => getComputedStyle(node).paddingRight), '8px');
+  assert.equal(await activeKey(), 'opacity', 'accepted writes do not steal the next field focus');
+  await page.evaluate(async id => (await import('./lib/store.js')).selectNodes(id, ['box-probe']), probe.id);
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.mouse.move(5, 5);
+  checks.push('held network writes preserve every rapid Tab edit and the next field focus');
+
   const patchProbe = async style => {
     const current = runtime.read({ view: 'document', documentId: probe.id });
     await runtime.patch({ documentId: probe.id, expectedVersion: current.version, patch: { nodes: { 'box-probe': { style } } } });
   };
   await patchProbe({ 'box-sizing': 'content-box', width: '65.328125px', height: '34px', transform: 'scale(1.5)', 'margin-top': '-6.5px', 'border-right-width': '3px' });
-  await waitUntil(async () => (await page.locator('#inspector .bm-border > .bm-r').innerText()) === '3', 'asymmetric computed border readback');
+  await waitUntil(async () => (await page.locator('#inspector [data-key="border-r"]').inputValue()) === '3', 'asymmetric authored border readback');
   assert.match(await page.locator('#inspector .bm-core').getAttribute('aria-label'), /65\.328 by 34/, 'content-box and transforms do not inflate the content measurement');
   assert.equal(await page.locator('#inspector [data-key="m-t"]').getAttribute('placeholder'), '-6.5', 'negative measured margins are not clamped to zero');
   assert.ok(await probeFrame.locator('[data-divlet-id="box-probe"]').evaluate(node => node.getBoundingClientRect().width > 100));
@@ -424,7 +510,7 @@ try {
     await revealBoxModel();
     await sleep(350);
     const collisions = await page.locator('#inspector .boxmodel').evaluate(model => {
-      const fields = [...model.querySelectorAll('.bm-field, .bm-offset, .bm-readout, .bm-core')].map(node => node.getBoundingClientRect());
+      const fields = [...model.querySelectorAll('.bm-field, .bm-offset, .bm-border > .bm-cell .bm-value, .bm-core')].map(node => node.getBoundingClientRect());
       const overlap = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
       const bad = [];
       if (model.scrollWidth > model.clientWidth + 1) bad.push('widget overflows');
@@ -441,6 +527,7 @@ try {
     await page.evaluate(() => document.activeElement?.blur());
     await sleep(250);
     await page.locator('#inspector .boxmodel').screenshot({ path: `artifacts/boxmodel-${width}-${size}-${theme}.png` });
+    await page.locator('#inspector .spacing-box').screenshot({ path: `artifacts/box-edit-${width}-${size}-${theme}.png` });
   }
   await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(100));
   await page.mouse.move(5, 5);
@@ -494,7 +581,7 @@ try {
   await boxTouch.close();
   await page.evaluate(async id => { (await import('./lib/store.js')).selectNodes(id, ['box-probe', 'box-other']); }, probe.id);
   await waitUntil(async () => /— by —/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'multi-selection does not invent aggregate geometry');
-  assert.deepEqual(await page.locator('#inspector .bm-border > .bm-cell').allTextContents(), ['—', '—', '—', '—']);
+  assert.deepEqual(await page.locator('#inspector .bm-border > .bm-cell input').evaluateAll(inputs => inputs.map(input => input.value || input.placeholder)), ['—', '—', '—', '—']);
   assert.equal(await page.locator('#inspector [data-key="m-t"]').getAttribute('placeholder'), '—');
   checks.push('real per-edge borders, signed margins, fractional untransformed content size, hidden/visible recovery, one undoable offset editor, truthful mixed state and desktop/phone/200% geometry');
   assert.deepEqual(errors, []);

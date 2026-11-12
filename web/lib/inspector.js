@@ -547,21 +547,38 @@ function instanceEditor(doc, node) {
 function panelFolds(kind, doc, nodes, parent) {
   // `refresh: false` is for an edit that lands while a field is being typed into: the panel must not replace the input
   // under the caret, so the change is committed without a forced re-render (the focusout path draws the deferred one).
-  const applyClasses = (transform, label, { group, refresh = true } = {}) => {
-    const patch = {};
-    for (const node of nodes) {
-      const next = transform(node.className || '');
-      if (next !== (node.className || '')) patch[node.id] = { className: next };
-    }
-    if (!Object.keys(patch).length) return;
-    const result = commit(doc.id, { nodes: patch }, { label, group });
-    if (refresh) refreshed(result);
+  const applyClasses = (transform, label, { group, refresh = true, style } = {}) => {
+    // Tab can reach several fields before the first write returns. Derive each change inside the writer queue,
+    // not from the nodes captured when this panel was built, or the next field would erase the previous one.
+    const result = commit(doc.id, async model => {
+      const patch = {};
+      for (const selected of nodes) {
+        const node = model.nodes[selected.id];
+        if (node?.type !== 'element') throw new Error(`Element no longer exists: ${selected.id}`);
+        const next = transform(node.className || '');
+        const inline = typeof style === 'function' ? await style(node) : style;
+        const change = inline ? { style: inline } : {};
+        if (next !== (node.className || '')) change.className = next;
+        if (Object.keys(change).length) patch[node.id] = change;
+      }
+      return Object.keys(patch).length ? { nodes: patch } : null;
+    }, { label, group });
+    if (refresh) refreshed(result); else quiet(result);
   };
   const ctx = {
     doc, nodes, node: nodes[0], parent, applyClasses,
     saveClasses: (next, label) => refreshed(commit(doc.id, { nodes: { [nodes[0].id]: { className: next.join(' ') } } }, { label: `${label} on ${nodes[0].id}` })),
     spacingFocus: focus => postToFrame(doc.id, { type: 'divlet:spacing-focus', focus }),
     measuredBox: nodeId => measuredBox(doc.id, nodeId),
+    freshMeasuredBox: nodeId => {
+      const render = descriptor(doc.id)?.render;
+      const read = () => { const box = measuredBox(doc.id, nodeId); return box?.render === render ? box : null; };
+      if (read()) return Promise.resolve(read());
+      return new Promise((resolve, reject) => {
+        const stop = on('spacing-box', () => { const box = read(); if (box) { stop(); clearTimeout(timer); resolve(box); } });
+        const timer = setTimeout(() => { stop(); reject(new Error('The preview has not measured this render yet. Try the size edit again.')); }, 2000);
+      });
+    },
   };
   return panelSections(kind, ctx).map(({ name, title, content }) => section(name, title ? details(title, content, true) : content));
 }

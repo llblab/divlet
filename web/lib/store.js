@@ -131,9 +131,20 @@ async function send(route, documentId, build, { version = Math.max(known.get(doc
   }
 }
 
+/** A literal patch, or async relative intent derived after prior local writes; derived patches never retry a stale model. */
 export function commit(documentId, patch, { label, group, expectedVersion, expectedRender } = {}) {
   const guard = expectedVersion === undefined ? {} : { version: expectedVersion, retry: false };
-  return enqueue(documentId, () => send('api/patch', documentId, version => ({ documentId, expectedVersion: version, expectedRender, patch, label, group }), guard)).catch(error => { toast(error.message); throw error; });
+  const format = store.state?.project?.format;
+  return enqueue(documentId, async () => {
+    if (typeof patch !== 'function') return send('api/patch', documentId, version => ({ documentId, expectedVersion: version, expectedRender, patch, label, group }), guard);
+    if (store.state?.project?.format !== format) throw Object.assign(new Error('The source format changed. Read it again before retrying.'), { code: 'REVISION_CONFLICT' });
+    const model = await freshModel(documentId);
+    if (store.state?.project?.format !== format || model !== cachedModel(documentId) || model.version < (known.get(documentId) || 0)) throw Object.assign(new Error('The frame model is not current. Read it again before retrying.'), { code: 'REVISION_CONFLICT' });
+    const derived = await patch(model);
+    if (store.state?.project?.format !== format || model !== cachedModel(documentId)) throw Object.assign(new Error('The frame changed while preparing this edit. Read it again before retrying.'), { code: 'REVISION_CONFLICT' });
+    if (!derived) return null;
+    return send('api/patch', documentId, version => ({ documentId, expectedVersion: version, expectedRender, patch: derived, label, group }), { version: expectedVersion ?? model.version, retry: false });
+  }).catch(error => { toast(error.message); throw error; });
 }
 export function edit(documentId, op, { label, group, expectedRender } = {}) {
   const format = store.state?.project?.format;
