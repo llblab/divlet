@@ -51,6 +51,21 @@ try {
   assert.equal(execFileSync(process.execPath, [path.join(target, 'node_modules/.bin/divlet-mcp'), '--version'], { encoding: 'utf8' }).trim(), packed.version);
   assert.equal(await readFile(path.join(target, 'node_modules/divlet/package.json'), 'utf8').then(text => JSON.parse(text).pi), undefined);
   await assert.rejects(readFile(path.join(target, 'node_modules/typebox/package.json')), { code: 'ENOENT' }, 'CLI/MCP do not install Pi peers');
+  const fontEntry = path.join(root, 'web/tests/release/fonts.mjs');
+  const fontOptions = { cwd: target, env: { ...process.env, NODE_OPTIONS: '' }, encoding: 'utf8', timeout: 90000, maxBuffer: 4 * 1024 * 1024 };
+  const installedFonts = JSON.parse(execFileSync(process.execPath, [fontEntry, target], fontOptions).trim().split('\n').pop());
+  assert.equal(installedFonts.status, 'passed', 'the installed CLI/MCP font lifecycle and prefixed output work without checkout product sources or Pi');
+  let aborted;
+  try { execFileSync(process.execPath, [fontEntry, target, '--abort-after-start'], fontOptions); } catch (error) { aborted = error; }
+  assert.equal(aborted?.status, 143, 'SIGTERM must clean up and exit with its explicit failure status');
+  const events = aborted.stdout.trim().split('\n').map(line => JSON.parse(line));
+  const ready = events.find(event => event.phase === 'abort-ready'), cleaned = events.find(event => event.phase === 'abort-cleaned');
+  assert.equal(path.dirname(ready.work), os.tmpdir()); assert.ok(path.basename(ready.work).startsWith('divlet-installed-fonts-'));
+  assert.equal(cleaned.browserClosed, true); assert.equal(cleaned.childrenClosed, true);
+  await assert.rejects(readFile(ready.work), { code: 'ENOENT' }, 'signal cleanup removes only the test-owned workspace');
+  assert.equal(ready.pids.length, 2);
+  for (const pid of ready.pids) { assert.ok(Number.isSafeInteger(pid) && pid > 0); assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'test-owned CLI/MCP children cannot survive signal cleanup'); }
+  installedFonts.signalCleanup = true;
   await writeFile(path.join(target, 'cli-smoke.mjs'), `
     import assert from 'node:assert/strict';
     import { spawn } from 'node:child_process';
@@ -182,5 +197,5 @@ try {
     assert.deepEqual(await handlers.get('resources_discover')(), { skillPaths: [path.dirname(skill)] });
   `);
   execFileSync(process.execPath, ['pi-smoke.mjs'], { cwd: target, stdio: 'pipe' });
-  console.log(JSON.stringify({ status: 'passed', files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, pluginTypes: true, browserModelBundle: true, mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
+  console.log(JSON.stringify({ status: 'passed', files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, pluginTypes: true, browserModelBundle: true, installedFonts, mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
 } finally { await rm(work, { recursive: true, force: true }); }
