@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import path from 'node:path';
 import { DivletError } from './model.ts';
+import { canonicalMediaType } from './media-type.ts';
 
 const MANIFEST = '.divlet-build.json';
 const LOCK = '.divlet-write.lock';
@@ -9,8 +10,10 @@ const hash = (value: string | Buffer): string => createHash('sha256').update(val
 const inside = (root: string, file: string): boolean => file === root || (!path.relative(root, file).startsWith('..' + path.sep) && path.relative(root, file) !== '..' && !path.isAbsolute(path.relative(root, file)));
 function fail(code: string, message: string): never { throw new DivletError(code, message); }
 
-/** The ownership manifest: which generated files this project owns and their hashes. */
-export interface OutputManifest { schemaVersion: 1; project: string; files: Record<string, string> }
+/** Owned hashes and optional authored MIME; MIME is provenance, never HTTP/public-file authority. */
+export interface OutputManifest { schemaVersion: 1; project: string; files: Record<string, string>; mediaTypes?: Record<string, string> }
+/** When supplied, the complete MIME map replaces prior metadata; omitted maps preserve it across partial writes. */
+export interface OutputMetadata { mediaTypes?: ReadonlyMap<string, string> }
 /** Generated files by relative name, as a build plans to publish them. */
 export type GeneratedFiles = Map<string, string | Buffer>;
 
@@ -85,6 +88,11 @@ export class OutputStore {
       if ([MANIFEST, LOCK].includes(name) || !/^[a-f0-9]{64}$/.test(digest)) fail('OUTPUT_CONFLICT', 'The output manifest has an invalid file record.');
     }
     manifest.files = Object.assign(Object.create(null), manifest.files);
+    if (Object.hasOwn(manifest, 'mediaTypes')) {
+      if (!manifest.mediaTypes || typeof manifest.mediaTypes !== 'object' || Array.isArray(manifest.mediaTypes)) fail('OUTPUT_CONFLICT', 'The output manifest has invalid MIME metadata.');
+      for (const [name, value] of Object.entries(manifest.mediaTypes)) if (!Object.hasOwn(manifest.files, name) || !canonicalMediaType(value)) fail('OUTPUT_CONFLICT', 'The output manifest has invalid MIME metadata.');
+      manifest.mediaTypes = Object.assign(Object.create(null), manifest.mediaTypes);
+    }
     return manifest;
   }
 
@@ -100,8 +108,20 @@ export class OutputStore {
     } catch { return false; }
   }
 
-  async preflight(files: GeneratedFiles, removed: string[] = []): Promise<OutputManifest> {
+  async preflight(files: GeneratedFiles, removed: string[] = [], metadata: OutputMetadata = {}): Promise<OutputManifest> {
     const manifest = await this.manifest();
+    if (metadata.mediaTypes !== undefined) {
+      if (!(metadata.mediaTypes instanceof Map)) fail('OUTPUT_CONFLICT', 'Output MIME metadata must be a map.');
+      const names = new Set([...Object.keys(manifest.files), ...files.keys()].filter(name => !removed.includes(name)));
+      const mediaTypes: Record<string, string> = Object.create(null);
+      for (const [name, value] of metadata.mediaTypes) {
+        this.file(name);
+        if (!names.has(name) || !canonicalMediaType(value)) fail('OUTPUT_CONFLICT', 'Output MIME metadata must name planned or owned files and canonical media types.');
+        mediaTypes[name] = value;
+      }
+      if (Object.keys(mediaTypes).length) manifest.mediaTypes = mediaTypes;
+      else delete manifest.mediaTypes;
+    }
     let preserve = false;
     for (const name of files.keys()) {
       const parts = name.split('/');
@@ -158,14 +178,14 @@ export class OutputStore {
     await this.atomic(destination, disk);
   }
 
-  async write(files: GeneratedFiles): Promise<void> {
-    await this.preflight(files);
-    return this.withLock(() => this.writeLocked(files));
+  async write(files: GeneratedFiles, metadata: OutputMetadata = {}): Promise<void> {
+    await this.preflight(files, [], metadata);
+    return this.withLock(() => this.writeLocked(files, metadata));
   }
 
-  async writeLocked(files: GeneratedFiles): Promise<void> {
+  async writeLocked(files: GeneratedFiles, metadata: OutputMetadata = {}): Promise<void> {
     if (!this.locked) fail('OUTPUT_BUSY', 'Output writes require the build lock.');
-    const manifest = await this.preflight(files);
+    const manifest = await this.preflight(files, [], metadata);
     const previous: Record<string, string> = { ...manifest.files };
     for (const [name] of files) {
       const disk = await this.read(name);
@@ -196,7 +216,9 @@ export class OutputStore {
         await fs.unlink(this.file(name));
       }
       delete manifest.files[name];
+      if (manifest.mediaTypes) delete manifest.mediaTypes[name];
     }
+    if (manifest.mediaTypes && !Object.keys(manifest.mediaTypes).length) delete manifest.mediaTypes;
     await this.atomic(MANIFEST, JSON.stringify(manifest, null, 2) + '\n');
   }
 }

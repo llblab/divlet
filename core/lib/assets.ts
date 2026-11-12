@@ -1,17 +1,19 @@
 // Owns native asset-tree admission and decoding, not project activation, URL rewriting or filesystem publication.
-import { MIMEType } from 'node:util';
+import { canonicalMediaType, MAX_MEDIA_TYPE } from './media-type.ts';
 import { DivletError, SOURCE_LIMITS } from './model.ts';
 import type { AssetFile, AssetTree } from './model.ts';
 import { ASSET_REFERENCE_LIMITS, validateAssetName } from './asset-reference.ts';
 
 /** Native payloads retain the existing 20 MiB resource ceiling and 32 MiB source envelope. */
-export const ASSET_LIMITS = Object.freeze({ files: 400, fileBytes: 20 * 1024 * 1024, encodedBytes: SOURCE_LIMITS.bytes, nodes: SOURCE_LIMITS.nodes, depth: ASSET_REFERENCE_LIMITS.depth, path: ASSET_REFERENCE_LIMITS.path, mediaType: 1024 });
+export const ASSET_LIMITS = Object.freeze({ files: 400, fileBytes: 20 * 1024 * 1024, encodedBytes: SOURCE_LIMITS.bytes, nodes: SOURCE_LIMITS.nodes, depth: ASSET_REFERENCE_LIMITS.depth, path: ASSET_REFERENCE_LIMITS.path, mediaType: MAX_MEDIA_TYPE });
 export interface ParsedAssets { readonly tree: AssetTree; readonly files: ReadonlyMap<string, AssetFile> }
 export interface AssetText { readonly kind: 'css' | 'svg'; readonly text: string; readonly ascii: boolean }
 
 /** Interpret declared text by MIME, not its filename; unsupported encodings must not be silently transcoded. */
 export function readAssetText(file: AssetFile): AssetText | null {
-  const mime = new MIMEType(file.mediaType), kind = mime.essence === 'text/css' ? 'css' : mime.essence === 'image/svg+xml' ? 'svg' : null;
+  const mime = canonicalMediaType(file.mediaType);
+  if (!mime) fail('Asset text requires a canonical media type.');
+  const kind = mime.essence === 'text/css' ? 'css' : mime.essence === 'image/svg+xml' ? 'svg' : null;
   if (['text/html', 'application/xhtml+xml'].includes(mime.essence)) fail('Declared HTML asset closure is not supported.');
   if (!kind) return null;
   const charset = mime.params.get('charset')?.toLowerCase();
@@ -39,11 +41,7 @@ function decode(value: string, where: string): AssetFile {
   const comma = value.indexOf(',');
   if (!value.startsWith('data:') || comma < 0 || value.slice(comma - 7, comma) !== ';base64') fail(`${where} must be a canonical base64 Data URL.`);
   const mediaType = value.slice(5, comma - 7);
-  if (!mediaType || mediaType.length > ASSET_LIMITS.mediaType || /[^\x20-\x7e]/.test(mediaType)) fail(`${where} has an invalid media type.`);
-  let parsed: MIMEType;
-  try { parsed = new MIMEType(mediaType); } catch { fail(`${where} has an invalid media type.`); }
-  // MIMEType is deliberately forgiving; require exact serialization so malformed parameters are not silently discarded.
-  if (parsed.toString() !== mediaType) fail(`${where} must use a canonical media type without discarded parameters.`);
+  if (!canonicalMediaType(mediaType)) fail(`${where} must use a canonical media type without discarded parameters.`);
   const payload = value.slice(comma + 1), padding = payload.endsWith('==') ? 2 : payload.endsWith('=') ? 1 : 0;
   const size = payload.length / 4 * 3 - padding;
   if (size > ASSET_LIMITS.fileBytes) fail(`${where} exceeds the ${ASSET_LIMITS.fileBytes} decoded-byte limit.`);

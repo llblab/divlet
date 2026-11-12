@@ -33,6 +33,8 @@ The read-session gate is `node scripts/source.mjs --test core/tests/board-sessio
 
 `node scripts/source.mjs --test core/tests/static-assets.test.js core/tests/static.test.js` exercises the private declared-resource build seam and retained legacy closure: named reuse/aliases, inline literals, MIME-driven CSS/SVG closure and cycles, exact percent/Unicode names under a prefix, absent-original/no-filesystem-fallback behavior, canonical reference preservation, locked previews and MIME/content cache invalidation, combined budgets/collisions, charset/base/carrier refusals and inert source maps. The kernel browser suite additionally serves the prepared declared graph under its prefix and checks real image decoding, XML parsing/escaping, character/namespace acceptance regions, character-reference text fidelity and case-insensitive imported CSS rendering. These are controlled prepared-graph checks, not native writer/HTTP-font loading or arbitrary static-host MIME proof.
 
+`node scripts/source.mjs --test core/tests/output-mime.test.js core/tests/landing-mime.test.js` checks owned MIME round trips and relocation, complete-map versus partial-write semantics, pre-mutation refusal, deletion cleanup and prototype-safe dictionaries. Prepared-copy checks cover hierarchical names, MIME/extension/charset compatibility, private-file exclusions and unchanged public-byte fingerprints. They do not enable native assets or prove real HTTP-font loading.
+
 ## Format candidate
 
 Run these from a source checkout:
