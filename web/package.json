@@ -24,6 +24,10 @@
     "./host": {
       "divlet-source": "./lib/board-host.ts",
       "default": "./dist/lib/board-host.js"
+    },
+    "./mcp": {
+      "divlet-source": "./lib/mcp-provider.ts",
+      "default": "./dist/lib/mcp-provider.js"
     }
   },
   "files": [

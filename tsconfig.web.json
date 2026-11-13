@@ -1,10 +1,28 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "lib": ["es2024", "dom"],
+    "lib": [
+      "es2024",
+      "dom"
+    ],
     "types": [],
     "checkJs": true
   },
-  "include": ["web/index.ts", "web/lib/board-session.ts", "web/lib/board-host.ts", "web/tests/board-session-types.test.ts", "web/lib/http.js", "web/lib/http-session.js", "web/lib/http-services.js", "web/lib/host.js"],
-  "exclude": ["node_modules", "**/dist/**"]
+  "include": [
+    "web/index.ts",
+    "web/lib/board-session.ts",
+    "web/lib/board-host.ts",
+    "web/tests/board-session-types.test.ts",
+    "web/lib/http.js",
+    "web/lib/http-session.js",
+    "web/lib/http-services.js",
+    "web/lib/host.js",
+    "web/lib/mcp-tools.ts",
+    "web/lib/mcp-provider.ts",
+    "web/lib/webmcp.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "**/dist/**"
+  ]
 }

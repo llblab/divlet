@@ -1,7 +1,10 @@
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "lib": ["es2024", "dom"],
+    "lib": [
+      "es2024",
+      "dom"
+    ],
     "types": [],
     "allowJs": false,
     "noEmit": false,
@@ -10,6 +13,16 @@
     "outDir": "dist",
     "rootDir": "."
   },
-  "include": ["index.ts", "lib/board-session.ts", "lib/board-host.ts"],
-  "exclude": ["dist", "tests"]
+  "include": [
+    "index.ts",
+    "lib/board-session.ts",
+    "lib/board-host.ts",
+    "lib/mcp-tools.ts",
+    "lib/mcp-provider.ts",
+    "lib/webmcp.ts"
+  ],
+  "exclude": [
+    "dist",
+    "tests"
+  ]
 }
