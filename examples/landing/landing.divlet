@@ -833,7 +833,7 @@
         "text-187": {
           "id": "text-187",
           "type": "text",
-          "content": "Version 0.0.3 is an early release; the native project format remains a pre-freeze draft, so keep backups of projects you care about.",
+          "content": "Version 0.0.4 is an early release candidate; the native project format remains a pre-freeze draft, so keep backups of projects you care about.",
           "metadata": {}
         },
         "text-189": {

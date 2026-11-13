@@ -2,6 +2,10 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
+## 0.0.4 — candidate
+
+- **The landing is rewritten around how people actually use divlet.** What it is (one edit as the agent and the board see it, beside four accurate facts), how a change lands, trying it without installing (editing on the published board and connecting an agent with `--connect`), using it on your own projects (CLI, MCP with the workflow skill, Pi), the seven shared tools, imports/output and honest boundaries. Stale claims (a single `divlet` package, "once both are published", Tailwind-first) are gone; the page stays plain HTML and CSS, edited through the normal writer and rebuilt through its owner.
+
 ## 0.0.3 — 2026-11-13
 
 - **The board runs as a static site that is its own MCP provider.** `scripts/pages-build.mjs` builds the GitHub Pages set: the real board client with a bundled browser host that opens the canonical landing project in the visitor's browser, keeps the visitor's copy in IndexedDB until the publication changes, and exposes `read_divlet`, `patch_divlet`, `edit_divlet`, `frame_divlet`, `undo_divlet` and `mark_divlet` through the page's MCP provider (and WebMCP when a browser offers it). A first visit reads the landing expanded at the window's width, with live updates, one step from the board. Native-only affordances (opening files, save-as, build output, image/font upload, the board conversation) are absent there; Copy/Download HTML and "Download project file" run in the page. The Pages workflow tests the built set in Chromium and publishes it only when its fingerprint changes. Deployed to GitHub Pages; all five packages published and verified through the CI/OIDC release.

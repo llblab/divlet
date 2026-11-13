@@ -119,8 +119,9 @@ test('the browser writer refuses what only the Node host can do, without changin
 
 test('a failing store keeps the accepted change and reports a diagnostic', async () => {
   const browser = await BrowserRuntime.open({ source: landing, file: 'landing.divlet', projectId: 'p', compiler: engine, persist: () => { throw new Error('quota exceeded'); } });
-  const result = await runOnRuntime('patch_divlet', { frameId: 'index', expectedVersion: 1, patch: { name: 'Renamed' } }, browser);
-  assert.equal(result.version, 2);
+  const version = browser.read({ view: 'document', documentId: 'index' }).version;
+  const result = await runOnRuntime('patch_divlet', { frameId: 'index', expectedVersion: version, patch: { name: 'Renamed' } }, browser);
+  assert.equal(result.version, version + 1);
   assert.deepEqual(browser.info().diagnostics.map(item => item.code), ['STORAGE_FAILED']);
   await browser.close();
 });

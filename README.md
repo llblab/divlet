@@ -6,7 +6,7 @@ A local layout board for coding agents. Work with real HTML in live artboards, r
 
 [Quick start](#quick-start) · [Connect an agent](#connect-an-agent) · [Board guide](docs/board.md) · [Documentation](docs/README.md)
 
-> **0.0.3 · early release.** All five packages are published on npm through verified GitHub Actions/OIDC. The native project format remains a pre-freeze draft; keep backups because future versions may require explicit conversion.
+> **0.0.4 · release candidate.** CI publication is being verified; 0.0.3 remains the last confirmed npm release until that completes. The native project format remains a pre-freeze draft; keep backups because future versions may require explicit conversion.
 
 ## Real pages, not pictures of pages
 
@@ -22,7 +22,7 @@ Requires **Node.js 22.19 or later**. Pi is optional.
 Open a standalone board:
 
 ```bash
-npx -y @divlet/cli@0.0.3 /absolute/path/to/workspace
+npx -y @divlet/cli@0.0.4 /absolute/path/to/workspace
 ```
 
 Or run from a source checkout:
@@ -46,7 +46,7 @@ Open the URL printed in the terminal. An empty workspace gets `project.divlet` w
 Install the Pi adapter:
 
 ```bash
-pi install npm:@divlet/pi@0.0.3
+pi install npm:@divlet/pi@0.0.4
 ```
 
 For checkout development, load the source adapter for a one-off session instead (no build needed):
@@ -84,7 +84,7 @@ Drop `--global` to install into the current project only. Skip this step under P
   "mcpServers": {
     "divlet": {
       "command": "npx",
-      "args": ["-y", "@divlet/mcp@0.0.3", "--cwd", "/absolute/path/to/workspace"]
+      "args": ["-y", "@divlet/mcp@0.0.4", "--cwd", "/absolute/path/to/workspace"]
     }
   }
 }
@@ -97,7 +97,7 @@ Call `open_divlet` and open its returned URL. No Pi installation is needed. Clie
 The [Pages board](https://llblab.github.io/divlet/) is a static site that is its own MCP provider: register it by URL and the tools run in a browser page, on that site's project, with no server deployed for it. From a checkout: `node scripts/source.mjs mcp/index.js --connect <url>`.
 
 ```bash
-npx -y @divlet/mcp@0.0.3 --connect https://llblab.github.io/divlet/
+npx -y @divlet/mcp@0.0.4 --connect https://llblab.github.io/divlet/
 ```
 
 The page opens in a managed browser window (headless without a display). Edits persist in that browser profile until the publication changes; utility compilation, images, fonts and opening other projects stay with the local server. Website descriptions and results are treated as website text, and redirects to other origins are refused. See [browser-hosted MCP](docs/browser-mcp.md) for the protocol, security boundaries and how to make another static app a provider.
@@ -120,7 +120,7 @@ npx -y @divlet/mcp --cwd ./workspace
 npm install -g @divlet/cli @divlet/mcp
 ```
 
-For Pi, run `pi install npm:@divlet/pi@0.0.3`. Shared setups should pin `@divlet/cli@0.0.3`, `@divlet/mcp@0.0.3` and `npm:@divlet/pi@0.0.3`. The root package has no commands or Pi manifest; there is no wrapper layer.
+For Pi, run `pi install npm:@divlet/pi@0.0.4`. Shared setups should pin `@divlet/cli@0.0.4`, `@divlet/mcp@0.0.4` and `npm:@divlet/pi@0.0.4`. The root package has no commands or Pi manifest; there is no wrapper layer.
 
 See [npm publication](docs/publishing.md) for version pinning, package identity and release gates.
 

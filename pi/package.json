@@ -1,6 +1,6 @@
 {
   "name": "@divlet/pi",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "The divlet Pi adapter: tools, /divlet and the shared workflow skill",
   "type": "module",
   "main": "./dist/index.js",
@@ -40,7 +40,7 @@
     "layout"
   ],
   "dependencies": {
-    "@divlet/core": "0.0.3"
+    "@divlet/core": "0.0.4"
   },
   "files": [
     "dist",
