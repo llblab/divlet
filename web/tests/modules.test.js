@@ -89,10 +89,15 @@ test('web runtime and type imports never reach core internals or Node', async ()
       assert.doesNotMatch(match[1], /^(?:@divlet\/core(?:\/|$)|node:)|(?:^|\/)core\//, `${path.relative(root, file)} must not depend back on core, even through JSDoc`);
     }
   }
+  // Two compositions resolve the web package: the HTTP host (asset locator) and the static browser host (public ports only).
   for (const file of await readdir(path.join(root, 'core/lib'))) {
     if (!/\.(?:js|ts)$/.test(file) || file === 'server.ts') continue;
     const source = await readFile(path.join(root, 'core/lib', file), 'utf8');
-    assert.doesNotMatch(source, /from\s*['"]@divlet\/web/, `only the HTTP composition may resolve the web package: ${file}`);
+    if (file === 'browser-board.ts') {
+      for (const match of source.matchAll(/from\s*['"](@divlet\/web[^'"]*)/g)) assert.match(match[1], /^@divlet\/web\/(?:mcp|host|session)$/, `the browser composition uses public web ports, not the asset locator: ${match[1]}`);
+      continue;
+    }
+    assert.doesNotMatch(source, /from\s*['"]@divlet\/web/, `only the compositions may resolve the web package: ${file}`);
   }
 });
 

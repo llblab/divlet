@@ -2,4 +2,4 @@
 export const clientRoot = new URL('./', import.meta.url);
 export { createSnapshotReadSession } from './lib/board-session.ts';
 export type { BoardReadSession, BoardReadEvent, BoardSelection, BoardSelectionPublisher, BoardObservation, BoardObservationPublisher } from './lib/board-session.ts';
-export type { BoardHistoryService, BoardSourceUpdates, BoardWriter, BoardPreviews, BoardComponents, BoardHostComposition } from './lib/board-host.ts';
+export type { BoardHistoryService, BoardSourceUpdates, BoardWriter, BoardPreviews, BoardComponents, BoardExports, BoardHostComposition } from './lib/board-host.ts';

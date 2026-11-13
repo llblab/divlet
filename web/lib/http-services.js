@@ -50,5 +50,8 @@ export function createHttpPreviews({ apiUrl, request }) {
   return Object.freeze(previews);
 }
 
+/** @param {Request} request @returns {import('@divlet/web/host').BoardExports} */
+export const createHttpExports = request => Object.freeze({ page: (/** @type {string} */ id) => request(`api/export/${encodeURIComponent(id)}`) });
+
 /** @param {Request} request @returns {import('@divlet/web/host').BoardComponents} */
 export const createHttpComponents = request => Object.freeze({ list: () => request('api/components') });

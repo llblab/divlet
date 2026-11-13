@@ -20,6 +20,9 @@ export const store = {
   leaving: new Set(),
 };
 
+/** A capability is unavailable only when the host says `false`; native hosts predate the newer flags and omit them. */
+export const capable = name => store.state?.project?.capabilities?.[name] !== false;
+
 export const documents = () => (store.state?.documents || []).filter(doc => !store.leaving.has(doc.id));
 export const descriptor = id => documents().find(doc => doc.id === id);
 

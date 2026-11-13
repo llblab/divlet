@@ -39,6 +39,21 @@ test('the static board opens the landing project with no backend', async () => {
   await page.waitForSelector('.artboard[data-artboard-id="index"] iframe');
   assert.match(await frameText(page, 'h1'), /\S/);
   assert.equal(await page.evaluate(() => typeof globalThis[Symbol.for('browser-mcp/1')]?.handle), 'function');
+  // Host capabilities: filesystem actions are absent, agents are offered the MCP connection to this very page.
+  await page.click('#status');
+  const menu = await page.locator('[role="menu"]').innerText();
+  assert.doesNotMatch(menu, /Open project|Save a copy|folder path/);
+  assert.match(menu, /Download project file/);
+  await page.keyboard.press('Escape');
+  await page.click('#open-agent');
+  await page.waitForSelector('#agent .ask-copy');
+  assert.match(await page.locator('#agent').innerText(), /Connect an agent to this page/);
+  const exported = await page.evaluate(async () => (await (await import('./lib/host.js')).exports.page('index')).html);
+  assert.match(exported, /^<!DOCTYPE html>/i);
+  assert.doesNotMatch(exported, /data-divlet-id/, 'a clean export, not the editing page');
+  await page.keyboard.press('Control+,');
+  await page.waitForSelector('.settings-row');
+  assert.equal(await page.locator('#settings-output').count(), 0, 'no build-output setting without a filesystem');
   assert.deepEqual(errors, []);
   assert.ok(requests.every(line => line.startsWith('GET ') && !line.includes('/api/') && !line.includes('/events')), `only static files were requested: ${requests.filter(line => line.includes('/api/')).join(', ')}`);
   await page.screenshot({ path: 'artifacts/pages-board.png' }).catch(() => {});

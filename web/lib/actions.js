@@ -4,7 +4,7 @@ import * as canvas from './canvas.js';
 import { openMenu } from './menu.js';
 import * as clip from './clip.js';
 import { newArtboard, duplicateArtboards, deleteArtboards } from './artboards.js';
-import { components as componentSource } from './host.js';
+import { components as componentSource, exports as exportSource, native } from './host.js';
 export { newArtboard, duplicateArtboards, deleteArtboards };
 
 /* Command facade for the toolbar, keyboard, context menus, inspector and layers.
@@ -42,22 +42,44 @@ export async function copyHtml(documentId, nodeIds) {
       const model = await modelOf(documentId);
       const ids = nodeIds.filter(id => model.nodes[id]);
       text = clip.htmlOf(model, ids);
-    } else text = (await request(`api/export/${encodeURIComponent(documentId)}`)).html;
+    } else if (exportSource) text = (await exportSource.page(documentId)).html;
+    else throw new Error('This host cannot export HTML.');
     if (!document.hasFocus()) document.querySelector('#viewport')?.focus({ preventScroll: true });
     await navigator.clipboard.writeText(text);
     toast(nodeIds?.length ? 'HTML copied' : `Page HTML copied · ${Math.max(1, Math.round(text.length / 1024))} KB with CSS`);
   } catch (error) { toast(error?.name === 'NotAllowedError' ? 'The clipboard is not available here' : error.message); }
 }
 
+/** Save the browser host's copy of the project as a .divlet file the user can open with the local host. */
+export async function downloadProject() {
+  try {
+    const { text, fileName } = await exportSource.project();
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const link = Object.assign(document.createElement('a'), { href: url, download: fileName });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast(`Downloading ${fileName} · open it with npx -y @divlet/cli ${fileName}`);
+  } catch (error) { toast(error?.message || 'This host cannot save the project.'); }
+}
+
 /** Save an artboard as a standalone HTML file. */
-export function downloadHtml(documentId) {
+export async function downloadHtml(documentId) {
   const link = document.createElement('a');
-  link.href = apiUrl(`api/export/${encodeURIComponent(documentId)}?download=1`);
+  let blob = null;
+  if (native) link.href = apiUrl(`api/export/${encodeURIComponent(documentId)}?download=1`);
+  else {
+    // A browser host builds the file itself; nothing is requested from a server.
+    try { const page = await exportSource.page(documentId); blob = URL.createObjectURL(new Blob([page.html], { type: 'text/html' })); link.href = blob; }
+    catch (error) { toast(error.message); return; }
+  }
   const fileName = descriptor(documentId)?.htmlPath?.split(/[\\/]/).at(-1) || `${documentId}.html`;
   link.download = fileName;
   document.body.append(link);
   link.click();
   link.remove();
+  if (blob) setTimeout(() => URL.revokeObjectURL(blob), 1000);
   toast(`Downloading ${fileName}`);
 }
 

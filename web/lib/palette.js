@@ -1,4 +1,5 @@
 import { $, el, icon, keys } from './util.js';
+import { native } from './host.js';
 import { store, on, documents, descriptor, cachedModel, loadModel, selectArtboards, selectNodes, undo, redo, textChild, parentOf } from './store.js';
 import * as canvas from './canvas.js';
 import * as actions from './actions.js';
@@ -122,8 +123,8 @@ function commands() {
   add(board, sidebar.isOpen('layers') ? 'Hide layers' : 'Show layers', () => sidebar.toggle('layers'), { icon: 'layers', keys: 'L' });
   add(board, sidebar.isOpen('activity') ? 'Hide history' : 'Show history', () => sidebar.toggle('activity'), { icon: 'chat', keys: 'H', words: 'activity log changes replies' });
   add(board, 'Open the site', () => window.open(store.state.site.url, '_blank', 'noopener'), { icon: 'site', when: !!store.state?.site, words: 'markdown pages' });
-  add(board, 'Open project…', () => project.show('open'), { icon: 'folder', keys: keys('Mod+O'), words: 'switch folder load' });
-  add(board, 'Save a copy as…', () => project.show('save'), { icon: 'download', keys: keys('Mod+Shift+S'), words: 'save as copy export project folder', when: project.canShowCopy() });
+  add(board, 'Open project…', () => project.show('open'), { icon: 'folder', keys: keys('Mod+O'), words: 'switch folder load', when: native });
+  add(board, 'Save a copy as…', () => project.show('save'), { icon: 'download', keys: keys('Mod+Shift+S'), words: 'save as copy export project folder', when: native && project.canShowCopy() });
   for (const percent of help.UI_SIZES) add(board, `Interface size ${percent}%`, () => help.setUiSize(percent), { icon: 'search', words: 'scale zoom text bigger smaller ui' });
   add(board, 'Keyboard shortcuts', () => shortcuts.toggle(true), { icon: 'keyboard', keys: '?', words: 'keys hotkeys help' });
   add(board, 'Settings', () => help.toggle(true), { icon: 'gear', keys: keys('Mod') + ' ,', words: 'preferences theme interface size' });

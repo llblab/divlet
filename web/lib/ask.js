@@ -1,6 +1,7 @@
 import { $, el, icon, button, keys } from './util.js';
 import { openMenu } from './menu.js';
 import { store, on, emit, post, toast, descriptor } from './store.js';
+import { native } from './host.js';
 import * as sidebar from './sidebar.js';
 import * as chat from './chat.js';
 
@@ -16,7 +17,10 @@ let draft = '';
 let watchdog = 0;
 let returnFocus = null;
 
-export const available = () => !!store.state?.agent?.connected;
+/** A board request needs a host that relays conversation; agents of a browser host work through its MCP tools only. */
+export const available = () => !!store.state?.agent?.connected && store.state.agent.conversation !== false;
+/** The command an MCP host runs to connect an agent to this page (browser hosts only). */
+const connectCommand = () => `npx -y @divlet/mcp --connect ${new URL('./', location.href).href}`;
 export const isOpen = () => sidebar.isOpen('agent');
 const agent = () => store.state?.agent || {};
 
@@ -162,11 +166,19 @@ function paintStatus() {
   input.disabled = !available();
   // The sidebar can be dragged narrow, so the texts follow its own width (sidebar.js measures it).
   const tight = (document.documentElement.dataset.sidebar ?? 'wide') !== 'wide';
-  input.placeholder = !available() ? (tight ? 'Open from Pi (/divlet)' : 'Open this board from Pi (/divlet) to talk to it')
+  input.placeholder = !native ? (tight ? 'Agents connect over MCP' : 'Agents work on this page through its MCP tools')
+    : !available() ? (tight ? 'Open from Pi (/divlet)' : 'Open this board from Pi (/divlet) to talk to it')
     : tight ? 'Ask the agent…' : 'Ask the agent to change the layout…';
   const keysHint = tight ? [`${keys('Enter')} send`] : [`${keys('Enter')} send`, `${keys('Shift+Enter')} new line`, '↑ previous'];
   // Each key with its meaning is one unit: a narrow composer wraps between units, never inside one.
-  if (!available()) {
+  if (!native) {
+    // A browser host: no conversation relay; offer the command that connects an MCP host to this very page.
+    const copy = button('copy', 'Copy the MCP command that connects an agent to this page', async () => {
+      try { await navigator.clipboard.writeText(connectCommand()); toast('Copied · register it as an MCP server in your agent'); }
+      catch { toast(connectCommand()); }
+    }, 'mini ask-copy');
+    hint.replaceChildren(el('span', '', store.state?.agent?.connected ? 'An agent is working through this page' : 'Connect an agent to this page'), copy);
+  } else if (!available()) {
     // Not connected: say so, and offer the exact command that connects this project in Pi.
     const file = store.state?.project?.file;
     const copy = button('copy', 'Copy the command that opens this project in Pi', async () => {
@@ -193,7 +205,7 @@ function focusInput() {
 
 export function toggle(open = !isOpen(), { text, fromFrame = false } = {}) {
   if (open && !available()) {
-    toast('No agent is connected to this board. Open it from Pi with /divlet, or connect an MCP client (divlet-mcp).');
+    toast(native ? 'No agent is connected to this board. Open it from Pi with /divlet, or connect an MCP client (divlet-mcp).' : `Agents connect to this page over MCP: ${connectCommand()}`);
     return false;
   }
   if (open === isOpen()) { if (open) { if (text !== undefined) { input.value = text; grow(); } input.focus(); } return open; }
@@ -324,7 +336,8 @@ function paintChip() {
   const state = agent();
   if (!state.busy) stopping = false;
   status.hidden = !state.busy;
-  stopButton.hidden = !state.busy;
+  // Only a host that relays the conversation can stop its agent; a browser host's agent is stopped by its own host.
+  stopButton.hidden = !state.busy || !native;
   placeStatus();
   status.classList.toggle('stopping', stopping);
   document.body.classList.toggle('agent-busy', !!state.busy);

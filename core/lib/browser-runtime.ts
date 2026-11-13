@@ -14,7 +14,8 @@ import type { DocumentModel } from './model.ts';
 import { diffDocuments, matchesPatch, summarizeChange, touchedNodeIds } from './diff.ts';
 import { operationPatch } from './ops.ts';
 import { HistoryLine } from './history.ts';
-import { readProject, writeProject, patchSettings, listComponents, instancesOf } from './project.ts';
+import { readProject, writeProject, patchSettings, listComponents, instancesOf, expandFrame } from './project.ts';
+import { exportHtml } from './codec.ts';
 import type { ProjectSettings } from './project.ts';
 import { prepareFrameWith } from './prepare.ts';
 import type { FrameCompiler, PreparedFrame } from './prepare.ts';
@@ -73,7 +74,8 @@ export class BrowserRuntime {
   redoStack: any[] = [];
   groupCounter = 0;
   work: any[] = [];
-  agent: { connected: boolean; busy: boolean; activity: string | null; since: string | null; queued: number } = { connected: false, busy: false, activity: null, since: null, queued: 0 };
+  /** `conversation: false`: this host relays no board requests; agents reach it through its MCP tools. */
+  agent: { connected: boolean; busy: boolean; activity: string | null; since: string | null; queued: number; conversation: false } = { connected: false, busy: false, activity: null, since: null, queued: 0, conversation: false };
   closed = false;
   url = '';
 
@@ -204,6 +206,21 @@ export class BrowserRuntime {
   render(id: string) {
     const entry = this.getEntry(id);
     return { documentId: id, version: entry.document.version, render: entry.render, html: entry.html };
+  }
+
+  /** Clean standalone HTML of a frame or of some of its nodes, as the Node host exports it (no embedded assets here). */
+  exportDocument(id: string, { nodeId, nodeIds, expectedVersion, expectedProjectVersion }: any = {}) {
+    const entry = this.getEntry(id);
+    assertExpectedVersion(expectedVersion, entry.document);
+    assertExpectedVersion(expectedProjectVersion, this.settings, 'project');
+    const expanded = expandFrame(entry.document, frameId => this.documents.get(frameId)?.document, this.settings).document;
+    if (nodeId || nodeIds !== undefined) {
+      const ids = nodeIds ?? [nodeId];
+      if (!Array.isArray(ids) || !ids.length || ids.length > 100 || ids.some(node => typeof node !== 'string' || !Object.hasOwn(entry.document.nodes, node))) fail('NOT_FOUND', 'Export requires existing node IDs in one frame.');
+      return { documentId: id, version: entry.document.version, ...(nodeId ? { nodeId } : { nodeIds: ids }), html: ids.map((item: string) => exportHtml(expanded, { nodeId: item, limits: LIMITS })).join('\n') };
+    }
+    const compiled = /<style data-divlet-compiled>([\s\S]*?)<\/style>/.exec(entry.html)?.[1] ?? '';
+    return { documentId: id, version: entry.document.version, html: exportHtml(expanded, { compiledCss: compiled, limits: LIMITS }), fileName: `${id}.html` };
   }
 
   /** The serialized project, as the Node host would write it to its `.divlet` file. */

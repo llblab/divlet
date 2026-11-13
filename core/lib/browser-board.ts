@@ -165,6 +165,10 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
       release(id: string, url: string) { if (previews.get(id)?.delete(url)) URL.revokeObjectURL(url); },
     }),
     components: Object.freeze({ list: async () => ({ components: copy(runtime.components()) }) }),
+    exports: Object.freeze({
+      page: async (id: string) => copy(runtime.exportDocument(id)),
+      project: async () => ({ text: runtime.source(), fileName: options.file }),
+    }),
     historyService: Object.freeze({
       readRecent: async () => copy(runtime.readHistory({ limit: 100 })),
       navigate: async (target: any) => copy(await runtime.navigateHistory({ ...target, actor: 'user' })),

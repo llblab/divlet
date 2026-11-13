@@ -1,5 +1,5 @@
 import { $, el, icon, button, clamp, round, debounce, keys, pressGuard } from './util.js';
-import { store, on, documents, descriptor, loadModel, cachedModel, commit, edit, toast, newGroup, selectNodes, parentOf, textChild, whenVersion, request, apiUrl, receiveState } from './store.js';
+import { store, capable, on, documents, descriptor, loadModel, cachedModel, commit, edit, toast, newGroup, selectNodes, parentOf, textChild, whenVersion, request, apiUrl, receiveState } from './store.js';
 import { fit, rectOf, postToFrame, measuredBox } from './canvas.js';
 import * as actions from './actions.js';
 import { openMenu, menuAnchor, closeMenu } from './menu.js';
@@ -479,7 +479,8 @@ function imageEditor(doc, node) {
   upload.dataset.tip = 'Add an image file to divlet/assets — or drop it onto the artboard';
   upload.addEventListener('click', () => uploadInto(doc, node));
   const buttons = el('div', 'image-buttons');
-  buttons.append(replace, upload);
+  // Choosing or uploading project images needs a host that stores asset bytes; elsewhere the source stays a plain field.
+  if (capable('assets')) buttons.append(replace, upload);
   const alt = textField('image-alt', node.attrs.alt ?? '', value => refreshed(commit(doc.id, { nodes: { [node.id]: { attrs: { alt: value } } } }, { label: `alt text of ${node.id}` })), { placeholder: 'Alt text (describe the image)', label: 'Alt text' });
   side.append(el('span', 'image-src', node.attrs.src || 'No source yet'), buttons);
   box.append(preview, side);

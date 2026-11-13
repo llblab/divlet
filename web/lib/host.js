@@ -3,7 +3,7 @@
 // `BoardHostComposition` before the board starts, and then no native route is used or synthesized.
 import { createJsonTransport } from './http.js';
 import { createHttpReadSession, createHttpSelectionPublisher, createHttpObservationPublisher } from './http-session.js';
-import { createHttpHistoryService, createHttpSourceUpdates, createHttpWriter, createHttpPreviews, createHttpComponents } from './http-services.js';
+import { createHttpHistoryService, createHttpSourceUpdates, createHttpWriter, createHttpPreviews, createHttpComponents, createHttpExports } from './http-services.js';
 
 /** @type {import('@divlet/web/host').BoardHostComposition | undefined} */
 const composed = /** @type {any} */ (globalThis)[Symbol.for('divlet.board-host/1')];
@@ -30,3 +30,5 @@ export const writer = composed ? composed.writer : createHttpWriter(post);
 export const previews = composed ? composed.previews : createHttpPreviews({ apiUrl, request });
 /** @type {import('@divlet/web/host').BoardComponents | undefined} */
 export const components = composed ? composed.components : createHttpComponents(request);
+/** @type {import('@divlet/web/host').BoardExports | undefined} */
+export const exports = composed ? composed.exports : createHttpExports(request);

@@ -2,6 +2,7 @@
 import { $, el, icon } from './util.js';
 import { filePicker } from './file-picker.js';
 import { on, emit, store, post, request, receiveState } from './store.js';
+import { native } from './host.js';
 import * as canvas from './canvas.js';
 
 const scrim = $('#help');
@@ -230,7 +231,8 @@ function render() {
   status.setAttribute('role', 'status');
   // The status keeps its reserved line above the buttons, so its text never moves them: the actions stay in the bottom-right.
   output.append(label, field, picker, hint, status, actions);
-  dialog.replaceChildren(head, block(appearance), block(scale), block(handleRow), block(output));
+  // The build output directory is a filesystem setting of the local host; a browser host has none.
+  dialog.replaceChildren(head, block(appearance), block(scale), block(handleRow), ...(native ? [block(output)] : []));
   if (isOpen() && hadFocus) dialog.querySelector('button:not(:disabled), input:not(:disabled)')?.focus({ preventScroll: true });
 }
 

@@ -31,6 +31,13 @@ export interface BoardPreviews {
   readonly release?: (id: string, url: string) => void;
 }
 
+/** Clean standalone HTML of one frame (`{ html, fileName }`), for Copy/Download HTML. */
+export interface BoardExports {
+  readonly page: (id: string) => Promise<unknown>;
+  /** The whole project source (`{ text, fileName }`), where the host's copy is not already a file the user owns. */
+  readonly project?: () => Promise<unknown>;
+}
+
 /** The project's reusable components, for insertion menus. Absent hosts offer no component insertion list. */
 export interface BoardComponents { readonly list: () => Promise<unknown> }
 
@@ -44,6 +51,7 @@ export interface BoardHostComposition {
   readonly writer: BoardWriter;
   readonly previews: BoardPreviews;
   readonly components?: BoardComponents;
+  readonly exports?: BoardExports;
   readonly historyService?: BoardHistoryService;
   readonly shareSelection?: import('./board-session.ts').BoardSelectionPublisher;
   readonly publishObservations?: import('./board-session.ts').BoardObservationPublisher;
