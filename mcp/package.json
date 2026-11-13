@@ -1,6 +1,6 @@
 {
   "name": "@divlet/mcp",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "type": "module",
   "description": "The divlet MCP stdio adapter",
   "bin": {
@@ -30,7 +30,7 @@
     "#package": "./package.json"
   },
   "dependencies": {
-    "@divlet/core": "0.0.1"
+    "@divlet/core": "0.0.2"
   },
   "files": [
     "dist",

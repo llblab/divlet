@@ -1,6 +1,6 @@
 {
   "name": "@divlet/cli",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "The divlet command-line adapter",
   "type": "module",
   "main": "./dist/index.js",
@@ -27,7 +27,7 @@
     "divlet": "./dist/index.js"
   },
   "dependencies": {
-    "@divlet/core": "0.0.1"
+    "@divlet/core": "0.0.2"
   },
   "files": [
     "dist",
