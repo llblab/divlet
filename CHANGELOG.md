@@ -4,7 +4,7 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased — 0.0.1 candidate
 
-Prepared for first publication; npm publish 2FA approval and registry-install verification remain outstanding. A versioned archive is not a completed release.
+Prepared for first publication; npm name approval or an explicitly approved scoped-package revision and registry-install verification remain outstanding. A versioned archive is not a completed release.
 
 Initial release of divlet: a local HTML/SVG/CSS layout board for agents. The native project format remains an unfrozen schema-1 draft; this release does not activate the approved future ordered-CSS/renderer profile or promise frozen compatibility.
 
