@@ -14,6 +14,7 @@ import { buildSite } from './site.ts';
 import { diffDocuments, diffValue, matchesPatch, summarizeChange, touchedNodeIds } from './diff.ts';
 import { operationPatch } from './ops.ts';
 import { HistoryLine } from './history.ts';
+import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertExpectedVersion, assertExpectedRender } from './acceptance.ts';
 import { expandPath, inspectPath, initProject, resolveProject, isProjectFile } from './projects.ts';
 import { OutputStore, safeDirectory } from './output.ts';
 import { buildStatic, inlineDeclaredAssets, readResourceBytes, normalizeExternalFiles } from './static.js';
@@ -37,7 +38,6 @@ const MAX_ASK = 4000;
 const MAX_REPLY = 6000;
 const HISTORY_LIMIT = 500;
 const UNDO_LIMIT = 200;
-const SETTINGS_FIELDS = ['name', 'tokens', 'css', 'metadata', 'outputDir', 'assets'];
 const capped = (list, limit = 50) => list.slice(0, limit);
 const digest = value => createHash('sha256').update(value).digest('hex');
 const hashOf = text => (text === null || text === undefined ? null : digest(text));
@@ -50,9 +50,6 @@ const imageUpload = (name, data, mediaType) => {
   if (!parsed || ![...IMAGE_TYPES.values()].includes(parsed.essence)) fail('UNSUPPORTED_ASSET', 'The upload must declare a supported canonical image media type.');
   return { extension, mediaType: type, bytes: Buffer.from(data) };
 };
-const sameDocument = (a, b) => isDeepStrictEqual({ ...a, version: 0 }, { ...b, version: 0 });
-const sameSettings = (a, b) => SETTINGS_FIELDS.every(key => isDeepStrictEqual(a[key], b[key]));
-const settingsPatch = (from, to) => Object.fromEntries(SETTINGS_FIELDS.map(key => [key, diffValue(from[key], to[key])]).filter(([, value]) => value !== undefined));
 const inside = (root, target) => target === root || (!path.relative(root, target).startsWith('..' + path.sep) && path.relative(root, target) !== '..' && !path.isAbsolute(path.relative(root, target)));
 
 function fail(code, message, details) {
@@ -94,21 +91,6 @@ function styleWarnings({ unknown = {}, changed = [], css = null, where }) {
   return out;
 }
 
-
-/**
- * A caller that names the state it read gets a refusal instead of silently overwriting a change it
- * never saw (AGENTS.md, "Validated commits"). Omitted means the caller accepted whatever is current.
- */
-function assertExpectedVersion(expected, target, what = 'frame') {
-  if (expected === undefined) return;
-  if (!Number.isInteger(expected) || expected !== target.version) fail('REVISION_CONFLICT', `Expected ${what} version ${target.version}; received ${expected}. Read it again and rebuild the change.`, { actualVersion: target.version });
-}
-
-/** The rendered page a gesture was made against; a dependent re-render advances it without a version bump. */
-function assertExpectedRender(expected, entry) {
-  if (expected === undefined) return;
-  if (!Number.isInteger(expected) || expected !== entry.render) fail('RENDER_CONFLICT', `Expected frame render ${entry.render}; received ${expected}. The page changed since it was read; reload the frame and repeat the change.`, { actualRender: entry.render, actualVersion: entry.document.version });
-}
 
 /*
  * Each .divlet file is an independent source of truth. Generated pages and metadata belong

@@ -2,52 +2,29 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
-import { isDeepStrictEqual } from 'node:util';
-import postcss from 'postcss';
-import { validateDocument, DivletError, LIMITS, documentLimits } from './model.ts';
+import { LIMITS } from './model.ts';
 import type { DocumentModel, Limits, NodeId } from './model.ts';
-import { expandFrame, instancesOf, storedFrame } from './project.ts';
+import { storedFrame } from './project.ts';
 import type { FrameLookup, ProjectSettings } from './project.ts';
-import { encodeHtml, decodeHtml, renderFile } from './codec.ts';
 import { compileClasses, unknownClasses } from './engine.ts';
+import { prepareFrameWith } from './prepare.ts';
+import type { FrameCompiler, PreparedFrame } from './prepare.ts';
+export type { PreparedFrame, FrameCompiler } from './prepare.ts';
 
 const PACKAGE_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const MAX_FILE_BYTES = 4 * 1024 * 1024;
 const digest = (value: string): string => createHash('sha256').update(value).digest('hex');
-const sameDocument = (a: DocumentModel, b: DocumentModel): boolean => isDeepStrictEqual({ ...a, version: 0 }, { ...b, version: 0 });
-function fail(code: string, message: string): never { throw new DivletError(code, message); }
-
-/** What preparing a frame produces: the validated document, the preview page, the generated file, its dependencies and the
- *  classes that do nothing. Nothing here is state: a caller decides what to publish. */
-export interface PreparedFrame { document: DocumentModel; html: string; fileHtml: string; uses: string[]; unknown: Record<string, string[]> }
 export interface PrepareOptions { lookup?: FrameLookup; settings?: ProjectSettings | null; limits?: Limits }
 /** One frame as the runtime stores it: the source of a rendered page and where its generated file lives. */
 export interface FrameEntry { document: DocumentModel; html: string; fileHtml: string; htmlPath: string; uses: string[] }
 
-function checkAtRules(css: string): void {
-  const tree = postcss.parse(css || '');
-  const allowed = new Set(['media', 'supports', 'layer', 'keyframes', '-webkit-keyframes', 'font-face', 'container', 'property', 'starting-style', 'scope']);
-  tree.walkAtRules(rule => {
-    if (!allowed.has(rule.name.toLowerCase())) fail('UNSUPPORTED_CSS', `CSS @${rule.name} is not allowed in a divlet project. Build directives and imports are disabled.`);
-  });
-  if (/<\/style/i.test(css)) fail('UNSUPPORTED_CSS', 'A style element closing sequence is not allowed in authored CSS.');
-}
+/** The Node composition: the installed style engine compiles each frame's classes. */
+const engineCompiler: FrameCompiler = {
+  compile: (tokens, candidates) => compileClasses(tokens, candidates, PACKAGE_ROOT),
+  unknown: input => unknownClasses({ ...input, base: PACKAGE_ROOT }),
+};
 
-export async function prepareFrame(input: unknown, { lookup = () => undefined, settings = null, limits = LIMITS }: PrepareOptions = {}): Promise<PreparedFrame> {
-  documentLimits(limits);
-  const document = validateDocument(input, { limits });
-  const expanded = expandFrame(document, lookup, settings, { limits });
-  checkAtRules(expanded.document.css);
-  const candidates = [...new Set(Object.values(expanded.document.nodes).flatMap(node => (node.type === 'element' ? node.className : '').split(/\s+/)).filter(Boolean))];
-  const compiledCss = await compileClasses(expanded.document.tokens, candidates, PACKAGE_ROOT);
-  const instances = new Map(instancesOf(document).map(item => [item.id, `${item.frame}/${item.node}`]));
-  const html = encodeHtml(expanded.document, { compiledCss, parts: expanded.parts, instances, limits });
-  if (Buffer.byteLength(html) > MAX_FILE_BYTES) fail('FILE_TOO_LARGE', 'The rendered frame exceeds the 4 MiB limit.');
-  const decoded = decodeHtml(html, { previous: expanded.document, limits });
-  if (!sameDocument(expanded.document, decoded)) fail('UNREPRESENTABLE_HTML', 'The frame does not survive HTML parsing unchanged (check element nesting); the last valid preview was retained.');
-  const own = Object.fromEntries(Object.values(document.nodes).flatMap(node => (node.type === 'element' && node.className ? [[node.id, node.className] as [string, string]] : [])));
-  const unknown = await unknownClasses({ tokens: expanded.document.tokens, css: expanded.document.css, byNode: own, base: PACKAGE_ROOT });
-  return { document, html, fileHtml: renderFile(expanded.document, { compiledCss, parts: expanded.parts, instances, limits }), uses: expanded.uses, unknown };
+export function prepareFrame(input: unknown, { lookup = () => undefined, settings = null, limits = LIMITS }: PrepareOptions = {}): Promise<PreparedFrame> {
+  return prepareFrameWith(input, { lookup, settings, limits, compiler: engineCompiler });
 }
 
 /** The `meta.json` beside a generated page: what it was built from, what it depends on and the hashes that detect a rebuild. */
