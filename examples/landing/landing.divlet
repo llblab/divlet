@@ -1834,7 +1834,7 @@
         "text-188": {
           "id": "text-188",
           "type": "text",
-          "content": ", supplies the runtime and plugins, with browser assets in @divlet/web and CLI/MCP/Pi adapters. Requires Node.js 22.19 or later.\n      Version 0.0.2 is an early release; the native project format remains a pre-freeze draft.",
+          "content": ", supplies the runtime and plugins, with browser assets in @divlet/web and CLI/MCP/Pi adapters. Requires Node.js 22.19 or later.\n      Version 0.0.3 is an early release candidate; the native project format remains a pre-freeze draft.",
           "metadata": {}
         },
         "text-189": {

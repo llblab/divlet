@@ -60,7 +60,7 @@ A board is the **single writer** of its project. A second client attaches to the
 
 ## A board on a website
 
-**Unreleased: ships with `@divlet/mcp` 0.0.3**; from a checkout use `node scripts/source.mjs mcp/index.js --connect <url>`. `divlet-mcp --connect <url>` connects any MCP host to a website that is its own MCP provider, such as the published board at `https://llblab.github.io/divlet/`. It opens the site in a managed Chromium (the installed Chrome first), finds the page's provider and offers its tools over stdio; each call runs in the page. No local board, project file or website server is involved.
+**Ships with the 0.0.3 candidate of `@divlet/mcp`**; from a checkout use `node scripts/source.mjs mcp/index.js --connect <url>`. `divlet-mcp --connect <url>` connects any MCP host to a website that is its own MCP provider, such as the published board at `https://llblab.github.io/divlet/`. It opens the site in a managed Chromium (the installed Chrome first), finds the page's provider and offers its tools over stdio; each call runs in the page. No local board, project file or website server is involved.
 
 - `--allow-tools <a,b>` offers only these website tools; `--allow-origin <origin>` admits one more redirect target (default: none).
 - `--headless` / `--headed` hide or show the window (default: shown when a display is available).
@@ -78,7 +78,7 @@ npx -y @divlet/mcp --cwd /absolute/path/to/workspace
 pi install npm:@divlet/pi
 ```
 
-In an MCP configuration, use `"command": "npx"` and `"args": ["-y", "@divlet/mcp@0.0.2", "--cwd", "/absolute/path/to/workspace"]`. Shared configurations should also pin `@divlet/cli@0.0.2` and `npm:@divlet/pi@0.0.2`; see [npm publication](publishing.md). The `divlet` and `divlet-mcp` binary names belong to the CLI and MCP packages respectively. The root library has no bins, Pi manifest or `divlet/pi` export.
+In an MCP configuration, use `"command": "npx"` and `"args": ["-y", "@divlet/mcp@0.0.3", "--cwd", "/absolute/path/to/workspace"]`. Shared configurations should also pin `@divlet/cli@0.0.3` and `npm:@divlet/pi@0.0.3`; see [npm publication](publishing.md). The `divlet` and `divlet-mcp` binary names belong to the CLI and MCP packages respectively. The root library has no bins, Pi manifest or `divlet/pi` export.
 
 For other hosts, install the skill with `npx skills add llblab/divlet --skill divlet --global` (omit `--global` for one project; pick the target agents when asked), or copy/link `skills/divlet/` into the host's skills directory, and register the MCP server separately. Installing a skill alone does not register tools, and a Pi session that loads the extension must not install the skill again. The skill folder is self-contained: it links to documents by their public address, not through the package's `node_modules`. The [workflow skill](../skills/divlet/SKILL.md) explains the model, component recipes and the read → edit → verify loop.
 

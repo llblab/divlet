@@ -5,10 +5,10 @@ The MCP stdio adapter for divlet. This package owns its implementation and depen
 Install:
 
 ```bash
-npx -y @divlet/mcp@0.0.2 --cwd ./workspace
+npx -y @divlet/mcp@0.0.3 --cwd ./workspace
 ```
 
-Unreleased (0.0.3): connect to a website that is its own MCP provider (the tools run in a managed browser page; `playwright-core` drives the installed Chrome or Playwright's Chromium):
+From 0.0.3: connect to a website that is its own MCP provider (the tools run in a managed browser page; `playwright-core` drives the installed Chrome or Playwright's Chromium):
 
 ```bash
 npx -y @divlet/mcp --connect https://llblab.github.io/divlet/ [--allow-tools a,b] [--headless] [--profile <dir>]

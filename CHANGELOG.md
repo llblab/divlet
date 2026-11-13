@@ -2,7 +2,7 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
-## Unreleased
+## 0.0.3 — candidate
 
 - **The board runs as a static site that is its own MCP provider.** `scripts/pages-build.mjs` builds the GitHub Pages set: the real board client with a bundled browser host that opens the canonical landing project in the visitor's browser, keeps the visitor's copy in IndexedDB until the publication changes, and exposes `read_divlet`, `patch_divlet`, `edit_divlet`, `frame_divlet`, `undo_divlet` and `mark_divlet` through the page's MCP provider (and WebMCP when a browser offers it). A first visit reads the landing expanded at the window's width, with live updates, one step from the board. Native-only affordances (opening files, save-as, build output, image/font upload, the board conversation) are absent there; Copy/Download HTML and "Download project file" run in the page. The Pages workflow tests the built set in Chromium and publishes it only when its fingerprint changes. Not yet deployed.
 - **`divlet-mcp --connect <url>`** connects any MCP host to such a website: the site opens in a managed, isolated Chromium and its tools run in the page. Both MCP eras are answered on stdio; website descriptions are marked as website text, annotations are dropped, results are reduced to text and JSON, cross-origin redirects are refused and a reloaded page is reconnected explicitly.

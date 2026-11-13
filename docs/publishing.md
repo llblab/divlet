@@ -1,6 +1,6 @@
 # npm publication
 
-All five **0.0.2** packages are published on npm through GitHub Actions/OIDC, with frozen-archive integrity, provenance metadata and clean registry CLI/MCP/Pi installations verified. This guide owns publication safeguards and the first-publication procedure below; it is not permission to publish again. A prepared tree or versioned changelog is not a completed registry publication. Publishing packages, pushing release refs and deploying the landing page require explicit maintainer authorization. Packaging does not freeze or cut over the native schema.
+All five **0.0.2** packages are published on npm through GitHub Actions/OIDC, with frozen-archive integrity, provenance metadata and clean registry CLI/MCP/Pi installations verified. **0.0.3** is the next candidate; do not treat it as published until all five registry checks and the installed-host CI job pass. This guide owns publication safeguards and the first-publication procedure below; it is not permission to publish again. A prepared tree or versioned changelog is not a completed registry publication. Publishing packages, pushing release refs and deploying the landing page require explicit maintainer authorization. Packaging does not freeze or cut over the native schema.
 
 npm refused the original unscoped `divlet` name as too similar to `figlet`. The maintainer approved `@divlet/core` and a separately owned `@divlet/web`; the old four-package archives are historical candidates, not scoped substitutes. Never edit archive manifests in place or retry the rejected publisher.
 
@@ -22,16 +22,16 @@ npm refused the original unscoped `divlet` name as too similar to `figlet`. The 
 
 Core's HTTP composition imports web's public asset locator; generic model/format modules do not import web. Web's portable contracts own opaque host payloads, not project validation/writes, and have no type/JSDoc back-edge to core. Browser modules use host HTTP/SSE and preview ports, not imports of the Node runtime. Backend plugins consume core contracts; client plugins use the served web module graph. See [architecture](architecture.md).
 
-The root owns `@divlet/core`, `web/` owns `@divlet/web`, and `cli/`, `mcp/` and `pi/` own the adapters, without wrappers. All five versions match. Adapters pin `@divlet/core@0.0.2`; core pins `@divlet/web@0.0.2`. Core has no bins, Pi manifest/peer requirements or `./pi` export. Its tarball excludes the web and adapter implementations. Web owns its only client copy and portable declarations. Built-in plugins remain bundled in core, not separately published.
+The root owns `@divlet/core`, `web/` owns `@divlet/web`, and `cli/`, `mcp/` and `pi/` own the adapters, without wrappers. All five versions match. The 0.0.3 candidate adapters pin `@divlet/core@0.0.3`; core pins `@divlet/web@0.0.3`. Core has no bins, Pi manifest/peer requirements or `./pi` export. Its tarball excludes the web and adapter implementations. Web owns its only client copy and portable declarations. Built-in plugins remain bundled in core, not separately published.
 
-Node.js 22.19 or later is required. Pi is not required for CLI/MCP. Shared configurations should pin adapter versions, including `npm:@divlet/pi@0.0.2`. For MCP:
+Node.js 22.19 or later is required. Pi is not required for CLI/MCP. Shared configurations should pin adapter versions, including `npm:@divlet/pi@0.0.3` after the candidate is published. For MCP:
 
 ```json
 {
   "mcpServers": {
     "divlet": {
       "command": "npx",
-      "args": ["-y", "@divlet/mcp@0.0.2", "--cwd", "/absolute/path/to/workspace"]
+      "args": ["-y", "@divlet/mcp@0.0.3", "--cwd", "/absolute/path/to/workspace"]
     }
   }
 }
@@ -67,7 +67,7 @@ Align the five manifests, exact pins, lockfile and candidate notes, then create 
 Select Actions → **Release** → Run workflow, branch `main`, and supply the tag. The equivalent explicit publication action is:
 
 ```bash
-gh workflow run release.yml --ref main -f release_tag=v0.0.2
+gh workflow run release.yml --ref main -f release_tag=v0.0.3
 ```
 
 The workflow has three boundaries:
