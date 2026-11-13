@@ -1,7 +1,7 @@
 import { $, el, icon, button, clamp, keys, shortcutKey, uiScale } from './lib/util.js';
 import { store, on, emit, documents, descriptor, apiUrl, request, receiveState, setConnection, selectArtboards, selectNodes, undo, redo, toast } from './lib/store.js';
 import * as canvas from './lib/canvas.js';
-import { readSession } from './lib/host.js';
+import { readSession, native } from './lib/host.js';
 import './lib/inspector.js';
 import { loadClientPlugins } from './lib/panels.js';
 import * as layers from './lib/layers.js';
@@ -103,10 +103,12 @@ $('#status').setAttribute('aria-haspopup', 'menu');
 $('#status').addEventListener('click', () => {
   openMenu([
     { heading: String(store.state?.project?.name || 'Project') },
-    { label: 'Open project…', icon: 'folder', keys: keys('Mod+O'), run: () => project.show('open') },
-    { label: 'Save a copy as…', icon: 'download', disabled: !project.canShowCopy(), keys: keys('Mod+Shift+S'), run: () => project.show('save') },
-    '-',
-    { label: 'Copy project folder path', icon: 'copy', run: () => actions.copyText(String(store.state?.projectDir || ''), 'Folder path copied') },
+    // A browser host has no filesystem: opening, copying and folder paths belong to the local host.
+    native && { label: 'Open project…', icon: 'folder', keys: keys('Mod+O'), run: () => project.show('open') },
+    native && { label: 'Save a copy as…', icon: 'download', disabled: !project.canShowCopy(), keys: keys('Mod+Shift+S'), run: () => project.show('save') },
+    native && '-',
+    native && { label: 'Copy project folder path', icon: 'copy', run: () => actions.copyText(String(store.state?.projectDir || ''), 'Folder path copied') },
+    !native && { label: 'Download project file', icon: 'download', run: () => actions.downloadProject() },
   ], { anchor: $('#status'), label: 'Project' });
 });
 $('#empty-new').addEventListener('click', () => actions.newArtboard());
@@ -223,8 +225,8 @@ function handleKey(event) {
   if (menuOpen()) { if (key === 'escape') { prevent(); closeMenu(); return true; } return false; }
   if (mod && event.altKey && (key === '=' || key === '+' || key === '-')) { prevent(); help.stepUiSize(key === '-' ? -1 : 1); return true; }
   if (mod && !event.altKey && !event.shiftKey && (key === ',' || event.code === 'Comma')) { prevent(); help.toggle(true); return true; }
-  if (mod && !event.altKey && key === 'o') { prevent(); project.show('open'); return true; }
-  if (mod && event.shiftKey && !event.altKey && key === 's') { prevent(); project.show('save'); return true; }
+  if (native && mod && !event.altKey && key === 'o') { prevent(); project.show('open'); return true; }
+  if (native && mod && event.shiftKey && !event.altKey && key === 's') { prevent(); project.show('save'); return true; }
   if (mod && !event.altKey && key === 'k') { prevent(); palette.toggle(true); return true; }
   // Copy, cut and paste from the board run through the native clipboard events (see clip.js);
   // keys forwarded by a preview frame have no clipboard event, so they act on the board's own copy.
