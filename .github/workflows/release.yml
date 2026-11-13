@@ -1,0 +1,135 @@
+name: Release
+run-name: npm ${{ inputs.release_tag }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing stable tag at the dispatched main commit (for example v0.0.2)'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publication
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.release_tag }}
+  NODE_OPTIONS: ''
+
+jobs:
+  prepare:
+    name: Validate and freeze
+    if: github.repository == 'llblab/divlet' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check release ref before executing package scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$GITHUB_SHA"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.19.0'
+          package-manager-cache: false
+      - run: npm ci --legacy-peer-deps --ignore-scripts
+      - run: npx --no-install playwright install --with-deps chromium
+      - name: Install an isolated real Pi test host
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pi-host" --no-audit --no-fund @earendil-works/pi-coding-agent@1.5.2
+          echo "$RUNNER_TEMP/pi-host/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Test with the publisher npm version
+        run: npm install --global npm@11.19.0 --ignore-scripts --no-audit --no-fund
+      - run: npm test
+      - run: npm run test:browser:all
+      - run: npm run build
+      - name: Freeze archives without running pack hooks again
+        run: node scripts/npm-release.mjs prepare "$RELEASE_TAG" "$RUNNER_TEMP/npm-candidate"
+      - name: Test the exact frozen archives, including real Pi
+        env:
+          DIVLET_RELEASE_MANIFEST: ${{ runner.temp }}/npm-candidate/manifest.json
+        run: npm run test:release:pi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-candidate-${{ github.run_id }}
+          path: ${{ runner.temp }}/npm-candidate/
+          if-no-files-found: error
+          retention-days: 90
+
+  publish:
+    name: Publish npm
+    needs: prepare
+    environment: npm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.19.0'
+          package-manager-cache: false
+      - name: Use an OIDC-capable npm CLI
+        run: npm install --global npm@11.19.0 --ignore-scripts --no-audit --no-fund
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: npm-candidate-${{ github.run_id }}
+          path: ${{ runner.temp }}/npm-candidate/
+      # No checkout dependency installation, build or package lifecycle scripts receive an OIDC token.
+      - name: Publish frozen web, core and adapters through OIDC
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/npm-release.mjs publish "$RELEASE_TAG" "$RUNNER_TEMP/npm-candidate"
+      - name: Retain outcome even after partial failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-outcome-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/npm-candidate/manifest.json
+            ${{ runner.temp }}/npm-candidate/publication-progress.json
+          if-no-files-found: ignore
+          retention-days: 90
+
+  verify:
+    name: Verify registry installation
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.19.0'
+          package-manager-cache: false
+      - run: npm ci --legacy-peer-deps --ignore-scripts
+      - run: npx --no-install playwright install --with-deps chromium
+      - name: Install an isolated real Pi test host
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pi-host" --no-audit --no-fund @earendil-works/pi-coding-agent@1.5.2
+          echo "$RUNNER_TEMP/pi-host/node_modules/.bin" >> "$GITHUB_PATH"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: npm-candidate-${{ github.run_id }}
+          path: ${{ runner.temp }}/npm-candidate/
+      - name: Test registry-name installations against frozen integrity
+        env:
+          DIVLET_RELEASE_MANIFEST: ${{ runner.temp }}/npm-candidate/manifest.json
+        run: node core/tests/release/install-smoke.mjs --registry --pi

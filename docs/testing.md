@@ -81,6 +81,12 @@ The renderer requirement seam has a separate focused gate: `node scripts/source.
 
 `node scripts/source.mjs --test core/tests/html-import.test.js core/tests/import.test.js` checks core-owned HTML admission without an HTML plugin registration, with no style engine, and through explicit `.html`/`.htm` opening, folder-page ingestion and re-import. It covers reported sanitization losses, preserved sources, existing destinations, listing policy, link refusal and unsupported input. It does not establish managed-cache reverse editing; generated-page hand edits remain diagnosed rather than imported.
 
+## CI release checks
+
+`node scripts/source.mjs --test core/tests/npm-release.test.js` tests the Release workflow's OIDC/ref boundary, aligned manifests/lock pins, immutable archive identities, prior-attempt guard and serial publication checkpoints with injected effects. Its fixture packs real local archives without running lifecycle hooks; it never publishes or changes credentials. The mocked accepted-upload/404, mismatched-byte and command/read-failure cases prove refusal behavior, not live npm authorization. A loopback-only mock registry also drives the real npm CLI with the publisher's retry flags: an HTTP 502 must produce exactly one package PUT. The fixture uses an owned dummy token and disables provenance only for that local transport test; no public registry publication occurs.
+
+The existing `core/tests/release/install-smoke.mjs` also accepts `DIVLET_RELEASE_MANIFEST=/absolute/path/manifest.json` to consume and check exact frozen archives instead of rebuilding them. Add `--registry --pi` to fetch packs and install by published names while comparing both pack and installed-lock integrity to that manifest. Without these options the ordinary local-tarball checks remain unchanged. Registry mode requires a manifest and an available real Pi CLI when `--pi` is requested. See [publication](publishing.md#github-actions-publishing) for the three CI jobs and activation gates.
+
 ## Conventions
 
 - Assert actual state (project file, model, accepted version), not only that a request returned.

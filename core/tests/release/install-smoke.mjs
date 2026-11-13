@@ -1,4 +1,4 @@
-// Release check: pack the package, install the tarball into an empty directory (dependencies come from the registry or its
+// Release check: pack locally (or consume a frozen manifest / --registry), then install into an empty directory (dependencies come from the registry or its
 // cache) and prove that what a user gets works: the CLI and the MCP server answer, a board starts, and the board and a plugin's
 // client module are served. The MCP check runs the installed bin over stdio with no Pi installed — standalone usage. Nothing is
 // published. Run it with `npm run test:release` before any release.
@@ -12,9 +12,25 @@ import { bundleBrowserModel } from '../../../scripts/browser-model.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const work = await mkdtemp(path.join(os.tmpdir(), 'divlet-release-'));
+process.env.PI_DIVLET_STATE_DIR = path.join(work, 'boards');
 try {
-  const webPacked = JSON.parse(execFileSync('npm', ['pack', '--json', '--pack-destination', work], { cwd: path.join(root, 'web'), encoding: 'utf8' }))[0];
-  const packed = JSON.parse(execFileSync('npm', ['pack', '--json', '--pack-destination', work], { cwd: root, encoding: 'utf8' }))[0];
+  const registry = process.argv.includes('--registry');
+  const manifestPath = process.env.DIVLET_RELEASE_MANIFEST;
+  assert.ok(!registry || manifestPath, '--registry requires DIVLET_RELEASE_MANIFEST to verify immutable bytes');
+  const candidate = manifestPath ? JSON.parse(await readFile(manifestPath, 'utf8')) : null;
+  const version = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8')).version;
+  const pack = (name, directory) => {
+    const expected = candidate?.packages.find(pkg => pkg.name === name);
+    if (candidate) { assert.ok(expected, `Missing frozen package: ${name}`); assert.equal(expected.version, version); }
+    const spec = registry ? `${name}@${version}` : expected ? path.resolve(path.dirname(manifestPath), expected.filename) : null;
+    const args = ['pack', ...(spec ? [spec, '--ignore-scripts'] : []), '--registry=https://registry.npmjs.org/', '--json', '--pack-destination', work];
+    const packed = JSON.parse(execFileSync('npm', args, { cwd: spec ? work : directory, encoding: 'utf8' }))[0];
+    if (expected) assert.equal(packed.integrity, expected.integrity, `${name}: installed test must use the exact frozen archive`);
+    return packed;
+  };
+  const installation = packed => registry ? `${packed.name}@${packed.version}` : path.join(work, packed.filename);
+  const webPacked = pack('@divlet/web', path.join(root, 'web'));
+  const packed = pack('@divlet/core', root);
   assert.equal(packed.name, '@divlet/core');
   assert.equal(webPacked.name, '@divlet/web');
   assert.equal(webPacked.version, packed.version);
@@ -30,7 +46,7 @@ try {
   await mkdir(path.join(target, 'proj'), { recursive: true });
   await mkdir(path.join(target, 'landing-example'));
   await writeFile(path.join(target, 'package.json'), '{"name":"try","private":true,"type":"module"}');
-  execFileSync('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline', path.join(work, webPacked.filename), path.join(work, packed.filename)], { cwd: target, stdio: 'pipe' });
+  execFileSync('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline', '--registry=https://registry.npmjs.org/', ...(registry ? [installation(packed)] : [installation(webPacked), installation(packed)])], { cwd: target, stdio: 'pipe' });
 
   // A real consumer selects the compiled browser binding without checkout sources or a provider bootstrap.
   const browserBundle = await bundleBrowserModel(target);
@@ -44,16 +60,16 @@ try {
   assert.equal(packed.files.some(file => /^dist\/(?:packages|adapters|cli|mcp|pi|web)\//.test(file.path)), false, 'the product contains no adapter implementations');
   const adapters = [];
   for (const name of ['cli', 'mcp', 'pi']) {
-    const adapter = JSON.parse(execFileSync('npm', ['pack', '--json', '--pack-destination', work], { cwd: path.join(root, name), encoding: 'utf8' }))[0];
+    const adapter = pack(`@divlet/${name}`, path.join(root, name));
     assert.equal(adapter.name, `@divlet/${name}`);
     assert.equal(adapter.version, packed.version);
     assert.equal(adapter.files.some(file => /(?:^|\/)(?:tests|core|web)(?:\/|$)/.test(file.path)), false, 'an adapter contains only its implementation, not another product');
     assert.equal(adapter.files.some(file => file.path.split('/').filter(part => part === 'dist').length > 1), false, 'generated output never nests inside itself');
     assert.ok(adapter.files.some(file => file.path === 'dist/LICENSE'), 'every independently distributed adapter includes the shared MIT notice');
     if (name !== 'pi') assert.ok(adapter.files.find(file => file.path === 'dist/index.js').mode & 0o111);
-    adapters.push(path.join(work, adapter.filename));
+    adapters.push(installation(adapter));
   }
-  execFileSync('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline', ...adapters.slice(0, 2)], { cwd: target, stdio: 'pipe' });
+  execFileSync('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline', '--registry=https://registry.npmjs.org/', ...adapters.slice(0, 2)], { cwd: target, stdio: 'pipe' });
   const help = execFileSync(process.execPath, [path.join(target, 'node_modules', '.bin', 'divlet'), '--help'], { encoding: 'utf8' });
   assert.match(help, /divlet \[path\]/, 'the CLI answers --help');
   assert.equal(execFileSync(process.execPath, [path.join(target, 'node_modules/.bin/divlet-mcp'), '--version'], { encoding: 'utf8' }).trim(), packed.version);
@@ -193,7 +209,7 @@ try {
   assert.equal(mcp.url, 'http://…', 'and opens a board: ' + JSON.stringify(mcp));
   assert.equal(mcp.frames, 1);
   // Only the Pi adapter needs the peer supplied by its host; CLI/MCP above run without it or the Pi SDK.
-  execFileSync('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline', adapters[2]], { cwd: target, stdio: 'pipe' });
+  execFileSync('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline', '--registry=https://registry.npmjs.org/', adapters[2]], { cwd: target, stdio: 'pipe' });
   await writeFile(path.join(target, 'pi-smoke.mjs'), `
     import assert from 'node:assert/strict';
     import adapter from '@divlet/pi';
@@ -210,10 +226,14 @@ try {
     assert.deepEqual(await handlers.get('resources_discover')(), { skillPaths: [path.dirname(skill)] });
   `);
   execFileSync(process.execPath, ['pi-smoke.mjs'], { cwd: target, stdio: 'pipe' });
+  if (candidate) {
+    const lock = JSON.parse(await readFile(path.join(target, 'package-lock.json'), 'utf8'));
+    for (const pkg of candidate.packages) assert.equal(lock.packages[`node_modules/${pkg.name}`].integrity, pkg.integrity, `${pkg.name}: installed resolution differs from the frozen archive`);
+  }
   let installedPi;
   if (process.argv.includes('--pi')) {
     installedPi = JSON.parse(execFileSync(process.execPath, [path.join(root, 'pi/tests/e2e/pi.mjs')], { cwd: target, env: { ...process.env, NODE_OPTIONS: '', PI_DIVLET_INSTALLED_ROOT: target }, encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 }).trim());
     assert.equal(installedPi.status, 'passed'); assert.equal(installedPi.installed, true); assert.equal(installedPi.installedFonts.status, 'passed', 'required installed Pi mode cannot silently skip the real host/browser case');
   }
-  console.log(JSON.stringify({ status: 'passed', files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, pluginTypes: true, browserModelBundle: true, webPackage: webPacked.name, installedFonts, ...(installedPi ? { installedPi } : {}), mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
+  console.log(JSON.stringify({ status: 'passed', registryInstallation: registry, frozenManifest: Boolean(candidate), files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, pluginTypes: true, browserModelBundle: true, webPackage: webPacked.name, installedFonts, ...(installedPi ? { installedPi } : {}), mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
 } finally { await rm(work, { recursive: true, force: true }); }

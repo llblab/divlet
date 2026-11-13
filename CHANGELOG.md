@@ -2,6 +2,10 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
+## Unreleased
+
+- Added a manually dispatched `Release` GitHub Actions workflow with npm Trusted Publishing/OIDC, frozen five-package archives, serial web/core/adapter publication and registry-install verification through CLI/MCP and an isolated real Pi host. Preparation and verification have no publish token; uncertain or prior publication attempts block automatic replay. Maintainer trusted-publisher/environment setup and a first live CI publication remain required.
+
 ## 0.0.1 — 2026-11-13
 
 Published `@divlet/web`, `@divlet/core`, `@divlet/cli`, `@divlet/mcp` and `@divlet/pi` on npm with matching versions and verified archive integrity. Clean registry installations exercise the standalone board, CLI/MCP tools and an isolated real Pi host.
