@@ -1,5 +1,5 @@
 import { $, $$, el, icon, clamp, round } from './util.js';
-import { publishObservations, previews } from './host.js';
+import { publishObservations, previews, initialView } from './host.js';
 import { store, emit, on, documents, descriptor, request, post, apiUrl, commit, edit, idle, undo, newGroup, selectArtboards, selectNodes, toast, viewState, saveViewState } from './store.js';
 
 const PREFETCH_TARGET = 8;
@@ -437,7 +437,11 @@ export function reconcileArtboards() {
     initialFit = true;
     const saved = viewState(store.state.projectId);
     if (saved && Number.isFinite(saved.k) && Number.isFinite(saved.x) && Number.isFinite(saved.y)) setCamera(saved);
-    else fit(null, { animate: false });
+    else {
+      fit(null, { animate: false });
+      // A first visit to a published board reads the page itself; the board is one step back.
+      if (initialView?.expand && descriptor(initialView.expand)) requestAnimationFrame(() => openExpanded(initialView.expand, undefined, { title: initialView.title }));
+    }
   }
   updateHandles();
   applyCamera();
@@ -499,6 +503,8 @@ function deliverEdit(entry) {
   entry.port?.postMessage({ type: 'divlet:edit', nodeId: pending.nodeId });
 }
 
+/** An expanded frame browses its published page (no delivery) unless the host has none, where it reads the live preview. */
+const browsingPublished = entry => store.expanded?.entry === entry && !!entry.doc.viewUrl;
 const needsEagerLoad = entry => store.expanded?.entry === entry || store.selected.has(entry.doc.id);
 
 function inspectFlag() { return !store.expanded && store.mode === 'select'; }
@@ -522,7 +528,7 @@ function mount(entry, { revision = false } = {}) {
     entry.port?.postMessage({ type: 'divlet:inspect', enabled: inspectFlag() });
     syncNodeSelection(entry);
     syncWork(entry);
-    if (store.expanded?.entry === entry) return;
+    if (browsingPublished(entry)) return;
     updateFrame(entry);
   });
   entry.iframe = frame;
@@ -568,7 +574,7 @@ async function updateFrame(entry) {
   // While a pill is being dragged the page shows its own inline preview; delivering a render would replace the DOM under
   // the pointer. The model still moves (the drag commits live) and this frame catches up when the drag ends.
   if (gesture?.type === 'space' && gesture.id === entry.doc.id) return;
-  if (store.expanded?.entry === entry || !entry.iframe || !entry.port || !entry.loaded || entry.pendingFetch || entry.awaitingVersion >= entry.doc.render || entry.renderedVersion >= entry.doc.render) return;
+  if (browsingPublished(entry) || !entry.iframe || !entry.port || !entry.loaded || entry.pendingFetch || entry.awaitingVersion >= entry.doc.render || entry.renderedVersion >= entry.doc.render) return;
   const frame = entry.iframe;
   const generation = entry.deliveryGeneration;
   entry.pendingFetch = true;
@@ -576,7 +582,7 @@ async function updateFrame(entry) {
   setFrameStatus(entry, 'updating');
   try {
     const rendered = await previews.readRender(entry.doc.id, { signal: entry.abort.signal });
-    if (entry.iframe !== frame || generation !== entry.deliveryGeneration || store.expanded?.entry === entry || rendered.documentId !== entry.doc.id || rendered.render < entry.renderedVersion) return;
+    if (entry.iframe !== frame || generation !== entry.deliveryGeneration || browsingPublished(entry) || rendered.documentId !== entry.doc.id || rendered.render < entry.renderedVersion) return;
     entry.awaitingVersion = rendered.render;
     entry.port?.postMessage({ type: 'divlet:update', documentId: entry.doc.id, version: rendered.render, html: rendered.html });
   } catch (error) {
@@ -707,10 +713,10 @@ function cancelDelivery(entry) {
   entry.reportTimer = null;
 }
 
-export function openExpanded(documentId, focusTarget) {
+export function openExpanded(documentId, focusTarget, { title } = {}) {
   const entry = entries.get(documentId);
   if (!entry || store.expanded) return;
-  store.expanded = { entry, mode: store.mode, focusTarget, camera: { ...camera } };
+  store.expanded = { entry, mode: store.mode, focusTarget, camera: { ...camera }, title };
   cancelDelivery(entry);
   store.node = null;
   selectArtboards([documentId]);
@@ -730,11 +736,11 @@ export function openExpanded(documentId, focusTarget) {
     entry.bridgeToken = crypto.randomUUID();
     entry.loaded = false;
     entry.iframe.src = viewUrl;
-  } else entry.port?.postMessage({ type: 'divlet:inspect', enabled: false });
+  } else { entry.port?.postMessage({ type: 'divlet:inspect', enabled: false }); updateFrame(entry); }
   const overlay = $('#expanded-preview');
   overlay.hidden = false;
   overlay.setAttribute('aria-owns', entry.iframe.id);
-  $('#expanded-title').textContent = entry.doc.name || entry.doc.id;
+  $('#expanded-title').textContent = title || entry.doc.name || entry.doc.id;
   setChromeInert(true, entry);
   document.body.classList.add('is-expanded');
   $('#expanded-back').focus({ preventScroll: true });

@@ -47,7 +47,7 @@ async function hostBundle(version) {
 import { startBrowserBoard } from ${JSON.stringify(path.join(root, 'core/lib/browser-board.ts'))};
 const here = new URL('./', import.meta.url);
 try {
-  await startBrowserBoard({ projectUrl: new URL('project.divlet', here), stylesUrl: new URL('styles.json', here), bridgeUrl: new URL('preview-bridge.js', here), storageKey: location.pathname + '#landing', file: 'landing.divlet', version: ${JSON.stringify(version)} });
+  await startBrowserBoard({ projectUrl: new URL('project.divlet', here), stylesUrl: new URL('styles.json', here), bridgeUrl: new URL('preview-bridge.js', here), entryFrame: 'index', storageKey: location.pathname + '#landing', file: 'landing.divlet', version: ${JSON.stringify(version)} });
   await import(new URL('./board.js', import.meta.url).href);
 } catch (error) {
   // Without its composition the board must not start: it would fall back to native routes that a static host does not have.

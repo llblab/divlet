@@ -126,7 +126,7 @@ on('state', state => {
     const doc = descriptor(store.expanded.entry.doc.id);
     if (!doc) canvas.closeExpanded({ reset: false });
     else {
-      $('#expanded-title').textContent = doc.name || doc.id;
+      $('#expanded-title').textContent = store.expanded.title || doc.name || doc.id;
       if (state.site) store.expanded.entry.iframe?.contentWindow.postMessage({ type: 'divlet:site-state', site: { version: state.site.version } }, '*');
     }
   }

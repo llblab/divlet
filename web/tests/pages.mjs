@@ -39,6 +39,20 @@ test('the static board opens the landing project with no backend', async () => {
   await page.waitForSelector('.artboard[data-artboard-id="index"] iframe');
   assert.match(await frameText(page, 'h1'), /\S/);
   assert.equal(await page.evaluate(() => typeof globalThis[Symbol.for('browser-mcp/1')]?.handle), 'function');
+  // A first visit reads the page at its real size; the board is one step back and is remembered afterwards.
+  await page.waitForSelector('#expanded-preview:not([hidden])');
+  assert.equal((await page.locator('#expanded-title').textContent()).trim(), 'Edit on the board');
+  const readable = async () => page.evaluate(() => {
+    const frame = document.querySelector('iframe[data-document-id="index"]').getBoundingClientRect();
+    return { width: frame.width, viewport: innerWidth };
+  });
+  const wide = await readable();
+  assert.ok(wide.width > wide.viewport * 0.9, `the page uses the window width (${wide.width}/${wide.viewport})`);
+  const heading = await page.frameLocator('iframe[data-document-id="index"]').locator('h1').first().evaluate(node => Number.parseFloat(getComputedStyle(node).fontSize) * node.getBoundingClientRect().width / node.offsetWidth);
+  assert.ok(heading >= 28, `the heading reads at real size (${heading}px)`);
+  await page.screenshot({ path: 'artifacts/pages-first-visit.png' }).catch(() => {});
+  await page.click('#expanded-back');
+  await page.waitForSelector('#expanded-preview', { state: 'hidden' });
   // Host capabilities: filesystem actions are absent, agents are offered the MCP connection to this very page.
   await page.click('#status');
   const menu = await page.locator('[role="menu"]').innerText();
@@ -58,6 +72,19 @@ test('the static board opens the landing project with no backend', async () => {
   assert.ok(requests.every(line => line.startsWith('GET ') && !line.includes('/api/') && !line.includes('/events')), `only static files were requested: ${requests.filter(line => line.includes('/api/')).join(', ')}`);
   await page.screenshot({ path: 'artifacts/pages-board.png' }).catch(() => {});
   await page.close();
+});
+
+test('a first visit on a phone reads the landing as a phone page', async () => {
+  const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await phone.goto(base);
+  await phone.waitForSelector('#expanded-preview:not([hidden])');
+  const frame = phone.frameLocator('iframe[data-document-id="index"]');
+  await frame.locator('h1').first().waitFor();
+  const layout = await frame.locator('h1').first().evaluate(node => ({ font: Number.parseFloat(getComputedStyle(node).fontSize), right: node.getBoundingClientRect().right, width: document.documentElement.clientWidth }));
+  assert.ok(layout.width <= 400 && layout.right <= layout.width + 1, `the page lays out at phone width (${JSON.stringify(layout)})`);
+  assert.ok(layout.font >= 24, 'and its heading stays readable');
+  await phone.screenshot({ path: 'artifacts/pages-first-visit-phone.png' }).catch(() => {});
+  await phone.close();
 });
 
 test('an agent connects by URL, edits the project and the visitor sees it; the copy persists across reloads', async () => {

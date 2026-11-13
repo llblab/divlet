@@ -55,4 +55,9 @@ export interface BoardHostComposition {
   readonly historyService?: BoardHistoryService;
   readonly shareSelection?: import('./board-session.ts').BoardSelectionPublisher;
   readonly publishObservations?: import('./board-session.ts').BoardObservationPublisher;
+  /**
+   * What a visitor with no saved view of this project sees first: `expand` opens that frame as a readable page, and `title`
+   * names the way back to the board. Absent: the board fits all frames, as the native host does.
+   */
+  readonly initialView?: { readonly expand: string; readonly title?: string };
 }

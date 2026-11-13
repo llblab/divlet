@@ -27,6 +27,8 @@ export interface BrowserBoardOptions {
   readonly version: string;
   /** The static preview bridge script (`previewBridgeScript()` output), served by the same site. */
   readonly bridgeUrl: URL;
+  /** The frame a first visit opens as a readable page (absent: the board fits all frames). */
+  readonly entryFrame?: string;
   readonly target?: object;
 }
 
@@ -178,6 +180,7 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
     // Selection and measurements are shared with the browser writer, so an agent reads what the visitor selected and sees.
     shareSelection: async (selection: any) => copy(runtime.setSelection(copy(selection))),
     publishObservations: async (report: any) => copy(runtime.setObservations(copy(report))),
+    ...(options.entryFrame && runtime.documents.has(options.entryFrame) ? { initialView: Object.freeze({ expand: options.entryFrame, title: 'Edit on the board' }) } : {}),
   });
   Object.defineProperty(target, HOST_KEY, { value: composition, configurable: false, enumerable: false, writable: false });
 

@@ -32,3 +32,5 @@ export const previews = composed ? composed.previews : createHttpPreviews({ apiU
 export const components = composed ? composed.components : createHttpComponents(request);
 /** @type {import('@divlet/web/host').BoardExports | undefined} */
 export const exports = composed ? composed.exports : createHttpExports(request);
+/** @type {import('@divlet/web/host').BoardHostComposition['initialView']} */
+export const initialView = composed?.initialView;
