@@ -1,0 +1,9 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="browser-mcp" content="browser-mcp/1">
+<title>Slow provider</title>
+<script type="module">
+// The provider appears only after asynchronous initialization.
+import { createBrowserMcpProvider, exposeBrowserMcp } from './provider.js';
+setTimeout(() => exposeBrowserMcp(createBrowserMcpProvider({ name: 'slow', version: '1', tools: [{ name: 'ping', description: 'Answers.', inputSchema: { type: 'object' }, execute: () => ({ pong: true }) }] })), 400);
+</script>
