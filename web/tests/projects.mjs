@@ -121,8 +121,10 @@ try {
   await page.getByRole('button', { name: 'Parent folder', exact: true }).click();
   await page.locator('#project .dir.is-project', { hasText: 'second' }).waitFor();
   assert.equal(await page.locator('#project .dir.is-project').count(), 2);
+  // Make the longest action exceed the old pixel floor on every host, not only the CI font stack.
+  await page.locator('#project .project-go').evaluate(node => { node.style.font = '600 14px monospace'; });
   await page.locator('#project .file-picker-path input').fill(path.join(root, 'empty-folder'));
-  await page.locator('#project .project-go', { hasText: 'Create project here' }).waitFor();
+  await page.locator('#project').getByRole('button', { name: 'Create project here', exact: true }).waitFor();
   const stable = () => page.evaluate(() => ['.file-picker-path', '.dir-list', '.project-go'].map(q => { const r = document.querySelector('#project ' + q).getBoundingClientRect(); return [Math.round(r.top), Math.round(r.left), Math.round(r.height)]; }));
   const quiet = await stable();
   await page.locator('#project .file-picker-path input').fill(path.join(root, 'nope', 'missing'));
@@ -130,11 +132,12 @@ try {
   assert.deepEqual(await stable(), quiet, 'an error message appears below the controls without moving the path field, list or action button');
   assert.equal(await page.evaluate(() => !!(document.querySelector('#project .project-go').compareDocumentPosition(document.querySelector('#project .project-status')) & Node.DOCUMENT_POSITION_FOLLOWING)), true);
   assert.equal(await page.locator('#project .project-go').isDisabled(), true);
+  await page.locator('#project .project-go').evaluate(node => { node.style.font = ''; });
   await page.locator('#project .file-picker-path input').fill(path.join(root, 'work') + '/');
   await page.locator('#project .dir', { hasText: 'second' }).click();
   await page.locator('#project .dir.is-project', { hasText: 'project.divlet' }).click();
   assert.equal(await page.locator('#project .file-picker-path input').inputValue(), path.join(root, 'work', 'second', 'project.divlet'));
-  await page.locator('#project .project-go', { hasText: 'Open project' }).waitFor();
+  await page.locator('#project').getByRole('button', { name: 'Open project', exact: true }).waitFor();
   await Promise.all([page.waitForURL(url => url.href !== first.runtime.info().url), page.keyboard.press('Enter')]);
   await page.waitForFunction(() => document.title.startsWith('second ·'));
   assert.equal((await page.locator('#project-name').textContent()).trim(), 'DIVLET');
@@ -144,7 +147,7 @@ try {
   // Create a project in an existing empty folder.
   await page.keyboard.press('Control+o');
   await page.locator('#project .file-picker-path input').fill(path.join(root, 'empty-folder'));
-  await page.locator('#project .project-go', { hasText: 'Create project here' }).click();
+  await page.locator('#project').getByRole('button', { name: 'Create project here', exact: true }).click();
   await page.waitForFunction(() => document.title.startsWith('empty-folder ·'));
   assert.ok((await readdir(path.join(root, 'empty-folder'))).includes('project.divlet'));
   await page.waitForFunction(() => document.querySelector('#loading')?.hidden);
@@ -176,7 +179,7 @@ try {
   const target = path.join(root, 'saved', 'copy-of-first');
   await page.locator('#project .file-picker-path input').fill(target);
   await page.locator('#project .project-status', { hasText: 'Will create' }).waitFor();
-  await Promise.all([page.waitForURL(url => url.href !== first.runtime.info().url), page.locator('#project .project-go', { hasText: 'Save here' }).click()]);
+  await Promise.all([page.waitForURL(url => url.href !== first.runtime.info().url), page.locator('#project').getByRole('button', { name: 'Save here', exact: true }).click()]);
   await page.waitForFunction(() => document.querySelectorAll('.artboard').length === 5);
   const saved = await readdir(target);
   assert.ok(saved.includes('project.divlet') && saved.includes('assets') && saved.includes('.divlet'), `the copy holds the project, its assets and managed build (${saved})`);
@@ -196,7 +199,7 @@ try {
   await page.locator('#project .file-picker-path input').fill(path.dirname(pen));
   await page.locator('#project .dir.is-project', { hasText: 'portable.pen' }).click();
   assert.equal(await page.locator('#project .file-picker-path input').inputValue(), pen);
-  await page.locator('#project .project-go', { hasText: 'Open project' }).waitFor();
+  await page.locator('#project').getByRole('button', { name: 'Open project', exact: true }).waitFor();
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => document.title === 'portable · divlet');
   assert.equal(await page.locator('#status').getAttribute('data-project'), 'portable');

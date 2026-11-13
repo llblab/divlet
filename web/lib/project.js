@@ -47,27 +47,29 @@ const clearRecovery = () => { failure = ''; recovery.replaceChildren(); };
 let input;
 let status;
 let primary;
+let primaryLabel;
+const actionLabels = { open: 'Open', save: 'Save here', project: 'Open project', collection: 'Open collection', create: 'Create project here', working: 'Working…' };
 
 export const isOpen = () => !scrim.hidden;
 export const canShowCopy = () => !!store.state?.project?.capabilities?.saveAs;
 
 function label() {
   const info = picker?.state.info;
-  if (!info) return { text: mode === 'open' ? 'Open' : 'Save here', ok: false, note: '' };
+  if (!info) return { text: mode === 'open' ? actionLabels.open : actionLabels.save, ok: false, note: '' };
   if (mode === 'open') {
-    if (info.kind === 'project') return { text: 'Open project', ok: true, note: 'A project is here.' };
-    if (info.kind === 'collection') return { text: 'Open collection', ok: true, note: `${info.projects} project${info.projects === 1 ? '' : 's'} here — pick one on the next page.` };
-    if (info.kind === 'new') return { text: 'Create project here', ok: true, note: 'No project in this folder yet.' };
-    return { text: 'Open project', ok: false, note: 'This folder does not exist.' };
+    if (info.kind === 'project') return { text: actionLabels.project, ok: true, note: 'A project is here.' };
+    if (info.kind === 'collection') return { text: actionLabels.collection, ok: true, note: `${info.projects} project${info.projects === 1 ? '' : 's'} here — pick one on the next page.` };
+    if (info.kind === 'new') return { text: actionLabels.create, ok: true, note: 'No project in this folder yet.' };
+    return { text: actionLabels.project, ok: false, note: 'This folder does not exist.' };
   }
-  if (info.kind === 'project' || info.kind === 'collection') return { text: 'Save here', ok: false, note: 'This folder already holds projects. Choose a new or empty folder.' };
-  if (info.kind === 'missing') return { text: 'Save here', ok: true, note: `Will create ${info.missing}.` };
-  return { text: 'Save here', ok: true, note: 'The folder must be empty.' };
+  if (info.kind === 'project' || info.kind === 'collection') return { text: actionLabels.save, ok: false, note: 'This folder already holds projects. Choose a new or empty folder.' };
+  if (info.kind === 'missing') return { text: actionLabels.save, ok: true, note: `Will create ${info.missing}.` };
+  return { text: actionLabels.save, ok: true, note: 'The folder must be empty.' };
 }
 
 function paintControls() {
   const state = label();
-  primary.textContent = busy ? 'Working…' : state.text;
+  primaryLabel.textContent = busy ? actionLabels.working : state.text;
   // Keep keyboard focus inside the modal when pending work disables a focused control.
   const focused = document.activeElement;
   if (focused === primary && (busy || !state.ok)) input.focus({ preventScroll: true });
@@ -127,6 +129,14 @@ function render() {
   status = el('span', 'caption project-status');
   status.setAttribute('role', 'status');
   primary = el('button', 'cta project-go');
+  primaryLabel = el('span', 'project-go-label');
+  primary.append(primaryLabel);
+  // All state labels share one grid cell, reserving real font-dependent width without another accessible control.
+  for (const text of Object.values(actionLabels)) {
+    const sizer = el('span', 'project-go-sizer', text);
+    sizer.setAttribute('aria-hidden', 'true');
+    primary.append(sizer);
+  }
   primary.type = 'button';
   primary.addEventListener('click', submit);
   const foot = el('div', 'dialog-foot');

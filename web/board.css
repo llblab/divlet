@@ -630,7 +630,9 @@ body.bar-dragging { user-select: none; }
 /* Anchored to the top so a longer message or recovery box grows downward and never moves the controls above it. */
 #project { place-items: start center; padding-top: min(calc(var(--vh) * 0.14), 120px); }
 #project .dialog-foot { align-items: flex-start; padding-bottom: 0; }
-.project-go { height: 32px; min-width: 156px; padding: 0 14px; }
+.project-go { display: inline-grid; grid-template-columns: minmax(0, 1fr); height: auto; min-height: 32px; min-width: min(156px, 100%); max-width: 100%; padding: 0 14px; }
+.project-go > span { grid-area: 1 / 1; min-width: 0; }
+.project-go-sizer { visibility: hidden; pointer-events: none; }
 .project-go:disabled { opacity: var(--disabled); cursor: default; }
 /* Read-only external-file recovery (picker, launcher and diagnostics). */
 .project-recovery:empty, .project-revision:empty { display: none; }
