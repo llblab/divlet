@@ -804,10 +804,21 @@ try {
       await page.evaluate(async size => (await import('./lib/help.js')).setUiSize(size), size);
       if (width === 900) {
         await waitUntil(() => grip.evaluate(node => Math.abs(node.getBoundingClientRect().left - document.querySelector('#inspector').getBoundingClientRect().left + 4) < 1), 'the resize grip follows the changed viewport before dragging');
+        // Font metrics differ across hosts; give the paired row its measured max-content room, not an assumed 320px.
+        const pairedWidth = await page.locator('#inspector [data-section="appearance"] [data-key="pick:Weight"]').evaluate(node => {
+          const row = node.parentElement, panel = document.querySelector('#inspector');
+          const probe = row.cloneNode(true);
+          Object.assign(probe.style, { position: 'fixed', visibility: 'hidden', width: 'max-content', maxWidth: 'none', flexWrap: 'nowrap' });
+          for (const field of probe.children) { field.style.flexGrow = '0'; field.style.flexShrink = '0'; }
+          row.parentElement.append(probe);
+          const needed = Math.ceil(probe.getBoundingClientRect().width + panel.getBoundingClientRect().width - row.getBoundingClientRect().width + 4);
+          probe.remove();
+          return Math.max(320, needed);
+        });
         const box = await grip.boundingBox(), now = Number(await grip.getAttribute('aria-valuenow'));
         await page.mouse.move(box.x + 4, box.y + box.height / 2); await page.mouse.down();
-        await page.mouse.move(box.x + 4 + now - 320, box.y + box.height / 2, { steps: 6 }); await page.mouse.up();
-        await waitUntil(() => page.locator('#inspector').evaluate(node => Math.abs(node.getBoundingClientRect().width - 320) < 1), 'the adaptive selector row really has 320px');
+        await page.mouse.move(box.x + 4 + now - pairedWidth, box.y + box.height / 2, { steps: 6 }); await page.mouse.up();
+        await waitUntil(() => page.locator('#inspector').evaluate((node, expected) => Math.abs(node.getBoundingClientRect().width - expected) < 1, pairedWidth), `the adaptive selector row has its measured ${pairedWidth}px`);
       }
       await waitUntil(async () => (await page.locator('#inspector .pick').count()) > 0, 'the inspector keeps a selector');
       const pick = page.locator('#inspector [data-section="appearance"] [data-key="pick:Weight"]');
@@ -824,7 +835,8 @@ try {
             return [...pick.querySelectorAll('.pick-k, .pick-v, .pick-caret')].every(child => { const r = child.getBoundingClientRect(); return Math.abs(r.top + r.height / 2 - box.top - box.height / 2) < 1; });
           });
           return {
-            centred, peerSingleLine: node.parentElement.querySelector('.vf').getBoundingClientRect().height / scale <= 30,
+            centred, rowWidth: node.parentElement.getBoundingClientRect().width / scale,
+            peerSingleLine: node.parentElement.querySelector('.vf').getBoundingClientRect().height / scale <= 30,
             peerCentred: Math.abs(node.parentElement.querySelector('.vf').getBoundingClientRect().top + node.parentElement.querySelector('.vf').getBoundingClientRect().height / 2 - b.top - b.height / 2) < 1,
             hierarchy: getComputedStyle(label).color !== getComputedStyle(value).color && Number(getComputedStyle(label).fontWeight) > Number(getComputedStyle(value).fontWeight),
             multiline: v.height / scale > 20, gap: Math.round((b.right - v.right) / scale), alignment: getComputedStyle(value).textAlign,
@@ -844,7 +856,8 @@ try {
       assert.equal(geom.multiline, false, 'Extra bold 800 stays on one line instead of wrapping or abbreviating the value');
       if (width === 900) {
         assert.equal(geom.peerSingleLine, true, 'the neighbouring font-size field retains its single-line height');
-        assert.equal(geom.peerCentred, true, 'the font-size and weight fields stay centred when they fit on the same row');
+        if (!geom.peerCentred) await pick.locator('..').screenshot({ path: 'artifacts/typography-paired-row-failure.png' });
+        assert.equal(geom.peerCentred, true, `the font-size and weight fields stay centred in the measured-content row (${JSON.stringify(geom)})`);
       }
     }
     await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(100));
