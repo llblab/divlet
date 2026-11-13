@@ -6,7 +6,7 @@ A local layout board for coding agents. Work with real HTML in live artboards, r
 
 [Quick start](#quick-start) · [Connect an agent](#connect-an-agent) · [Board guide](docs/board.md) · [Documentation](docs/README.md)
 
-> **0.0.1 · release candidate.** npm publication is blocked by the registry's name-similarity policy, pending a maintainer decision. The native project format remains a pre-freeze draft; keep backups because future versions may require explicit conversion.
+> **0.0.1 · release candidate.** Scoped-package preparation is in progress after npm refused the unscoped name; no package is published yet. The native project format remains a pre-freeze draft; keep backups because future versions may require explicit conversion.
 
 ## Real pages, not pictures of pages
 
@@ -97,7 +97,7 @@ Call `open_divlet` and open its returned URL. No Pi installation is needed. Clie
 <details>
 <summary><strong>Package roles and alternative installation</strong></summary>
 
-The **`divlet`** package is the library, board, built-in plugins and shared workflow skill. Three real adapter packages own their implementation and commands: **`@divlet/cli`**, **`@divlet/mcp`** and **`@divlet/pi`**. Each depends on the exact matching product version.
+**`@divlet/core`** owns the library, model/runtime, server, built-in plugins and shared workflow skill. **`@divlet/web`** owns browser assets and portable host ports, without a dependency back on core. Core's HTTP composition uses its public asset locator. Three real adapter packages own their implementation and commands: **`@divlet/cli`**, **`@divlet/mcp`** and **`@divlet/pi`**. Each adapter pins the exact matching core version; core pins web. All five packages share one product release. See the [web package](https://github.com/llblab/divlet/blob/main/web/README.md).
 
 ```bash
 # Open a standalone board:

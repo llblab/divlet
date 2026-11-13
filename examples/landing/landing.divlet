@@ -1828,13 +1828,13 @@
         "text-187": {
           "id": "text-187",
           "type": "text",
-          "content": "divlet",
+          "content": "@divlet/core",
           "metadata": {}
         },
         "text-188": {
           "id": "text-188",
           "type": "text",
-          "content": ", provides the board, CLI and MCP server. Requires Node.js 22.19 or later.\n      Version 0.0.1 is an early release; the native project format remains a pre-freeze draft.",
+          "content": ", supplies the runtime and plugins, with browser assets in @divlet/web and CLI/MCP/Pi adapters. Requires Node.js 22.19 or later.\n      Version 0.0.1 is an early release; the native project format remains a pre-freeze draft.",
           "metadata": {}
         },
         "text-189": {

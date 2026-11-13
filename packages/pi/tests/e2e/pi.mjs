@@ -23,13 +23,13 @@ let extension = path.join(ROOT, 'packages/pi/index.js'), installed;
 if (consumer) {
   console.error('[installed Pi] verify consumer exports');
   const resolve = createRequire(path.join(consumer, 'package.json')).resolve;
-  for (const name of ['divlet/model', 'divlet/project', '@divlet/pi']) {
+  for (const name of ['@divlet/core/model', '@divlet/core/project', '@divlet/pi']) {
     const file = await realpath(resolve(name));
     assert.ok(file.startsWith(path.resolve(consumer) + path.sep + 'node_modules' + path.sep) && file.includes(path.sep + 'dist' + path.sep), 'installed Pi must use compiled consumer exports: ' + file);
   }
-  await assert.rejects(lstat(path.join(consumer, 'node_modules/divlet/core')), { code: 'ENOENT' });
+  await assert.rejects(lstat(path.join(consumer, 'node_modules/@divlet/core/core')), { code: 'ENOENT' });
   extension = resolve('@divlet/pi');
-  installed = { model: await import(pathToFileURL(resolve('divlet/model'))), project: await import(pathToFileURL(resolve('divlet/project'))) };
+  installed = { model: await import(pathToFileURL(resolve('@divlet/core/model'))), project: await import(pathToFileURL(resolve('@divlet/core/project'))) };
 }
 const SP = await mkdtemp(path.join(os.tmpdir(), 'divlet-e2e-'));
 await mkdir(path.join(SP, 'agent'));

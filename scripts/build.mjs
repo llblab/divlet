@@ -1,5 +1,5 @@
-// Build the publishable package: compiled JavaScript and declarations in `dist/`, plus the non-code assets that compiled modules
-// reach by a relative path (`web`, the skill, plugin client modules), copied so those paths keep meaning the same thing.
+// Build the five publishable packages. Core owns compiled runtime/plugins/skill; web owns client files and portable host ports.
+// No client or adapter implementation is copied into the core tarball.
 // Development and tests run the TypeScript sources directly; only what npm publishes goes through here.
 import { execFileSync } from 'node:child_process';
 import { chmod, cp, readFile, readdir, rm } from 'node:fs/promises';
@@ -14,7 +14,7 @@ await rm(dist, { recursive: true, force: true });
 execFileSync(tsc, ['-p', path.join(root, 'tsconfig.build.json')], { cwd: root, stdio: 'inherit' });
 
 // Assets the compiled code resolves relative to itself.
-for (const asset of ['web', 'skills']) await cp(path.join(root, asset), path.join(dist, asset), {
+for (const asset of ['skills']) await cp(path.join(root, asset), path.join(dist, asset), {
   recursive: true,
   filter: source => !path.relative(path.join(root, asset), source).split(path.sep).includes('tests'),
 });
@@ -22,12 +22,23 @@ for (const plugin of await readdir(path.join(root, 'plugins'), { withFileTypes: 
   if (!plugin.isDirectory()) continue;
   await cp(path.join(root, 'plugins', plugin.name, 'web'), path.join(dist, 'plugins', plugin.name, 'web'), { recursive: true }).catch(() => {});
 }
-// Each adapter owns its published output; none of its implementation ships in the product tarball.
+// Web owns a small DOM-only port build; core never emits or ships its peer's implementation.
 const product = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
+const web = path.join(root, 'web');
+const webPackage = JSON.parse(await readFile(path.join(web, 'package.json'), 'utf8'));
+if (webPackage.version !== product.version || product.dependencies?.['@divlet/web'] !== product.version) throw new Error('Core must pin the exact matching @divlet/web version.');
+await rm(path.join(web, 'dist'), { recursive: true, force: true });
+execFileSync(tsc, ['-p', path.join(web, 'tsconfig.build.json')], { cwd: root, stdio: 'inherit' });
+for (const asset of ['board.js', 'board.css', 'index.html', 'lib']) await cp(path.join(web, asset), path.join(web, 'dist', asset), {
+  recursive: true,
+  filter: source => !source.endsWith('.ts'),
+});
+await cp(path.join(root, 'LICENSE'), path.join(web, 'dist/LICENSE'));
+// Each adapter owns its published output; none of its implementation ships in the core tarball.
 for (const name of ['cli', 'mcp', 'pi']) {
   const directory = path.join(root, 'packages', name);
   const pkg = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'));
-  if (pkg.version !== product.version || pkg.dependencies?.divlet !== product.version) throw new Error(`${pkg.name} must share the product version and pin divlet exactly.`);
+  if (pkg.version !== product.version || pkg.dependencies?.['@divlet/core'] !== product.version) throw new Error(`${pkg.name} must share the product version and pin @divlet/core exactly.`);
   await rm(path.join(directory, 'dist'), { recursive: true, force: true });
   await cp(path.join(dist, 'packages', name), path.join(directory, 'dist'), { recursive: true });
   await cp(path.join(root, 'LICENSE'), path.join(directory, 'dist/LICENSE'));

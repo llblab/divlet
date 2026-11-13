@@ -1,0 +1,39 @@
+{
+  "name": "@divlet/web",
+  "version": "0.0.1",
+  "description": "The divlet browser board, static client assets and transport-free host ports",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/llblab/divlet.git",
+    "directory": "web"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "exports": {
+    ".": {
+      "divlet-source": "./index.ts",
+      "default": "./dist/index.js"
+    },
+    "./session": {
+      "divlet-source": "./lib/board-session.ts",
+      "default": "./dist/lib/board-session.js"
+    },
+    "./host": {
+      "divlet-source": "./lib/board-host.ts",
+      "default": "./dist/lib/board-host.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "prepack": "node ../scripts/build.mjs"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

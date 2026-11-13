@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import path from 'node:path';
-import { openRuntime, launch, makeHost } from 'divlet';
+import { openRuntime, launch, makeHost } from '@divlet/core';
 
 export async function runCli(argv = process.argv.slice(2)) {
   const args = argv;

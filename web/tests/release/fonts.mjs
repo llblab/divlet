@@ -17,15 +17,15 @@ import { cffWoff2Bytes } from '../../../core/tests/fixtures/font-woff2.js';
 const consumer = path.resolve(process.argv[2] || '');
 assert.ok(process.argv[2], 'Usage: node web/tests/release/fonts.mjs <isolated installed consumer>');
 const resolve = createRequire(path.join(consumer, 'package.json')).resolve;
-for (const name of ['divlet', 'divlet/codec', 'divlet/project', '@divlet/cli', '@divlet/mcp']) {
+for (const name of ['@divlet/core', '@divlet/core/codec', '@divlet/core/project', '@divlet/cli', '@divlet/mcp']) {
   const file = await realpath(resolve(name));
   assert.ok(file.startsWith(consumer + path.sep + 'node_modules' + path.sep) && file.includes(`${path.sep}dist${path.sep}`), `${name} must resolve to the isolated compiled installation: ${file}`);
 }
-assert.equal((await lstat(path.join(consumer, 'node_modules/divlet'))).isSymbolicLink(), false, 'the product is an installed tarball, not a checkout link');
-await assert.rejects(lstat(path.join(consumer, 'node_modules/divlet/core')), { code: 'ENOENT' }, 'no checkout source can rescue installed imports');
+assert.equal((await lstat(path.join(consumer, 'node_modules/@divlet/core'))).isSymbolicLink(), false, 'the product is an installed tarball, not a checkout link');
+await assert.rejects(lstat(path.join(consumer, 'node_modules/@divlet/core/core')), { code: 'ENOENT' }, 'no checkout source can rescue installed imports');
 await assert.rejects(lstat(path.join(consumer, 'node_modules/typebox')), { code: 'ENOENT' }, 'CLI/MCP fonts do not require Pi peers');
-const { decodeHtml } = await import(pathToFileURL(resolve('divlet/codec')));
-const { validateSettings, writeProject } = await import(pathToFileURL(resolve('divlet/project')));
+const { decodeHtml } = await import(pathToFileURL(resolve('@divlet/core/codec')));
+const { validateSettings, writeProject } = await import(pathToFileURL(resolve('@divlet/core/project')));
 const work = await mkdtemp(path.join(os.tmpdir(), 'divlet-installed-fonts-'));
 const original = path.join(work, 'original'), copy = path.join(work, 'copy');
 const file = path.join(original, 'project.divlet'), copyFile = path.join(copy, 'project.divlet');

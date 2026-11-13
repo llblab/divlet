@@ -1,6 +1,6 @@
 # @divlet/cli
 
-The command-line adapter for divlet. This package owns its implementation and depends on the exact matching `divlet` product version; the core does not contain another copy.
+The command-line adapter for divlet. This package owns its implementation and depends on the exact matching `@divlet/core` product version; the core does not contain another copy.
 
 Install:
 

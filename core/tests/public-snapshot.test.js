@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createPublicPageSnapshot } from '../lib/public-snapshot.ts';
 import { validateDocument } from '../lib/model.ts';
 import { encodeHtml, renderFile } from '../lib/codec.ts';
-import { createSnapshotReadSession } from '../lib/board-session.ts';
+import { createSnapshotReadSession } from '@divlet/web/session';
 
 const geometry = { x: 80, y: 100, width: 1280, height: 900 };
 function source() {

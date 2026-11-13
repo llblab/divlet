@@ -1,6 +1,6 @@
 # @divlet/mcp
 
-The MCP stdio adapter for divlet. This package owns its implementation and depends on the exact matching `divlet` product version; the core does not contain another copy.
+The MCP stdio adapter for divlet. This package owns its implementation and depends on the exact matching `@divlet/core` product version; the core does not contain another copy.
 
 Install:
 

@@ -7,6 +7,7 @@ import { runOnRuntime } from './contract.ts';
 import type { BoardRuntime } from './contract.ts';
 import type { HistoryNavigation } from './history.ts';
 import { fileURLToPath } from 'node:url';
+import { clientRoot } from '@divlet/web';
 import { previewBridge } from './bridge.js';
 import { clientPluginFile } from './engine.ts';
 import { FONT_LIMITS } from './font.ts';
@@ -64,7 +65,7 @@ export interface BoardServer {
   close(): Promise<void>;
 }
 
-const WEB_ROOT = fileURLToPath(new URL('../../web/', import.meta.url));
+const WEB_ROOT = fileURLToPath(clientRoot);
 
 /*
  * `siteBridge` is serialized with `Function#toString` and runs inside the site page, so it may not reference anything from this

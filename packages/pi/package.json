@@ -40,7 +40,7 @@
     "layout"
   ],
   "dependencies": {
-    "divlet": "0.0.1"
+    "@divlet/core": "0.0.1"
   },
   "files": [
     "dist",

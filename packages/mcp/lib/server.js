@@ -10,8 +10,8 @@
  * Pi session, another MCP client or the CLI attaches to the same board instead of opening a second writer; when it does not own
  * the board, tool calls are forwarded to the owner over that board's token-scoped HTTP API.
  */
-import { createSession, forAgent, inputSchema, openView, toolList, S, optional } from 'divlet/contract';
-import { makeHost, openRuntime } from 'divlet';
+import { createSession, forAgent, inputSchema, openView, toolList, S, optional } from '@divlet/core/contract';
+import { makeHost, openRuntime } from '@divlet/core';
 
 const PROTOCOL_VERSION = '2025-06-18';
 const SUPPORTED = new Set(['2024-11-05', '2025-03-26', '2025-06-18']);

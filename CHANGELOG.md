@@ -4,13 +4,13 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased — 0.0.1 candidate
 
-Prepared for first publication; npm name approval or an explicitly approved scoped-package revision and registry-install verification remain outstanding. A versioned archive is not a completed release.
+Preparing the approved five-package scoped candidate; publication and registry-install verification remain outstanding. A versioned archive is not a completed release.
 
 Initial release of divlet: a local HTML/SVG/CSS layout board for agents. The native project format remains an unfrozen schema-1 draft; this release does not activate the approved future ordered-CSS/renderer profile or promise frozen compatibility.
 
 ### Product and agent integration
 
-- **One product, three real adapters.** `divlet` supplies the library, board, bundled plugins and portable workflow skill. `@divlet/cli`, `@divlet/mcp` and `@divlet/pi` own their commands and implementations, with exact matching product dependencies. Node.js 22.19 or later is required; CLI and MCP do not require Pi.
+- **One product, three real adapters.** `@divlet/core` supplies the model/runtime/server, bundled plugins and portable workflow skill. The separate `@divlet/web` owns the only browser client and portable host ports, without a core/Node dependency; the HTTP composition uses its public asset locator. `@divlet/cli`, `@divlet/mcp` and `@divlet/pi` own their commands and implementations, with exact matching core dependencies; core pins web. All five release versions match. The unscoped `divlet` npm name was refused by registry policy; the product, command and tool identities stay divlet. Node.js 22.19 or later is required; CLI and MCP do not require Pi.
 - **Seven shared validated tools.** Pi and MCP use the same open/read/patch/structural-edit/frame/history/work-mark contract, revisions and refusal codes. Board requests carry the submitted selection snapshot and compact context rather than following later selection changes. MCP sampling and Pi model/thinking controls appear only when the host advertises them; session settings are not project content.
 - **One live writer per project.** Other clients attach to the owning board and share its revisions and history. Importing the library or an adapter starts no service. Installed packages use compiled exports; checkout development runs TypeScript sources without a build.
 

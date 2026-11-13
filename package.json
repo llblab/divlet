@@ -1,5 +1,5 @@
 {
-  "name": "divlet",
+  "name": "@divlet/core",
   "version": "0.0.1",
   "description": "A browser layout board for agents: one project file, live frames, reusable components; the same tools through Pi and MCP",
   "type": "module",
@@ -132,6 +132,7 @@
     "prepack": "npm run build"
   },
   "dependencies": {
+    "@divlet/web": "0.0.1",
     "@tailwindcss/node": "^4.1.0",
     "@xmldom/xmldom": "0.9.12",
     "lucide-static": "1.67.0",
@@ -152,6 +153,7 @@
   },
   "workspaces": [
     ".",
+    "web",
     "packages/*",
     "plugins/*"
   ]

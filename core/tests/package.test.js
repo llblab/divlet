@@ -53,12 +53,13 @@ test('the npm package includes public entrypoints and a complete documentation l
       }
     };
     for (const name of ['cli', 'mcp', 'pi']) await visit(path.join(root, 'packages', name, 'dist'), name);
+    await visit(path.join(root, 'web/dist'), 'web');
     return files;
   };
   const first = await snapshot();
   const repeated = spawnSync('npm', ['run', 'build'], { cwd: root, encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 });
   assert.ifError(repeated.error); assert.equal(repeated.status, 0, repeated.stderr);
-  assert.deepEqual(await snapshot(), first, 'successive builds preserve every adapter file name and byte');
+  assert.deepEqual(await snapshot(), first, 'successive builds preserve every adapter and web file name and byte');
   const result = spawnSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: root, encoding: 'utf8', timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr);
@@ -66,7 +67,7 @@ test('the npm package includes public entrypoints and a complete documentation l
   const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
   const lock = JSON.parse(await readFile(path.join(root, 'package-lock.json'), 'utf8'));
   const files = new Set(packed.files.map(file => file.path));
-  assert.equal(pkg.name, 'divlet');
+  assert.equal(pkg.name, '@divlet/core');
   assert.equal(pkg.bin, undefined, 'executables belong to the scoped adapter packages');
   assert.equal(pkg.pi, undefined);
   assert.ok(files.has('skills/divlet/SKILL.md'));
@@ -106,7 +107,13 @@ test('the npm package includes public entrypoints and a complete documentation l
     const declaration = target.default.replace(/\.js$/, '.d.ts').replace(/^\.\//, '');
     assert.ok(files.has(declaration), `Missing type declaration for export "${condition}": ${declaration}`);
   }
-  assert.equal([...files].some(file => /^(?:dist\/)?(?:adapters|packages)\//.test(file)), false, 'adapter implementations do not ship in the core tarball');
+  assert.equal([...files].some(file => /^(?:dist\/)?(?:adapters|packages|web)\//.test(file)), false, 'adapter and web implementations do not ship in the core tarball');
+  const webResult = spawnSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: path.join(root, 'web'), encoding: 'utf8', timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
+  assert.ifError(webResult.error); assert.equal(webResult.status, 0, webResult.stderr);
+  const [webPacked] = JSON.parse(webResult.stdout), webFiles = new Set(webPacked.files.map(file => file.path));
+  assert.equal(webPacked.name, '@divlet/web'); assert.equal(webPacked.version, pkg.version);
+  for (const file of ['dist/index.js', 'dist/index.d.ts', 'dist/lib/board-session.js', 'dist/lib/board-session.d.ts', 'dist/lib/board-host.d.ts', 'dist/board.js', 'dist/board.css', 'dist/index.html', 'dist/LICENSE']) assert.ok(webFiles.has(file), file);
+  for (const file of webFiles) assert.doesNotMatch(file, /(?:^|\/)(?:tests?|artifacts|core|node_modules)(?:\/|$)/, `Web development/private input must not ship: ${file}`);
   for (const file of files) {
     assert.doesNotMatch(file, /(?:^|\/)(?:node_modules|tests?|artifacts|coverage|\.git)(?:\/|$)/, `Development output must not ship: ${file}`);
     assert.doesNotMatch(file, /(?:^|\/)(?:\.divlet|\.trash|\.cache|\.divlet-upload-[^/]+)(?:\/|$)|(?:^|\/)(?:\.divlet-build\.json|\.divlet-write\.lock|\.divlet-save-[^/]+)$/, `Managed build state must not ship: ${file}`);

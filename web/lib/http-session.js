@@ -1,8 +1,8 @@
 // @ts-check
-/** @typedef {import('../../core/lib/board-session.ts').BoardReadSession} BoardReadSession */
-/** @typedef {import('../../core/lib/board-session.ts').BoardReadEvent} BoardReadEvent */
-/** @typedef {import('../../core/lib/board-session.ts').BoardSelectionPublisher} BoardSelectionPublisher */
-/** @typedef {import('../../core/lib/board-session.ts').BoardObservationPublisher} BoardObservationPublisher */
+/** @typedef {import('@divlet/web/session').BoardReadSession} BoardReadSession */
+/** @typedef {import('@divlet/web/session').BoardReadEvent} BoardReadEvent */
+/** @typedef {import('@divlet/web/session').BoardSelectionPublisher} BoardSelectionPublisher */
+/** @typedef {import('@divlet/web/session').BoardObservationPublisher} BoardObservationPublisher */
 /** @typedef {{ addEventListener: (name: string, listener: (event: unknown) => void) => void, close: () => void }} ReadStream */
 
 /** Native ephemeral-selection adapter; absence of this capability means browser-local selection.

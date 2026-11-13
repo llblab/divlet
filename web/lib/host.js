@@ -6,11 +6,11 @@ import { createHttpHistoryService, createHttpSourceUpdates } from './http-servic
 export const base = new URL('./', location.href);
 export const { apiUrl, request, post } = createJsonTransport(base);
 export const readSession = createHttpReadSession({ request, events: () => new EventSource(apiUrl('events')) });
-/** @type {import('../../core/lib/board-session.ts').BoardSelectionPublisher | undefined} */
+/** @type {import('@divlet/web/session').BoardSelectionPublisher | undefined} */
 export const shareSelection = createHttpSelectionPublisher(post);
-/** @type {import('../../core/lib/board-session.ts').BoardObservationPublisher | undefined} */
+/** @type {import('@divlet/web/session').BoardObservationPublisher | undefined} */
 export const publishObservations = createHttpObservationPublisher(post);
-/** @type {import('../../core/lib/board-host.ts').BoardHistoryService | undefined} */
+/** @type {import('@divlet/web/host').BoardHistoryService | undefined} */
 export const historyService = createHttpHistoryService({ request, post });
-/** @type {import('../../core/lib/board-host.ts').BoardSourceUpdates | undefined} */
+/** @type {import('@divlet/web/host').BoardSourceUpdates | undefined} */
 export const sourceUpdates = createHttpSourceUpdates({ request, post });

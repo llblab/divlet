@@ -16,7 +16,7 @@ const walk = async directory => {
   const files = [];
   for (const entry of entries) {
     const full = path.join(directory, entry.name);
-    if (entry.isDirectory()) { if (entry.name !== 'tests') files.push(...await walk(full)); }
+    if (entry.isDirectory()) { if (entry.name !== 'tests' && entry.name !== 'dist' && entry.name !== 'node_modules') files.push(...await walk(full)); }
     else files.push(full);
   }
   return files;
@@ -79,6 +79,21 @@ test('every browser module imports a file that exists, and never TypeScript', as
     }
   }
   assert.deepEqual(broken, [], 'a module the board serves must resolve');
+});
+
+test('web runtime and type imports never reach core internals or Node', async () => {
+  const files = (await walk(WEB)).filter(file => /\.(?:js|ts)$/.test(file));
+  for (const file of files) {
+    const source = await readFile(file, 'utf8');
+    for (const match of source.matchAll(/\b(?:from\s*|import\s*\()\s*['"]([^'"]+)/g)) {
+      assert.doesNotMatch(match[1], /^(?:@divlet\/core(?:\/|$)|node:)|(?:^|\/)core\//, `${path.relative(root, file)} must not depend back on core, even through JSDoc`);
+    }
+  }
+  for (const file of await readdir(path.join(root, 'core/lib'))) {
+    if (!/\.(?:js|ts)$/.test(file) || file === 'server.ts') continue;
+    const source = await readFile(path.join(root, 'core/lib', file), 'utf8');
+    assert.doesNotMatch(source, /from\s*['"]@divlet\/web/, `only the HTTP composition may resolve the web package: ${file}`);
+  }
 });
 
 test('browser module dependencies are acyclic, including literal lazy imports', async () => {

@@ -3,7 +3,7 @@ import { build } from 'esbuild';
 
 export async function bundleBrowserModel(resolveDir, { source = false } = {}) {
   const result = await build({
-    stdin: { contents: "export * from 'divlet/model';", resolveDir, sourcefile: 'divlet-browser-entry.js' },
+    stdin: { contents: "export * from '@divlet/core/model';", resolveDir, sourcefile: 'divlet-browser-entry.js' },
     conditions: source ? ['divlet-source'] : [],
     bundle: true, write: false, platform: 'browser', format: 'esm', target: 'es2022', metafile: true,
     define: { 'process.env.NODE_ENV': '"production"' },

@@ -60,7 +60,7 @@ A board is the **single writer** of its project. A second client attaches to the
 
 ## npm installation
 
-The product library is `divlet`. The [CLI adapter](https://github.com/llblab/divlet/blob/main/packages/cli/README.md), [MCP adapter](https://github.com/llblab/divlet/blob/main/packages/mcp/README.md) and [Pi adapter](https://github.com/llblab/divlet/blob/main/packages/pi/README.md) are published as `@divlet/cli`, `@divlet/mcp` and `@divlet/pi`. They own their implementations, not wrappers, and depend on the exact matching `divlet` version.
+The product library is `@divlet/core`; the dependency-free browser assets and portable host ports belong to `@divlet/web`. The [CLI adapter](https://github.com/llblab/divlet/blob/main/packages/cli/README.md), [MCP adapter](https://github.com/llblab/divlet/blob/main/packages/mcp/README.md) and [Pi adapter](https://github.com/llblab/divlet/blob/main/packages/pi/README.md) are published as `@divlet/cli`, `@divlet/mcp` and `@divlet/pi`. They own their implementations, not wrappers, and depend on the exact matching `@divlet/core` version, which pins `@divlet/web`.
 
 ```bash
 npx -y @divlet/cli ./my-project
@@ -116,9 +116,9 @@ If the version has changed, the tool returns `REVISION_CONFLICT`: read the frame
 ## From JavaScript
 
 ```js
-import { readProject, expandFrame } from "divlet/project";
-import { encodeHtml, exportHtml } from "divlet/codec";
-import { validateDocument } from "divlet/model";
+import { readProject, expandFrame } from "@divlet/core/project";
+import { encodeHtml, exportHtml } from "@divlet/core/codec";
+import { validateDocument } from "@divlet/core/model";
 ```
 
 `readProject` validates the whole project, including component references. `expandFrame` expands instances into ordinary nodes. `exportHtml` produces clean HTML for a page or node. The runtime compiles Tailwind automatically.

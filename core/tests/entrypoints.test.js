@@ -1,4 +1,4 @@
-// Package boundaries are installation boundaries: one product and three adapters, with no copied wrapper layer.
+// Package boundaries are installation boundaries: core → web, adapters → core; no copied clients or wrappers.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
@@ -10,8 +10,8 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 const exists = async file => { try { return (await stat(file)).isFile(); } catch { return false; } };
 
-test('divlet is the shared product library, not a host or command package', async () => {
-  assert.equal(pkg.name, 'divlet');
+test('@divlet/core is the shared product library, not a host or command package', async () => {
+  assert.equal(pkg.name, '@divlet/core');
   assert.equal(pkg.exports['.'].default, './dist/core/index.js');
   assert.equal(pkg.exports['./runtime'].default, './dist/core/lib/runtime.js');
   assert.equal(pkg.bin, undefined);
@@ -23,6 +23,21 @@ test('divlet is the shared product library, not a host or command package', asyn
   assert.equal(await exists(path.join(root, 'adapters')), false, 'there is one package owner per adapter');
   assert.equal(pkg.files.includes('packages'), false);
   assert.ok(pkg.workspaces.includes('.'), 'source adapters can resolve the product workspace without a registry release');
+});
+
+test('@divlet/web owns client files and portable ports with no reverse package dependency', async () => {
+  const web = JSON.parse(await readFile(path.join(root, 'web/package.json'), 'utf8'));
+  assert.equal(web.name, '@divlet/web'); assert.equal(web.version, pkg.version);
+  assert.equal(pkg.dependencies['@divlet/web'], pkg.version);
+  assert.ok(pkg.workspaces.includes('web'));
+  for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) assert.equal(Object.keys(web[field] ?? {}).length, 0, `web has no ${field} back edge`);
+  assert.deepEqual(web.exports['./session'], { 'divlet-source': './lib/board-session.ts', default: './dist/lib/board-session.js' });
+  assert.deepEqual(web.exports['./host'], { 'divlet-source': './lib/board-host.ts', default: './dist/lib/board-host.js' });
+  const { clientRoot } = await import('@divlet/web');
+  assert.equal(clientRoot.href, new URL('../../web/', import.meta.url).href);
+  const server = await readFile(path.join(root, 'core/lib/server.ts'), 'utf8');
+  assert.match(server, /from '@divlet\/web'/);
+  assert.doesNotMatch(server, /new URL\('\.\.\/\.\.\/web\//, 'the server uses a public locator, not a sibling path');
 });
 
 test('browser mapping replaces only the model style port and names real source bindings', async () => {
@@ -39,7 +54,8 @@ for (const name of ['cli', 'mcp', 'pi']) test(`@divlet/${name} owns its adapter,
   assert.equal(adapter.name, `@divlet/${name}`);
   assert.notEqual(adapter.private, true);
   assert.equal(adapter.version, pkg.version);
-  assert.equal(adapter.dependencies.divlet, pkg.version);
+  assert.equal(adapter.dependencies['@divlet/core'], pkg.version);
+  assert.equal(adapter.dependencies['@divlet/web'], undefined, 'the core HTTP composition owns the web dependency');
   assert.equal(adapter.repository.directory, `packages/${name}`);
   assert.deepEqual(adapter.exports['.'], { 'divlet-source': './index.js', default: './dist/index.js' });
   assert.equal(adapter.files.includes('dist'), true);

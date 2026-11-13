@@ -13,7 +13,15 @@ import { bundleBrowserModel } from '../../../scripts/browser-model.mjs';
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const work = await mkdtemp(path.join(os.tmpdir(), 'divlet-release-'));
 try {
+  const webPacked = JSON.parse(execFileSync('npm', ['pack', '--json', '--pack-destination', work], { cwd: path.join(root, 'web'), encoding: 'utf8' }))[0];
   const packed = JSON.parse(execFileSync('npm', ['pack', '--json', '--pack-destination', work], { cwd: root, encoding: 'utf8' }))[0];
+  assert.equal(packed.name, '@divlet/core');
+  assert.equal(webPacked.name, '@divlet/web');
+  assert.equal(webPacked.version, packed.version);
+  assert.ok(webPacked.files.some(file => file.path === 'dist/board.js'));
+  assert.ok(webPacked.files.some(file => file.path === 'dist/lib/board-session.d.ts'));
+  assert.equal(webPacked.files.some(file => /(?:^|\/)(?:tests|core|node_modules)(?:\/|$)/.test(file.path)), false);
+  assert.equal(packed.files.some(file => file.path.startsWith('dist/web/')), false, 'core never bundles a second web client');
   assert.ok(packed.entryCount > 50 && packed.entryCount < 400, `a plausible number of files (${packed.entryCount})`);
   const leaked = packed.files.map(file => file.path).filter(file => /(^|\/)(tests?|artifacts|node_modules|\.divlet)(\/|$)|\.test\./.test(file));
   assert.deepEqual(leaked, [], 'no tests, artifacts or caches in the package');
@@ -22,7 +30,7 @@ try {
   await mkdir(path.join(target, 'proj'), { recursive: true });
   await mkdir(path.join(target, 'landing-example'));
   await writeFile(path.join(target, 'package.json'), '{"name":"try","private":true,"type":"module"}');
-  execFileSync('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline', path.join(work, packed.filename)], { cwd: target, stdio: 'pipe' });
+  execFileSync('npm', ['install', '--no-audit', '--no-fund', '--prefer-offline', path.join(work, webPacked.filename), path.join(work, packed.filename)], { cwd: target, stdio: 'pipe' });
 
   // A real consumer selects the compiled browser binding without checkout sources or a provider bootstrap.
   const browserBundle = await bundleBrowserModel(target);
@@ -49,7 +57,7 @@ try {
   const help = execFileSync(process.execPath, [path.join(target, 'node_modules', '.bin', 'divlet'), '--help'], { encoding: 'utf8' });
   assert.match(help, /divlet \[path\]/, 'the CLI answers --help');
   assert.equal(execFileSync(process.execPath, [path.join(target, 'node_modules/.bin/divlet-mcp'), '--version'], { encoding: 'utf8' }).trim(), packed.version);
-  assert.equal(await readFile(path.join(target, 'node_modules/divlet/package.json'), 'utf8').then(text => JSON.parse(text).pi), undefined);
+  assert.equal(await readFile(path.join(target, 'node_modules/@divlet/core/package.json'), 'utf8').then(text => JSON.parse(text).pi), undefined);
   await assert.rejects(readFile(path.join(target, 'node_modules/typebox/package.json')), { code: 'ENOENT' }, 'CLI/MCP do not install Pi peers');
   const fontEntry = path.join(root, 'web/tests/release/fonts.mjs');
   const fontOptions = { cwd: target, env: { ...process.env, NODE_OPTIONS: '' }, encoding: 'utf8', timeout: 90000, maxBuffer: 4 * 1024 * 1024 };
@@ -93,9 +101,12 @@ try {
   await writeFile(path.join(target, 'smoke.mjs'), `
     import path from 'node:path';
     import assert from 'node:assert/strict';
-    import { openRuntime } from 'divlet';
+    import { openRuntime } from '@divlet/core';
+    import { clientRoot, createSnapshotReadSession } from '@divlet/web';
+    assert.equal(clientRoot.href, new URL('./node_modules/@divlet/web/dist/', import.meta.url).href);
+    assert.equal(await createSnapshotReadSession({ state: 1, frames: new Map() }).readState(), 1);
     import { readFile, copyFile } from 'node:fs/promises';
-    import { compileClasses, resolveStyleEngine, setStyleEngines } from 'divlet/engine';
+    import { compileClasses, resolveStyleEngine, setStyleEngines } from '@divlet/core/engine';
     import { pathToFileURL } from 'node:url';
     const runtime = await openRuntime({ file: path.resolve('proj/project.divlet'), watch: false, createDemo: true });
     const info = runtime.info();
@@ -105,7 +116,7 @@ try {
     const served = async file => (await fetch(new URL(file, info.url))).status;
     const board = { frames: info.documents.length, index: await served('./'), board: await served('board.js'), lib: await served('lib/store.js'), panel: await served('plugins/tailwind/panel.js') };
     await runtime.close();
-    await copyFile('node_modules/divlet/examples/landing/landing.divlet', 'landing-example/landing.divlet');
+    await copyFile('node_modules/@divlet/core/examples/landing/landing.divlet', 'landing-example/landing.divlet');
     const landing = await openRuntime({ file: path.resolve('landing-example/landing.divlet'), watch: false, createDemo: false });
     try {
       assert.deepEqual(landing.info().diagnostics, []);
@@ -114,7 +125,7 @@ try {
       assert.equal(landing.staticSources.size, 0, 'the installed example needs no omitted asset file');
     } finally { await landing.close(); }
     // Internal packaging probe: the versioned descriptor is not yet a default or a new public subpath.
-    const { createRenderer } = await import(pathToFileURL(path.resolve('node_modules/divlet/dist/plugins/tailwind/index.js')).href);
+    const { createRenderer } = await import(pathToFileURL(path.resolve('node_modules/@divlet/core/dist/plugins/tailwind/index.js')).href);
     const renderer = createRenderer();
     setStyleEngines([renderer]);
     const requirement = { id: renderer.id, version: renderer.version };
@@ -122,7 +133,7 @@ try {
     console.log(JSON.stringify({ ...board, renderer: renderer.version }));
     process.exit(0);
   `);
-  const runtimeTypes = await readFile(path.join(target, 'node_modules/divlet/dist/core/lib/runtime.d.ts'), 'utf8');
+  const runtimeTypes = await readFile(path.join(target, 'node_modules/@divlet/core/dist/core/lib/runtime.d.ts'), 'utf8');
   assert.match(runtimeTypes, /reuseImage\(input\?:\s*\{\s*\}\):\s*any;/, 'the previously emitted compatibility signature remains');
   assert.match(runtimeTypes, /@deprecated Image reuse was retired/, 'the unsupported method is not advertised as a working feature');
   const result = JSON.parse(execFileSync(process.execPath, ['smoke.mjs'], { cwd: target, encoding: 'utf8' }).trim().split('\n').pop());
@@ -164,9 +175,11 @@ try {
   `);
   // The contracts are types a plugin author compiles against: they resolve from the installed package and need no Node types.
   await writeFile(path.join(target, 'plugin.ts'), `
-    import type { Importer } from 'divlet/plugins';
-    import type { StyleEngine } from 'divlet/engine';
-    import { S, optional } from 'divlet/contract';
+    import type { BoardReadSession } from '@divlet/web/session';
+    import type { BoardHistoryService } from '@divlet/web/host';
+    import type { Importer } from '@divlet/core/plugins';
+    import type { StyleEngine } from '@divlet/core/engine';
+    import { S, optional } from '@divlet/core/contract';
     const demo: Importer = { id: 'demo', label: 'Demo', extensions: ['.demo'], claims: async () => false, convert: () => ({ text: '{}' }) };
     const plain: StyleEngine = { id: 'plain' };
     const parameter = optional(S.string({ description: 'x', maxLength: 4 }));
@@ -188,7 +201,7 @@ try {
     import { fileURLToPath } from 'node:url';
     import path from 'node:path';
     assert.equal(typeof adapter, 'function');
-    const skill = fileURLToPath(import.meta.resolve('divlet/skill'));
+    const skill = fileURLToPath(import.meta.resolve('@divlet/core/skill'));
     assert.ok(existsSync(skill));
     const registered = [], handlers = new Map();
     adapter({ registerCommand() {}, registerTool(tool) { registered.push(tool.name); }, on(name, handler) { handlers.set(name, handler); }, getThinkingLevel() { return 'off'; } });
@@ -202,5 +215,5 @@ try {
     installedPi = JSON.parse(execFileSync(process.execPath, [path.join(root, 'packages/pi/tests/e2e/pi.mjs')], { cwd: target, env: { ...process.env, NODE_OPTIONS: '', PI_DIVLET_INSTALLED_ROOT: target }, encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 }).trim());
     assert.equal(installedPi.status, 'passed'); assert.equal(installedPi.installed, true); assert.equal(installedPi.installedFonts.status, 'passed', 'required installed Pi mode cannot silently skip the real host/browser case');
   }
-  console.log(JSON.stringify({ status: 'passed', files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, pluginTypes: true, browserModelBundle: true, installedFonts, ...(installedPi ? { installedPi } : {}), mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
+  console.log(JSON.stringify({ status: 'passed', files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, pluginTypes: true, browserModelBundle: true, webPackage: webPacked.name, installedFonts, ...(installedPi ? { installedPi } : {}), mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
 } finally { await rm(work, { recursive: true, force: true }); }

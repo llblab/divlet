@@ -8,7 +8,7 @@
  * termination signal arrives, closing only the boards it owns (a board another client owns keeps running for that client).
  */
 import path from 'node:path';
-import { createSession } from 'divlet/contract';
+import { createSession } from '@divlet/core/contract';
 import { createMcpServer, localBoardOpener, wireBoardAgent } from './lib/server.js';
 import metadata from '#package' with { type: 'json' };
 

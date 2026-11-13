@@ -26,8 +26,8 @@ const files = new Map([
   [`${prefix}cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/validation.js', import.meta.url), 'utf8')]],
   [`${prefix}model.js`, ['text/javascript', bundle.code]],
   [`${prefix}frames.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/frame-portability.js', import.meta.url), 'utf8')]],
-  [`${prefix}read-session.js`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/board-session.ts', import.meta.url), 'utf8'))]],
-  [`${prefix}session-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/board-session.js', import.meta.url), 'utf8')]],
+  [`${prefix}read-session.js`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../lib/board-session.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}session-cases.js`, ['text/javascript', await readFile(new URL('./fixtures/board-session.js', import.meta.url), 'utf8')]],
   [`${prefix}public-snapshot.json`, ['application/json', JSON.stringify({ state: publicSnapshot.state, frames: [...publicSnapshot.frames] })]],
 ]);
 const [storeSource, utilSource, selectionHost, selectionCases] = await Promise.all([

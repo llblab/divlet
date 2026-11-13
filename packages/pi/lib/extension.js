@@ -8,11 +8,11 @@
 import path from 'node:path';
 import { Type } from 'typebox';
 import { fileURLToPath } from 'node:url';
-import { compactComponents, compactProject, createSession, forAgent, openView, toTypeBox, toolList } from 'divlet/contract';
-import { makeHost, openRuntime } from 'divlet';
+import { compactComponents, compactProject, createSession, forAgent, openView, toTypeBox, toolList } from '@divlet/core/contract';
+import { makeHost, openRuntime } from '@divlet/core';
 
 // The skill belongs to the product, not to this adapter: it lives at the package root so any host can load it.
-const SKILL_DIR = path.dirname(fileURLToPath(import.meta.resolve('divlet/skill')));
+const SKILL_DIR = path.dirname(fileURLToPath(import.meta.resolve('@divlet/core/skill')));
 const DIVLET_TOOLS = new Set(toolList().map((tool) => tool.name));
 const TOOL_ACTIVITY = { read_divlet: 'reading', patch_divlet: 'editing', edit_divlet: 'editing', undo_divlet: 'undoing', open_divlet: 'opening the board', mark_divlet: 'planning', frame_divlet: 'editing' };
 

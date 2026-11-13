@@ -1,9 +1,9 @@
 import { createSnapshotReadSession } from '../lib/board-session.ts';
 import type { BoardReadEvent, BoardReadSession, BoardSelection, BoardSelectionPublisher, BoardObservationPublisher } from '../lib/board-session.ts';
-import { createHttpReadSession, createHttpSelectionPublisher, createHttpObservationPublisher } from '../../web/lib/http-session.js';
+import { createHttpReadSession, createHttpSelectionPublisher, createHttpObservationPublisher } from '../lib/http-session.js';
 import type { BoardHistoryService, BoardSourceUpdates } from '../lib/board-host.ts';
-import { createHttpHistoryService, createHttpSourceUpdates } from '../../web/lib/http-services.js';
-import { createJsonTransport } from '../../web/lib/http.js';
+import { createHttpHistoryService, createHttpSourceUpdates } from '../lib/http-services.js';
+import { createJsonTransport } from '../lib/http.js';
 
 const transport = createJsonTransport(new URL('http://127.0.0.1/token/'));
 const native: BoardReadSession = createHttpReadSession({ request: transport.request, events: () => ({ addEventListener() {}, close() {} }) });
