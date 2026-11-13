@@ -22,3 +22,33 @@ export function createHttpSourceUpdates({ request, post }) {
   };
   return Object.freeze(service);
 }
+
+/** @param {Post} post @returns {import('@divlet/web/host').BoardWriter} */
+export function createHttpWriter(post) {
+  /** @type {import('@divlet/web/host').BoardWriter} */
+  const writer = {
+    patch: body => post('api/patch', body),
+    edit: body => post('api/edit', body),
+    undo: body => post('api/undo', body),
+    redo: body => post('api/redo', body),
+    createArtboard: body => post('api/artboards', body),
+    deleteArtboard: body => post('api/artboards/delete', body),
+  };
+  return Object.freeze(writer);
+}
+
+/**
+ * @param {{ apiUrl: (path: string) => string, request: (path: string, options?: RequestInit) => Promise<unknown> }} transport
+ * @returns {import('@divlet/web/host').BoardPreviews}
+ */
+export function createHttpPreviews({ apiUrl, request }) {
+  /** @type {import('@divlet/web/host').BoardPreviews} */
+  const previews = {
+    frameUrl: (id, { revision, bridge }) => apiUrl(`preview/${encodeURIComponent(id)}?${revision ? `revision=${revision}&` : ''}bridge=${bridge}`),
+    readRender: (id, { signal } = {}) => request(`api/render/${encodeURIComponent(id)}`, signal ? { signal } : {}),
+  };
+  return Object.freeze(previews);
+}
+
+/** @param {Request} request @returns {import('@divlet/web/host').BoardComponents} */
+export const createHttpComponents = request => Object.freeze({ list: () => request('api/components') });

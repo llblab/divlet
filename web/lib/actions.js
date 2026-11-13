@@ -4,6 +4,7 @@ import * as canvas from './canvas.js';
 import { openMenu } from './menu.js';
 import * as clip from './clip.js';
 import { newArtboard, duplicateArtboards, deleteArtboards } from './artboards.js';
+import { components as componentSource } from './host.js';
 export { newArtboard, duplicateArtboards, deleteArtboards };
 
 /* Command facade for the toolbar, keyboard, context menus, inspector and layers.
@@ -338,7 +339,7 @@ export async function selectSibling(step) {
 export async function insertMenu(documentId, position) {
   if (!documentId) { toast('Select an artboard first'); return; }
   let components = [];
-  try { components = (await request('api/components')).components; } catch {}
+  try { if (componentSource) components = (await componentSource.list()).components; } catch {}
   openMenu([
     { heading: store.node?.documentId === documentId ? 'Add after or inside the selection' : `Add to “${nameOf(documentId)}”` },
     ...insertionPresets().map(item => (item === '-' ? '-' : { label: item[2], icon: item[1], run: () => insertElement(documentId, item[0], item[2]) })),

@@ -149,7 +149,7 @@ try {
   local.on('pageerror', error => localErrors.push(error.message));
   local.on('request', request => { if (request.url().endsWith('/api/observations')) observationPosts++; });
   const hostSource = await readFile(new URL('../lib/host.js', import.meta.url), 'utf8');
-  const nativePublisher = 'export const publishObservations = createHttpObservationPublisher(post);';
+  const nativePublisher = 'export const publishObservations = composed ? composed.publishObservations : createHttpObservationPublisher(post);';
   assert.equal(hostSource.split(nativePublisher).length, 2, 'one fixed native publisher binding is replaced before module execution');
   await local.route('**/lib/host.js', route => route.fulfill({ contentType: 'text/javascript', body: hostSource.replace(nativePublisher, 'export const publishObservations = undefined;') }));
   await local.goto(runtime.info().url);

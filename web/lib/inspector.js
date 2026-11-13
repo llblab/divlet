@@ -5,6 +5,7 @@ import * as actions from './actions.js';
 import { openMenu, menuAnchor, closeMenu } from './menu.js';
 import { overflowBar } from './toolbar.js';
 import { panelSections } from './panels.js';
+import { components as componentSource } from './host.js';
 import { fontFamilyControl } from './typography.js';
 import { attributesEditor } from './attrs.js';
 import { formatCss, highlightCss } from './css.js';
@@ -491,9 +492,9 @@ function imageEditor(doc, node) {
 let componentsCache = { revision: -1, list: [], loading: false };
 function componentList() {
   const revision = store.state?.revision ?? 0;
-  if (componentsCache.revision !== revision && !componentsCache.loading) {
+  if (componentSource && componentsCache.revision !== revision && !componentsCache.loading) {
     componentsCache.loading = true;
-    request('api/components').then(result => { componentsCache = { revision, list: result.components, loading: false }; schedule(); }).catch(() => { componentsCache.loading = false; });
+    componentSource.list().then(result => { componentsCache = { revision, list: result.components, loading: false }; schedule(); }).catch(() => { componentsCache.loading = false; });
   }
   return componentsCache.list;
 }

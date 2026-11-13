@@ -1,5 +1,5 @@
 import { $, $$, el, icon, clamp, round } from './util.js';
-import { publishObservations } from './host.js';
+import { publishObservations, previews } from './host.js';
 import { store, emit, on, documents, descriptor, request, post, apiUrl, commit, edit, idle, undo, newGroup, selectArtboards, selectNodes, toast, viewState, saveViewState } from './store.js';
 
 const PREFETCH_TARGET = 8;
@@ -514,7 +514,7 @@ function mount(entry, { revision = false } = {}) {
   frame.referrerPolicy = 'no-referrer';
   // The browser owns when an off-screen page loads; frames are never torn down and rebuilt by scrolling or zooming.
   frame.loading = needsEagerLoad(entry) ? 'eager' : 'lazy';
-  frame.src = apiUrl(`preview/${encodeURIComponent(entry.doc.id)}?${revision ? `revision=${entry.doc.render}&` : ''}bridge=${entry.bridgeToken}`);
+  frame.src = previews.frameUrl(entry.doc.id, { revision: revision ? entry.doc.render : undefined, bridge: entry.bridgeToken });
   frame.addEventListener('load', () => {
     if (entry.iframe !== frame) return;
     entry.loaded = true;
@@ -555,6 +555,7 @@ function unmount(entry) {
   entry.abort?.abort();
   entry.abort = null;
   entry.port?.close();
+  previews.release?.(entry.doc.id, entry.iframe.src);
   entry.iframe.remove();
   Object.assign(entry, { iframe: null, port: null, bridgeToken: null, loaded: false, renderedVersion: 0, awaitingVersion: 0, pendingFetch: false, latestReport: null });
   clearTimeout(entry.reportTimer);
@@ -574,7 +575,7 @@ async function updateFrame(entry) {
   entry.abort = new AbortController();
   setFrameStatus(entry, 'updating');
   try {
-    const rendered = await request(`api/render/${encodeURIComponent(entry.doc.id)}`, { signal: entry.abort.signal });
+    const rendered = await previews.readRender(entry.doc.id, { signal: entry.abort.signal });
     if (entry.iframe !== frame || generation !== entry.deliveryGeneration || store.expanded?.entry === entry || rendered.documentId !== entry.doc.id || rendered.render < entry.renderedVersion) return;
     entry.awaitingVersion = rendered.render;
     entry.port?.postMessage({ type: 'divlet:update', documentId: entry.doc.id, version: rendered.render, html: rendered.html });

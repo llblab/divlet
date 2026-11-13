@@ -1,5 +1,5 @@
 import { clamp } from './util.js';
-import { post, readSession, shareSelection } from './host.js';
+import { readSession, shareSelection, writer } from './host.js';
 export { base, apiUrl, request, post } from './host.js';
 
 const listeners = new Map();
@@ -117,10 +117,10 @@ function enqueue(documentId, task) {
   return result;
 }
 
-async function send(route, documentId, build, { version = Math.max(known.get(documentId) || 0, descriptor(documentId)?.version || 0), retry = true } = {}) {
+async function send(write, documentId, build, { version = Math.max(known.get(documentId) || 0, descriptor(documentId)?.version || 0), retry = true } = {}) {
   for (let attempt = 0; ; attempt++) {
     try {
-      const result = await post(route, build(version));
+      const result = await write(build(version));
       known.set(documentId, result.version);
       return result;
     } catch (error) {
@@ -136,32 +136,32 @@ export function commit(documentId, patch, { label, group, expectedVersion, expec
   const guard = expectedVersion === undefined ? {} : { version: expectedVersion, retry: false };
   const format = store.state?.project?.format;
   return enqueue(documentId, async () => {
-    if (typeof patch !== 'function') return send('api/patch', documentId, version => ({ documentId, expectedVersion: version, expectedRender, patch, label, group }), guard);
+    if (typeof patch !== 'function') return send(writer.patch, documentId, version => ({ documentId, expectedVersion: version, expectedRender, patch, label, group }), guard);
     if (store.state?.project?.format !== format) throw Object.assign(new Error('The source format changed. Read it again before retrying.'), { code: 'REVISION_CONFLICT' });
     const model = await freshModel(documentId);
     if (store.state?.project?.format !== format || model !== cachedModel(documentId) || model.version < (known.get(documentId) || 0)) throw Object.assign(new Error('The frame model is not current. Read it again before retrying.'), { code: 'REVISION_CONFLICT' });
     const derived = await patch(model);
     if (store.state?.project?.format !== format || model !== cachedModel(documentId)) throw Object.assign(new Error('The frame changed while preparing this edit. Read it again before retrying.'), { code: 'REVISION_CONFLICT' });
     if (!derived) return null;
-    return send('api/patch', documentId, version => ({ documentId, expectedVersion: version, expectedRender, patch: derived, label, group }), { version: expectedVersion ?? model.version, retry: false });
+    return send(writer.patch, documentId, version => ({ documentId, expectedVersion: version, expectedRender, patch: derived, label, group }), { version: expectedVersion ?? model.version, retry: false });
   }).catch(error => { toast(error.message); throw error; });
 }
 export function edit(documentId, op, { label, group, expectedRender } = {}) {
   const format = store.state?.project?.format;
   return enqueue(documentId, async () => {
-    if (typeof op !== 'function') return send('api/edit', documentId, expectedVersion => ({ documentId, expectedVersion, expectedRender, op, label, group }));
+    if (typeof op !== 'function') return send(writer.edit, documentId, expectedVersion => ({ documentId, expectedVersion, expectedRender, op, label, group }));
     // Derive relative legacy intent after local commits; native operations keep their shown-view guards.
     if (store.state?.project?.format !== format) throw Object.assign(new Error('The source format changed. Read it again before retrying.'), { code: 'REVISION_CONFLICT' });
     const model = await freshModel(documentId);
     if (store.state?.project?.format !== format || model !== cachedModel(documentId) || model.version < (known.get(documentId) || 0)) throw Object.assign(new Error('The frame model is not current. Read it again before retrying.'), { code: 'REVISION_CONFLICT' });
     const derived = op(model);
     if (!derived) return null;
-    return send('api/edit', documentId, expectedVersion => ({ documentId, expectedVersion, expectedRender, op: derived, label, group }), { version: model.version, retry: false });
+    return send(writer.edit, documentId, expectedVersion => ({ documentId, expectedVersion, expectedRender, op: derived, label, group }), { version: model.version, retry: false });
   }).catch(error => { toast(error.message); throw error; });
 }
 
-export const undo = () => post('api/undo', {}).catch(error => { toast(error.message); return null; });
-export const redo = () => post('api/redo', {}).catch(error => { toast(error.message); return null; });
+export const undo = () => writer.undo({}).catch(error => { toast(error.message); return null; });
+export const redo = () => writer.redo({}).catch(error => { toast(error.message); return null; });
 
 /* ---- selection ------------------------------------------------------------ */
 let selectionSequence = 0;

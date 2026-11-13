@@ -1,5 +1,6 @@
 // Artboard lifecycle commands; selection, reveal, grouping and failure feedback stay with each accepted operation.
-import { descriptor, post, undo, toast, newGroup, selectArtboards, whenDocument, leave } from './store.js';
+import { descriptor, undo, toast, newGroup, selectArtboards, whenDocument, leave } from './store.js';
+import { writer } from './host.js';
 import * as canvas from './canvas.js';
 
 export async function newArtboard({ x, y, width, height, name } = {}) {
@@ -8,7 +9,7 @@ export async function newArtboard({ x, y, width, height, name } = {}) {
   if (name) body.name = name;
   if (Number.isFinite(x) && Number.isFinite(y)) Object.assign(body, { x: Math.round(x), y: Math.round(y) });
   try {
-    const result = await post('api/artboards', body);
+    const result = await writer.createArtboard(body);
     await whenDocument(result.documentId);
     selectArtboards([result.documentId]);
     canvas.reveal(result.documentId);
@@ -21,7 +22,7 @@ export async function duplicateArtboards(ids) {
   const group = newGroup();
   const created = [];
   for (const from of ids) {
-    try { created.push((await post('api/artboards', { from, group, expectedVersion: descriptor(from)?.version, label: ids.length > 1 ? `duplicate ${ids.length} artboards` : 'duplicate artboard' })).documentId); }
+    try { created.push((await writer.createArtboard({ from, group, expectedVersion: descriptor(from)?.version, label: ids.length > 1 ? `duplicate ${ids.length} artboards` : 'duplicate artboard' })).documentId); }
     catch (error) { toast(error.message); }
   }
   if (!created.length) return;
@@ -49,7 +50,7 @@ export async function deleteArtboards(ids) {
   }
   leave(order.map(doc => doc.id));
   for (const doc of order) {
-    try { await post('api/artboards/delete', { documentId: doc.id, group, expectedVersion: doc.version, label: order.length > 1 ? `delete ${order.length} artboards` : `delete “${doc.name}”` }); removed.push(doc); }
+    try { await writer.deleteArtboard({ documentId: doc.id, group, expectedVersion: doc.version, label: order.length > 1 ? `delete ${order.length} artboards` : `delete “${doc.name}”` }); removed.push(doc); }
     catch (error) { leave([doc.id], true); toast(error.message); }
   }
   if (removed.length) toast(removed.length > 1 ? `${removed.length} artboards deleted` : `“${removed[0].name}” deleted`, { label: 'Undo', run: () => undo() });
