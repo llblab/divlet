@@ -45,7 +45,7 @@ export function localBoardOpener({ hubs = new Map() } = {}) {
  */
 export function createMcpServer({ session, argv = {}, send, log = () => {} }) {
   const tools = toolList();
-  const toolByName = new Map(tools.map(tool => [tool.name, tool]));
+  const toolByName = new Map(tools.flatMap(tool => [tool.name, ...(tool.aliases ?? [])].map(name => [name, tool])));
   let initialized = false;
   let sampling = false;
   let nextRequestId = 1;
@@ -80,7 +80,7 @@ export function createMcpServer({ session, argv = {}, send, log = () => {} }) {
           protocolVersion: SUPPORTED.has(requested) ? requested : PROTOCOL_VERSION,
           capabilities: { tools: { listChanged: false } },
           serverInfo: { name: SERVER_NAME, version: argv.version || '0.0.0' },
-          instructions: 'divlet edits a local layout project (one .divlet file of HTML elements with Tailwind classes). Call open_divlet first, then read_divlet before patch_divlet or edit_divlet.',
+          instructions: 'divlet edits a local layout project (one .divlet file of HTML elements with Tailwind classes). Call divlet_open first, then divlet_read before divlet_patch or divlet_edit.',
         });
       }
       case 'notifications/initialized':
@@ -96,12 +96,12 @@ export function createMcpServer({ session, argv = {}, send, log = () => {} }) {
         const tool = toolByName.get(name);
         if (!tool) return failure(id, -32602, `Unknown tool: ${name}.`);
         try {
-          // `open_divlet` inherits the server's own defaults (--project, --port, --no-demo) unless the call overrides them.
-          const args = name === 'open_divlet'
+          // `divlet_open` inherits the server's own defaults (--project, --port, --no-demo) unless the call overrides them.
+          const args = tool.kind === 'open'
             ? { path: argv.project, port: argv.port, createDemo: argv.createDemo, ...(params?.arguments ?? {}) }
             : (params?.arguments ?? {});
           const value = await session.call(name, args, { cwd: argv.cwd });
-          return result(id, answer(name === 'open_divlet' ? openView(value) : value));
+          return result(id, answer(tool.kind === 'open' ? openView(value) : value));
         } catch (error) {
           return result(id, refusal(error));
         }
@@ -166,7 +166,7 @@ export function wireBoardAgent(runtime, server, { log = () => {} } = {}) {
       const result = await server.request('sampling/createMessage', {
         messages: [{ role: 'user', content: { type: 'text', text: message } }],
         maxTokens: 4096,
-        systemPrompt: 'You are the agent of a divlet layout board. Answer in a few sentences. Use the divlet tools (read_divlet, patch_divlet, edit_divlet) when the request asks for a change; style with Tailwind classes.',
+        systemPrompt: 'You are the agent of a divlet layout board. Answer in a few sentences. Use the divlet tools (divlet_read, divlet_patch, divlet_edit) when the request asks for a change; style with Tailwind classes.',
       });
       const text = samplingText(result);
       runtime.say({ text: text || 'The client returned no text answer.', seq });

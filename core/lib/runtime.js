@@ -307,7 +307,7 @@ export class DivletRuntime extends EventEmitter {
 
   getEntry(id) {
     const entry = this.documents.get(id);
-    if (!entry) fail('NOT_FOUND', `Unknown frame: ${id}. read_divlet view:project lists the frames.`);
+    if (!entry) fail('NOT_FOUND', `Unknown frame: ${id}. divlet_read view:project lists the frames.`);
     return entry;
   }
 
@@ -1473,7 +1473,7 @@ await this.importProject(project.settings, project.frames, hash);
       lines.push(`elements in ${nodes.documentId}:`);
       for (const label of nodes.labels) lines.push(`- ${label}`);
     }
-    lines.push('next:', '- read_divlet before changing anything', '- edit_divlet for structure, patch_divlet for classes, text and components', '- Tailwind classes first, custom css only as an exception (the divlet skill explains the workflow)');
+    lines.push('next:', '- divlet_read before changing anything', '- divlet_edit for structure, divlet_patch for classes, text and components', '- Tailwind classes first, custom css only as an exception (the divlet skill explains the workflow)');
     return `${lines.join('\n')}\n\n${text}`;
   }
 

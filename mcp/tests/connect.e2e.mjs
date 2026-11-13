@@ -32,7 +32,8 @@ for (const [era, options] of [['legacy initialize', {}], ['2026-07-28', { versio
     await client.connect(transport);
     try {
       const { tools } = await client.listTools();
-      assert.deepEqual(tools.map(tool => tool.name), ['read_divlet', 'patch_divlet', 'edit_divlet', 'frame_divlet', 'undo_divlet', 'mark_divlet']);
+      assert.deepEqual(tools.filter(tool => !tool.name.endsWith('_divlet')).map(tool => tool.name), ['divlet_read', 'divlet_patch', 'divlet_edit', 'divlet_frame_manage', 'divlet_undo', 'divlet_mark']);
+      assert.equal(tools.length, 12, 'the browser adapter forwards explicit compatibility aliases');
       assert.ok(tools.every(tool => tool.description.startsWith(`[Website tool from ${new URL(site).origin};`)));
       const project = await client.callTool({ name: 'read_divlet', arguments: {} });
       assert.equal(project.isError, false);
@@ -41,7 +42,7 @@ for (const [era, options] of [['legacy initialize', {}], ['2026-07-28', { versio
       const patched = await client.callTool({ name: 'patch_divlet', arguments: { frameId: 'index', expectedVersion: version, patch: { name: `Patched over ${era}` } } });
       assert.equal(patched.isError, false, patched.content[0].text);
       assert.equal(patched.structuredContent.version, version + 1);
-      const refused = await client.callTool({ name: 'patch_divlet', arguments: { frameId: 'index', expectedVersion: version, patch: { name: 'stale' } } });
+      const refused = await client.callTool({ name: 'divlet_patch', arguments: { frameId: 'index', expectedVersion: version, patch: { name: 'stale' } } });
       assert.equal(refused.isError, true);
       assert.match(refused.content[0].text, /^REVISION_CONFLICT/);
     } finally { await client.close(); }

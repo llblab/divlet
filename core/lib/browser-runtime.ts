@@ -21,7 +21,7 @@ import { prepareFrameWith } from './prepare.ts';
 import type { FrameCompiler, PreparedFrame } from './prepare.ts';
 import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertExpectedVersion, assertExpectedRender } from './acceptance.ts';
 import { sameJson } from './validation.ts';
-import { runOnRuntime, toolList } from './tools.ts';
+import { runOnRuntime, toolByName, toolList } from './tools.ts';
 
 const HISTORY_LIMIT = 500;
 const UNDO_LIMIT = 200;
@@ -30,8 +30,8 @@ const clone = <T>(value: T): T => structuredClone(value);
 function fail(code: string, message: string, details?: unknown): never { throw new DivletError(code, message, details); }
 const randomId = (): string => [...globalThis.crypto.getRandomValues(new Uint8Array(12))].map(byte => byte.toString(16).padStart(2, '0')).join('');
 
-/** Tools this writer runs. `open_divlet` belongs to hosts that can open files; `create_frame` is a hidden host route. */
-export const BROWSER_TOOLS: readonly string[] = Object.freeze(['read_divlet', 'patch_divlet', 'edit_divlet', 'frame_divlet', 'undo_divlet', 'mark_divlet']);
+/** Tools this writer runs. `divlet_open` belongs to hosts that can open files; `create_frame` is a hidden host route. */
+export const BROWSER_TOOLS: readonly string[] = Object.freeze(['divlet_read', 'divlet_patch', 'divlet_edit', 'divlet_frame_manage', 'divlet_undo', 'divlet_mark']);
 
 interface Entry extends PreparedFrame { render: number; savedVersion: number }
 type Listener = (type: 'state' | 'change', value: unknown) => void;
@@ -163,7 +163,7 @@ export class BrowserRuntime {
 
   getEntry(id: unknown): Entry {
     const entry = typeof id === 'string' ? this.documents.get(id) : undefined;
-    if (!entry) fail('NOT_FOUND', `Unknown frame: ${id}. read_divlet view:project lists the frames.`);
+    if (!entry) fail('NOT_FOUND', `Unknown frame: ${id}. divlet_read view:project lists the frames.`);
     return entry;
   }
 
@@ -615,7 +615,7 @@ export class BrowserRuntime {
 
   /**
    * What the board shows about an agent working through this page. Unlike the Node host, an idle agent keeps its work marks:
-   * stateless MCP calls carry no turn boundary, so marks end only by `mark_divlet { clear: true }` or replacement.
+   * stateless MCP calls carry no turn boundary, so marks end only by `divlet_mark { clear: true }` or replacement.
    */
   setAgent(patch: Partial<BrowserRuntime['agent']> = {}) {
     const next = { ...this.agent, ...patch };
@@ -629,12 +629,13 @@ export class BrowserRuntime {
 
   /** Run one shared contract tool against this writer (the same `run` Pi, MCP and the CLI use). */
   async callTool(name: string, args: unknown) {
-    if (!BROWSER_TOOLS.includes(name)) fail('UNKNOWN_TOOL', `The browser host does not run ${name}.`);
+    const canonical = toolByName.get(name)?.name;
+    if (!canonical || !BROWSER_TOOLS.includes(canonical)) fail('UNKNOWN_TOOL', `The browser host does not run ${name}.`);
     return runOnRuntime(name, args, this as any);
   }
 
   /** The shared tool descriptions this writer runs. */
-  tools() { return toolList().filter(tool => BROWSER_TOOLS.includes(tool.name)); }
+  tools({ aliases = false }: { aliases?: boolean } = {}) { return toolList({ aliases }).filter(tool => BROWSER_TOOLS.includes(toolByName.get(tool.name)!.name)); }
 
   async close() { await this.#queue; this.closed = true; this.#listeners.clear(); }
 }

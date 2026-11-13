@@ -28,7 +28,7 @@ test('a board request becomes one compact prompt block, then the request', async
   assert.equal(request, 'Make the intro calmer');
   const lines = block.split('\n');
   assert.match(lines[0], /^\[divlet\|project:[^|]+\|frames:\d+\] about the project as a whole; nothing is selected$/, 'header with key:value metadata, value on the same line');
-  assert.deepEqual(lines.slice(1), ['next:', '- read_divlet before changing anything', '- edit_divlet for structure, patch_divlet for classes, text and components', '- Tailwind classes first, custom css only as an exception (the divlet skill explains the workflow)']);
+  assert.deepEqual(lines.slice(1), ['next:', '- divlet_read before changing anything', '- divlet_edit for structure, divlet_patch for classes, text and components', '- Tailwind classes first, custom css only as an exception (the divlet skill explains the workflow)']);
 });
 
 test('a selection adds its frames and elements as Markdown lists under the header', async t => {

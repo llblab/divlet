@@ -47,7 +47,7 @@ Register this stdio server in your host's configuration; no Pi installation is r
 
 From the checkout root, the equivalent source command is `node scripts/source.mjs mcp/index.js --cwd /absolute/path/to/workspace`. The runner passes the `divlet-source` export condition to child processes through `NODE_OPTIONS`.
 
-The server starts a board when the first tool needs one. Open the URL returned by `open_divlet` in your browser.
+The server starts a board when the first tool needs one. Open the URL returned by `divlet_open` in your browser.
 
 - `--cwd <dir>` sets the directory for relative paths and the default project.
 - `--project <file.divlet>` opens that project when the first tool needs it.
@@ -66,7 +66,7 @@ Available from `@divlet/mcp` 0.0.3; from a checkout use `node scripts/source.mjs
 - `--headless` / `--headed` hide or show the window (default: shown when a display is available).
 - `--browser <path>` chooses the Chromium-based executable; `--profile <dir>` keeps the site's browser storage between runs.
 
-The published board serves `read_divlet`, `patch_divlet`, `edit_divlet`, `frame_divlet`, `undo_divlet` and `mark_divlet` on a copy of its project stored in that browser profile. Descriptions are marked as website text, annotations are dropped and results are reduced to text and JSON. A reloaded page is reconnected on the next call; calls that were running are reported as interrupted, never retried. See [browser-hosted MCP](browser-mcp.md).
+The published board serves `divlet_read`, `divlet_patch`, `divlet_edit`, `divlet_frame_manage`, `divlet_undo` and `divlet_mark` on a copy of its project stored in that browser profile. Descriptions are marked as website text, annotations are dropped and results are reduced to text and JSON. A reloaded page is reconnected on the next call; calls that were running are reported as interrupted, never retried. See [browser-hosted MCP](browser-mcp.md).
 
 ## npm installation
 
@@ -86,13 +86,13 @@ For other hosts, install the skill with `npx skills add llblab/divlet --skill di
 
 The following tools use the project file's vocabulary in their results: `frames` and `frameId`.
 
-- **`open_divlet`** — Opens a project and returns the board URL, project version and frames with their versions. Repeated calls reuse the runtime.
-- **`read_divlet`** — `view`: `project`, `frame`, `nodes` (`ids`, `query`, `depth`, `limit`), `components` (addresses, names, overridable text nodes and usage), `selection`, `preview` (measured geometry, overflow, `contentHeight`), `history` (`since`), `diagnostics`, `site` (`route`).
-- **`patch_divlet`** — Atomically patches a frame (`frameId` + `expectedVersion`) or, without `frameId`, project settings (name, `outputDir`, shared `tokens`, `css`, `metadata`, `assets`). Resource patches use hierarchical Data-URL leaves and null deletions; project reads expose payload-free `resources` descriptions instead of binary strings. Objects merge, arrays replace and `null` removes.
-- **`edit_divlet`** — Structural operations: `insert` (a preset, a nested spec with `children`, an instance `{ ref, descendants }`, an array or an `html` fragment), `move`, `duplicate`, `remove`, `text`, `wrap`, `unwrap`, `detach`, `rename`.
-- **`frame_divlet`** — `create`, `duplicate` (for example, a 390px-wide copy) or `delete` a frame. A copy uses the original components rather than copying them.
-- **`undo_divlet`** — Undoes or redoes (`redo: true`) the latest change, optionally scoped to one frame.
-- **`mark_divlet`** — Announces where the agent is working: a whole frame or elements at any depth (`nodeIds`), with a short `note`. The board animates the area with a flowing outline and shows the note in the agent indicator. Marks clear when the turn ends. A new call replaces them; `add: true` adds areas, and `clear: true` removes marks. The project is unchanged.
+- **`divlet_open`** — Opens a project and returns the board URL, project version and frames with their versions. Repeated calls reuse the runtime.
+- **`divlet_read`** — `view`: `project`, `frame`, `nodes` (`ids`, `query`, `depth`, `limit`), `components` (addresses, names, overridable text nodes and usage), `selection`, `preview` (measured geometry, overflow, `contentHeight`), `history` (`since`), `diagnostics`, `site` (`route`).
+- **`divlet_patch`** — Atomically patches a frame (`frameId` + `expectedVersion`) or, without `frameId`, project settings (name, `outputDir`, shared `tokens`, `css`, `metadata`, `assets`). Resource patches use hierarchical Data-URL leaves and null deletions; project reads expose payload-free `resources` descriptions instead of binary strings. Objects merge, arrays replace and `null` removes.
+- **`divlet_edit`** — Structural operations: `insert` (a preset, a nested spec with `children`, an instance `{ ref, descendants }`, an array or an `html` fragment), `move`, `duplicate`, `remove`, `text`, `wrap`, `unwrap`, `detach`, `rename`.
+- **`divlet_frame_manage`** — `create`, `duplicate` (for example, a 390px-wide copy) or `delete` a frame. A copy uses the original components rather than copying them.
+- **`divlet_undo`** — Undoes or redoes (`redo: true`) the latest change, optionally scoped to one frame.
+- **`divlet_mark`** — Announces where the agent is working: a whole frame or elements at any depth (`nodeIds`), with a short `note`. The board animates the area with a flowing outline and shows the note in the agent indicator. Marks clear when the turn ends. A new call replaces them; `add: true` adds areas, and `clear: true` removes marks. The project is unchanged.
 
 ```json
 {
@@ -122,6 +122,24 @@ The following tools use the project file's vocabulary in their results: `frames`
 An unknown MCP tool returns JSON-RPC `-32602`; domain errors retain codes such as `REVISION_CONFLICT`, `CANNOT_UNDO` and `RENDER_CONFLICT` in result text.
 
 If the version has changed, the tool returns `REVISION_CONFLICT`: read the frame again and rebuild the patch. An invalid patch is never applied, even partially. Before each agent turn, the extension adds a hidden summary of user and file changes since the previous turn, together with a selection snapshot.
+
+### Tool-name compatibility
+
+Canonical names follow domain → resource → operation, using a reduced domain → operation form when the resource would be redundant. These names describe the current source/unreleased contract; earlier installed packages may advertise only the legacy spellings.
+
+| Legacy name | Canonical name |
+| --- | --- |
+| `open_divlet` | `divlet_open` |
+| `read_divlet` | `divlet_read` |
+| `patch_divlet` | `divlet_patch` |
+| `edit_divlet` | `divlet_edit` |
+| `frame_divlet` | `divlet_frame_manage` |
+| `undo_divlet` | `divlet_undo` |
+| `mark_divlet` | `divlet_mark` |
+
+Both spellings resolve to the same operation, parameters, revision checks and errors; aliases do not create another writer or change persisted project data. Sessions forward the original wire spelling to an attached board so a newer client can still use an older live owner, without retrying a mutation under a second name.
+
+Local MCP lists the seven canonical names and accepts legacy calls. Pi registers legacy aliases inactive by default, keeping the seven canonical tools in new model requests; a host can activate legacy definitions for an existing workflow. Browser MCP and WebMCP explicitly expose six canonical names plus their six compatibility aliases because browser transport allowlisting and WebMCP registration require callable spellings to be listed. Alias descriptions identify the canonical replacement. MCP clients may add their own server namespace; that transport prefix is not part of the raw tool name. No alias removal is scheduled.
 
 ## From JavaScript
 

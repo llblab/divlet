@@ -12,7 +12,7 @@ A divlet site starts with an ordinary document. Its stable nodes become slots fo
 
 The template controls the complete visual frame: the header above, the navigation beside you, and the type on this page. Its responsive CSS adapts the same structure to a narrow browser.
 
-You can patch the template through `patch_divlet`. Every page uses the next accepted version without copying the shared layout into another source file.
+You can patch the template through `divlet_patch`. Every page uses the next accepted version without copying the shared layout into another source file.
 
 ## Independent chapters
 

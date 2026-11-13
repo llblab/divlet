@@ -52,7 +52,7 @@ const server = http.createServer(async (req, res) => {
     res.write(chunk({}, 'stop', usage));
   } else {
     const args = scriptedCall?.args || { frameId: 'welcome', expectedVersion: 1, label: 'add a note under the CTA', op: { type: 'insert', after: 'cta', spec: { tag: 'p', id: 'e2e-note', className: 'text-sm text-[#b4a9c7]', text: 'Added by Pi' } } };
-    res.write(chunk({ role: 'assistant', content: null, tool_calls: [{ index: 0, id: 'call_1', type: 'function', function: { name: scriptedCall?.name || 'edit_divlet', arguments: JSON.stringify(args) } }] }));
+    res.write(chunk({ role: 'assistant', content: null, tool_calls: [{ index: 0, id: 'call_1', type: 'function', function: { name: scriptedCall?.name || 'divlet_edit', arguments: JSON.stringify(args) } }] }));
     res.write(chunk({}, 'tool_calls', usage));
   }
   res.end('data: [DONE]\n\n');
@@ -123,7 +123,7 @@ try {
   await waitFor(event => event.type === 'agent_start', 'agent_start');
   const busy = await api('api/project');
   result.busyWhileWorking = busy.agent.busy;
-  await waitFor(event => event.type === 'tool_execution_end' && event.toolName === 'edit_divlet', 'edit_divlet executed');
+  await waitFor(event => event.type === 'tool_execution_end' && event.toolName === 'divlet_edit', 'divlet_edit executed');
   await waitFor(event => event.type === 'agent_end', 'agent_end');
   await new Promise(resolve => setTimeout(resolve, 600));
   const after = await api('api/project');
@@ -144,7 +144,7 @@ try {
     && !/sent from the divlet board/.test(userText);
   const system = JSON.stringify(firstPrompt.messages.filter(message => message.role === 'system'));
   result.skillAdvertised = /<name>divlet<\/name>/.test(system) && /SKILL\.md/.test(system);
-  result.toolsAdvertised = (firstPrompt.tools || []).map(tool => tool.function?.name).filter(name => /_divlet$/.test(name));
+  result.toolsAdvertised = (firstPrompt.tools || []).map(tool => tool.function?.name).filter(name => /^divlet_|_divlet$/.test(name));
   result.modelRequests = requests.length;
   assert.deepEqual(result.skillCommand, ['skill:divlet (skill)']);
   assert.equal(result.connected, true);
@@ -155,7 +155,7 @@ try {
   assert.deepEqual(result.history.map(line => line.split(':')[0]), ['user/ask', 'agent/patch', 'agent/reply']);
   assert.equal(result.userMessageHasContext, true);
   assert.equal(result.skillAdvertised, true);
-  assert.deepEqual(result.toolsAdvertised, ['open_divlet', 'read_divlet', 'patch_divlet', 'edit_divlet', 'frame_divlet', 'undo_divlet', 'mark_divlet']);
+  assert.deepEqual(result.toolsAdvertised, ['divlet_open', 'divlet_read', 'divlet_patch', 'divlet_edit', 'divlet_frame_manage', 'divlet_undo', 'divlet_mark']);
   // Keep the legacy RPC fixture explicit, then earn the real command's native missing-source default independently.
   send({ id: 'native-divlet', type: 'prompt', message: '/divlet native-default' });
   const nativeNotice = await waitFor(event => event.type === 'extension_ui_request' && /divlet: http/.test(event.message || '') && event.message !== notify.message, 'native default board URL');
@@ -164,10 +164,14 @@ try {
   const nativeState = await nativeApi('api/project'), descriptor = nativeState.documents[0];
   assert.equal(nativeState.project.format, 'divlet'); assert.equal(nativeState.project.version, 1); assert.equal(nativeState.documents.length, 1); assert.equal(descriptor.id, 'welcome');
   const nativeModel = await nativeApi(`api/documents/${encodeURIComponent(descriptor.id)}`);
+  // An existing host workflow can explicitly activate the inactive compatibility definitions.
+  send({ id: 'legacy-tools', type: 'prompt', message: '/divlet-legacy-tools' });
+  const legacyActivation = await waitFor(event => event.id === 'legacy-tools', 'activate legacy tool definitions');
+  assert.notEqual(legacyActivation.success, false);
   scriptedCall = { name: 'edit_divlet', reply: 'Added a default note.', args: { frameId: descriptor.id, expectedVersion: descriptor.version, label: 'default first edit', op: { type: 'insert', parentId: nativeModel.rootId, spec: { tag: 'p', id: 'rpc-default-note', text: 'Default RPC proof' } } } };
   const nativeEvents = events.length;
   const nativeAsked = await nativeApi('api/ask', { text: 'Add a native note', ids: [descriptor.id], nodes: { documentId: descriptor.id, nodeIds: [nativeModel.rootId] } }); assert.equal(nativeAsked.queued, false);
-  await waitFor(event => events.indexOf(event) >= nativeEvents && event.type === 'tool_execution_end' && event.toolName === 'edit_divlet', 'native edit_divlet executed');
+  await waitFor(event => events.indexOf(event) >= nativeEvents && event.type === 'tool_execution_end' && event.toolName === 'edit_divlet', 'native legacy edit_divlet executed');
   await waitFor(event => events.indexOf(event) >= nativeEvents && event.type === 'agent_end', 'native agent_end');
   const nativeSource = JSON.parse(await readFile(path.join(SP, 'work/native-default/project.divlet'), 'utf8'));
   assert.equal(nativeSource.schemaVersion, 1); assert.match(JSON.stringify(nativeSource.frames[0]), /Default RPC proof/);

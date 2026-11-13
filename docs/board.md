@@ -54,7 +54,7 @@ Open Settings with the gear in the bottom-right toolbar or `Ctrl ,`. **Build out
 
 ## Where projects live
 
-A project is one `<name>.divlet` file. Multiple sources in the same directory are independent projects, with separate boards, versions, history and generated output. Paths passed to the CLI, `/divlet <path>` or `open_divlet` follow these rules:
+A project is one `<name>.divlet` file. Multiple sources in the same directory are independent projects, with separate boards, versions, history and generated output. Paths passed to the CLI, `/divlet <path>` or `divlet_open` follow these rules:
 
 | Selected path | What happens |
 | --- | --- |
@@ -69,7 +69,7 @@ Source reads use bounded regular-file descriptors rather than trusting a pathnam
 
 Collections can also contain project files in immediate child directories; `Designs/`, `designs/` and the relative `projects` folder in `divlet.config.json` remain optional discovery conveniences. There is no special `divlet/` workspace folder.
 
-The launcher shows names, frame counts, modification ages and frame names. Names use a known `divlet.name` or the source stem, with no extension-version gate; unknown fields and old marker values remain inert. Summary labels are bounded, malformed-source messages never quote project JSON or credentials, and listing performs no rendering, asset approval or source writes. Counts are not a promise of render/edit readiness; opening the exact source still validates its resources and capabilities. Type a name and press `Enter` to create `<name>.divlet` directly in the collection. It opens only exact source files from its listing. Agent collection results include each project's absolute `file` target for a subsequent `open_divlet` call. A project selected there becomes current for the Pi session; an explicit `projectId` still selects another open project. Named source files use their filename stem in the board tab and project indicator, so sibling projects remain distinguishable; the default `project.divlet` uses its containing folder's name.
+The launcher shows names, frame counts, modification ages and frame names. Names use a known `divlet.name` or the source stem, with no extension-version gate; unknown fields and old marker values remain inert. Summary labels are bounded, malformed-source messages never quote project JSON or credentials, and listing performs no rendering, asset approval or source writes. Counts are not a promise of render/edit readiness; opening the exact source still validates its resources and capabilities. Type a name and press `Enter` to create `<name>.divlet` directly in the collection. It opens only exact source files from its listing. Agent collection results include each project's absolute `file` target for a subsequent `divlet_open` call. A project selected there becomes current for the Pi session; an explicit `projectId` still selects another open project. Named source files use their filename stem in the board tab and project indicator, so sibling projects remain distinguishable; the default `project.divlet` uses its containing folder's name.
 
 ### Importing HTML and foreign formats
 
@@ -137,13 +137,13 @@ An instance of that component, overriding its text child:
 - **Instance:** A `ref` node addressed as `"frameId/nodeId"`, or just `"nodeId"` within the same frame.
 - **Overrides:** In `descendants`, a key is a component node ID; `"nested-instance/node"` reaches inside a nested instance. Values set a text node's `content`, or an element's `text`, `className`, `tag`, `style`, `attrs` and `metadata`.
 - **Validation:** The runtime refuses to remove a used component or a frame containing one. It also rejects overrides of missing nodes, cycles and invalid nesting after expansion. Errors name the frame and instance.
-- **Shared styling:** Project tokens and CSS (`patch_divlet` without `frameId`) are visible in every frame. This is where a shared design system belongs.
+- **Shared styling:** Project tokens and CSS (`divlet_patch` without `frameId`) are visible in every frame. This is where a shared design system belongs.
 
 On the board, use Make component in an element's menu and find components in the + menu (Add element). For an instance, the inspector shows text overrides, Go to, Reset and Detach. Double-clicking text inside an instance creates an override directly.
 
 ## Fluid and responsive layouts
 
-An artboard's size is its iframe viewport; ordinary layout rules work inside it: flex, grid, percentages and `clamp()`. Use Tailwind variants (`md:`, `lg:`, `max-[719px]:`) for responsive behavior. Frame CSS is an exception for things classes cannot express, such as `@keyframes` and complex selectors. It lives in the `components` layer, so utility classes take precedence over frame or project CSS. One tree should work at several widths: change `artboard.width` to check it. A 390px frame copy (`frame_divlet duplicate`) uses the same components.
+An artboard's size is its iframe viewport; ordinary layout rules work inside it: flex, grid, percentages and `clamp()`. Use Tailwind variants (`md:`, `lg:`, `max-[719px]:`) for responsive behavior. Frame CSS is an exception for things classes cannot express, such as `@keyframes` and complex selectors. It lives in the `components` layer, so utility classes take precedence over frame or project CSS. One tree should work at several widths: change `artboard.width` to check it. A 390px frame copy (`divlet_frame_manage duplicate`) uses the same components.
 
 ## Use the generated site independently
 

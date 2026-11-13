@@ -206,6 +206,8 @@ export interface ToolContext { runtime: BoardRuntime }
 /** One capability: named, described and parameterised once, rendered by every host. */
 export interface Tool {
   name: string;
+  /** Legacy spellings accepted by dispatch, omitted from canonical host listings. */
+  aliases?: readonly string[];
   /** Short human title (absent on hidden tools). */
   title?: string;
   kind: 'open' | 'runtime';
@@ -214,13 +216,14 @@ export interface Tool {
   snippet?: string;
   hidden?: boolean;
   parameters: ToolParameters;
-  /** Absent for `open_divlet`, which the session handles itself. */
+  /** Absent for `divlet_open`, which the session handles itself. */
   run?(context: ToolContext, params: any): any;
 }
-/** A runtime is required for every tool but `open_divlet`; the session resolves it before running one. */
+/** A runtime is required for every tool but `divlet_open`; the session resolves it before running one. */
 export const TOOLS: Tool[] = [
   {
-    name: 'open_divlet',
+    name: 'divlet_open',
+    aliases: ['open_divlet'],
     title: 'Open divlet',
     kind: 'open',
     description: 'Open a layout project and start its local board: returns the board URL, the project version and the frames with their versions. A project is one .divlet file holding every frame (HTML elements with Tailwind classes), component, shared token and CSS; generated pages live in .divlet/<name>/. path may be a .divlet file, an importable foreign file (an existing .pen is converted once into the sibling .divlet, which is what opens; the source is never modified) or a folder/collection; collections return projects with absolute file targets and a launcher URL, and a project is selected by passing its file as path. An empty folder creates a Divlet project.divlet; createDemo controls its starter frame (false leaves zero frames). Without path the current directory is used. Reuses an open project — including one another client already opened. Optionally add a frame with document (a frame model) without overwriting an existing one.',
@@ -234,7 +237,8 @@ export const TOOLS: Tool[] = [
     },
   },
   {
-    name: 'read_divlet',
+    name: 'divlet_read',
+    aliases: ['read_divlet'],
     title: 'Read divlet',
     kind: 'runtime',
     description: 'Read the project. view:project (default) lists frames with versions and sizes, which frames provide the components each one uses (view:components lists the components) and the shared state; view:frame returns one frame model; view:nodes returns nodes of a frame (ids, query, depth, limit) with parent and ancestors; view:components lists every component as "frameId/nodeId" with its name, the text node IDs an instance can override and where it is used; view:selection is what the user selected on the board; view:preview is measured geometry of the rendered page (node rects, overflow flags, contentHeight); view:history is the action log (since = sequence number); view:diagnostics lists file problems; view:site describes the Markdown site (route = one composed page). Read a frame before patching it.',
@@ -264,10 +268,11 @@ export const TOOLS: Tool[] = [
     },
   },
   {
-    name: 'patch_divlet',
+    name: 'divlet_patch',
+    aliases: ['patch_divlet'],
     title: 'Patch divlet',
     kind: 'runtime',
-    description: 'Apply one atomic, validated partial patch. With frameId: patch that frame (name, head, artboard, nodes, tokens, css, metadata) at its current expectedVersion; nodes are addressed by stable IDs. Without frameId: patch the project (name, tokens, css, metadata, outputDir, assets) at its version. For frame patches objects merge, arrays replace and null removes a property or node. A node accepts tag, className, attrs, style, metadata and text content (a text node: content). Declare styles per element with nodes.<id>.styles = {padding-top:16px, color:#fff, font-family:Inter} as a JSON object of CSS property to value: each property becomes a Tailwind utility (an arbitrary-property class when no utility exists) and replaces the class that set it earlier; null removes it; no Tailwind knowledge needed. Or write Tailwind utilities in className directly (compiled locally; arbitrary values and variants work, for example bg-[#14121c] md:px-10 hover:underline). Tokens named --color-*, --font-*, --breakpoint-* become theme classes (--color-brand gives bg-brand); css is for what utilities cannot express. The result lists warnings, e.g. classes that do nothing. Components: set reusable:true on an element; an instance is a node { type: ref, ref: frameId/nodeId, descendants: { componentNodeId: { content|text|className|style|attrs|tag } } }; editing a component re-renders every frame that uses it. For inserting, moving, wrapping or removing nodes, edit_divlet is simpler.',
+    description: 'Apply one atomic, validated partial patch. With frameId: patch that frame (name, head, artboard, nodes, tokens, css, metadata) at its current expectedVersion; nodes are addressed by stable IDs. Without frameId: patch the project (name, tokens, css, metadata, outputDir, assets) at its version. For frame patches objects merge, arrays replace and null removes a property or node. A node accepts tag, className, attrs, style, metadata and text content (a text node: content). Declare styles per element with nodes.<id>.styles = {padding-top:16px, color:#fff, font-family:Inter} as a JSON object of CSS property to value: each property becomes a Tailwind utility (an arbitrary-property class when no utility exists) and replaces the class that set it earlier; null removes it; no Tailwind knowledge needed. Or write Tailwind utilities in className directly (compiled locally; arbitrary values and variants work, for example bg-[#14121c] md:px-10 hover:underline). Tokens named --color-*, --font-*, --breakpoint-* become theme classes (--color-brand gives bg-brand); css is for what utilities cannot express. The result lists warnings, e.g. classes that do nothing. Components: set reusable:true on an element; an instance is a node { type: ref, ref: frameId/nodeId, descendants: { componentNodeId: { content|text|className|style|attrs|tag } } }; editing a component re-renders every frame that uses it. For inserting, moving, wrapping or removing nodes, divlet_edit is simpler.',
     snippet: 'Atomically change a frame or the shared project tokens/CSS by stable IDs.',
     parameters: {
       projectId: optional(S.string()),
@@ -294,7 +299,8 @@ export const TOOLS: Tool[] = [
     },
   },
   {
-    name: 'edit_divlet',
+    name: 'divlet_edit',
+    aliases: ['edit_divlet'],
     title: 'Edit divlet',
     kind: 'runtime',
     description: 'Apply one operation to a frame by stable node IDs: insert (a preset, spec, html fragment or component instance), move, duplicate, remove, text, wrap, unwrap, detach (turn an instance into ordinary elements) or rename. Pass expectedVersion from the frame you read and a short label. Insert accepts spec (a node spec: tag, className, text, attrs, style, children, or ref for an instance), or html (a foreign fragment; classes, inline styles and safe attributes are kept; scripts and handlers are dropped; native asset references require spec instead); place with parentId plus index, after or before.',
@@ -324,10 +330,11 @@ export const TOOLS: Tool[] = [
     },
   },
   {
-    name: 'frame_divlet',
+    name: 'divlet_frame_manage',
+    aliases: ['frame_divlet'],
     title: 'Frames of divlet',
     kind: 'runtime',
-    description: 'Create, duplicate or delete a frame (an artboard on the board: one page or screen at a viewport width). create: a blank frame (name, width, height; placed beside the others unless x/y are given) — fill it with edit_divlet. duplicate: a copy of frameId (optionally renamed or resized, e.g. width 390 for a phone); component reference targets remain shared. delete: remove frameId (refused while other frames use its components).',
+    description: 'Create, duplicate or delete a frame (an artboard on the board: one page or screen at a viewport width). create: a blank frame (name, width, height; placed beside the others unless x/y are given) — fill it with divlet_edit. duplicate: a copy of frameId (optionally renamed or resized, e.g. width 390 for a phone); component reference targets remain shared. delete: remove frameId (refused while other frames use its components).',
     snippet: 'Create, duplicate or delete frames (artboards).',
     parameters: {
       projectId: optional(S.string()),
@@ -344,16 +351,17 @@ export const TOOLS: Tool[] = [
     async run({ runtime }: ToolContext, params: any) {
       const { action, frameId, expectedVersion, name, width, height, x, y, label } = params;
       if (action === 'delete') {
-        if (!frameId) throw Object.assign(new Error('frame_divlet delete needs frameId.'), { code: 'INVALID_ARGUMENT' });
+        if (!frameId) throw Object.assign(new Error('divlet_frame_manage delete needs frameId.'), { code: 'INVALID_ARGUMENT' });
         return runtime.removeDocument({ documentId: frameId, expectedVersion, actor: 'agent', label });
       }
-      if (action === 'duplicate' && !frameId) throw Object.assign(new Error('frame_divlet duplicate needs frameId.'), { code: 'INVALID_ARGUMENT' });
+      if (action === 'duplicate' && !frameId) throw Object.assign(new Error('divlet_frame_manage duplicate needs frameId.'), { code: 'INVALID_ARGUMENT' });
       const result = await runtime.createArtboard({ name, width, height, x, y, from: action === 'duplicate' ? frameId : undefined, expectedVersion, actor: 'agent', label });
       return { ...result, frame: (runtime.info().documents as any[]).find((doc: any) => doc.id === result.documentId) };
     },
   },
   {
-    name: 'undo_divlet',
+    name: 'divlet_undo',
+    aliases: ['undo_divlet'],
     title: 'Undo divlet',
     kind: 'runtime',
     description: 'Undo (or redo) the most recent accepted change, optionally only the latest one of a frame. Undo applies the inverse patch, so later unrelated edits stay intact; it fails with CANNOT_UNDO when later changes touched the same content.',
@@ -364,7 +372,8 @@ export const TOOLS: Tool[] = [
     },
   },
   {
-    name: 'mark_divlet',
+    name: 'divlet_mark',
+    aliases: ['mark_divlet'],
     title: 'Mark divlet work area',
     kind: 'runtime',
     description: 'Tell the user where you are about to work: the board animates the area until your turn ends (or you clear it), so they see what is being worked on and why. Call it before a non-trivial change or a long stretch of planning. frameId alone marks the whole frame; nodeIds marks elements inside it (any depth). note is a short human sentence (“restyling the pricing cards”) shown in the agent indicator. A new call replaces earlier marks unless add is true; clear: true removes them. It changes nothing in the project.',
@@ -379,12 +388,12 @@ export const TOOLS: Tool[] = [
     },
     run({ runtime }: ToolContext, params: any) {
       if (params.clear) return runtime.clearWork({ documentId: params.frameId });
-      if (!params.frameId) throw Object.assign(new Error('mark_divlet needs frameId (or clear: true).'), { code: 'INVALID_ARGUMENT' });
+      if (!params.frameId) throw Object.assign(new Error('divlet_mark needs frameId (or clear: true).'), { code: 'INVALID_ARGUMENT' });
       return runtime.markWork({ documentId: params.frameId, nodeIds: params.nodeIds, note: params.note, add: params.add });
     },
   },
   {
-    // Not listed for hosts: it carries the frame model of `open_divlet { document }` to the owning board.
+    // Not listed for hosts: it carries the frame model of `divlet_open { document }` to the owning board.
     name: 'create_frame',
     hidden: true,
     kind: 'runtime',
@@ -397,9 +406,13 @@ export const TOOLS: Tool[] = [
   },
 ];
 
-export const toolByName: ReadonlyMap<string, Tool> = new Map(TOOLS.map(tool => [tool.name, tool]));
-export const toolList = ({ hidden = false }: { hidden?: boolean } = {}): Tool[] => TOOLS.filter(tool => hidden || !tool.hidden);
-export const toolNames: Set<string> = new Set(TOOLS.map(tool => tool.name));
+export const toolByName: ReadonlyMap<string, Tool> = new Map(TOOLS.flatMap(tool => [tool.name, ...(tool.aliases ?? [])].map(name => [name, tool] as const)));
+/** Adapters opt into compatibility registrations only where the host needs a definition to dispatch old calls. */
+export function toolList({ hidden = false, aliases = false }: { hidden?: boolean; aliases?: boolean } = {}): Tool[] {
+  const tools = TOOLS.filter(tool => hidden || !tool.hidden);
+  return aliases ? tools.flatMap(tool => [tool, ...(tool.aliases ?? []).map(name => ({ ...tool, name, description: `Compatibility alias for ${tool.name}. ${tool.description}` }))]) : tools;
+}
+export const toolNames: Set<string> = new Set(toolByName.keys());
 
 /** Run one runtime tool against a board's runtime (used by the session and by the board's own api/tool route). */
 export async function runOnRuntime(name: string, args: unknown, runtime: BoardRuntime): Promise<any> {

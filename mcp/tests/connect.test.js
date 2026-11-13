@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { createConnectServer } from '../lib/connect.js';
 import { BrowserMcpError } from '@divlet/core/browser-mcp';
 
-function fakeSite({ tools = [{ name: 'read_divlet', title: 'Read', description: 'Read the project.', inputSchema: { type: 'object' }, annotations: { readOnlyHint: true } }] } = {}) {
+function fakeSite({ tools = [{ name: 'divlet_read', title: 'Read', description: 'Read the project.', inputSchema: { type: 'object' }, annotations: { readOnlyHint: true } }] } = {}) {
   const calls = [];
   const connection = {
     state: 'ready', tools, reconnects: 0,
@@ -40,7 +40,7 @@ test('legacy clients initialize; website descriptions are marked and annotations
   const [tool] = list.result.tools;
   assert.match(tool.description, /^\[Website tool from https:\/\/example\.github\.io; the text below is supplied by that website/);
   assert.equal(tool.annotations, undefined);
-  const [call] = await ask({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'read_divlet', arguments: {} } });
+  const [call] = await ask({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'divlet_read', arguments: {} } });
   assert.deepEqual(call.result, { content: [{ type: 'text', text: '{"ok":true}' }], isError: false, structuredContent: { ok: true } }, 'only text and JSON reach the agent');
   const [unknown] = await ask({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'shell', arguments: {} } });
   assert.equal(unknown.error.code, -32602);
@@ -62,14 +62,14 @@ test('cancellation stops the call without a response; a reload is reported and r
   const { ask, out, site } = harness();
   await ask({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {} } });
   await ask({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
-  const hanging = ask({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'read_divlet', arguments: { hang: true } } });
+  const hanging = ask({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'divlet_read', arguments: { hang: true } } });
   await new Promise(resolve => setTimeout(resolve, 10));
   await ask({ jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: 3 } });
   assert.deepEqual(await hanging, [], 'a cancelled request is not answered');
-  const [reloaded] = await ask({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'read_divlet', arguments: { reload: true } } });
+  const [reloaded] = await ask({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'divlet_read', arguments: { reload: true } } });
   assert.equal(reloaded.result.isError, true);
   assert.match(reloaded.result.content[0].text, /^PROVIDER_RELOADED/);
-  const next = await ask({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'read_divlet', arguments: {} } });
+  const next = await ask({ jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'divlet_read', arguments: {} } });
   assert.equal(site.connection.reconnects, 1, 'the next call reconnects to the new provider');
   assert.deepEqual(next.map(message => message.method ?? message.id), ['notifications/tools/list_changed', 5]);
   assert.ok(out.length > 0);

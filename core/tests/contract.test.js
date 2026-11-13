@@ -4,16 +4,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
+import http from 'node:http';
 import path from 'node:path';
 import { Type } from 'typebox';
 import {
   LARGE_FRAME_BYTES, S, compactComponents, compactProject, forAgent, inputSchema, nullable, openView, optional,
-  outlineOf, propertySchema, runOnRuntime, toTypeBox, toolList, toolNames,
+  createSession, outlineOf, propertySchema, runOnRuntime, toTypeBox, toolByName, toolList, toolNames,
 } from '../lib/contract.ts';
 import { findBoard, listBoards, registerBoard, unregisterBoard } from '../lib/boards.ts';
 
 test('one tool list, and every tool is described once', () => {
-  assert.deepEqual(toolList().map(tool => tool.name), ['open_divlet', 'read_divlet', 'patch_divlet', 'edit_divlet', 'frame_divlet', 'undo_divlet', 'mark_divlet']);
+  assert.deepEqual(toolList().map(tool => tool.name), ['divlet_open', 'divlet_read', 'divlet_patch', 'divlet_edit', 'divlet_frame_manage', 'divlet_undo', 'divlet_mark']);
   assert.equal(toolList({ hidden: true }).length, toolList().length + 1, 'the internal create_frame tool stays out of host listings');
   for (const tool of toolList()) {
     assert.ok(tool.description.length > 40, `${tool.name} has a real description`);
@@ -23,8 +24,59 @@ test('one tool list, and every tool is described once', () => {
   assert.equal(toolNames.has('create_frame'), true);
 });
 
+test('legacy names resolve to the canonical operations without doubling the default tool list', async () => {
+  const aliases = { open_divlet: 'divlet_open', read_divlet: 'divlet_read', patch_divlet: 'divlet_patch', edit_divlet: 'divlet_edit', frame_divlet: 'divlet_frame_manage', undo_divlet: 'divlet_undo', mark_divlet: 'divlet_mark' };
+  assert.equal(toolList({ aliases: true }).length, 14);
+  for (const [legacy, canonical] of Object.entries(aliases)) {
+    assert.equal(toolByName.get(legacy), toolByName.get(canonical), legacy);
+    assert.equal(toolNames.has(legacy), true);
+    const advertised = toolList({ aliases: true }).find(tool => tool.name === legacy);
+    assert.match(advertised.description, new RegExp('Compatibility alias for ' + canonical));
+    assert.equal(advertised.parameters, toolByName.get(canonical).parameters);
+  }
+  const runtime = { patch: async args => args };
+  const args = { frameId: 'one', expectedVersion: 1, patch: { name: 'x' } };
+  assert.deepEqual(await runOnRuntime('patch_divlet', args, runtime), await runOnRuntime('divlet_patch', args, runtime));
+  await assert.rejects(() => runOnRuntime('open_divlet', {}, runtime), { code: 'UNKNOWN_TOOL' });
+});
+
+test('new sessions attach to legacy-only live boards using their original wire names', async t => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'divlet-legacy-board-'));
+  const previous = process.env.PI_DIVLET_STATE_DIR;
+  process.env.PI_DIVLET_STATE_DIR = path.join(root, 'state');
+  const file = path.join(root, 'project.divlet');
+  await writeFile(file, '{}');
+  const info = { projectId: 'legacy-owner', project: { file }, documents: [] };
+  const calls = [];
+  const server = http.createServer(async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    if (req.method === 'GET') return res.end(JSON.stringify(info));
+    let text = '';
+    for await (const chunk of req) text += chunk;
+    const request = JSON.parse(text);
+    calls.push(request);
+    if (request.name !== 'read_divlet') { res.statusCode = 400; return res.end(JSON.stringify({ error: 'UNKNOWN_TOOL' })); }
+    res.end(JSON.stringify({ result: { legacyOwner: true } }));
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const board = await registerBoard({ file, url: `http://127.0.0.1:${server.address().port}/token/`, projectId: info.projectId });
+  const session = createSession({ cwd: root, openBoard: () => { throw new Error('must attach, not start a second writer'); } });
+  t.after(async () => {
+    await session.close();
+    await unregisterBoard({ file, url: board.url });
+    server.closeAllConnections();
+    await new Promise(resolve => server.close(resolve));
+    if (previous === undefined) delete process.env.PI_DIVLET_STATE_DIR; else process.env.PI_DIVLET_STATE_DIR = previous;
+    await rm(root, { recursive: true, force: true });
+  });
+  await session.call('divlet_open');
+  assert.deepEqual(await session.call('divlet_read'), { legacyOwner: true });
+  assert.deepEqual(await session.call('read_divlet'), { legacyOwner: true });
+  assert.deepEqual(calls.map(call => call.name), ['read_divlet', 'read_divlet']);
+});
+
 test('the JSON Schema and the TypeBox rendering come from the same parameters', () => {
-  const patch = toolList().find(tool => tool.name === 'patch_divlet');
+  const patch = toolList().find(tool => tool.name === 'divlet_patch');
   const json = inputSchema(patch);
   assert.deepEqual([...json.required].sort(), ['expectedVersion', 'patch']);
   assert.equal(json.properties.patch.type, 'object');
@@ -73,10 +125,10 @@ test('results are in the agent vocabulary, and nothing but data crosses the cont
 test('a board only runs the runtime tools it publishes', async () => {
   const calls = [];
   const runtime = { patch: async args => { calls.push(args); return { version: 4 }; } };
-  assert.deepEqual(await runOnRuntime('patch_divlet', { frameId: 'one', expectedVersion: 3, patch: { name: 'x' } }, runtime), { version: 4 });
+  assert.deepEqual(await runOnRuntime('divlet_patch', { frameId: 'one', expectedVersion: 3, patch: { name: 'x' } }, runtime), { version: 4 });
   assert.equal(calls[0].documentId, 'one');
   assert.equal(calls[0].actor, 'agent');
-  for (const name of ['open_divlet', 'create_frame', 'nope']) {
+  for (const name of ['divlet_open', 'create_frame', 'nope']) {
     await assert.rejects(() => runOnRuntime(name, {}, runtime), { code: 'UNKNOWN_TOOL' });
   }
 });

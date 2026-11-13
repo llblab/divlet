@@ -51,11 +51,11 @@ export async function checkInstalledPiFonts({ url, file, invoke, ownBrowser }) {
     await until(() => live.evaluate(node => Math.round(node.getBoundingClientRect().width) === 120), 'Pi-host TTF renders120px');
     console.error('[installed Pi fonts] real Pi tool patch/read/history');
     const current = await api('api/documents/' + id);
-    await invoke('patch_divlet', { frameId: id, expectedVersion: current.version, label: 'Use installed Pi bold face', patch: { nodes: { 'font-sample': { style: { 'font-weight': '700' } } } } });
+    await invoke('divlet_patch', { frameId: id, expectedVersion: current.version, label: 'Use installed Pi bold face', patch: { nodes: { 'font-sample': { style: { 'font-weight': '700' } } } } });
     await until(() => live.evaluate(node => Math.round(node.getBoundingClientRect().width) === 180), 'real Pi patch chooses CFF WOFF2 glyphs180px');
-    for (const args of [{ view: 'project' }, { view: 'frame', frameId: id }]) assert.ok(!JSON.stringify(await invoke('read_divlet', args)).includes(';base64,'), 'Pi tool reads do not return font payloads');
-    await invoke('undo_divlet', {}); await until(() => live.evaluate(node => Math.round(node.getBoundingClientRect().width) === 120), 'Pi tool Undo shares browser-owned registration history');
-    await invoke('undo_divlet', { redo: true }); await until(() => live.evaluate(node => Math.round(node.getBoundingClientRect().width) === 180), 'Pi tool Redo restores font matching');
+    for (const args of [{ view: 'project' }, { view: 'frame', frameId: id }]) assert.ok(!JSON.stringify(await invoke('divlet_read', args)).includes(';base64,'), 'Pi tool reads do not return font payloads');
+    await invoke('divlet_undo', {}); await until(() => live.evaluate(node => Math.round(node.getBoundingClientRect().width) === 120), 'Pi tool Undo shares browser-owned registration history');
+    await invoke('divlet_undo', { redo: true }); await until(() => live.evaluate(node => Math.round(node.getBoundingClientRect().width) === 180), 'Pi tool Redo restores font matching');
     assert.equal(await iframe.evaluate((node, id) => node.isConnected && node === document.querySelector(`iframe[data-document-id="${id}"]`), id), true);
     console.error('[installed Pi fonts] capture current render');
     await page.waitForFunction(id => { const entry = window.fontCanvas.entries.get(id); return entry.shot?.render === entry.doc.render; }, id);

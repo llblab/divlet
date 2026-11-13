@@ -180,7 +180,7 @@ try {
     }; tick(); });
     send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {} } });
     send({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
-    send({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'open_divlet', arguments: {} } });
+    send({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'divlet_open', arguments: {} } });
     await waitFor();
     child.stdin.end();
     await exited;
@@ -205,7 +205,7 @@ try {
 
   const mcp = JSON.parse(execFileSync(process.execPath, ['mcp-smoke.mjs'], { cwd: target, encoding: 'utf8' }).trim().split('\n').pop());
   assert.equal(mcp.protocol, '2025-06-18', 'the installed MCP server answers initialize');
-  assert.deepEqual(mcp.tools, ['open_divlet', 'read_divlet', 'patch_divlet', 'edit_divlet', 'frame_divlet', 'undo_divlet', 'mark_divlet'], 'the installed MCP server lists the shared tools');
+  assert.deepEqual(mcp.tools, ['divlet_open', 'divlet_read', 'divlet_patch', 'divlet_edit', 'divlet_frame_manage', 'divlet_undo', 'divlet_mark'], 'the installed MCP server lists the shared tools');
   assert.equal(mcp.url, 'http://…', 'and opens a board: ' + JSON.stringify(mcp));
   assert.equal(mcp.frames, 1);
   // Only the Pi adapter needs the peer supplied by its host; CLI/MCP above run without it or the Pi SDK.
@@ -220,8 +220,10 @@ try {
     const skill = fileURLToPath(import.meta.resolve('@divlet/core/skill'));
     assert.ok(existsSync(skill));
     const registered = [], handlers = new Map();
-    adapter({ registerCommand() {}, registerTool(tool) { registered.push(tool.name); }, on(name, handler) { handlers.set(name, handler); }, getThinkingLevel() { return 'off'; } });
-    assert.equal(registered.length, 7);
+    adapter({ registerCommand() {}, registerTool(tool) { registered.push(tool); }, on(name, handler) { handlers.set(name, handler); }, getThinkingLevel() { return 'off'; } });
+    assert.deepEqual(registered.filter(tool => tool.defaultActive !== false).map(tool => tool.name), ['divlet_open', 'divlet_read', 'divlet_patch', 'divlet_edit', 'divlet_frame_manage', 'divlet_undo', 'divlet_mark']);
+    assert.equal(registered.length, 14);
+    assert.equal(registered.find(tool => tool.name === 'open_divlet').defaultActive, false);
     assert.ok(path.dirname(skill).endsWith('skills/divlet'));
     assert.deepEqual(await handlers.get('resources_discover')(), { skillPaths: [path.dirname(skill)] });
   `);

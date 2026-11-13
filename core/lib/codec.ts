@@ -28,7 +28,7 @@ export interface EncodeOptions {
 export interface ExportOptions { nodeId?: NodeId; compiledCss?: string; limits?: Limits }
 export interface RenderFileOptions extends EncodeOptions {}
 export interface DecodeOptions { fallbackId?: string; previous?: unknown; limits?: Limits }
-/** One element of a pasted fragment, ready for `edit_divlet`'s insert op. */
+/** One element of a pasted fragment, ready for `divlet_edit`'s insert op. */
 export interface NodeSpec {
   tag: string;
   id?: string;

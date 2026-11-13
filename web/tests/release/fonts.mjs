@@ -128,7 +128,7 @@ try {
   mcp = connectMcp();
   await mcp.call('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'installed-font-proof', version: '1' } });
   const listed = await mcp.call('tools/list'); assert.equal(listed.tools.length, 7);
-  const attached = await mcp.tool('open_divlet'); assert.equal(attached.url, cli.url, 'installed MCP attaches to the CLI owner, never a second writer');
+  const attached = await mcp.tool('divlet_open'); assert.equal(attached.url, cli.url, 'installed MCP attaches to the CLI owner, never a second writer');
   const stateBefore = await get(cli.url, 'api/project'), versionBefore = stateBefore.documents.find(frame => frame.id === 'proof').version;
   browser = await chromium.launch({ headless: true, handleSIGTERM: false, handleSIGINT: false, args: ['--no-sandbox', '--disable-dev-shm-usage'], ...(process.env.PI_DIVLET_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PI_DIVLET_CHROMIUM_EXECUTABLE } : {}) });
   if (process.argv.includes('--abort-after-start')) {
@@ -161,24 +161,24 @@ try {
   }
   for (const privateName of ['proof.meta.json', '.divlet-build.json']) assert.equal((await fetch(cli.url + 'build/' + privateName)).status, 404, 'installed serving cannot expose editor sidecars');
   for (const view of ['project', 'frame']) {
-    const read = await mcp.tool('read_divlet', { view, ...(view === 'frame' ? { frameId: 'proof' } : {}) });
+    const read = await mcp.tool('divlet_read', { view, ...(view === 'frame' ? { frameId: 'proof' } : {}) });
     assert.ok(!JSON.stringify(read).includes(';base64,'), 'ordinary installed MCP ' + view + ' reads stay payload-free');
   }
   await page.locator('#inspector [data-key=font-family]').click();
   const choice = page.getByRole('menuitemradio', { name: '"Null Family"', exact: true }); assert.equal(await choice.count(), 1); await choice.click();
   const live = page.locator('iframe[data-document-id="proof"]').contentFrame().locator('#sample');
   await until(() => live.evaluate(node => Math.round(node.getBoundingClientRect().width) === 120), 'installed TTF glyphs render120px');
-  const current = await mcp.tool('read_divlet', { view: 'frame', frameId: 'proof' });
-  await mcp.tool('patch_divlet', { frameId: 'proof', expectedVersion: current.version, label: 'Use installed bold companion', patch: { nodes: { sample: { style: { 'font-weight': '700' } } } } });
+  const current = await mcp.tool('divlet_read', { view: 'frame', frameId: 'proof' });
+  await mcp.tool('divlet_patch', { frameId: 'proof', expectedVersion: current.version, label: 'Use installed bold companion', patch: { nodes: { sample: { style: { 'font-weight': '700' } } } } });
   await until(() => live.evaluate(node => Math.round(node.getBoundingClientRect().width) === 180), 'installed CFF WOFF2 glyphs render180px');
   const accepted = await readFile(file, 'utf8'), history = await get(cli.url, 'api/history');
   const overlap = await upload(bold, 'overlap.woff2', 'font/woff2'); assert.equal(overlap.status, 400); assert.equal(overlap.body.error, 'FONT_CONFLICT');
   assert.equal(await readFile(file, 'utf8'), accepted); assert.deepEqual(await get(cli.url, 'api/history'), history);
-  await mcp.tool('undo_divlet'); await until(() => live.evaluate(node => Math.round(node.getBoundingClientRect().width) === 120), 'MCP Undo shares the installed owner history');
-  for (let i = 0; i < 3; i++) await mcp.tool('undo_divlet');
+  await mcp.tool('divlet_undo'); await until(() => live.evaluate(node => Math.round(node.getBoundingClientRect().width) === 120), 'MCP Undo shares the installed owner history');
+  for (let i = 0; i < 3; i++) await mcp.tool('divlet_undo');
   const undone = await source();
   assert.deepEqual({ assets: undone.assets, css: undone.css }, { assets: initial.assets, css: initial.css }, 'both registrations undo independently, including canonical omission of empty wire fields');
-  for (let i = 0; i < 4; i++) await mcp.tool('undo_divlet', { redo: true });
+  for (let i = 0; i < 4; i++) await mcp.tool('divlet_undo', { redo: true });
   await until(() => live.evaluate(node => Math.round(node.getBoundingClientRect().width) === 180), 'installed Redo restores exact font matching');
   assert.equal(await iframe.evaluate(node => node.isConnected && node === document.querySelector('iframe[data-document-id="proof"]')), true);
   await page.waitForFunction(() => { const entry = window.installedCanvas.entries.get('proof'); return entry.shot?.render === entry.doc.render; });

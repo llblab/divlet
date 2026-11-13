@@ -37,7 +37,7 @@ test('a board request reaches Pi with its selection, and Pi state and replies co
   await legacyProject(path.join(cwd, 'project.divlet'), { demo: true });
   const host = harness(cwd);
   try {
-    const info = await host.call('open_divlet');
+    const info = await host.call('divlet_open');
     assert.equal(info.agent.connected, true);
     assert.equal(info.agent.busy, false);
     const asked = await post(info.url, 'api/ask', { text: 'Make the title bigger', ids: ['welcome'], nodes: { documentId: 'welcome', nodeIds: ['title'] } });
@@ -49,7 +49,7 @@ test('a board request reaches Pi with its selection, and Pi state and replies co
     assert.match(host.sent[0].content, /^\[divlet\|project:[^|]+\|frames:1\|nodes:1\] about “A space for ideas” with 1 selected element\nframes:\n- welcome · v1 · “A space for ideas”\nelements in welcome:\n/);
     assert.match(host.sent[0].content, /\n- h1#title “Make room for something new\.”/);
     assert.ok(host.sent[0].content.endsWith('\n\nMake the title bigger'));
-    const history = await host.call('read_divlet', { view: 'history' });
+    const history = await host.call('divlet_read', { view: 'history' });
     const ask = history.changes.at(-1);
     assert.equal(ask.kind, 'ask');
     assert.equal(ask.actor, 'user');
@@ -57,38 +57,38 @@ test('a board request reaches Pi with its selection, and Pi state and replies co
     assert.deepEqual(ask.context.nodes.ids, ['title']);
 
     await host.emit('agent_start');
-    const runtime = await host.call('read_divlet', { view: 'project' });
+    const runtime = await host.call('divlet_read', { view: 'project' });
     assert.equal(runtime.agent.busy, true);
-    await host.emit('tool_execution_start', { toolName: 'patch_divlet', args: { documentId: 'welcome' } });
-    assert.equal((await host.call('read_divlet')).agent.activity, 'editing “A space for ideas”');
+    await host.emit('tool_execution_start', { toolName: 'divlet_patch', args: { documentId: 'welcome' } });
+    assert.equal((await host.call('divlet_read')).agent.activity, 'editing “A space for ideas”');
     const queued = await (await post(info.url, 'api/ask', { text: 'And the button too' })).json();
     assert.equal(queued.queued, true);
-    assert.equal((await host.call('read_divlet')).agent.queued, 1);
+    assert.equal((await host.call('divlet_read')).agent.queued, 1);
     const stop = await post(info.url, 'api/agent/stop', {});
     assert.equal(stop.status, 200);
     assert.equal(host.aborted(), 1);
-    await host.emit('tool_execution_end', { toolName: 'patch_divlet' });
-    await host.emit('agent_end', { messages: [{ role: 'user', content: 'x' }, { role: 'assistant', content: [{ type: 'toolCall', name: 'patch_divlet' }] }, { role: 'assistant', content: [{ type: 'text', text: 'Done — the title is now 6xl.' }] }] });
-    const reply = (await host.call('read_divlet', { view: 'history' })).changes.at(-1);
+    await host.emit('tool_execution_end', { toolName: 'divlet_patch' });
+    await host.emit('agent_end', { messages: [{ role: 'user', content: 'x' }, { role: 'assistant', content: [{ type: 'toolCall', name: 'divlet_patch' }] }, { role: 'assistant', content: [{ type: 'text', text: 'Done — the title is now 6xl.' }] }] });
+    const reply = (await host.call('divlet_read', { view: 'history' })).changes.at(-1);
     assert.equal(reply.kind, 'reply');
     assert.equal(reply.actor, 'agent');
     assert.equal(reply.message, 'Done — the title is now 6xl.');
     assert.equal(reply.context.replyTo, ask.seq);
     await host.emit('agent_settled', { aborted: false });
-    assert.equal((await host.call('read_divlet')).agent.busy, false);
+    assert.equal((await host.call('divlet_read')).agent.busy, false);
     assert.equal((await post(info.url, 'api/agent/stop', {})).status, 409);
     // Board requests and replies are not repeated back to Pi as “changes since your last turn”.
     const snapshot = await host.emit('before_agent_start', {});
     assert.doesNotMatch(snapshot?.message?.content ?? '', /Make the title bigger|Done — the title/);
 
     // A run that never touched divlet and was not asked from the board stays out of the board log.
-    const seq = (await host.call('read_divlet', { view: 'history' })).changes.at(-1).seq;
+    const seq = (await host.call('divlet_read', { view: 'history' })).changes.at(-1).seq;
     await host.emit('agent_start');
     await host.emit('tool_execution_start', { toolName: 'bash', args: {} });
-    assert.equal((await host.call('read_divlet')).agent.activity, 'using bash');
+    assert.equal((await host.call('divlet_read')).agent.activity, 'using bash');
     await host.emit('agent_end', { messages: [{ role: 'assistant', content: 'Unrelated answer' }] });
     await host.emit('agent_settled', {});
-    assert.equal((await host.call('read_divlet', { view: 'history' })).changes.at(-1).seq, seq);
+    assert.equal((await host.call('divlet_read', { view: 'history' })).changes.at(-1).seq, seq);
 
     const empty = await post(info.url, 'api/ask', { text: '   ' });
     assert.equal(empty.status, 400);
@@ -212,26 +212,26 @@ test('the agent marks where it works; marks end with its turn and follow deleted
   const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-work-'));
   const host = harness(cwd);
   try {
-    const opened = await host.call('open_divlet');
+    const opened = await host.call('divlet_open');
     const id = opened.frames[0].id;
     host.emit('agent_start');
-    await assert.rejects(host.call('mark_divlet', { frameId: id, nodeIds: ['nope'] }), /no node nope/);
-    await assert.rejects(host.call('mark_divlet', {}), /needs frameId/);
-    const frame = await host.call('read_divlet', { view: 'frame', frameId: id });
+    await assert.rejects(host.call('divlet_mark', { frameId: id, nodeIds: ['nope'] }), /no node nope/);
+    await assert.rejects(host.call('divlet_mark', {}), /needs frameId/);
+    const frame = await host.call('divlet_read', { view: 'frame', frameId: id });
     const node = Object.keys(frame.nodes).find(key => frame.nodes[key].type === 'element' && key !== frame.rootId);
-    const first = await host.call('mark_divlet', { frameId: id, nodeIds: [node], note: 'restyling the first block' });
+    const first = await host.call('divlet_mark', { frameId: id, nodeIds: [node], note: 'restyling the first block' });
     assert.deepEqual(first.marked.nodeIds, [node]);
     const state = await fetch(new URL('api/project', opened.url)).then(response => response.json());
     assert.equal(state.work.length, 1);
     assert.equal(state.work[0].note, 'restyling the first block');
-    const second = await host.call('mark_divlet', { frameId: id, add: true });
+    const second = await host.call('divlet_mark', { frameId: id, add: true });
     assert.equal(second.work, 2, 'add keeps earlier marks; no nodeIds marks the whole frame');
-    const replaced = await host.call('mark_divlet', { frameId: id, note: 'whole frame' });
+    const replaced = await host.call('divlet_mark', { frameId: id, note: 'whole frame' });
     assert.equal(replaced.work, 1, 'a new call replaces earlier marks');
     host.emit('tool_execution_end');
     assert.equal((await fetch(new URL('api/project', opened.url)).then(response => response.json())).agent.activity, 'whole frame', 'the note shows as the activity');
-    assert.equal((await host.call('mark_divlet', { clear: true })).cleared, 1);
-    await host.call('mark_divlet', { frameId: id });
+    assert.equal((await host.call('divlet_mark', { clear: true })).cleared, 1);
+    await host.call('divlet_mark', { frameId: id });
     host.emit('agent_end', { messages: [] });
     host.emit('agent_settled');
     const after = await fetch(new URL('api/project', opened.url)).then(response => response.json());

@@ -13,7 +13,7 @@
         "description": "divlet is a local browser layout board for coding agents: live frames of real HTML and CSS, reusable components, and the same validated tools through Pi, MCP or the board running in your browser.",
         "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgY29sb3I9IiM1YjViZjAiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj48cGF0aCBkPSJNOCA0LjUgMi41IDEwIDggMTUuNSIgZmlsbD0ibm9uZSIvPjxwYXRoIGQ9Ik0xMC41IDQuNUgxMkwxNy41IDEwIDEyIDE1LjVoLTEuNVoiIGZpbGw9ImN1cnJlbnRDb2xvciIgc3Ryb2tlPSJub25lIi8+PC9zdmc+Cg=="
       },
-      "version": 3,
+      "version": 4,
       "artboard": {
         "x": 80,
         "y": 80,
@@ -181,7 +181,7 @@
         "text-47": {
           "id": "text-47",
           "type": "text",
-          "content": "patch_divlet",
+          "content": "divlet_patch",
           "metadata": {}
         },
         "node-48": {
@@ -893,7 +893,7 @@
         "text-195": {
           "id": "text-195",
           "type": "text",
-          "content": "open_divlet",
+          "content": "divlet_open",
           "metadata": {}
         },
         "node-199": {
@@ -911,7 +911,7 @@
         "text-200": {
           "id": "text-200",
           "type": "text",
-          "content": "read_divlet",
+          "content": "divlet_read",
           "metadata": {}
         },
         "text-202": {
@@ -948,7 +948,7 @@
         "text-205": {
           "id": "text-205",
           "type": "text",
-          "content": "patch_divlet",
+          "content": "divlet_patch",
           "metadata": {}
         },
         "text-207": {
@@ -1011,7 +1011,7 @@
         "text-220": {
           "id": "text-220",
           "type": "text",
-          "content": "undo_divlet",
+          "content": "divlet_undo",
           "metadata": {}
         },
         "node-223": {
@@ -1030,7 +1030,7 @@
         "text-225": {
           "id": "text-225",
           "type": "text",
-          "content": "mark_divlet",
+          "content": "divlet_mark",
           "metadata": {}
         },
         "node-226": {
@@ -1556,7 +1556,7 @@
         "text-40": {
           "id": "text-40",
           "type": "text",
-          "content": "read_divlet",
+          "content": "divlet_read",
           "metadata": {}
         },
         "node-41": {
@@ -2516,7 +2516,7 @@
         "text-210": {
           "id": "text-210",
           "type": "text",
-          "content": "edit_divlet",
+          "content": "divlet_edit",
           "metadata": {}
         },
         "node-211": {
@@ -2546,7 +2546,7 @@
         "text-215": {
           "id": "text-215",
           "type": "text",
-          "content": "frame_divlet",
+          "content": "divlet_frame_manage",
           "metadata": {}
         },
         "node-216": {

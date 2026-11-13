@@ -148,16 +148,16 @@ test('extension keeps same-directory project runtimes and session selection dist
   try {
     const a = await initProject(path.join(root, 'a.divlet'), 'A');
     await initProject(path.join(root, 'b.divlet'), 'B');
-    const listed = await call('open_divlet', { createDemo: false });
+    const listed = await call('divlet_open', { createDemo: false });
     assert.deepEqual(listed.projects.map(item => item.path).sort(), ['a.divlet', 'b.divlet']);
-    const openedA = await call('open_divlet', { path: 'a.divlet', createDemo: false });
-    const openedB = await call('open_divlet', { path: 'b.divlet', createDemo: false });
+    const openedA = await call('divlet_open', { path: 'a.divlet', createDemo: false });
+    const openedB = await call('divlet_open', { path: 'b.divlet', createDemo: false });
     assert.notEqual(openedA.projectId, openedB.projectId);
-    assert.equal((await call('read_divlet')).project.name, 'B');
-    assert.equal((await call('read_divlet', { projectId: openedA.projectId })).project.name, 'A');
+    assert.equal((await call('divlet_read')).project.name, 'B');
+    assert.equal((await call('divlet_read', { projectId: openedA.projectId })).project.name, 'A');
     const hub = await fetch(new URL('api/open', listed.launcher), { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: new URL(listed.launcher).origin }, body: JSON.stringify({ file: a }) });
     assert.equal(hub.status, 200);
-    assert.equal((await call('read_divlet')).project.name, 'A');
+    assert.equal((await call('divlet_read')).project.name, 'A');
   } finally {
     await events.get('session_shutdown')?.();
     await rm(root, { recursive: true, force: true });

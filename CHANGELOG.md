@@ -2,6 +2,10 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
+## Unreleased
+
+- **Domain-first agent tools.** The shared contract now names its seven operations `divlet_open`, `divlet_read`, `divlet_patch`, `divlet_edit`, `divlet_frame_manage`, `divlet_undo` and `divlet_mark`. Legacy `*_divlet` calls retain the same validation, history and single-writer behavior, including attachment to older boards. Pi defaults and local MCP listings prefer canonical names; browser MCP/WebMCP explicitly retain callable aliases. Skills, prompts, guides and the owned landing build use the new vocabulary. This is unreleased source behavior, not a new npm publication.
+
 ## 0.0.4 — candidate
 
 - **The landing is rewritten around how people actually use divlet.** What it is (one edit as the agent and the board see it, beside four accurate facts), how a change lands, trying it without installing (editing on the published board and connecting an agent with `--connect`), using it on your own projects (CLI, MCP with the workflow skill, Pi), the seven shared tools, imports/output and honest boundaries. Stale claims (a single `divlet` package, "once both are published", Tailwind-first) are gone; the page stays plain HTML and CSS, edited through the normal writer and rebuilt through its owner.

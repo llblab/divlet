@@ -61,7 +61,7 @@ host-neutral schema form, the shared result shaping (frames rather than document
 and `createSession`, which resolves a project to the board that owns it. Hosts translate the representation only — the Pi
 adapter renders the parameters as TypeBox and wraps results in Pi's tool envelope, `mcp/` renders the same parameters as
 JSON Schema and answers in MCP content blocks — and both call the same implementation, so validation, revision checks and
-domain error codes are identical everywhere. Add a capability once, in the contract.
+domain error codes are identical everywhere. Add a capability once, in the contract. `core/lib/tools.ts` owns canonical domain-first names and legacy aliases; adapters only translate their exposure ([tool-name compatibility](agents.md#tool-name-compatibility)), never reimplement alias operations.
 
 The board's Agent tab is a host concern, so each adapter answers it its own way: Pi turns `ask` into a user message in the
 running session, and the MCP server turns it into `sampling/createMessage` for its client when that client advertises

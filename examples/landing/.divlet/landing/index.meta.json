@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "frame": "index",
   "name": "divlet — a layout board for agents",
-  "version": 3,
+  "version": 4,
   "project": "../../landing.divlet",
   "html": "index.html",
   "components": [],
@@ -11,7 +11,7 @@
   "usedBy": [],
   "dependencies": {},
   "hashes": {
-    "frame": "7cb5f23bd0312f8815b8cfc9e92a7d1fdf7b5ddc7d5de2efe162e54244e3092f",
-    "html": "1c7e643fa676d7169b31782f8e0edffdedccc66b61d59acdab8491284204c984"
+    "frame": "28bd0d90a22163967aacfaa5d179f8d9279f245fc4345faf745ed9e0957a18d0",
+    "html": "062d20de8473330aff32e7fbe244104eb5a4901f351c3cf007301deb7e1076fc"
   }
 }

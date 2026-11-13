@@ -148,7 +148,7 @@ test('a request about a selected instance names it and its component', async t =
   assert.match(asked[0].message, /instance#cta of components\/button/);
 });
 
-test('instances are inserted with edit_divlet like any other spec, and text cannot be set on them directly', async t => {
+test('instances are inserted with divlet_edit like any other spec, and text cannot be set on them directly', async t => {
   const { runtime } = await fixture(t);
   const inserted = await runtime.edit({ documentId: 'landing', expectedVersion: 1, op: { type: 'insert', parentId: 'root', spec: { ref: 'components/button', descendants: { 'button-label': { content: 'Contact' } } } } });
   assert.deepEqual(inserted.ids, ['button']);

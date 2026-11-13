@@ -8,13 +8,13 @@
 import path from 'node:path';
 import { Type } from 'typebox';
 import { fileURLToPath } from 'node:url';
-import { compactComponents, compactProject, createSession, forAgent, openView, toTypeBox, toolList } from '@divlet/core/contract';
+import { compactComponents, compactProject, createSession, forAgent, openView, toTypeBox, toolByName, toolList } from '@divlet/core/contract';
 import { makeHost, openRuntime } from '@divlet/core';
 
 // The skill belongs to the product, not to this adapter: it lives at the package root so any host can load it.
 const SKILL_DIR = path.dirname(fileURLToPath(import.meta.resolve('@divlet/core/skill')));
-const DIVLET_TOOLS = new Set(toolList().map((tool) => tool.name));
-const TOOL_ACTIVITY = { read_divlet: 'reading', patch_divlet: 'editing', edit_divlet: 'editing', undo_divlet: 'undoing', open_divlet: 'opening the board', mark_divlet: 'planning', frame_divlet: 'editing' };
+const DIVLET_TOOLS = new Set(toolList({ aliases: true }).map((tool) => tool.name));
+const TOOL_ACTIVITY = { divlet_read: 'reading', divlet_patch: 'editing', divlet_edit: 'editing', divlet_undo: 'undoing', divlet_open: 'opening the board', divlet_mark: 'planning', divlet_frame_manage: 'editing' };
 
 /** Text of the last assistant message in a run (string content or text blocks). */
 export function lastAssistantText(messages) {
@@ -64,7 +64,7 @@ export default function divletExtension(pi) {
 
   /** The board opener `launch` and the boards ask for: one project file, or a host-driven open from a board. */
   async function hostOpenBoard(location, args = {}, cwd) {
-    const opened = await session.call('open_divlet', { path: location.file, ...(location.externalFiles ? { externalFiles: location.externalFiles } : {}) }, { cwd: cwd ?? lastCwd ?? session.cwd });
+    const opened = await session.call('divlet_open', { path: location.file, ...(location.externalFiles ? { externalFiles: location.externalFiles } : {}) }, { cwd: cwd ?? lastCwd ?? session.cwd });
     if (opened.kind === 'collection') return { info: () => ({ url: opened.launcher }) };
     session.activate(cwd ?? lastCwd ?? session.cwd, opened.info.project.file);
     return { info: () => opened.info };
@@ -128,8 +128,9 @@ export default function divletExtension(pi) {
     if (!DIVLET_TOOLS.has(event.toolName)) return `using ${event.toolName}`;
     const id = event.args?.frameId ?? event.args?.documentId;
     const doc = id && [...session.runtimes.values()].map((runtime) => runtime.documents.get(id)?.document).find(Boolean);
-    if (event.toolName === 'mark_divlet' && event.args?.note) return String(event.args.note).slice(0, 80);
-    const verb = TOOL_ACTIVITY[event.toolName] ?? event.toolName;
+    const name = toolByName.get(event.toolName)?.name;
+    if (name === 'divlet_mark' && event.args?.note) return String(event.args.note).slice(0, 80);
+    const verb = TOOL_ACTIVITY[name] ?? event.toolName;
     return doc ? `${verb} “${doc.name}”` : verb;
   }
 
@@ -141,9 +142,11 @@ export default function divletExtension(pi) {
   };
 
   // Every tool is the shared contract, rendered for Pi: one schema, one implementation, one set of error codes.
-  for (const tool of toolList()) {
+  for (const tool of toolList({ aliases: true })) {
+    const canonical = toolByName.get(tool.name);
     pi.registerTool({
       name: tool.name,
+      ...(canonical.name !== tool.name ? { defaultActive: false } : {}),
       label: tool.title,
       description: tool.description,
       ...(tool.snippet ? { promptSnippet: tool.snippet } : {}),
@@ -152,7 +155,7 @@ export default function divletExtension(pi) {
         signal?.throwIfAborted();
         lastCwd = ctx.cwd;
         const value = await session.call(tool.name, params ?? {}, { cwd: ctx.cwd, signal });
-        if (tool.name === 'open_divlet') return reply(openView(value));
+        if (canonical.kind === 'open') return reply(openView(value));
         return reply(value);
       },
     });
@@ -162,7 +165,7 @@ export default function divletExtension(pi) {
     description: 'Open divlet for this directory, or /divlet <project.divlet or collection folder>.',
     handler: async (args, ctx) => {
       lastCwd = ctx.cwd;
-      const opened = await session.call('open_divlet', { path: args.trim() || undefined }, { cwd: ctx.cwd });
+      const opened = await session.call('divlet_open', { path: args.trim() || undefined }, { cwd: ctx.cwd });
       if (opened.kind === 'collection') {
         if (ctx.hasUI) ctx.ui.notify(`divlet: ${opened.launcher}`, 'info');
         pi.sendMessage({ customType: 'divlet', content: `divlet projects (${opened.projects.length}) in ${opened.collection}: ${opened.launcher}\nPick or create one in the browser, or use /divlet <project folder>.`, display: true }, { triggerTurn: false });
@@ -186,7 +189,7 @@ export default function divletExtension(pi) {
     const block = (header, summary, sections) => [`[${header.join('|')}] ${summary}`, ...sections].join('\n');
     if (activity.length) {
       const changes = activity.map((change) => `- #${change.seq} ${change.actor}${change.kind === 'patch' ? '' : ` ${change.kind}`} ${change.documentId ?? 'project'} v${change.fromVersion ?? 0}→v${change.toVersion ?? '—'}: ${String(change.summary ?? '').replace(/\s+/g, ' ').trim()}${change.touched.length ? ` [${change.touched.slice(0, 8).join(', ')}]` : ''}`);
-      parts.push(block(['divlet', `project:${info.projectId}`, `changes:${changes.length}`], 'made by the user or by file edits since your last turn', [...changes, 'next:', '- read_divlet view:history for details']));
+      parts.push(block(['divlet', `project:${info.projectId}`, `changes:${changes.length}`], 'made by the user or by file edits since your last turn', [...changes, 'next:', '- divlet_read view:history for details']));
     }
     if (info.selection?.ids?.length) {
       const frames = info.documents.filter((doc) => info.selection.ids.includes(doc.id));
@@ -195,7 +198,7 @@ export default function divletExtension(pi) {
       if (nodes) header.push(`nodes:${nodes.nodeIds.length}`);
       const sections = ['frames:', ...frames.map(({ id, name, version, artboard }) => `- ${id} · v${version} · “${String(name).replace(/\s+/g, ' ').trim()}” · ${artboard.width}×${artboard.height}`)];
       if (nodes) sections.push(`elements in ${nodes.documentId}:`, ...nodes.nodeIds.map((id) => `- ${nodes.documentId}/${id}`));
-      parts.push(block(header, 'selection at prompt start', [...sections, 'next:', '- use these explicit IDs for references such as “these screens” or “this button”; later selection changes do not retarget this request', '- read node state with read_divlet before applying patches']));
+      parts.push(block(header, 'selection at prompt start', [...sections, 'next:', '- use these explicit IDs for references such as “these screens” or “this button”; later selection changes do not retarget this request', '- read node state with divlet_read before applying patches']));
     }
     if (!parts.length) return;
     return { message: { customType: 'divlet-selection', content: parts.join('\n\n'), display: false } };

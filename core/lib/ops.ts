@@ -27,7 +27,7 @@ export interface OpsPatch {
   ids?: NodeId[];
   map?: Record<string, string>;
 }
-/** The structural operations both adapters expose, as `edit_divlet` receives them. */
+/** The structural operations both adapters expose, as `divlet_edit` receives them. */
 export type Operation =
   | { type: 'detach'; id: NodeId }
   | { type: 'remove'; id?: NodeId; ids?: NodeId[] }

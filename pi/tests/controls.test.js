@@ -53,7 +53,7 @@ test('a fresh Pi session advertises the model list and thinking level to every b
 
   // The session exists before any turn; that is when the board must learn what it can change.
   await pi.emit('session_start', { reason: 'startup' });
-  const opened = await pi.call('open_divlet', {});
+  const opened = await pi.call('divlet_open', {});
   const controls = (await fetch(new URL('api/project', opened.url), { headers: { Origin: new URL(opened.url).origin } }).then(response => response.json())).agent.controls;
   assert.deepEqual(controls.model, { value: 'anthropic/claude-sonnet-4-5', options: [{ id: 'anthropic/claude-sonnet-4-5', label: 'claude-sonnet-4-5' }, { id: 'anthropic/claude-haiku-4-5', label: 'claude-haiku-4-5' }] }, 'the model picker lists what the session can use, current first');
   assert.deepEqual(controls.thinking, { value: 'medium', options: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] });
@@ -77,7 +77,7 @@ test('a model Pi cannot authenticate is refused, and the board is told instead o
   const pi = fakePi(cwd);
   t.after(async () => { await pi.emit('session_shutdown'); await rm(cwd, { recursive: true, force: true }); });
   await pi.emit('session_start', { reason: 'startup' });
-  const opened = await pi.call('open_divlet', {});
+  const opened = await pi.call('divlet_open', {});
   const origin = new URL(opened.url).origin;
   const state = () => fetch(new URL('api/project', opened.url), { headers: { Origin: origin } }).then(response => response.json());
   const history = () => fetch(new URL('api/history?limit=5', opened.url), { headers: { Origin: origin } }).then(response => response.json());

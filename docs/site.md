@@ -7,7 +7,7 @@ A site combines one accepted frame from `project.divlet` as a shared template wi
 | Source | Owns | Editing path |
 | --- | --- | --- |
 | `site.json` beside the selected `.divlet` source | Template binding, content directory and slot IDs | Edit the JSON file |
-| Template frame in `project.divlet` | Shared layout and metadata | `patch_divlet` or a valid project-file edit |
+| Template frame in `project.divlet` | Shared layout and metadata | `divlet_patch` or a valid project-file edit |
 | Content `.md` files | Page content and page metadata | Edit individual files |
 | Composed route documents | Derived template + Markdown projection | Read-only; edit their sources |
 
@@ -45,7 +45,7 @@ Slots must exist, reference different element nodes, and have no ancestor/descen
 
 Content and navigation slots accept `div`, `main`, `section`, `article`, `aside`, `nav`, `header` or `footer`. A title slot can be another non-void element, such as `h1`.
 
-The template is an ordinary frame. Read its current version, then patch its CSS or stable nodes through `patch_divlet`. A successful template-source change rebuilds the site. It can reference project components outside the slots; slots must address the template's own element nodes, not nodes inside an instance. Changes to directly or transitively referenced components, or shared project CSS/tokens, also rebuild the routes without changing the template's source version. Snapshot caching includes the expanded template model and shared theme, not unrelated frame revisions or the compiler's cumulative stylesheet. Unrelated component and project-name edits, and unchanged scans, keep the accepted snapshot. Per-page structural overrides are not supported.
+The template is an ordinary frame. Read its current version, then patch its CSS or stable nodes through `divlet_patch`. A successful template-source change rebuilds the site. It can reference project components outside the slots; slots must address the template's own element nodes, not nodes inside an instance. Changes to directly or transitively referenced components, or shared project CSS/tokens, also rebuild the routes without changing the template's source version. Snapshot caching includes the expanded template model and shared theme, not unrelated frame revisions or the compiler's cumulative stylesheet. Unrelated component and project-name edits, and unchanged scans, keep the accepted snapshot. Per-page structural overrides are not supported.
 
 ## File-based routes
 
@@ -111,7 +111,7 @@ Local resources are bundled into `_assets/`; navigation and asset URLs become re
 
 ## Reading and live updates
 
-`read_divlet` accepts:
+`divlet_read` accepts:
 
 ```json
 { "view": "site" }
@@ -129,7 +129,7 @@ The board provides an **Open site** link. Site pages use normal browser navigati
 
 Any artboard can also expand inside the web client's viewport. Its **Open site** control navigates the same iframe to the routed site. The sandboxed frame receives accepted site versions from the parent board connection through a source-checked message bridge; it does not need cross-origin SSE access. Resetting exits expanded mode and loads the current accepted original artboard, including template edits made while browsing.
 
-Markdown, configuration and external `project.divlet` edits are picked up by the runtime's scanner. Template changes through `patch_divlet` trigger a rebuild directly. Navigation is rebuilt when page titles, ordering or membership change.
+Markdown, configuration and external `project.divlet` edits are picked up by the runtime's scanner. Template changes through `divlet_patch` trigger a rebuild directly. Navigation is rebuilt when page titles, ordering or membership change.
 
 ## Failure and round-trip boundaries
 

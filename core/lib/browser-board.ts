@@ -9,7 +9,7 @@
  * uploaded; a private project is never fetched or paired.
  */
 import { BrowserRuntime } from './browser-runtime.ts';
-import { inputSchema, forAgent } from './tools.ts';
+import { inputSchema, forAgent, toolByName } from './tools.ts';
 import { sameJson } from './validation.ts';
 import type { FrameCompiler } from './prepare.ts';
 import { createBrowserMcpProvider, exposeBrowserMcp, defineTools, registerWebMcpTools } from '@divlet/web/mcp';
@@ -33,7 +33,7 @@ export interface BrowserBoardOptions {
 }
 
 const HOST_KEY = Symbol.for('divlet.board-host/1');
-const READ_ONLY = new Set(['read_divlet']);
+const READ_ONLY = new Set(['divlet_read']);
 
 /**
  * The browser host compiles no utilities: it serves the build-time stylesheet for the frame's token set, and reports a class
@@ -186,12 +186,12 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
 
   /* ---- the agent surface: the same contract tools ------------------------------------------------- */
   let running = 0;
-  const tools: BrowserTool[] = runtime.tools().map(tool => ({
+  const tools: BrowserTool[] = runtime.tools({ aliases: true }).map(tool => ({
     name: tool.name,
     ...(tool.title ? { title: tool.title } : {}),
     description: tool.description,
     inputSchema: inputSchema(tool),
-    annotations: READ_ONLY.has(tool.name) ? { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } : { readOnlyHint: false, destructiveHint: tool.name !== 'mark_divlet', openWorldHint: false },
+    annotations: READ_ONLY.has(toolByName.get(tool.name)!.name) ? { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } : { readOnlyHint: false, destructiveHint: toolByName.get(tool.name)!.name !== 'divlet_mark', openWorldHint: false },
     async execute(args: Record<string, unknown>) {
       running++;
       runtime.setAgent({ connected: true, busy: true, activity: tool.title ?? tool.name, queued: running - 1 });
@@ -200,9 +200,10 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
     },
   }));
   const registry = defineTools(tools);
+  // Browser transports allow only listed tools, and WebMCP requires explicit alias registrations.
   const provider = createBrowserMcpProvider({
     name: 'divlet', title: 'divlet in the browser', version: options.version, tools: registry,
-    instructions: `divlet is a layout board for agents. This page holds a browser-local copy of the ${options.file} project (HTML/SVG/CSS frames), stored only in this browser. Read the project with read_divlet, then change it with patch_divlet or edit_divlet using the versions you read; frame_divlet adds or removes frames and undo_divlet reverts. The visitor watches every change live. Utility classes are not compiled here: style with the frame css or inline style. Files, fonts, embedded assets and opening other projects need the local divlet host (npx -y @divlet/mcp).`,
+    instructions: `divlet is a layout board for agents. This page holds a browser-local copy of the ${options.file} project (HTML/SVG/CSS frames), stored only in this browser. Read the project with divlet_read, then change it with divlet_patch or divlet_edit using the versions you read; divlet_frame_manage adds or removes frames and divlet_undo reverts. The visitor watches every change live. Utility classes are not compiled here: style with the frame css or inline style. Files, fonts, embedded assets and opening other projects need the local divlet host (npx -y @divlet/mcp).`,
   });
   exposeBrowserMcp(provider, target);
   const webmcp = await registerWebMcpTools(registry);

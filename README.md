@@ -90,7 +90,7 @@ Drop `--global` to install into the current project only. Skip this step under P
 }
 ```
 
-Call `open_divlet` and open its returned URL. No Pi installation is needed. Clients that support **sampling** can also answer requests typed in the board's Agent tab.
+Call `divlet_open` and open its returned URL. No Pi installation is needed. Clients that support **sampling** can also answer requests typed in the board's Agent tab.
 
 ### A board on a website
 
@@ -145,9 +145,11 @@ Open a Pencil `.pen` or static `.html` file to import it into a sibling `.divlet
 
 **Read → edit → verify.** The agent reads the current frame and version, submits a labelled change, then checks the result. A stale version is refused rather than silently overwriting newer work.
 
-- **Open and inspect:** `open_divlet`, `read_divlet`.
-- **Change the layout:** `patch_divlet`, `edit_divlet`, `frame_divlet`.
-- **Explain and recover:** `mark_divlet`, `undo_divlet`.
+- **Open and inspect:** `divlet_open`, `divlet_read`.
+- **Change the layout:** `divlet_patch`, `divlet_edit`, `divlet_frame_manage`.
+- **Explain and recover:** `divlet_mark`, `divlet_undo`.
+
+These are the current source/unreleased canonical names; legacy `*_divlet` spellings remain compatibility aliases ([migration details](docs/agents.md#tool-name-compatibility)). Use the names advertised by your installed version.
 
 The [workflow skill](skills/divlet/SKILL.md) teaches the loop; the [tool guide](docs/agents.md#agent-tools) covers views, components, overrides and refusal codes.
 

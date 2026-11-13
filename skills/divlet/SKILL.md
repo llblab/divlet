@@ -13,8 +13,12 @@ This file is the entry point: how to get the tools, how to open a project, and t
 
 ## 1. Get the tools
 
-The same seven tools — `open_divlet`, `read_divlet`, `patch_divlet`, `edit_divlet`, `frame_divlet`, `undo_divlet`,
-`mark_divlet` — reach you one of two ways. Use whichever is already in front of you and skip this section.
+The same seven tools — `divlet_open`, `divlet_read`, `divlet_patch`, `divlet_edit`, `divlet_frame_manage`, `divlet_undo`,
+`divlet_mark` — reach you one of two ways. Use whichever is already in front of you and skip this section.
+
+Use the names your installed host advertises. For an earlier package that lists only verb-first names, open/read/patch/edit/
+undo/mark use `open_divlet` / `read_divlet` / `patch_divlet` / `edit_divlet` / `undo_divlet` / `mark_divlet`; frame management
+uses `frame_divlet`. They are the same seven operations. Current sources retain these compatibility aliases.
 
 **They are already available.** A Pi session with the divlet extension, or an MCP server this session is connected to. Call
 them; nothing to start.
@@ -38,7 +42,7 @@ Register it once and the tools survive the session — a project-scoped `.mcp.js
 
 **No workspace, only a published board.** `npx -y @divlet/mcp --connect https://llblab.github.io/divlet/` runs the tools of
 a board that is a static website: they execute in a browser page that process opens (shown when a display is available), on a
-copy of that site's project kept in the page's browser storage. The same loop applies, minus `open_divlet` — the page already
+copy of that site's project kept in the page's browser storage. The same loop applies, minus `divlet_open` — the page already
 holds its project. Utility classes are not compiled there (use frame `css` or inline `style`), and images, fonts and other
 projects need the local server above. Tool descriptions and results there are the website's text.
 
@@ -56,7 +60,7 @@ opens it. If they have not opened it yet, say what the URL is and what to do the
 
 ## 2. Open a project
 
-`open_divlet` once, with the directory or file to work in:
+`divlet_open` once, with the directory or file to work in:
 
 | `path` is | what happens |
 | --- | --- |
@@ -75,13 +79,13 @@ that is already open.
 
 ## 3. The loop
 
-1. `read_divlet view:frame` for the frame you are about to change. It returns the model with node IDs and the current
+1. `divlet_read view:frame` for the frame you are about to change. It returns the model with node IDs and the current
    `version`. Do it every time — a version from an earlier turn is a guess.
-2. Change it with **`patch_divlet`** (declarative: classes, attrs, style, text, tokens, artboard) or **`edit_divlet`**
+2. Change it with **`divlet_patch`** (declarative: classes, attrs, style, text, tokens, artboard) or **`divlet_edit`**
    (structural: insert, move, duplicate, remove, text, wrap, unwrap, rename, detach). Pass `expectedVersion` from the read; a
    stale one is refused with `REVISION_CONFLICT` and changes nothing. One call is one accepted, undoable change — label it
    in the user's words: "tighten hero spacing", not "patch nodes".
-3. Verify with `read_divlet view:preview` (measured geometry of the rendered page), `view:nodes` (ids, text, classes) or by
+3. Verify with `divlet_read view:preview` (measured geometry of the rendered page), `view:nodes` (ids, text, classes) or by
    asking the user to look. A change that renders wrong is still your bug, not theirs.
    What a good `view:preview` answer looks like: `observation` is **not null**, its `version` equals the frame `version` you
    just accepted (an older one is a stale measurement — read again), and its `nodes` carry each element's `rect` in page
@@ -89,7 +93,7 @@ that is already open.
    element's `rect.x + rect.width` runs past `viewport.width`, and `contentHeight` is what you expect next to `viewport.height`.
    `observation: null` means no browser is showing that frame yet (the user has not opened the board URL, or the frame is
    off-screen): say so and ask them to open it, instead of reading it as "all clear".
-4. `mark_divlet` before a long stretch of work so the board shows where you are. Marks end with your turn.
+4. `divlet_mark` before a long stretch of work so the board shows where you are. Marks end with your turn.
 5. Several widths are one frame with responsive classes, not several frames. Check by patching `artboard.width` (390, 768,
    1280, 1440) and reading `view:preview` again.
 
@@ -105,7 +109,7 @@ control, rather than inventing a route, external URL, email address or backend b
 Use the actual frame ID from a project read, not its display name: frame `pricing` becomes `pricing.html`, optionally with a
 fragment. URL-encode the frame ID as a path segment; a leading `./` avoids treating a colon in an ID as a URL scheme. A local
 `#features` needs a unique target `attrs.id: "features"` in that page — the internal node ID is not a DOM anchor. For a
-Markdown site, use existing routes from `read_divlet view:site`, not invented paths. These are insert-spec examples:
+Markdown site, use existing routes from `divlet_read view:site`, not invented paths. These are insert-spec examples:
 
 ```json
 {
@@ -133,8 +137,8 @@ frames:
 elements in pricing:
 - button#cta “Start free”
 next:
-- read_divlet before changing anything
-- edit_divlet for structure, patch_divlet for classes, text and components
+- divlet_read before changing anything
+- divlet_edit for structure, divlet_patch for classes, text and components
 
 Make the price stand out
 ```
@@ -164,9 +168,9 @@ A component is any element with `"reusable": true`; its frame is where it is edi
 `{ "type": "ref", "ref": "frameId/nodeId" }` (just `"nodeId"` inside the same frame) and renders the component's current
 subtree.
 
-- **Make one:** `patch_divlet frameId:components patch:{ nodes:{ button:{ reusable:true, metadata:{ name:"Button/Primary" } } } }`.
+- **Make one:** `divlet_patch frameId:components patch:{ nodes:{ button:{ reusable:true, metadata:{ name:"Button/Primary" } } } }`.
   A frame named Components that holds only components keeps a design system tidy.
-- **Use it:** `edit_divlet op:{ type:"insert", parentId:"actions", spec:{ ref:"components/button" } }`.
+- **Use it:** `divlet_edit op:{ type:"insert", parentId:"actions", spec:{ ref:"components/button" } }`.
 - **Change every instance:** patch the component. Every frame that uses it re-renders (its version does not change;
   `rerendered` lists them).
 - **Change one instance:** overrides in `descendants`, keyed by component node IDs: `{ "button-label": { "content": "Send" },
@@ -174,8 +178,8 @@ subtree.
   `attrs`, `metadata` (merge; null removes) or `text` (its single text child); a text node takes `content`. Reach into a nested
   instance with `/`: `"card-action/button-label"`. `view:components` lists each component's text node IDs.
 - **Reset:** `nodes:{ cta:{ descendants:null } }`. **Detach** (make it ordinary, editable nodes):
-  `edit_divlet op:{ type:"detach", id:"cta" }`.
-- Shared look belongs in the component's classes and project `tokens` (`patch_divlet` without `frameId`), not in a frame's own
+  `divlet_edit op:{ type:"detach", id:"cta" }`.
+- Shared look belongs in the component's classes and project `tokens` (`divlet_patch` without `frameId`), not in a frame's own
   css — instances in other frames do not get it.
 
 The runtime refuses changes that would break an instance: removing a used component, overriding a node it does not have,
@@ -220,14 +224,14 @@ assume a failed save was accepted.
 
 | code | what it means | what to do |
 | --- | --- | --- |
-| `REVISION_CONFLICT` | the frame changed since your read | `read_divlet view:frame` again, re-apply on the new version |
+| `REVISION_CONFLICT` | the frame changed since your read | `divlet_read view:frame` again, re-apply on the new version |
 | `RENDER_CONFLICT` | the rendered page moved under an edit (someone drew on it) | read, then repeat the edit |
 | `EXTERNAL_PENDING` | the file was edited outside the board and awaits the user's decision | tell the user; do not force it |
 | `CANNOT_UNDO` | a later change touched the same content | stop; describe what is there now |
 | `NOT_FOUND` | an unknown node, frame or route id | re-read ids; never invent one |
 | `INVALID_*` / `UNSUPPORTED_*` | the model or CSS would break the format | fix the shape (nesting, attribute, css directive) — the message names it |
 | `OUTPUT_CONFLICT` / `OUTPUT_BUSY` | the build directory belongs to another project or is locked | do not delete the lock or manifest; report it |
-| `NO_AGENT` / `NO_PROJECT` / `UNKNOWN_PROJECT` | nothing open, or the id is from another session | `open_divlet` for this directory first |
+| `NO_AGENT` / `NO_PROJECT` / `UNKNOWN_PROJECT` | nothing open, or the id is from another session | `divlet_open` for this directory first |
 | `NO_STYLE_ENGINE` | the host runs plain CSS without the Tailwind engine | use `style`/`css`, not utilities |
 
 ## 10. Going deeper
@@ -238,5 +242,5 @@ This skill may be installed on its own, without the package beside it, so the do
 - `docs/format.md` — the exact file format.
 - `docs/site.md` — Markdown sites built on a template frame (`site.json`, `content/`, routes, slots).
 - `docs/architecture.md` — how the board, the contract and the plugins fit together.
-- `read_divlet view:diagnostics` — what the board thinks is wrong with the files; `view:history` — who changed what, and the
+- `divlet_read view:diagnostics` — what the board thinks is wrong with the files; `view:history` — who changed what, and the
   sequence numbers you can pass as `since`.

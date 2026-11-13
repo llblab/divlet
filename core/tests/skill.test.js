@@ -52,15 +52,15 @@ test('it is an entry point: install the tools, then open, then work', async () =
   for (const flag of ['--cwd', '--project', '--port', '--no-demo']) assert.ok(source.includes(flag), `it documents ${flag}`);
   const help = await readFile(path.join(root, 'mcp/index.js'), 'utf8');
   for (const flag of ['--cwd', '--project', '--port', '--no-demo']) assert.ok(help.includes(flag), `the server accepts ${flag}`);
-  // The published-board route: a real flag, and the browser host really serves every tool but open_divlet.
+  // The published-board route: a real flag, and the browser host really serves every tool but divlet_open.
   assert.match(source, /npx -y @divlet\/mcp --connect https:\/\//);
   assert.ok(help.includes("arg === '--connect'"), 'the server accepts --connect');
   const { BROWSER_TOOLS } = await import('../lib/browser-runtime.ts');
-  assert.deepEqual([...BROWSER_TOOLS].sort(), TOOLS.filter(tool => !tool.hidden && tool.name !== 'open_divlet').map(tool => tool.name).sort());
+  assert.deepEqual([...BROWSER_TOOLS].sort(), TOOLS.filter(tool => !tool.hidden && tool.name !== 'divlet_open').map(tool => tool.name).sort());
 });
 
 test('every tool it names is a tool the contract serves, and it names them all once', () => {
-  const named = new Set([...source.matchAll(/`([a-z]+_divlet)`/g)].map(match => match[1]));
+  const named = new Set([...source.matchAll(/`(divlet_[a-z_]+)`/g)].map(match => match[1]));
   const served = new Set(TOOLS.filter(tool => !tool.hidden).map(tool => tool.name));
   for (const name of named) assert.ok(served.has(name), `the skill names ${name}, which the contract serves`);
   for (const name of served) assert.ok(named.has(name), `the skill mentions ${name}`);
@@ -170,7 +170,7 @@ test('a copied standalone skill stands on its own, and the install path is the d
 
 test('the preview verification it teaches is the shape the runtime returns', async () => {
   const runtime = await readFile(path.join(root, 'core/lib/runtime.js'), 'utf8');
-  const section = source.split('What a good `view:preview` answer looks like')[1]?.split('4. `mark_divlet`')[0];
+  const section = source.split('What a good `view:preview` answer looks like')[1]?.split('4. `divlet_mark`')[0];
   assert.ok(section, 'the verification step says what a good answer is');
   for (const field of ['observation', 'overflowX', 'overflowY', 'contentHeight', 'viewport', 'rect']) {
     assert.ok(section.includes(field), `the skill names ${field}`);

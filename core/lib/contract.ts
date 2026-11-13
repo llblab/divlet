@@ -129,15 +129,15 @@ export function createSession({ openBoard, cwd = process.cwd(), attach = true, o
       if (board) return { board, runtime: null };
       const file = files.get(projectId);
       if (file && !runtimes.has(file)) return boardFor(file, {}, ctx);
-      throw Object.assign(new Error(`Unknown open divlet project: ${projectId}. Call open_divlet first.`), { code: 'UNKNOWN_PROJECT' });
+      throw Object.assign(new Error(`Unknown open divlet project: ${projectId}. Call divlet_open first.`), { code: 'UNKNOWN_PROJECT' });
     }
     const dir = resolve(ctx.cwd ?? cwd);
     const file = active.get(dir);
-    if (!file) throw Object.assign(new Error('No divlet project is open for this client directory. Call open_divlet first.'), { code: 'NO_PROJECT' });
+    if (!file) throw Object.assign(new Error('No divlet project is open for this client directory. Call divlet_open first.'), { code: 'NO_PROJECT' });
     return boardFor(file, {}, ctx);
   }
 
-  /** `open_divlet`: a project opens its board, a collection with several projects opens the launcher. */
+  /** `divlet_open`: a project opens its board, a collection with several projects opens the launcher. */
   async function open(args: Record<string, any> = {}, ctx: CallContext = {}): Promise<any> {
     const from = resolve(ctx.cwd ?? cwd);
     const target = resolve(args.path || args.cwd || '.', from);
@@ -163,7 +163,7 @@ export function createSession({ openBoard, cwd = process.cwd(), attach = true, o
     return answer;
   }
 
-  /** Run one tool. `open_divlet` decides ownership, everything else runs on the board that owns the project. */
+  /** Run one tool. `divlet_open` decides ownership, everything else runs on the board that owns the project. */
   async function call(name: string, args: Record<string, any> = {}, ctx: CallContext = {}): Promise<any> {
     if (closed) throw Object.assign(new Error('This divlet session is closed.'), { code: 'CLOSED' });
     const tool = toolByName.get(name);
@@ -171,7 +171,8 @@ export function createSession({ openBoard, cwd = process.cwd(), attach = true, o
     if (tool.kind === 'open') return open(args, ctx);
     const { runtime, board } = await runtimeFor(args ?? {}, ctx);
     if (board) {
-      try { return await boardTool(board, name, args, { signal: ctx.signal }); }
+      // Older live boards accept the original wire names; both generations resolve them to the same operation.
+      try { return await boardTool(board, tool.aliases?.[0] ?? tool.name, args, { signal: ctx.signal }); }
       catch (error) {
         // The owning process is gone (or its board stopped): forget it and open this project here, once.
         const code = (error as { code?: string })?.code;
@@ -202,16 +203,16 @@ export function createSession({ openBoard, cwd = process.cwd(), attach = true, o
   return { call, open, close, activate, runtimes, owners, hubs, active, get cwd() { return cwd; } };
 }
 
-/** What `open_divlet` answers: the compact project view, or the collection's projects and launcher. */
+/** What `divlet_open` answers: the compact project view, or the collection's projects and launcher. */
 export const openView = (opened: any): any => opened.kind === 'collection' ? collectionView(opened) : compactProject(opened.info);
 
-/** The collection listing `open_divlet` answers with, in the agent's vocabulary. */
+/** The collection listing `divlet_open` answers with, in the agent's vocabulary. */
 export function collectionView(result: any): Record<string, unknown> {
   return {
     launcher: result.launcher,
     collection: result.collection,
     projects: (result.projects as any[]).map(({ name, file, path: where, frames, modified, error }) => ({ name, file, path: where, frames, modified, ...(error ? { error } : {}) })),
-    next: 'Call open_divlet with path set to a project\'s absolute file target, or let the user choose or create one in the launcher.',
+    next: 'Call divlet_open with path set to a project\'s absolute file target, or let the user choose or create one in the launcher.',
   };
 }
 

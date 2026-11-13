@@ -247,7 +247,7 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
     clone(nodeId, '');
     for (const [address, override] of Object.entries(refNode.descendants ?? {})) {
       const target = nodes.get(address);
-      if (!target) fail('INVALID_OVERRIDE', `${where} overrides ${address}, which is not a node of ${refNode.ref}. Read the component (read_divlet view:components) for its node IDs.`);
+      if (!target) fail('INVALID_OVERRIDE', `${where} overrides ${address}, which is not a node of ${refNode.ref}. Read the component (divlet_read view:components) for its node IDs.`);
       applyOverride(target, override, `${where} → ${address}`, makeText);
     }
     return { rootKey: nodeId, nodes };

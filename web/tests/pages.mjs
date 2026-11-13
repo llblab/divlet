@@ -90,37 +90,39 @@ test('a first visit on a phone reads the landing as a phone page', async () => {
 test('an agent connects by URL, edits the project and the visitor sees it; the copy persists across reloads', async () => {
   const connection = await connectBrowserMcp(base, { browser, readyTimeoutMs: 15_000 });
   try {
-    assert.deepEqual(connection.tools.map(tool => tool.name), ['read_divlet', 'patch_divlet', 'edit_divlet', 'frame_divlet', 'undo_divlet', 'mark_divlet']);
+    assert.deepEqual(connection.tools.filter(tool => !tool.name.endsWith('_divlet')).map(tool => tool.name), ['divlet_read', 'divlet_patch', 'divlet_edit', 'divlet_frame_manage', 'divlet_undo', 'divlet_mark']);
+    assert.equal(connection.tools.length, 12, 'browser allowlisting retains six explicitly described compatibility aliases');
+    assert.match(connection.tools.find(tool => tool.name === 'read_divlet').description, /Compatibility alias for divlet_read/);
     assert.match(String(connection.discovery.instructions), /browser-local copy/);
     const page = connection.page;
     await page.waitForSelector('.artboard[data-artboard-id="index"] iframe');
     const project = parse(await connection.callTool('read_divlet', {}));
     assert.deepEqual(project.frames.map(frame => frame.id), ['index']);
-    const frame = parse(await connection.callTool('read_divlet', { view: 'frame', frameId: 'index', full: true }));
+    const frame = parse(await connection.callTool('divlet_read', { view: 'frame', frameId: 'index', full: true }));
     const heading = Object.values(frame.nodes).find(node => node.type === 'element' && node.tag === 'h1');
     const text = Object.values(frame.nodes).find(node => node.type === 'text' && heading.children.includes(node.id));
-    parse(await connection.callTool('mark_divlet', { frameId: 'index', nodeIds: [heading.id], note: 'retitling the hero' }));
+    parse(await connection.callTool('divlet_mark', { frameId: 'index', nodeIds: [heading.id], note: 'retitling the hero' }));
     const patched = parse(await connection.callTool('patch_divlet', { frameId: 'index', expectedVersion: frame.version, label: 'agent retitle', patch: { nodes: { [text.id]: { content: 'Edited by an agent in your browser' } } } }));
     assert.equal(patched.version, frame.version + 1);
     await page.frameLocator('iframe[data-document-id="index"]').locator('h1', { hasText: 'Edited by an agent in your browser' }).waitFor();
-    const stale = await connection.callTool('patch_divlet', { frameId: 'index', expectedVersion: frame.version, patch: { name: 'stale' } });
+    const stale = await connection.callTool('divlet_patch', { frameId: 'index', expectedVersion: frame.version, patch: { name: 'stale' } });
     assert.equal(stale.isError, true);
     assert.match(stale.content[0].text, /^REVISION_CONFLICT/);
-    const invalid = await connection.callTool('edit_divlet', { frameId: 'index', expectedVersion: patched.version, op: { type: 'explode' } });
+    const invalid = await connection.callTool('divlet_edit', { frameId: 'index', expectedVersion: patched.version, op: { type: 'explode' } });
     assert.equal(invalid.isError, true, 'schema refusal');
     // The visitor's own edit goes through the same writer; the agent reads it.
     await page.evaluate(async () => { const { commit, descriptor } = await import('./lib/store.js'); await commit('index', { name: 'Visitor renamed' }, { expectedVersion: descriptor('index').version }); });
-    const after = parse(await connection.callTool('read_divlet', { view: 'frame', frameId: 'index', full: true }));
+    const after = parse(await connection.callTool('divlet_read', { view: 'frame', frameId: 'index', full: true }));
     assert.equal(after.name, 'Visitor renamed');
-    const history = parse(await connection.callTool('read_divlet', { view: 'history' }));
+    const history = parse(await connection.callTool('divlet_read', { view: 'history' }));
     assert.deepEqual(history.changes.map(change => change.actor), ['agent', 'user']);
     await page.reload();
     await connection.reconnect();
-    const restored = parse(await connection.callTool('read_divlet', { view: 'frame', frameId: 'index', full: true }));
+    const restored = parse(await connection.callTool('divlet_read', { view: 'frame', frameId: 'index', full: true }));
     assert.equal(restored.name, 'Visitor renamed', 'IndexedDB kept the browser copy');
     assert.equal(restored.nodes[text.id].content, 'Edited by an agent in your browser');
     // Undo history belongs to the page instance, not to storage: a reload starts a new history line.
-    const undo = await connection.callTool('undo_divlet', {});
+    const undo = await connection.callTool('divlet_undo', {});
     assert.equal(undo.isError, true);
     assert.match(undo.content[0].text, /^NOTHING_TO_UNDO/);
   } finally { await connection.close(); }
@@ -132,11 +134,11 @@ test('the official SDK client drives the real application through the browser tr
     const client = new Client({ name: 'sdk', version: '1.0.0' }, { versionNegotiation: { mode: { pin: '2026-07-28' } } });
     await client.connect(browserMcpTransport(connection));
     const { tools } = await client.listTools();
-    assert.equal(tools.find(tool => tool.name === 'read_divlet').annotations.readOnlyHint, true);
-    const created = await client.callTool({ name: 'frame_divlet', arguments: { action: 'create', name: 'Phone', width: 390, height: 844 } });
+    assert.equal(tools.find(tool => tool.name === 'divlet_read').annotations.readOnlyHint, true);
+    const created = await client.callTool({ name: 'divlet_frame_manage', arguments: { action: 'create', name: 'Phone', width: 390, height: 844 } });
     assert.equal(created.isError, false);
     await connection.page.waitForSelector('.artboard[data-artboard-id="phone"]');
-    const undone = await client.callTool({ name: 'undo_divlet', arguments: {} });
+    const undone = await client.callTool({ name: 'divlet_undo', arguments: {} });
     assert.equal(undone.isError, false);
     await connection.page.waitForSelector('.artboard[data-artboard-id="phone"]', { state: 'detached' });
     await client.close();

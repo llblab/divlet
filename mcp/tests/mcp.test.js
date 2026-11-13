@@ -112,8 +112,8 @@ test('an MCP client initializes, lists the shared tools and edits a project end 
 
   const list = await rpc.request('tools/list');
   const names = list.result.tools.map(tool => tool.name);
-  assert.deepEqual(names, ['open_divlet', 'read_divlet', 'patch_divlet', 'edit_divlet', 'frame_divlet', 'undo_divlet', 'mark_divlet'], 'the MCP surface is the shared contract');
-  const patch = list.result.tools.find(tool => tool.name === 'patch_divlet');
+  assert.deepEqual(names, ['divlet_open', 'divlet_read', 'divlet_patch', 'divlet_edit', 'divlet_frame_manage', 'divlet_undo', 'divlet_mark'], 'the MCP surface is the shared contract');
+  const patch = list.result.tools.find(tool => tool.name === 'divlet_patch');
   assert.equal(patch.inputSchema.type, 'object');
   assert.deepEqual([...patch.inputSchema.required].sort(), ['expectedVersion', 'patch'], 'required parameters come from the same schema Pi uses');
   assert.ok(patch.description.includes('expectedVersion'));
@@ -131,23 +131,23 @@ test('an MCP client initializes, lists the shared tools and edits a project end 
   const patched = await tool(rpc, 'patch_divlet', { projectId, frameId: 'one', expectedVersion: 1, label: 'rename', patch: { name: 'First' } });
   assert.equal(patched.isError, false);
   assert.equal(patched.json.version, 2);
-  const after = await tool(rpc, 'read_divlet', { projectId, frameId: 'one', view: 'frame' });
+  const after = await tool(rpc, 'divlet_read', { projectId, frameId: 'one', view: 'frame' });
   assert.equal(after.json.name, 'First');
 
-  const stale = await tool(rpc, 'patch_divlet', { projectId, frameId: 'one', expectedVersion: 1, patch: { name: 'Again' } });
+  const stale = await tool(rpc, 'divlet_patch', { projectId, frameId: 'one', expectedVersion: 1, patch: { name: 'Again' } });
   assert.equal(stale.isError, true, 'a stale revision is a tool error');
   assert.match(stale.text, /REVISION_CONFLICT/);
-  const unchanged = await tool(rpc, 'read_divlet', { projectId, frameId: 'one', view: 'frame' });
+  const unchanged = await tool(rpc, 'divlet_read', { projectId, frameId: 'one', view: 'frame' });
   assert.equal(unchanged.json.name, 'First', 'a refused change changed nothing');
 
-  const undone = await tool(rpc, 'undo_divlet', { projectId, frameId: 'one' });
+  const undone = await tool(rpc, 'divlet_undo', { projectId, frameId: 'one' });
   assert.equal(undone.isError, false);
-  const restored = await tool(rpc, 'read_divlet', { projectId, frameId: 'one', view: 'frame' });
+  const restored = await tool(rpc, 'divlet_read', { projectId, frameId: 'one', view: 'frame' });
   assert.equal(restored.json.name, 'One');
 
-  const created = await tool(rpc, 'frame_divlet', { projectId, action: 'create', name: 'Third', width: 390, height: 600 });
+  const created = await tool(rpc, 'divlet_frame_manage', { projectId, action: 'create', name: 'Third', width: 390, height: 600 });
   assert.equal(created.json.frame.name, 'Third');
-  const marked = await tool(rpc, 'mark_divlet', { projectId, frameId: created.json.frame.id, note: 'laying it out' });
+  const marked = await tool(rpc, 'divlet_mark', { projectId, frameId: created.json.frame.id, note: 'laying it out' });
   assert.equal(marked.isError, false);
 
   const unknown = await rpc.request('tools/call', { name: 'nope', arguments: {} });
@@ -171,7 +171,7 @@ test('protocol errors keep the JSON-RPC shape and do not disturb the session', a
   assert.equal(unknownTool.error.code, -32602);
   const ping = await rpc.request('ping');
   assert.deepEqual(ping.result, {});
-  const opened = await tool(rpc, 'open_divlet', {});
+  const opened = await tool(rpc, 'divlet_open', {});
   assert.equal(opened.json.frames.length, 2, 'the session still works after a protocol error');
 });
 
@@ -182,25 +182,25 @@ test('two MCP clients share one board: the second attaches instead of opening a 
   t.after(() => Promise.all([first.stop(), second.stop()]));
   for (const rpc of [first, second]) { await rpc.request('initialize', { protocolVersion: '2025-06-18', capabilities: {} }); }
 
-  const a = await tool(first, 'open_divlet', {});
-  const b = await tool(second, 'open_divlet', {});
+  const a = await tool(first, 'divlet_open', {});
+  const b = await tool(second, 'divlet_open', {});
   assert.equal(b.json.url, a.json.url, 'the second client reaches the same board');
   assert.equal(b.json.projectId, a.json.projectId);
 
   // One accepted state: what one client writes, the other reads, and revisions are the board's.
-  const written = await tool(first, 'patch_divlet', { projectId: a.json.projectId, frameId: 'one', expectedVersion: 1, patch: { name: 'From A' } });
+  const written = await tool(first, 'divlet_patch', { projectId: a.json.projectId, frameId: 'one', expectedVersion: 1, patch: { name: 'From A' } });
   assert.equal(written.json.version, 2);
-  const seen = await tool(second, 'read_divlet', { projectId: b.json.projectId, frameId: 'one', view: 'frame' });
+  const seen = await tool(second, 'divlet_read', { projectId: b.json.projectId, frameId: 'one', view: 'frame' });
   assert.equal(seen.json.name, 'From A');
   assert.equal(seen.json.version, 2);
 
   // Both read version 2; the first write wins and the second is refused without changing anything.
-  const winner = await tool(first, 'patch_divlet', { projectId: a.json.projectId, frameId: 'one', expectedVersion: 2, patch: { name: 'Winner' } });
+  const winner = await tool(first, 'divlet_patch', { projectId: a.json.projectId, frameId: 'one', expectedVersion: 2, patch: { name: 'Winner' } });
   assert.equal(winner.json.version, 3);
-  const loser = await tool(second, 'patch_divlet', { projectId: b.json.projectId, frameId: 'one', expectedVersion: 2, patch: { name: 'Loser' } });
+  const loser = await tool(second, 'divlet_patch', { projectId: b.json.projectId, frameId: 'one', expectedVersion: 2, patch: { name: 'Loser' } });
   assert.equal(loser.isError, true);
   assert.match(loser.text, /REVISION_CONFLICT/);
-  const final = await tool(second, 'read_divlet', { projectId: b.json.projectId, frameId: 'one', view: 'frame' });
+  const final = await tool(second, 'divlet_read', { projectId: b.json.projectId, frameId: 'one', view: 'frame' });
   assert.equal(final.json.name, 'Winner');
 
   // A browser session is just another client of the same board: the page's own API reports the accepted revision.
@@ -209,14 +209,14 @@ test('two MCP clients share one board: the second attaches instead of opening a 
   assert.equal(page.projectId, a.json.projectId);
 
   // The user's selection on the board is one thing, seen by both clients.
-  const selected = await tool(first, 'read_divlet', { projectId: a.json.projectId, view: 'selection' });
-  const selectedFromB = await tool(second, 'read_divlet', { projectId: b.json.projectId, view: 'selection' });
+  const selected = await tool(first, 'divlet_read', { projectId: a.json.projectId, view: 'selection' });
+  const selectedFromB = await tool(second, 'divlet_read', { projectId: b.json.projectId, view: 'selection' });
   assert.deepEqual(selectedFromB.json.selection, selected.json.selection);
 
   // Closing the client that attached leaves the owner's board alone.
   const secondExit = await second.stop();
   assert.equal(secondExit.code, 0);
-  const stillThere = await tool(first, 'read_divlet', { projectId: a.json.projectId, view: 'project' });
+  const stillThere = await tool(first, 'divlet_read', { projectId: a.json.projectId, view: 'project' });
   assert.equal(stillThere.json.frames.length, 2, 'the board outlives the client that attached to it');
 });
 
@@ -226,7 +226,7 @@ test('a board owned by another process is used, not duplicated, even for a clien
   const owner = client(cwd, state);
   t.after(() => owner.stop());
   await owner.request('initialize', { protocolVersion: '2025-06-18', capabilities: {} });
-  const opened = await tool(owner, 'open_divlet', {});
+  const opened = await tool(owner, 'divlet_open', {});
   process.env.PI_DIVLET_STATE_DIR = state;
   const board = await findBoard(path.join(cwd, 'project.divlet'));
   assert.ok(board, 'the owner registered its board');
@@ -235,7 +235,7 @@ test('a board owned by another process is used, not duplicated, even for a clien
   const later = client(cwd, state);
   t.after(() => later.stop());
   await later.request('initialize', { protocolVersion: '2025-06-18', capabilities: {} });
-  const attached = await tool(later, 'open_divlet', {});
+  const attached = await tool(later, 'divlet_open', {});
   assert.equal(attached.json.url, board.url);
   assert.equal((await readFile(path.join(cwd, 'project.divlet'), 'utf8')).length > 0, true);
 });
@@ -248,7 +248,7 @@ test('a request typed on the board becomes a sampling request the client answers
   t.after(() => rpc.stop());
   await rpc.request('initialize', { protocolVersion: '2025-06-18', capabilities: { sampling: {} }, clientInfo: { name: 'sampler', version: '1' } });
   rpc.notify('notifications/initialized');
-  const opened = await tool(rpc, 'open_divlet', {});
+  const opened = await tool(rpc, 'divlet_open', {});
   assert.equal(opened.isError, false);
   const projectId = opened.json.projectId;
   const frameId = opened.json.frames[0].id;
@@ -271,7 +271,7 @@ test('a request typed on the board becomes a sampling request the client answers
 
   // The answer lands in the board's own history and conversation, visible to every client.
   await waitFor(async () => {
-    const history = await tool(rpc, 'read_divlet', { projectId, view: 'history' });
+    const history = await tool(rpc, 'divlet_read', { projectId, view: 'history' });
     return history.json.changes.some(change => change.kind === 'reply' && /Tightened the title spacing/.test(change.message || change.text || ''));
   }, 'the sampling answer reaches the board');
   const board = await (await fetch(new URL('api/project', opened.json.url))).json();
@@ -285,12 +285,12 @@ test('without sampling the board is told, not left waiting', async t => {
   const rpc = client(cwd, state);
   t.after(() => rpc.stop());
   await rpc.request('initialize', { protocolVersion: '2025-06-18', capabilities: {} });
-  const opened = await tool(rpc, 'open_divlet', {});
+  const opened = await tool(rpc, 'divlet_open', {});
   assert.ok(opened.json.url);
   const ask = await fetch(new URL('api/ask', opened.json.url), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: 'bigger title' }) });
   assert.equal(ask.status, 200, 'the request is accepted: an agent is connected');
   await waitFor(async () => {
-    const history = await tool(rpc, 'read_divlet', { projectId: opened.json.projectId, view: 'history' });
+    const history = await tool(rpc, 'divlet_read', { projectId: opened.json.projectId, view: 'history' });
     return history.json.changes.some(change => change.kind === 'reply' && /does not support sampling/.test(change.message || ''));
   }, 'the board is told the client cannot answer');
   assert.equal(rpc.requests.length, 0, 'no sampling request is sent to a client that cannot answer');

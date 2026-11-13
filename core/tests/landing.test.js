@@ -142,7 +142,7 @@ test('installation examples distinguish released packages, commands and draft-fo
   // Every way to run it that the page offers is a real command of a real package.
   assert.ok(html.includes('npx -y @divlet/mcp --connect https://llblab.github.io/divlet/'));
   assert.ok(html.includes('npx skills add llblab/divlet --skill divlet --global'));
-  for (const tool of ['open_divlet', 'read_divlet', 'patch_divlet', 'edit_divlet', 'frame_divlet', 'undo_divlet', 'mark_divlet']) assert.ok(html.includes(tool), `the tool list names ${tool}`);
+  for (const tool of ['divlet_open', 'divlet_read', 'divlet_patch', 'divlet_edit', 'divlet_frame_manage', 'divlet_undo', 'divlet_mark']) assert.ok(html.includes(tool), `the tool list names ${tool}`);
   assert.doesNotMatch(html, /not yet published/);
 });
 
