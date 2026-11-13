@@ -73,6 +73,7 @@ export class BrowserRuntime {
   redoStack: any[] = [];
   groupCounter = 0;
   work: any[] = [];
+  agent: { connected: boolean; busy: boolean; activity: string | null; since: string | null; queued: number } = { connected: false, busy: false, activity: null, since: null, queued: 0 };
   closed = false;
   url = '';
 
@@ -148,7 +149,7 @@ export class BrowserRuntime {
       selection: clone(this.selection),
       history: this.historyHead(),
       clients: 0,
-      agent: { connected: false, busy: false, activity: null, since: null, queued: 0 },
+      agent: { ...this.agent },
       work: clone(this.work),
       site: null,
       clientPlugins: [],
@@ -593,6 +594,20 @@ export class BrowserRuntime {
     for (const [key, value] of Object.entries({ contentHeight, scrollHeight })) if (Number.isFinite(value) && (value as number) >= 0 && (value as number) < 1e7) page[key] = Math.round(value as number);
     this.observations.set(documentId, { documentId, version: entry.document.version, render: entry.render, viewport: { width: entry.document.artboard.width, height: entry.document.artboard.height }, ...page, nodes: clean, receivedAt: new Date().toISOString() });
     return { ok: true };
+  }
+
+  /**
+   * What the board shows about an agent working through this page. Unlike the Node host, an idle agent keeps its work marks:
+   * stateless MCP calls carry no turn boundary, so marks end only by `mark_divlet { clear: true }` or replacement.
+   */
+  setAgent(patch: Partial<BrowserRuntime['agent']> = {}) {
+    const next = { ...this.agent, ...patch };
+    if (next.busy && !this.agent.busy) next.since = new Date().toISOString();
+    if (!next.busy) { next.since = null; next.activity = null; next.queued = 0; }
+    if (sameJson(next, this.agent)) return this.agent;
+    this.agent = next;
+    this.publish();
+    return this.agent;
   }
 
   /** Run one shared contract tool against this writer (the same `run` Pi, MCP and the CLI use). */
