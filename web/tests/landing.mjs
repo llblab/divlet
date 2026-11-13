@@ -54,7 +54,7 @@ try {
       image.src = src;
     }), icon), 'embedded favicon decodes without any source or cache asset file');
     await page.screenshot({ path: `artifacts/landing-native-${width}-${colorScheme}.png`, fullPage: true });
-    for (const [label, id] of [['What it is', 'what'], ['How it works', 'how'], ['Formats', 'formats'], ['Get it', 'start'], ['Run it locally', 'start'], ['divlet', 'top']]) {
+    for (const [label, id] of [['How it works', 'how'], ['Try it', 'try'], ['Install', 'start'], ['For agents', 'agents'], ['Get started', 'start'], ['Try it without installing', 'try'], ['divlet', 'top']]) {
       await page.getByRole('link', { name: label, exact: true }).click();
       assert.equal(new URL(page.url()).pathname, '/divlet/'); assert.equal(new URL(page.url()).hash, `#${id}`);
       assert.ok(await page.locator(`#${id}`).evaluate(node => { const rect = node.getBoundingClientRect(); return rect.bottom > 0 && rect.top < innerHeight; }), `${label}: actual target is in view`);

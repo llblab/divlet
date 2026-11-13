@@ -139,6 +139,10 @@ test('installation examples distinguish released packages, commands and draft-fo
   assert.ok(html.includes(`pi install npm:${wrapper.name}`));
   assert.ok(html.includes(`Version ${pkg.version} is an early release`));
   assert.match(html, /pre-freeze draft/);
+  // Every way to run it that the page offers is a real command of a real package.
+  assert.ok(html.includes('npx -y @divlet/mcp --connect https://llblab.github.io/divlet/'));
+  assert.ok(html.includes('npx skills add llblab/divlet --skill divlet --global'));
+  for (const tool of ['open_divlet', 'read_divlet', 'patch_divlet', 'edit_divlet', 'frame_divlet', 'undo_divlet', 'mark_divlet']) assert.ok(html.includes(tool), `the tool list names ${tool}`);
   assert.doesNotMatch(html, /not yet published/);
 });
 
