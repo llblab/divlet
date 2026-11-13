@@ -138,7 +138,8 @@
     "prepack": "npm run build",
     "test:browser-mcp": "node scripts/source.mjs web/tests/browser-mcp.mjs",
     "test:pages": "node scripts/source.mjs web/tests/pages.mjs",
-    "pages:build": "node scripts/source.mjs scripts/pages-build.mjs"
+    "pages:build": "node scripts/source.mjs scripts/pages-build.mjs",
+    "test:connect": "node scripts/source.mjs mcp/tests/connect.e2e.mjs"
   },
   "dependencies": {
     "@divlet/web": "0.0.2",

@@ -3,6 +3,7 @@
  * divlet over MCP (stdio), for any MCP client: Claude Desktop, an editor, a script.
  *
  *   npx -y @divlet/mcp [--cwd <dir>] [--project <file.divlet>] [--port <0..65535>] [--no-demo]
+ *   npx -y @divlet/mcp --connect <https://site/> [--allow-tools a,b] [--headless] [--profile <dir>]
  *
  * Nothing starts at import time: the board opens when a tool asks for it, and the process ends when stdin closes or a
  * termination signal arrives, closing only the boards it owns (a board another client owns keeps running for that client).
@@ -10,6 +11,7 @@
 import path from 'node:path';
 import { createSession } from '@divlet/core/contract';
 import { createMcpServer, localBoardOpener, wireBoardAgent } from './lib/server.js';
+import { createConnectServer } from './lib/connect.js';
 import metadata from '#package' with { type: 'json' };
 
 const VERSION = metadata.version;
@@ -25,9 +27,21 @@ function parseArgs(argv) {
     if (arg === '--project' && value) { options.project = value; i++; continue; }
     if (arg === '--port' && value) { options.port = Number(value); i++; continue; }
     if (arg === '--no-demo') { options.createDemo = false; continue; }
+    if (arg === '--connect' && value) { options.connect = value; i++; continue; }
+    if (arg === '--allow-tools' && value) { options.allowTools = value.split(',').map(name => name.trim()).filter(Boolean); i++; continue; }
+    if (arg === '--allow-origin' && value) { (options.allowOrigins ??= []).push(value); i++; continue; }
+    if (arg === '--browser' && value) { options.browser = path.resolve(value); i++; continue; }
+    if (arg === '--profile' && value) { options.profile = path.resolve(value); i++; continue; }
+    if (arg === '--headless') { options.headless = true; continue; }
+    if (arg === '--headed') { options.headless = false; continue; }
     if (arg.startsWith('--')) throw new Error(`Unknown option: ${arg}`);
   }
   if (!Number.isInteger(options.port) || options.port < 0 || options.port > 65535) throw new Error('--port takes 0..65535.');
+  if (options.connect !== undefined) {
+    let url;
+    try { url = new URL(options.connect); } catch { throw new Error('--connect takes an http(s) URL.'); }
+    if (!['https:', 'http:'].includes(url.protocol)) throw new Error('--connect takes an http(s) URL.');
+  }
   return options;
 }
 
@@ -39,6 +53,14 @@ Usage: divlet-mcp [options]
   --port <n>           port for the board the first open starts (0 picks a free one)
   --no-demo            do not seed a starter frame when a new project is created
   --help, --version
+
+Connect to a website that is its own MCP provider (no local board; tools run in the page):
+  --connect <url>      open this site in a managed browser and offer its tools (for example https://llblab.github.io/divlet/)
+  --allow-tools <a,b>  offer only these website tools (default: all the site lists)
+  --allow-origin <o>   an additional origin the site may redirect to (default: none)
+  --headless/--headed  hide or show the browser window (default: shown when a display is available)
+  --browser <path>     Chromium-based browser to launch (default: installed Chrome, then Playwright's Chromium)
+  --profile <dir>      keep the site's browser storage in this directory (default: a fresh profile per run)
 
 Speaks MCP on stdin/stdout; diagnostics go to stderr. The board is the single writer of its project: if another client
 already opened it, tool calls are forwarded to that board instead of opening a second one.`;
@@ -53,6 +75,7 @@ export function runMcp(argv = process.argv.slice(2)) {
   if (options.version) { process.stdout.write(VERSION + '\n'); process.exit(0); }
 
   const log = message => process.stderr.write(`${message}\n`);
+  if (options.connect) return runConnect(options, log);
   session = createSession({
     cwd: options.cwd,
     openBoard: localBoardOpener(),
@@ -95,6 +118,44 @@ export function runMcp(argv = process.argv.slice(2)) {
 
   log(`divlet-mcp ${VERSION} ready (stdio${options.project ? `, project ${path.resolve(options.cwd, options.project)}` : ''})`);
   return { session, server };
+}
+
+/** Stdio framing for the connect mode: requests are handled concurrently and the browser closes with stdin. */
+function runConnect(options, log) {
+  const display = process.platform === 'darwin' || process.platform === 'win32' || !!process.env.DISPLAY || !!process.env.WAYLAND_DISPLAY;
+  const connect = createConnectServer({
+    url: options.connect,
+    version: VERSION,
+    log,
+    send: chunk => process.stdout.write(chunk),
+    browserOptions: {
+      headless: options.headless ?? !display,
+      ...(options.allowTools ? { allowTools: options.allowTools } : {}),
+      ...(options.allowOrigins ? { allowedOrigins: options.allowOrigins } : {}),
+      ...(options.browser ? { executablePath: options.browser } : {}),
+      ...(options.profile ? { userDataDir: options.profile } : {}),
+    },
+  });
+  let stopping = false;
+  const stop = async (code = 0) => { if (stopping) return; stopping = true; await connect.close().catch(() => {}); process.exit(code); };
+  process.stdout.on('error', () => stop(0));
+  process.on('SIGTERM', () => stop(0));
+  process.on('SIGINT', () => stop(0));
+  process.on('unhandledRejection', error => { log(`divlet-mcp: ${error?.stack || error}`); });
+  let pending = '';
+  process.stdin.setEncoding('utf8');
+  process.stdin.on('data', chunk => {
+    pending += chunk;
+    let at;
+    while ((at = pending.indexOf('\n')) >= 0) {
+      const line = pending.slice(0, at);
+      pending = pending.slice(at + 1);
+      if (line.trim()) connect.receive(line);
+    }
+  });
+  process.stdin.on('end', () => { if (pending.trim()) connect.receive(pending); stop(0); });
+  log(`divlet-mcp ${VERSION} ready (stdio, connecting to ${new URL(options.connect).origin})`);
+  return { connect };
 }
 
 export { session, server };
