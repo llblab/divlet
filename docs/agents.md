@@ -60,7 +60,7 @@ A board is the **single writer** of its project. A second client attaches to the
 
 ## A board on a website
 
-**Ships with the 0.0.3 candidate of `@divlet/mcp`**; from a checkout use `node scripts/source.mjs mcp/index.js --connect <url>`. `divlet-mcp --connect <url>` connects any MCP host to a website that is its own MCP provider, such as the published board at `https://llblab.github.io/divlet/`. It opens the site in a managed Chromium (the installed Chrome first), finds the page's provider and offers its tools over stdio; each call runs in the page. No local board, project file or website server is involved.
+Available from `@divlet/mcp` 0.0.3; from a checkout use `node scripts/source.mjs mcp/index.js --connect <url>`. `divlet-mcp --connect <url>` connects any MCP host to a website that is its own MCP provider, such as the published board at `https://llblab.github.io/divlet/`. It opens the site in a managed Chromium (the installed Chrome first), finds the page's provider and offers its tools over stdio; each call runs in the page. No local board, project file or website server is involved.
 
 - `--allow-tools <a,b>` offers only these website tools; `--allow-origin <origin>` admits one more redirect target (default: none).
 - `--headless` / `--headed` hide or show the window (default: shown when a display is available).

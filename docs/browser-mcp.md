@@ -1,6 +1,6 @@
 # Browser-hosted MCP
 
-**Status: implemented for tools; deployed on GitHub Pages; `--connect` is in the 0.0.3 release candidate.** A static website can be an executable MCP provider: its tools run in the visitor's (or the agent's) browser, and a local agent connects by URL. The divlet GitHub Pages build is the first such provider — the real board, opening the canonical landing project, with the same contract tools Pi and the local MCP adapter offer. No MCP server is deployed for it. From a checkout: `node scripts/source.mjs mcp/index.js --connect <url>`.
+**Status: implemented for tools; deployed on GitHub Pages; `--connect` ships with `@divlet/mcp` 0.0.3.** A static website can be an executable MCP provider: its tools run in the visitor's (or the agent's) browser, and a local agent connects by URL. The divlet GitHub Pages build is the first such provider — the real board, opening the canonical landing project, with the same contract tools Pi and the local MCP adapter offer. No MCP server is deployed for it. From a checkout: `node scripts/source.mjs mcp/index.js --connect <url>`.
 
 ```bash
 # Register in any MCP host (Claude Code, an editor, a script). Tools run in a managed browser page, not on this machine.

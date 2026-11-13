@@ -36,7 +36,7 @@ Register it once and the tools survive the session — a project-scoped `.mcp.js
 { "mcpServers": { "divlet": { "command": "npx", "args": ["-y", "@divlet/mcp", "--cwd", "/absolute/path/to/the/workspace"] } } }
 ```
 
-**No workspace, only a published board** (from `@divlet/mcp` 0.0.3). `npx -y @divlet/mcp --connect https://llblab.github.io/divlet/` runs the tools of
+**No workspace, only a published board.** `npx -y @divlet/mcp --connect https://llblab.github.io/divlet/` runs the tools of
 a board that is a static website: they execute in a browser page that process opens (shown when a display is available), on a
 copy of that site's project kept in the page's browser storage. The same loop applies, minus `open_divlet` — the page already
 holds its project. Utility classes are not compiled there (use frame `css` or inline `style`), and images, fonts and other

@@ -6,7 +6,7 @@ A local layout board for coding agents. Work with real HTML in live artboards, r
 
 [Quick start](#quick-start) · [Connect an agent](#connect-an-agent) · [Board guide](docs/board.md) · [Documentation](docs/README.md)
 
-> **0.0.3 · release candidate.** CI publication is being verified; 0.0.2 remains the last confirmed npm release until that completes. The native project format remains a pre-freeze draft; keep backups because future versions may require explicit conversion.
+> **0.0.3 · early release.** All five packages are published on npm through verified GitHub Actions/OIDC. The native project format remains a pre-freeze draft; keep backups because future versions may require explicit conversion.
 
 ## Real pages, not pictures of pages
 
@@ -94,7 +94,7 @@ Call `open_divlet` and open its returned URL. No Pi installation is needed. Clie
 
 ### A board on a website
 
-The [Pages board](https://llblab.github.io/divlet/) is a static site that is its own MCP provider: register it by URL and the tools run in a browser page, on that site's project, with no server deployed for it. `--connect` ships with the 0.0.3 candidate of `@divlet/mcp`; until its publication is verified, run it from a checkout (`node scripts/source.mjs mcp/index.js --connect <url>`).
+The [Pages board](https://llblab.github.io/divlet/) is a static site that is its own MCP provider: register it by URL and the tools run in a browser page, on that site's project, with no server deployed for it. From a checkout: `node scripts/source.mjs mcp/index.js --connect <url>`.
 
 ```bash
 npx -y @divlet/mcp@0.0.3 --connect https://llblab.github.io/divlet/
