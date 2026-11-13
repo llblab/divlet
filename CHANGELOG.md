@@ -2,11 +2,11 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
-## 0.0.2 — candidate
+## 0.0.2 — 2026-11-13
 
 - Fixed Landing CI to resolve workspace sources in a fresh checkout, without depending on a previously generated web build. Browser activity checks now take their initial tab baseline after the newly visible toolbar reports its measured height, and paired typography checks use content width instead of a host-specific font-width assumption. Exact geometry assertions remain unchanged.
 - Project-picker action buttons reserve intrinsic space for all state labels, keeping controls fixed through loading/errors across host fonts and narrow layouts.
-- Added a manually dispatched `Release` GitHub Actions workflow with npm Trusted Publishing/OIDC, frozen five-package archives, serial web/core/adapter publication and registry-install verification through CLI/MCP and an isolated real Pi host. Preparation and verification have no publish token; uncertain or prior publication attempts block automatic replay. The first live CI publication is pending verification; this candidate does not freeze the native project format.
+- Added a manually dispatched `Release` GitHub Actions workflow with npm Trusted Publishing/OIDC, frozen five-package archives, serial web/core/adapter publication and registry-install verification through CLI/MCP and an isolated real Pi host. Preparation and verification have no publish token; uncertain or prior publication attempts block automatic replay. The first live CI release verified all five registry integrities and actual installed CLI/MCP/Pi behavior without a stored npm token. The native project format remains a pre-freeze draft.
 
 ## 0.0.1 — 2026-11-13
 

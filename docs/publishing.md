@@ -1,6 +1,6 @@
 # npm publication
 
-All five **0.0.1** packages are published on npm, with frozen-archive integrity and clean registry installations verified. **0.0.2** is the candidate for the first live CI/OIDC publication; do not treat it as published until all five registry checks and the installed-host CI job pass. This guide owns publication safeguards and the first-publication procedure below; it is not permission to publish again. A prepared tree or versioned changelog is not a completed registry publication. Publishing packages, pushing release refs and deploying the landing page require explicit maintainer authorization. Packaging does not freeze or cut over the native schema.
+All five **0.0.2** packages are published on npm through GitHub Actions/OIDC, with frozen-archive integrity, provenance metadata and clean registry CLI/MCP/Pi installations verified. This guide owns publication safeguards and the first-publication procedure below; it is not permission to publish again. A prepared tree or versioned changelog is not a completed registry publication. Publishing packages, pushing release refs and deploying the landing page require explicit maintainer authorization. Packaging does not freeze or cut over the native schema.
 
 npm refused the original unscoped `divlet` name as too similar to `figlet`. The maintainer approved `@divlet/core` and a separately owned `@divlet/web`; the old four-package archives are historical candidates, not scoped substitutes. Never edit archive manifests in place or retry the rejected publisher.
 
@@ -22,9 +22,9 @@ npm refused the original unscoped `divlet` name as too similar to `figlet`. The 
 
 Core's HTTP composition imports web's public asset locator; generic model/format modules do not import web. Web's portable contracts own opaque host payloads, not project validation/writes, and have no type/JSDoc back-edge to core. Browser modules use host HTTP/SSE and preview ports, not imports of the Node runtime. Backend plugins consume core contracts; client plugins use the served web module graph. See [architecture](architecture.md).
 
-The root owns `@divlet/core`, `web/` owns `@divlet/web`, and `cli/`, `mcp/` and `pi/` own the adapters, without wrappers. All five versions match. The 0.0.2 candidate adapters pin `@divlet/core@0.0.2`; core pins `@divlet/web@0.0.2`. Core has no bins, Pi manifest/peer requirements or `./pi` export. Its tarball excludes the web and adapter implementations. Web owns its only client copy and portable declarations. Built-in plugins remain bundled in core, not separately published.
+The root owns `@divlet/core`, `web/` owns `@divlet/web`, and `cli/`, `mcp/` and `pi/` own the adapters, without wrappers. All five versions match. Adapters pin `@divlet/core@0.0.2`; core pins `@divlet/web@0.0.2`. Core has no bins, Pi manifest/peer requirements or `./pi` export. Its tarball excludes the web and adapter implementations. Web owns its only client copy and portable declarations. Built-in plugins remain bundled in core, not separately published.
 
-Node.js 22.19 or later is required. Pi is not required for CLI/MCP. Shared configurations should pin adapter versions, including `npm:@divlet/pi@0.0.2` after the candidate is published. For MCP:
+Node.js 22.19 or later is required. Pi is not required for CLI/MCP. Shared configurations should pin adapter versions, including `npm:@divlet/pi@0.0.2`. For MCP:
 
 ```json
 {
@@ -82,7 +82,7 @@ Keep the `npm-candidate-<run-id>` archive set and `npm-outcome-<run-id>-<attempt
 
 Publication jobs **cannot be rerun automatically**: attempts after the first are refused, and a fresh dispatch checks prior runs of this workflow for the same tag, including all job attempts. A previously started publisher requires explicit operator recovery even if no registry version is visible. Do not delete run history or edit the run title to bypass that guard. Runs whose publisher was skipped because validation failed do not count as upload attempts; use a fresh dispatch after fixing validation while preserving the tag/source constraint. A failed registry verification after all uploads is not permission to publish again; rerun only the read-only verification job.
 
-For partial or uncertain outcomes, inspect the original logs, frozen bytes, receipt and fresh registry metadata before choosing an explicit manual recovery or a new aligned version. Do not rebuild a failed release's archives, overwrite accepted versions, infer token rights from `npm whoami`, or run manual and CI publishing concurrently. A local/mock pass proves guard behavior, not a successful live OIDC exchange; activation and the first real CI release remain external checks.
+For partial or uncertain outcomes, inspect the original logs, frozen bytes, receipt and fresh registry metadata before choosing an explicit manual recovery or a new aligned version. Do not rebuild a failed release's archives, overwrite accepted versions, infer token rights from `npm whoami`, or run manual and CI publishing concurrently. A local/mock pass proves guard behavior, not a successful live OIDC exchange. The first real CI release was verified for 0.0.2; changes to workflow identity, environment bindings or account policy still require their own live authorization check.
 
 ## Readiness gates
 
