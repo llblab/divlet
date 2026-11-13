@@ -31,6 +31,13 @@ try {
     assert.equal(await plaque.evaluate(node => getComputedStyle(node.querySelector('.spinner')).gridRowStart), '1', 'the open-panel indicator keeps its existing placement');
     await page.locator('#open-agent').click();
     await page.locator('#agent-status-dock > .agent-status').waitFor();
+    // Closing the phone sheet reveals a wrapped dock; take the baseline only after its ResizeObserver publishes that height.
+    await page.waitForFunction(() => {
+      const root = document.documentElement, dock = document.querySelector('#dock');
+      const scale = Number.parseFloat(root.style.getPropertyValue('--ui')) || 1;
+      const measured = Number.parseFloat(root.style.getPropertyValue('--dock-h'));
+      return measured > 0 && measured === Math.round(dock.getBoundingClientRect().height / scale);
+    });
     const tabs = await page.locator('#side-tabs').boundingBox();
     const footer = async label => {
       const result = await plaque.evaluate(card => {

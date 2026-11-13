@@ -2,12 +2,9 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
-## Unreleased
-
-- Fixed Landing CI to resolve workspace sources in a fresh checkout, without depending on a previously generated web build.
-
 ## 0.0.2 — candidate
 
+- Fixed Landing CI to resolve workspace sources in a fresh checkout, without depending on a previously generated web build. Browser activity checks now take their initial tab baseline after the newly visible toolbar reports its measured height; exact stability checks remain unchanged.
 - Added a manually dispatched `Release` GitHub Actions workflow with npm Trusted Publishing/OIDC, frozen five-package archives, serial web/core/adapter publication and registry-install verification through CLI/MCP and an isolated real Pi host. Preparation and verification have no publish token; uncertain or prior publication attempts block automatic replay. The first live CI publication is pending verification; this candidate does not freeze the native project format.
 
 ## 0.0.1 — 2026-11-13
