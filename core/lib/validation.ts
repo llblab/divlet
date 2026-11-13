@@ -34,6 +34,21 @@ export function string(value: unknown, label: string, max = 65536): string {
   return value.replace(/\r\n?/g, '\n');
 }
 
+/**
+ * Deep equality of plain JSON data with util.isDeepStrictEqual's results for such values: primitives by Object.is (so 0 and
+ * -0 differ), arrays by position, objects by own enumerable key set regardless of order. Not for class instances or cycles.
+ */
+export function sameJson(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b) || Object.getPrototypeOf(a) !== Object.getPrototypeOf(b)) return false;
+  if (Array.isArray(a)) return a.length === (b as unknown[]).length && a.every((item, index) => sameJson(item, (b as unknown[])[index]));
+  const keysA = Object.keys(a), keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) if (!Object.hasOwn(b, key) || !sameJson((a as Record<string, unknown>)[key], (b as Record<string, unknown>)[key])) return false;
+  return true;
+}
+
 /** Test a caller-owned UTF-8 budget without allocating more than budget + 1 encoded bytes. */
 export function withinUtf8Budget(value: string, maxBytes: number): boolean {
   if (value.length > maxBytes) return false;

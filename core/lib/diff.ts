@@ -2,7 +2,7 @@
  * Patches and summaries: the smallest change between two documents, the check that a change still applies to the values it
  * expects, and the human sentence a history row shows. Used by undo/redo, by the runtime's commit path and by the browser.
  */
-import { isDeepStrictEqual } from 'node:util';
+import { sameJson as isDeepStrictEqual } from './validation.ts';
 import type { Artboard, DocumentModel, Node, NodeId } from './model.ts';
 
 const PATCH_KEYS = ['name', 'head', 'artboard', 'rootId', 'tokens', 'css', 'metadata', 'nodes'] as const;

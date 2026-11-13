@@ -87,7 +87,7 @@ function readTree(input: unknown, deletions: boolean): ParsedAssets {
       const portable = assetCollisionKey(relative);
       if (paths.has(portable)) fail(`Asset paths alias on a portable filesystem: ${relative}.`);
       paths.add(portable);
-      encodedBytes += Buffer.byteLength(name) + (typeof value === 'string' ? value.length : 0);
+      encodedBytes += new TextEncoder().encode(name).byteLength + (typeof value === 'string' ? value.length : 0);
       if (encodedBytes > ASSET_LIMITS.encodedBytes) fail('Assets exceed the encoded-byte limit.');
       if (value === null && deletions) continue;
       if (typeof value === 'string') {

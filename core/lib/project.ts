@@ -7,13 +7,13 @@
  * instance of it, with `descendants` overrides addressed by component node IDs (joined by
  * "/" to reach into nested instances), following the Pencil .pen conventions.
  */
-import path from 'node:path';
 import { readAssets, validateAssetPatch } from './assets.ts';
 import type { AssetTree } from './model.ts';
 import {
   DivletError, validateDocument, SOURCE_LIMITS, LIMITS, PROJECTION_LIMITS, documentLimits, validateTokens, validateCss,
   validateMetadata, string, merge, REF,
 } from './model.ts';
+import { withinUtf8Budget } from './validation.ts';
 import type { Attrs, DocumentModel, Limits, Metadata, Node, NodeId, Override, Style } from './model.ts';
 
 export const PROJECT_SCHEMA = 1;
@@ -72,7 +72,7 @@ export function validateSettings(source: unknown = {}): ProjectSettings {
   const version = input.version ?? 1;
   if (!Number.isSafeInteger(version) || version < 1) fail('INVALID_PROJECT', 'Project version must be a positive integer');
   const outputDir = input.outputDir ?? null;
-  if (outputDir !== null && (typeof outputDir !== 'string' || !outputDir.trim() || outputDir.length > 2048 || /[\\\u0000-\u001f]/.test(outputDir) || path.posix.isAbsolute(outputDir) || path.win32.isAbsolute(outputDir) || /^[a-z]:/i.test(outputDir))) fail('INVALID_OUTPUT_DIR', 'outputDir must be a relative directory path, or null for the default.');
+  if (outputDir !== null && (typeof outputDir !== 'string' || !outputDir.trim() || outputDir.length > 2048 || /[\\\u0000-\u001f]/.test(outputDir) || outputDir.startsWith('/') || /^[a-z]:/i.test(outputDir))) fail('INVALID_OUTPUT_DIR', 'outputDir must be a relative directory path, or null for the default.');
   return {
     name,
     version,
@@ -126,7 +126,7 @@ export function writeProject(settings: ProjectSettings, frames: DocumentModel[])
   if (frames.length > MAX_FRAMES) fail('INVALID_PROJECT', `A project can hold at most ${MAX_FRAMES} frames`);
   const assets = readAssets(settings.assets ?? {}).tree;
   const text = JSON.stringify({ schemaVersion: PROJECT_SCHEMA, name: settings.name, version: settings.version, tokens: settings.tokens, css: settings.css, metadata: settings.metadata, ...(settings.outputDir !== null && settings.outputDir !== undefined ? { outputDir: settings.outputDir } : {}), ...(Object.keys(assets).length ? { assets } : {}), frames: frames.map(storedFrame) }, null, 2) + '\n';
-  if (Buffer.byteLength(text) > SOURCE_LIMITS.bytes) fail('FILE_TOO_LARGE', 'The serialized project exceeds the source read limit.');
+  if (!withinUtf8Budget(text, SOURCE_LIMITS.bytes)) fail('FILE_TOO_LARGE', 'The serialized project exceeds the source read limit.');
   return text;
 }
 

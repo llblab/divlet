@@ -41,12 +41,18 @@ test('@divlet/web owns client files and portable ports with no reverse package d
   assert.doesNotMatch(server, /new URL\('\.\.\/\.\.\/web\//, 'the server uses a public locator, not a sibling path');
 });
 
-test('browser mapping replaces only the model style port and names real source bindings', async () => {
+test('browser mapping replaces only the declared host ports and keeps their source bindings', async () => {
   assert.deepEqual(pkg.browser, {
     './core/lib/model-styles.ts': './core/lib/browser-styles.ts',
     './dist/core/lib/model-styles.js': './dist/core/lib/browser-styles.js',
+    './core/lib/media-type.ts': './core/lib/browser-media-type.ts',
+    './dist/core/lib/media-type.js': './dist/core/lib/browser-media-type.js',
   });
-  for (const file of [Object.keys(pkg.browser)[0], Object.values(pkg.browser)[0]]) assert.ok(await exists(path.join(root, file)), file);
+  for (const [source, replacement] of Object.entries(pkg.browser).filter(([file]) => file.endsWith('.ts'))) {
+    for (const file of [source, replacement]) assert.ok(await exists(path.join(root, file)), file);
+    const [original, browser] = await Promise.all([import(path.join(root, source)), import(path.join(root, replacement))]);
+    assert.deepEqual(Object.keys(browser).sort(), Object.keys(original).sort(), `${replacement} names the same bindings as ${source}`);
+  }
 });
 
 for (const name of ['cli', 'mcp', 'pi']) test(`@divlet/${name} owns its adapter, release version and installed entry`, async () => {

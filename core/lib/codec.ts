@@ -11,6 +11,7 @@ import postcss from 'postcss';
 import { serializeDeclarations } from './declarations.ts';
 import { validateDocument, validateHead, safeAttribute, DivletError, VOID_TAGS, LIMITS, documentLimits, supportsTag } from './model.ts';
 import { readAssetReference } from './asset-reference.ts';
+import { withinUtf8Budget } from './validation.ts';
 import type { DocumentModel, ElementNode, Limits, Node, NodeId } from './model.ts';
 
 /** A node of the parse5 tree, as this codec needs to read it. */
@@ -306,7 +307,7 @@ function parseInlineStyle(value: string): Record<string, string> {
 
 export function decodeHtml(source: unknown, { fallbackId = 'imported', previous, limits = LIMITS }: DecodeOptions = {}): DocumentModel {
   documentLimits(limits);
-  if (typeof source !== 'string' || Buffer.byteLength(source) > LIMITS.bytes * 2) error('HTML must be a string of at most 4 MiB');
+  if (typeof source !== 'string' || !withinUtf8Budget(source, LIMITS.bytes * 2)) error('HTML must be a string of at most 4 MiB');
   const html = source;
   const prior = previous ? validateDocument(previous, { limits }) : null;
   const parseErrors: any[] = [];
