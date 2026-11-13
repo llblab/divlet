@@ -1,6 +1,6 @@
 # npm publication
 
-This guide owns the guarded first-publication procedure for **0.0.1** and is not permission to run it. A prepared tree or versioned changelog is not a completed registry publication. Publishing packages, pushing release refs and deploying the landing page require explicit maintainer authorization. Packaging does not freeze or cut over the native schema.
+All five **0.0.1** packages are published on npm, with frozen-archive integrity and clean registry installations verified. This guide owns publication safeguards and the first-publication procedure below; it is not permission to publish again. A prepared tree or versioned changelog is not a completed registry publication. Publishing packages, pushing release refs and deploying the landing page require explicit maintainer authorization. Packaging does not freeze or cut over the native schema.
 
 npm refused the original unscoped `divlet` name as too similar to `figlet`. The maintainer approved `@divlet/core` and a separately owned `@divlet/web`; the old four-package archives are historical candidates, not scoped substitutes. Never edit archive manifests in place or retry the rejected publisher.
 
@@ -36,6 +36,10 @@ Node.js 22.19 or later is required. Pi is not required for CLI/MCP. Shared confi
   }
 }
 ```
+
+## Subsequent releases
+
+Keep all five versions aligned and update every exact internal dependency pin plus the lockfile. Validate and freeze a new candidate, then publish the new version in web → core → adapters order under the same integrity/install/auth safeguards. Published `0.0.1` bytes are immutable; fixes require a new version, never an overwrite or unpublish/retry. Git release refs and Pages remain separately authorized delivery surfaces. The first-publication sequence below is retained for its guards and recovery rules, not as a command to rerun the initial release.
 
 ## Readiness gates
 

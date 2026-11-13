@@ -2,9 +2,9 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
-## Unreleased — 0.0.1 candidate
+## 0.0.1 — 2026-11-13
 
-Preparing the approved five-package scoped candidate; publication and registry-install verification remain outstanding. A versioned archive is not a completed release.
+Published `@divlet/web`, `@divlet/core`, `@divlet/cli`, `@divlet/mcp` and `@divlet/pi` on npm with matching versions and verified archive integrity. Clean registry installations exercise the standalone board, CLI/MCP tools and an isolated real Pi host.
 
 Initial release of divlet: a local HTML/SVG/CSS layout board for agents. The native project format remains an unfrozen schema-1 draft; this release does not activate the approved future ordered-CSS/renderer profile or promise frozen compatibility.
 
