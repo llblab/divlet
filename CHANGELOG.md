@@ -2,6 +2,14 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
+## Unreleased
+
+- **The board runs as a static site that is its own MCP provider.** `scripts/pages-build.mjs` builds the GitHub Pages set: the real board client with a bundled browser host that opens the canonical landing project in the visitor's browser, keeps the visitor's copy in IndexedDB until the publication changes, and exposes `read_divlet`, `patch_divlet`, `edit_divlet`, `frame_divlet`, `undo_divlet` and `mark_divlet` through the page's MCP provider (and WebMCP when a browser offers it). Native-only affordances (opening files, save-as, build output, image/font upload, the board conversation) are absent there; Copy/Download HTML and "Download project file" run in the page. The Pages workflow tests the built set in Chromium and publishes it only when its fingerprint changes. Not yet deployed.
+- **`divlet-mcp --connect <url>`** connects any MCP host to such a website: the site opens in a managed, isolated Chromium and its tools run in the page. Both MCP eras are answered on stdio; website descriptions are marked as website text, annotations are dropped, results are reduced to text and JSON, cross-origin redirects are refused and a reloaded page is reconnected explicitly.
+- **Reusable browser MCP layers.** `@divlet/web/mcp` (one tool registry with bounded JSON Schema validation, an MCP 2026-07-28 browser provider with a versioned page endpoint, optional WebMCP registration) and `@divlet/core/browser-mcp` (the agent-side transport, also as an SDK-shaped `Transport`). The official MCP TypeScript SDK client interoperates with both.
+- **A browser-local project writer.** `BrowserRuntime` runs the shared contract tools over the shared kernel; shared vectors require identical models, pages, refusals, history and serialized projects to the Node runtime. `project`, `codec`, `diff`, `ops`, frame preparation, acceptance rules and the tool list no longer reach Node built-ins; embedded asset decoding refuses explicitly in browser builds.
+- The board reaches its host through writer, preview, export and component ports; a complete alternative composition can replace the native HTTP routes without fallback.
+
 ## 0.0.2 — 2026-11-13
 
 - Fixed Landing CI to resolve workspace sources in a fresh checkout, without depending on a previously generated web build. Browser activity checks now take their initial tab baseline after the newly visible toolbar reports its measured height, and paired typography checks use content width instead of a host-specific font-width assumption. Exact geometry assertions remain unchanged.

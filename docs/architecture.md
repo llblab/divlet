@@ -85,7 +85,7 @@ The **skill** (`skills/divlet/SKILL.md`) is the same product surface for a human
 
 The narrowly tracked `examples/landing/.divlet/landing/` build is derived through normal validation/output ownership, with portable provenance and no tracked locks or recovery state. `scripts/landing-build.mjs` attaches to any existing owner; its check mode snapshots inputs and owned output into a relocated sandbox, regenerates there and compares the complete owned cache without editing the original. A stale build or unresolved hand edit fails rather than being silently published. Rendering remains self-contained: no scripts or remote font/image/stylesheet dependencies.
 
-`scripts/landing-hash.mjs` alone owns the public set and its fingerprint: owned `index.html` and eligible portable `_assets/` files, plus an empty `.nojekyll` marker required by Pages. It validates public bytes against output provenance and excludes sidecars, manifests, locks, trash and unowned files. The copy command prints the fingerprint of the exact byte snapshot it copied. `.github/workflows/landing.yml` uses Node.js 22 to verify the nested source/cache and run its checks, compares that hash with `.landing-hash` on `gh-pages`, and copies prepared public output only when different. It neither authors nor patches a second HTML page; metadata-only changes with identical public bytes create no deployment commit.
+`scripts/landing-hash.mjs` owns the prepared landing page's public subset: owned `index.html` and eligible portable `_assets/` files. It validates public bytes against output provenance and excludes sidecars, manifests, locks, trash and unowned files. `scripts/pages-build.mjs` owns the whole Pages set and its fingerprint: the static board (client files, the bundled browser host, `project.divlet`, the build-time `styles.json` snapshot and `preview-bridge.js`), that landing subset under `page/` and `.nojekyll`; see [browser-hosted MCP](browser-mcp.md). `.github/workflows/landing.yml` uses Node.js 22 to verify the nested source/cache, run its checks and the built-site browser test, compares the fingerprint with `.pages-hash` on `gh-pages`, and copies the set only when different. It neither authors nor patches a second HTML page; changes with identical public bytes create no deployment commit.
 
 See [editable examples](../examples/README.md) for commands and file sets. Publishing requires separately authorized remote access and Pages configured for the `gh-pages` root. A configured origin/homepage does not prove synchronization or a live deployment; npm publication is separate (see [npm publication](publishing.md)).
 
@@ -126,10 +126,11 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `core/lib/model.ts` | Native vocabulary, validation/resource URL contexts, limits and patches. |
 | `core/lib/validation.ts` | Host-free JSON/text/UTF-8 checks and the shared domain error. |
 | `web/lib/board-session.ts` | Opaque reads/snapshots and optional view-state publication; no project writes. |
-| `web/lib/board-host.ts` | Optional History and native source-update service contracts. |
+| `web/lib/board-host.ts` | Writer, preview, export and component ports, optional History/source-update services and the alternative `BoardHostComposition`. |
+| `web/lib/mcp-tools.ts`, `mcp-provider.ts`, `webmcp.ts` | `@divlet/web/mcp`: one tool registry with bounded schema validation, the MCP 2026-07-28 browser provider and its page endpoint, optional WebMCP registration. |
 | `core/lib/public-snapshot.ts` | Build-side allowlisted inspection data from explicitly public prepared HTML. |
-| `web/lib/host.js`, `http-session.js`, `http.js` | Native host binding, HTTP/SSE read adapter and JSON transport. |
-| `web/lib/http-services.js` | Native History and source-update adapters; no model authority. |
+| `web/lib/host.js`, `http-session.js`, `http.js` | Host composition point (native HTTP/SSE adapters, or a published browser composition), read adapter and JSON transport. |
+| `web/lib/http-services.js` | Native writer, preview, export, component, History and source-update adapters; no model authority. |
 | `web/lib/file-picker.js` | Reusable read-only path/list/keyboard UI and request lifetime. |
 | `web/lib/project.js`, `help.js` | Open/copy and Settings policy, writes and modal lifetime. |
 | `core/lib/model-styles.ts`, `browser-styles.ts` | Node lowering binding and explicit absent browser capability. |
@@ -141,19 +142,25 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `core/lib/font-css.ts` | Non-shadowing face registration against closed, source-owned public styles; no write authority. |
 | `core/lib/capture.ts` | Bounded, self-contained frame font CSS for browser rasterization; no filesystem/publication authority. |
 | `core/lib/css-literals.ts` | Shared CSS escape decoding and quoted-string contents for projection and registration. |
-| `core/lib/media-type.ts` | Canonical bounded MIME syntax and shared HTTP/projection extension defaults; no byte sniffing or serving authority. |
+| `core/lib/media-type.ts`, `browser-media-type.ts` | Canonical bounded MIME syntax and shared HTTP/projection extension defaults; the browser mapping refuses (`ASSETS_UNAVAILABLE`) rather than approximating. |
 | `core/lib/svg-resource.ts` | Strict XML SVG resource projection, not HTML parsing or publication. |
 | `core/lib/project.ts` | Project settings/read/write and component expansion/listing. |
 | `core/lib/codec.ts` | Strict native model ↔ HTML codec and `renderFile`. |
 | `core/lib/html-import.ts` | Loss-aware external HTML admission, separate from the strict codec. |
-| `core/lib/render.ts` | Frame preparation and utility-compilation hooks. |
+| `core/lib/prepare.ts` | Host-independent frame preparation with an injected style compiler. |
+| `core/lib/render.ts` | Node composition of preparation with the style engine, and public frame metadata. |
+| `core/lib/acceptance.ts` | No-op, settings-diff and expected version/render rules both writers apply. |
 | `core/lib/engine.ts` | Optional style-engine contract, registry and capability dispatch. |
 | `core/lib/plugins.ts` | Importer/exporter contracts and registry. |
 | `core/lib/import.ts` | Bounded source dispatch and exclusive conversion publication. |
 | `core/lib/ops.ts` | Structural frame operations: insert, move, wrap and related edits. |
 | `core/lib/runtime.js` | Accepted state, writer queue, replay, persistence, watching and assets. |
 | `core/lib/history.ts` | Session point identity/lineage, not replay or persistence. |
-| `core/lib/contract.ts` | Host-neutral operations, schemas, result shaping and sessions. |
+| `core/lib/tools.ts` | Portable tool list, schemas and result vocabulary (every host runs these). |
+| `core/lib/contract.ts` | Sessions and board resolution over `tools.ts`, which it re-exports. |
+| `core/lib/browser-runtime.ts` | Browser-local project writer over the shared kernel; no files, assets, sites or conversation. |
+| `core/lib/browser-board.ts` | Static-site composition: the browser writer, board ports, MCP provider and IndexedDB copy. |
+| `core/lib/browser-mcp.ts` | `@divlet/core/browser-mcp`: agent-side transport to a website's browser MCP provider. |
 | `core/lib/output.ts` | Generated-file hashes/MIME provenance, collision checks and safe publication. |
 | `core/lib/static.js` | Resource closure/previews and bounded declared-byte HTML export. |
 | `core/lib/server.ts` | Token-scoped board HTTP and preview boundary. |
@@ -163,6 +170,7 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `core/lib/hub.ts` | Collection launcher and its local HTTP surface. |
 | `pi/lib/extension.js` | Pi tools, session bridge and board conversation. |
 | `mcp/lib/server.js` | MCP stdio representation and sampling bridge. |
+| `mcp/lib/connect.js` | `divlet-mcp --connect`: stdio adapter for a website's browser-hosted tools. |
 | `cli/index.js` | Standalone command entry. |
 | `web/` | Native ES-module board, canvas, panels, inspector and palette. |
 

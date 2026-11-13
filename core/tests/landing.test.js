@@ -159,7 +159,7 @@ test('freshness refuses source/embedded-resource drift and metadata-only rebuild
   assert.notEqual(await landingHash(output), original, 'published resource bytes participate in the fingerprint');
 });
 
-test('CI verifies then copies the prepared public set without compiling a different page in the publication step', async () => {
+test('CI verifies then copies the built Pages set without compiling a different page in the publication step', async () => {
   const workflow = YAML.parse(await fs.readFile(path.join(root, '.github/workflows/landing.yml'), 'utf8'));
   assert.equal(workflow.jobs.publish.env.NODE_OPTIONS, '--conditions=divlet-source', 'a fresh CI checkout resolves web sources, never an unbuilt workspace dist');
   const steps = workflow.jobs.publish.steps, publish = steps.find(step => step.name === 'Publish');
@@ -168,8 +168,10 @@ test('CI verifies then copies the prepared public set without compiling a differ
   const contracts = steps.find(step => step.name === 'Test landing and resource contracts').run;
   assert.match(contracts, /npm run typecheck/);
   for (const file of ['core/tests/landing.test.js', 'web/tests/icons.test.js', 'core/tests/data-urls.test.js']) assert.ok(contracts.includes(file));
-  assert.ok(steps.some(step => String(step.run).includes('node scripts/landing-hash.mjs')));
-  assert.match(publish.run, /node scripts\/landing-hash\.mjs --copy/);
+  // The Pages set (board + landing page) has one owner; the static-site check runs before anything is published.
+  assert.ok(steps.some(step => String(step.run).includes('node scripts/pages-build.mjs')));
+  assert.ok(steps.findIndex(step => String(step.run).includes('web/tests/pages.mjs')) < steps.indexOf(publish), 'the built site is tested before publication');
+  assert.match(publish.run, /node scripts\/pages-build\.mjs --copy/);
   assert.match(publish.run, /test "\$copied_hash"/);
   assert.equal(/landing:build|sed |index\.html/.test(publish.run), false);
   assert.equal(workflow.permissions.contents, 'write');

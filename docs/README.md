@@ -11,6 +11,7 @@ Start with the [project README](../README.md) for the product overview and a wor
 
 - [Web-native core contract](web-native.md): Accepted target semantics, the saved model/editor state/browser projection split, and importer/style-plugin boundaries; not a claim of complete implementation.
 - [Architecture](architecture.md): Module ownership, accepted-state commits, persistence, undo/redo, preview trust and the Pi bridge.
+- [Browser-hosted MCP](browser-mcp.md): The static board on GitHub Pages as its own MCP provider; the provider, transport, `--connect`, protocol revision, lifecycle, security boundaries, deployment and reuse.
 - [Browser runtime direction](browser-runtime.md): Shared browser/Node frame operations, remaining project/session/host boundaries, static/offline demo modes and WebMCP/external-agent routes; not a completed offline runtime.
 - [Project format](format.md): First-release specification candidate and current wire-format reference; schemas, defaults, components, supported web content and explicit freeze boundaries. Not yet frozen.
 - [Markdown sites](site.md): Configuration, template slots, routes, source ownership, links, live updates and current limits.

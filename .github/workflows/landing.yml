@@ -1,8 +1,10 @@
-# Copy the prepared examples/landing/.divlet/landing public artifact to GitHub Pages only when its bytes changed.
+# Publish the static board to GitHub Pages only when its bytes changed.
 #
-# The branch root holds the module's explicit public set (including .nojekyll), plus .landing-hash — its byte fingerprint. If that line already matches what `scripts/landing-hash.mjs` says today, the workflow stops without a commit, so a
-# push that does not touch the page cannot rewrite it. Serve Pages from the `gh-pages` branch root (Settings → Pages).
-name: Landing
+# `scripts/pages-build.mjs` owns the public set: the real board client with a bundled browser host that opens the canonical
+# landing project in the visitor's browser and exposes its tools through the page's browser MCP provider, plus the prepared
+# landing page under page/. The branch root holds that set and .pages-hash, its byte fingerprint. If the fingerprint already
+# matches, the workflow stops without a commit. Serve Pages from the `gh-pages` branch root (Settings → Pages).
+name: Pages
 
 on:
   push:
@@ -10,13 +12,12 @@ on:
     paths:
       - 'examples/landing/**'
       - 'scripts/landing-*.mjs'
+      - 'scripts/pages-build.mjs'
       - 'core/lib/**'
+      - 'web/**'
       - 'core/tests/landing.test.js'
       - 'web/tests/icons.test.js'
       - 'core/tests/data-urls.test.js'
-      - 'web/index.html'
-      - 'web/lib/util.js'
-      - 'web/board.css'
       - 'plugins/tailwind/**'
       - 'package.json'
       - 'package-lock.json'
@@ -58,19 +59,25 @@ jobs:
       - name: Test landing and resource contracts
         run: |
           npm run typecheck
-          node scripts/source.mjs --test core/tests/landing.test.js web/tests/icons.test.js core/tests/data-urls.test.js
+          node scripts/source.mjs --test core/tests/landing.test.js web/tests/icons.test.js core/tests/data-urls.test.js core/tests/browser-runtime.test.js web/tests/mcp-provider.test.js
 
-      - name: Fingerprint the prepared public files
+      - name: Install Chromium for the static-site check
+        run: npx playwright install --with-deps chromium
+
+      - name: Test the built site as a static host with an agent connected by URL
+        run: node scripts/source.mjs web/tests/pages.mjs
+
+      - name: Fingerprint the public set
         id: landing
-        run: echo "hash=$(node scripts/landing-hash.mjs)" >> "$GITHUB_OUTPUT"
+        run: echo "hash=$(node scripts/pages-build.mjs)" >> "$GITHUB_OUTPUT"
 
       - name: Check the published fingerprint
         id: published
         run: |
           # The branch may never have been published, or may not be in the clone's remote refs yet.
           git fetch --quiet --depth=1 origin gh-pages:refs/remotes/origin/gh-pages 2>/dev/null || true
-          if git show origin/gh-pages:.landing-hash >/dev/null 2>&1; then
-            echo "hash=$(git show origin/gh-pages:.landing-hash | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+          if git show origin/gh-pages:.pages-hash >/dev/null 2>&1; then
+            echo "hash=$(git show origin/gh-pages:.pages-hash | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
           else
             echo "hash=" >> "$GITHUB_OUTPUT"
           fi
@@ -85,21 +92,21 @@ jobs:
           set -euo pipefail
           workspace="$(mktemp -d)"
           # The same module that hashed the folder decides what gets published.
-          copied_hash="$(node scripts/landing-hash.mjs --copy "$workspace")"
+          copied_hash="$(node scripts/pages-build.mjs --copy "$workspace")"
           test "$copied_hash" = "${{ steps.landing.outputs.hash }}"
-          echo "$copied_hash" > "$workspace/.landing-hash"
+          echo "$copied_hash" > "$workspace/.pages-hash"
           cd "$workspace"
           git init --quiet --initial-branch=gh-pages
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add --all
-          git commit --quiet --message "Landing: ${{ steps.landing.outputs.hash }}"
+          git commit --quiet --message "Pages: ${{ steps.landing.outputs.hash }}"
           git push --quiet --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
 
       - name: Summary
         run: |
           {
-            echo "### Landing"
+            echo "### Pages"
             echo ""
             echo "- fingerprint: \`${{ steps.landing.outputs.hash }}\`"
             echo "- published: \`${{ steps.published.outputs.hash || '(never)' }}\`"

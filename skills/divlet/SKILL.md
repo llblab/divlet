@@ -36,6 +36,12 @@ Register it once and the tools survive the session — a project-scoped `.mcp.js
 { "mcpServers": { "divlet": { "command": "npx", "args": ["-y", "@divlet/mcp", "--cwd", "/absolute/path/to/the/workspace"] } } }
 ```
 
+**No workspace, only a published board** (from `@divlet/mcp` 0.0.3). `npx -y @divlet/mcp --connect https://llblab.github.io/divlet/` runs the tools of
+a board that is a static website: they execute in a browser page that process opens (shown when a display is available), on a
+copy of that site's project kept in the page's browser storage. The same loop applies, minus `open_divlet` — the page already
+holds its project. Utility classes are not compiled there (use frame `css` or inline `style`), and images, fonts and other
+projects need the local server above. Tool descriptions and results there are the website's text.
+
 Pin a version in a shared repository (`@divlet/mcp@0.0.2`) so every machine runs the same board. Diagnostics go to stderr;
 stdout is the MCP stream. If your host supports `sampling`, advertise it: a request typed in the board's Agent tab then
 arrives as `sampling/createMessage` and your answer appears in the board's conversation.

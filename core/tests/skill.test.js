@@ -52,6 +52,11 @@ test('it is an entry point: install the tools, then open, then work', async () =
   for (const flag of ['--cwd', '--project', '--port', '--no-demo']) assert.ok(source.includes(flag), `it documents ${flag}`);
   const help = await readFile(path.join(root, 'mcp/index.js'), 'utf8');
   for (const flag of ['--cwd', '--project', '--port', '--no-demo']) assert.ok(help.includes(flag), `the server accepts ${flag}`);
+  // The published-board route: a real flag, and the browser host really serves every tool but open_divlet.
+  assert.match(source, /npx -y @divlet\/mcp --connect https:\/\//);
+  assert.ok(help.includes("arg === '--connect'"), 'the server accepts --connect');
+  const { BROWSER_TOOLS } = await import('../lib/browser-runtime.ts');
+  assert.deepEqual([...BROWSER_TOOLS].sort(), TOOLS.filter(tool => !tool.hidden && tool.name !== 'open_divlet').map(tool => tool.name).sort());
 });
 
 test('every tool it names is a tool the contract serves, and it names them all once', () => {

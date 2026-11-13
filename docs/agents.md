@@ -58,6 +58,16 @@ Diagnostics go to stderr; stdin/stdout carry MCP only. If the client advertises 
 
 A board is the **single writer** of its project. A second client attaches to the existing board over its token-scoped local API, sharing revisions instead of opening another writer. Closing an attached client leaves the owner's board running; closing the owner's process stops it, and the next client can open it again.
 
+## A board on a website
+
+**Unreleased: ships with `@divlet/mcp` 0.0.3**; from a checkout use `node scripts/source.mjs mcp/index.js --connect <url>`. `divlet-mcp --connect <url>` connects any MCP host to a website that is its own MCP provider, such as the published board at `https://llblab.github.io/divlet/`. It opens the site in a managed Chromium (the installed Chrome first), finds the page's provider and offers its tools over stdio; each call runs in the page. No local board, project file or website server is involved.
+
+- `--allow-tools <a,b>` offers only these website tools; `--allow-origin <origin>` admits one more redirect target (default: none).
+- `--headless` / `--headed` hide or show the window (default: shown when a display is available).
+- `--browser <path>` chooses the Chromium-based executable; `--profile <dir>` keeps the site's browser storage between runs.
+
+The published board serves `read_divlet`, `patch_divlet`, `edit_divlet`, `frame_divlet`, `undo_divlet` and `mark_divlet` on a copy of its project stored in that browser profile. Descriptions are marked as website text, annotations are dropped and results are reduced to text and JSON. A reloaded page is reconnected on the next call; calls that were running are reported as interrupted, never retried. See [browser-hosted MCP](browser-mcp.md).
+
 ## npm installation
 
 The product library is `@divlet/core`; the dependency-free browser assets and portable host ports belong to `@divlet/web`. The [CLI adapter](https://github.com/llblab/divlet/blob/main/cli/README.md), [MCP adapter](https://github.com/llblab/divlet/blob/main/mcp/README.md) and [Pi adapter](https://github.com/llblab/divlet/blob/main/pi/README.md) are published as `@divlet/cli`, `@divlet/mcp` and `@divlet/pi`. They own their implementations, not wrappers, and depend on the exact matching `@divlet/core` version, which pins `@divlet/web`.

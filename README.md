@@ -35,7 +35,7 @@ npm start -- /absolute/path/to/workspace
 
 Open the URL printed in the terminal. An empty workspace gets `project.divlet` with a starter artboard; an existing project opens directly, and a folder with several projects opens the launcher.
 
-`npm run demo` opens the real onboarding page, [examples/landing/landing.divlet](examples/landing/landing.divlet). Its tracked, derived cache supplies GitHub Pages; see [editing and rebuilding the landing](examples/README.md). `npm run demo:site` opens the Markdown handbook in `examples/handbook/`; `examples/studio/` holds a separate layout scenario. Pencil import remains supported, but no authored PEN demo is bundled.
+`npm run demo` opens the real onboarding page, [examples/landing/landing.divlet](examples/landing/landing.divlet). On GitHub Pages the same project opens in the real board running entirely in your browser, which is also an MCP provider for agents ([browser-hosted MCP](docs/browser-mcp.md)); see [editing and rebuilding the landing](examples/README.md). `npm run demo:site` opens the Markdown handbook in `examples/handbook/`; `examples/studio/` holds a separate layout scenario. Pencil import remains supported, but no authored PEN demo is bundled.
 
 **First moves:** `V` selects, `P` lets the page behave normally, `L` opens Layers and `H` opens History. `Ctrl K` finds commands; `?` shows shortcuts. See the [board guide](docs/board.md) for direct editing, the inspector and touch controls.
 
@@ -91,6 +91,16 @@ Drop `--global` to install into the current project only. Skip this step under P
 ```
 
 Call `open_divlet` and open its returned URL. No Pi installation is needed. Clients that support **sampling** can also answer requests typed in the board's Agent tab.
+
+### A board on a website
+
+**Unreleased (0.0.3).** The [Pages board](https://llblab.github.io/divlet/) becomes a static site that is its own MCP provider once the Pages workflow publishes this build: register it by URL and the tools run in a browser page, on that site's project, with no server deployed for it. `--connect` ships with `@divlet/mcp` 0.0.3; until then run it from a checkout (`node scripts/source.mjs mcp/index.js --connect <url>`).
+
+```bash
+npx -y @divlet/mcp@0.0.3 --connect https://llblab.github.io/divlet/
+```
+
+The page opens in a managed browser window (headless without a display). Edits persist in that browser profile until the publication changes; utility compilation, images, fonts and opening other projects stay with the local server. Website descriptions and results are treated as website text, and redirects to other origins are refused. See [browser-hosted MCP](docs/browser-mcp.md) for the protocol, security boundaries and how to make another static app a provider.
 
 [Agent integration guide](docs/agents.md) → Alternative Pi installation, MCP options, the workflow skill and JavaScript entry points.
 
