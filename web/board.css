@@ -718,6 +718,8 @@ html.w440 .shortcut-group dd { text-align: left; padding-bottom: 5px; white-spac
 .crumbs-bar .crumb { height: 24px; flex: none; max-width: 100%; }
 .crumbs-bar .crumb.home { flex: 0 1 auto; min-width: 0; }
 .crumb.current { background: var(--field); color: var(--ink); }
+/* The next level after a selected artboard: a step you can take, quieter than the current crumb. */
+.crumb.root-entry { color: var(--muted); }
 .ask-more { padding: 0 6px; font: 11px var(--mono); color: var(--muted); }
 .ask-input { width: 100%; min-height: 40px; max-height: 220px; padding: 9px 11px; border: 0; border-radius: var(--radius-inner); background: var(--field); color: var(--ink); font: 13.5px/1.45 var(--font); resize: none; outline: none; }
 .ask-input:focus { outline-offset: 1px; outline: var(--focus-ring) solid var(--accent); }

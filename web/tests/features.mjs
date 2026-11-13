@@ -98,7 +98,7 @@ try {
   await page.locator('#agent').waitFor();
   assert.equal(await page.locator('#open-agent').getAttribute('aria-selected'), 'true');
   assert.equal(await page.locator('#agent .ask-about, #agent .crumbs').count(), 0, 'the composer carries no breadcrumbs: the path lives at the bottom centre');
-  assert.equal(await page.locator('#crumbs button[aria-label="Select root element"]').count(), 1, 'an artboard-only context has a compact root-entry icon');
+  assert.equal(await page.locator('#crumbs button[aria-label="Select root element"]').count(), 1, 'an artboard-only context offers the root step');
   await page.keyboard.type('Make the hero warmer');
   await page.keyboard.press('Enter');
   await waitUntil(() => asks.length === 1, 'the request reaches Pi');
@@ -712,7 +712,7 @@ try {
   await waitUntil(() => selectedNodes()[0] === 'hero', 'a crumb above the dock re-selects that container');
   await page.locator('#crumbs .crumb', { hasText: 'A space for ideas' }).click();
   await waitUntil(() => !selectedNodes().length, 'the artboard crumb selects the artboard');
-  await waitUntil(async () => (await page.locator('#crumbs .crumb').count()) === 1, 'at the artboard the path folds to one root-entry crumb');
+  await waitUntil(async () => (await page.locator('#crumbs .crumb').count()) === 2 && (await page.locator('#crumbs .crumb.current.home').count()) === 1, 'at the artboard the path is the artboard and its root step');
   await pickNode('welcome', 'cta');
   await focusCanvas();
   await page.keyboard.press('a');
@@ -728,8 +728,8 @@ try {
   await page.locator('#crumbs .home').click();
   await waitUntil(() => !selectedNodes().length, 'the artboard crumb widens the context to the whole artboard');
   assert.equal(await page.locator('#agent .crumb-x, #crumbs .crumb-x').count(), 0, 'no × in either place: the artboard crumb is the way back up');
-  assert.equal(await page.locator('#crumbs .crumb').count(), 1, 'at the artboard the path is folded');
-  assert.equal(await page.locator('#crumbs [aria-label="Select root element"]').innerText(), '', 'the collapsed root entry is icon-only');
+  assert.equal(await page.locator('#crumbs .crumb.current.home').count(), 1, 'at the artboard the artboard crumb stays, as the current one');
+  assert.equal((await page.locator('#crumbs [aria-label="Select root element"]').innerText()).trim(), 'root', 'followed by the root step');
   await page.keyboard.press('Escape');
   check('the path sits in the bottom row between the sidebar tabs and the tools, and the Agent tab shows the same crumbs (no ×); crumbs walk up and widen the context');
 

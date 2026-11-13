@@ -6,8 +6,9 @@ import { openMenu } from './menu.js';
 import { selectRoot } from './actions.js';
 
 /**
- * Fill the bottom path for `ctx` ({ ids, nodes? }). A selected artboard collapses to its root-entry icon;
- * selecting that root opens the path. Container crumbs select ancestors; the artboard crumb folds it again.
+ * Fill the bottom path for `ctx` ({ ids, nodes? }). The artboard is always the first crumb; with only the artboard selected
+ * it is the current one, followed by a `root` crumb that previews the next level and selects the root element.
+ * Container crumbs select ancestors; the artboard crumb selects the whole artboard again.
  * `after()` runs after activation; `repaint()` is called when element data arrives late.
  */
 export function pathInto(container, ctx, { after, repaint, all = false } = {}) {
@@ -23,10 +24,14 @@ export function pathInto(container, ctx, { after, repaint, all = false } = {}) {
   const sep = () => el('i', 'crumb-sep');
   if (!ctx.nodes) {
     if (ctx.ids.length === 1) {
-      const root = crumb('', () => selectRoot(ctx.ids[0]), `Select root element · ${descriptor(ctx.ids[0])?.name || ctx.ids[0]}`, 'root-entry');
+      const id = ctx.ids[0];
+      const home = crumb('', () => {}, 'The selected artboard', 'home current');
+      home.append(icon('artboard'), el('span', '', descriptor(id)?.name || id));
+      // The one exception to "the path ends at the selection": the next level is shown, so the way into the page is visible.
+      const root = crumb('', () => selectRoot(id), `Select the root element of ${descriptor(id)?.name || id}`, 'root-entry');
       root.setAttribute('aria-label', 'Select root element');
-      root.append(icon('inspect'));
-      container.append(root);
+      root.append(icon('inspect'), el('span', '', 'root'));
+      container.append(home, sep(), root);
     } else container.append(crumb(`${ctx.ids.length} artboards`, () => {}, 'These artboards', 'current'));
     return;
   }

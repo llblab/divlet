@@ -62,9 +62,11 @@ try {
   await page.evaluate(async () => (await import('./lib/store.js')).selectArtboards(['welcome']));
   const rootEntry = page.locator('#crumbs button[aria-label="Select root element"]');
   await rootEntry.waitFor();
-  assert.equal(await page.locator('#crumbs .crumb').count(), 1, 'a selected artboard folds to a single root icon');
-  assert.equal(await rootEntry.innerText(), '', 'the collapsed path is really icon-only');
-  assert.equal(await rootEntry.locator('svg').count(), 1, 'the root action has a visible icon');
+  const artboardName = runtime.read({ view: 'document', documentId: 'welcome' }).name;
+  assert.deepEqual((await page.locator('#crumbs .crumb').allInnerTexts()).map(text => text.trim()), [artboardName, 'root'], 'a selected artboard stays visible as the current crumb, followed by the root step');
+  assert.equal(await page.locator('#crumbs .crumb.current.home').count(), 1, 'the artboard is the current crumb');
+  assert.equal(await page.locator('#crumbs .crumb-sep').count(), 1, 'a separator leads to the next level');
+  assert.equal(await rootEntry.locator('svg').count(), 1, 'the root step has a visible icon');
   await page.locator('#crumbs .crumbs-track').screenshot({ path: 'artifacts/root-crumb-folded.png' });
   await rootEntry.focus(); await page.keyboard.press('Enter');
   await waitUntil(() => page.evaluate(async root => (await import('./lib/store.js')).store.node?.nodeIds[0] === root, rootId), 'keyboard activation selects the actual model root');
@@ -73,7 +75,7 @@ try {
   await page.locator('#crumbs .crumbs-track').screenshot({ path: 'artifacts/root-crumb-expanded.png' });
   await page.locator('#crumbs .home').click();
   await rootEntry.waitFor();
-  assert.equal(await rootEntry.evaluate(node => document.activeElement === node), true, 'the artboard crumb folds back to the focused root icon');
+  assert.equal(await page.locator('#crumbs .crumb.current.home').evaluate(node => document.activeElement === node), true, 'the artboard crumb selects the artboard and keeps focus on it');
   await rootEntry.click();
   await waitUntil(() => page.evaluate(async root => (await import('./lib/store.js')).store.node?.nodeIds[0] === root, rootId), 'pointer activation also enters the root');
   assert.equal(runtime.read({ view: 'document', documentId: 'welcome' }).version, versionBeforeNavigation, 'breadcrumb navigation changes no content');
