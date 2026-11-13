@@ -20,8 +20,9 @@ test('@divlet/core is the shared product library, not a host or command package'
   assert.equal(pkg.peerDependencies?.typebox, undefined);
   for (const word of ['pi', 'pi-package']) assert.equal(pkg.keywords.includes(word), false);
   assert.equal(pkg.exports['./skill'], './skills/divlet/SKILL.md', 'the workflow remains product-owned');
-  assert.equal(await exists(path.join(root, 'adapters')), false, 'there is one package owner per adapter');
-  assert.equal(pkg.files.includes('packages'), false);
+  for (const legacy of ['adapters', 'packages']) await assert.rejects(stat(path.join(root, legacy)), { code: 'ENOENT' }, 'no legacy adapter wrapper tree');
+  for (const name of ['cli', 'mcp', 'pi']) assert.equal(pkg.files.includes(name), false, 'adapter sources stay out of core');
+  assert.deepEqual(pkg.workspaces, ['.', 'web', 'cli', 'mcp', 'pi', 'plugins/*']);
   assert.ok(pkg.workspaces.includes('.'), 'source adapters can resolve the product workspace without a registry release');
 });
 
@@ -49,14 +50,18 @@ test('browser mapping replaces only the model style port and names real source b
 });
 
 for (const name of ['cli', 'mcp', 'pi']) test(`@divlet/${name} owns its adapter, release version and installed entry`, async () => {
-  const directory = path.join(root, 'packages', name);
+  const directory = path.join(root, name);
   const adapter = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'));
   assert.equal(adapter.name, `@divlet/${name}`);
   assert.notEqual(adapter.private, true);
   assert.equal(adapter.version, pkg.version);
   assert.equal(adapter.dependencies['@divlet/core'], pkg.version);
   assert.equal(adapter.dependencies['@divlet/web'], undefined, 'the core HTTP composition owns the web dependency');
-  assert.equal(adapter.repository.directory, `packages/${name}`);
+  assert.equal(adapter.repository.directory, name);
+  const lock = JSON.parse(await readFile(path.join(root, 'package-lock.json'), 'utf8'));
+  assert.equal(lock.packages[`node_modules/@divlet/${name}`].resolved, name);
+  assert.equal(lock.packages[name].name, adapter.name);
+  assert.equal(Object.keys(lock.packages).some(key => key.startsWith('packages/')), false, 'the lock retains no phantom nested workspaces');
   assert.deepEqual(adapter.exports['.'], { 'divlet-source': './index.js', default: './dist/index.js' });
   assert.equal(adapter.files.includes('dist'), true);
   assert.equal(adapter.files.includes('tests'), false);

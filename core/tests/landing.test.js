@@ -133,7 +133,7 @@ test('the generated page keeps crawler metadata, real section links and a self-c
 test('installation examples distinguish released packages, commands and draft-format status', async () => {
   const html = await read('index.html');
   const pkg = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
-  const wrapper = JSON.parse(await fs.readFile(path.join(root, 'packages/pi/package.json'), 'utf8'));
+  const wrapper = JSON.parse(await fs.readFile(path.join(root, 'pi/package.json'), 'utf8'));
   assert.ok(html.includes('npx -y @divlet/cli ./my-project'));
   assert.ok(html.includes('npx -y @divlet/mcp --cwd ./my-project'));
   assert.ok(html.includes(`pi install npm:${wrapper.name}`));

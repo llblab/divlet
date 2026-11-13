@@ -30,8 +30,12 @@
   "include": [
     "core/**/*.ts",
     "core/**/*.js",
-    "packages/**/*.ts",
-    "packages/**/*.js",
+    "cli/**/*.ts",
+    "cli/**/*.js",
+    "mcp/**/*.ts",
+    "mcp/**/*.js",
+    "pi/**/*.ts",
+    "pi/**/*.js",
     "plugins/**/*.ts",
     "plugins/**/*.js"
   ],

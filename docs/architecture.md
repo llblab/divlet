@@ -12,7 +12,9 @@ A browser-hosted/offline editor is not implemented: current startup depends on t
 core/        the Divlet core: index.js (public API — the package's `.`), lib/, tests/
 web/         the web client (a peer of core: plugins may act on both): `board.js` entry, `index.html`, `board.css`, modules by domain in `web/lib/`, frontend unit/browser suites in `web/tests/`
 plugins/     importers/exporters/style engines, one package each (index.js, lib/, tests/)
-packages/    real adapters: cli/ (@divlet/cli), mcp/ (@divlet/mcp), pi/ (@divlet/pi); each owns implementation and tests
+cli/         @divlet/cli: standalone command, implementation and tests
+mcp/         @divlet/mcp: MCP stdio adapter, implementation and tests
+pi/          @divlet/pi: Pi adapter, implementation and tests
 skills/      the portable product workflow in skills/divlet/, independent of any host
 examples/    independent landing/, studio/ and handbook/ scenarios (no authored PEN demo)
 ```
@@ -28,7 +30,7 @@ The separately published `@divlet/web` lives directly in `web/`, not behind a wr
 
 Frontend unit and Chromium acceptance suites live in `web/tests/`; server/model unit suites and their shared fixture builders remain in `core/tests/`. Tests use the core runtime as a fixture host, not as their ownership location. Build asset copying excludes tests, and the browser module graph covers only served production modules.
 
-The npm workspace includes `.`, `web`, `packages/*` and `plugins/*`. Development executes sources with the custom `divlet-source` export condition; `scripts/source.mjs` propagates it through `NODE_OPTIONS` to children. Root start, demo, test, Pi and MCP scripts use this runner. Focused source tests use `node scripts/source.mjs --test …`. Root `dist/`, `web/dist/` and each adapter's `dist/` are publishing output only. The shared build orchestrates web's own DOM-only port compiler profile and copies native client files to `web/dist/` without tests. Core's compiler never owns web output. Neither package ships another copy of its peer.
+The npm workspace includes `.`, `web`, `cli`, `mcp`, `pi` and `plugins/*`. The root manifest still owns `@divlet/core`; the source roots and real adapters are peers, not wrappers under a shared package directory. Development executes sources with the custom `divlet-source` export condition; `scripts/source.mjs` propagates it through `NODE_OPTIONS` to children. Root start, demo, test, Pi and MCP scripts use this runner. Focused source tests use `node scripts/source.mjs --test …`. Root `dist/`, `web/dist/` and each adapter's `dist/` are publishing output only. The shared build orchestrates web's own DOM-only port compiler profile and copies native client files to `web/dist/` without tests. Core's compiler never owns web output. Neither package ships another copy of its peer.
 
 The emitted runtime class previously exposed `reuseImage()` even after its implementation retired. Its name/signature remain as a deprecated compatibility boundary, synchronously throwing `UNSUPPORTED_OPERATION` without inspecting input or touching state/files. It is not a recovery capability or a registered route/tool. `saveAsset()` publishes a new ordinary authored image, not a resumed reuse operation.
 
@@ -38,7 +40,7 @@ The core connects one native format, HTML admission/projection and a local brows
 
 Optional capabilities attach as plugins. Tailwind supplies the declaration ↔ class codec, compilation and class explanation/suggestion, plus the inspector's class/layout/spacing/effects panels. Client panels register through `web/lib/panels.js`; the server advertises `clientPlugins` and serves modules at `plugins/<id>/<file>`. A provider may expose the generic `data-inspector-slot="typography"` slot in Appearance for core-native controls. The core owns font-family inspection/patching in `web/lib/typography.js` and composes it there; without a provider it supplies a minimal Appearance section. No concrete provider import is needed. An advertised `project.capabilities.fontUpload` adds the adjacent device button: the browser decodes bytes, then the runtime queues one expected-version asset/CSS registration. The CSS owner admits only understood unconditional disjoint companion coverage, conservatively refusing overlap/ambiguous identity or conditions; it recognizes the codec-owned projected layer without treating authored layers as generated. Uninspectable style dependencies remain refused; the common allocator reserves directory and file identities. Selection is a later ordinary family edit. Pending device work belongs to the inspector upload operation, so recreated selection controls keep the same busy/duplicate guard. Importers/exporters translate foreign formats, not the native model.
 
-Plugin contracts are **types, not prose**. `core/lib/plugins.ts` exports `Importer` and `Exporter` (what a format plugin must provide), `core/lib/engine.ts` exports `StyleEngine` (what a style engine must provide), and `core/lib/contract.ts` exports the capability schema (`Schema`, `Tool`, `ToolParameters`, `Session`) that an adapter renders. Each is a real exported type with a declaration in the published package, so a plugin author writes `import type { Importer } from '@divlet/core/plugins'` and the compiler — not a reviewer — says whether the descriptor fits: `npm run typecheck` includes every `.ts` under `core/`, `packages/` and `plugins/`, and `npm run build` emits `dist/**/*.d.ts`. A JavaScript plugin still works: the registry (`registerImporter`, `registerStyleEngine`, `registerExporter`) is the one place that promises a descriptor satisfies its contract, which is why that promise is written down as a cast there and nowhere else.
+Plugin contracts are **types, not prose**. `core/lib/plugins.ts` exports `Importer` and `Exporter` (what a format plugin must provide), `core/lib/engine.ts` exports `StyleEngine` (what a style engine must provide), and `core/lib/contract.ts` exports the capability schema (`Schema`, `Tool`, `ToolParameters`, `Session`) that an adapter renders. Each is a real exported type with a declaration in the published package, so a plugin author writes `import type { Importer } from '@divlet/core/plugins'` and the compiler — not a reviewer — says whether the descriptor fits: `npm run typecheck` includes every `.ts` under `core/`, `cli/`, `mcp/`, `pi/` and `plugins/`, and `npm run build` emits `dist/**/*.d.ts`. A JavaScript plugin still works: the registry (`registerImporter`, `registerStyleEngine`, `registerExporter`) is the one place that promises a descriptor satisfies its contract, which is why that promise is written down as a cast there and nowhere else.
 
 The renderer seam also exports `StyleEngineRequirement` (`id` plus exact opaque `version`), `ResolvedStyleEngine` and `resolveStyleEngine(requirement)`. The resolver consumes validated requirement data, returns `null` for native CSS and otherwise requires one exact, compilation-capable provider; missing, mismatched, ambiguous and incapable providers have explicit `STYLE_ENGINE_*` errors. It neither invokes providers nor changes active selection. `compileClasses(tokens, candidates, base, requirement)` opts into this resolution; explicit `null` never compiles utilities, whereas omitting the fourth argument preserves draft first-provider/empty-CSS behavior. Provider `version` remains optional for legacy-only capabilities. The bundled plugin also exports an opt-in, compiler-only `createRenderer()` descriptor: it pins stylesheet resolution to the provider, not caller/project `node_modules`, while the default draft descriptor remains unchanged. Its portable opaque version combines an explicit configuration-policy revision, actually resolved compiler/ordinary dependency versions and the four shipped Tailwind stylesheet hashes. Requested ranges and installation paths are not identity; optional platform binaries share their parent package's published semantic version. This is a trusted installed-package contract, not bytecode attestation; restart after dependency changes. Project dependency admission, host composition and matching resource/inspector capabilities remain [transition work](format.md#approved-first-release-profile); the factory is not a new public package subpath.
 
@@ -57,7 +59,7 @@ Two deliberate limits (maintainer decisions, 2026-11-08): the **exporter** contr
 `core/lib/contract.ts` owns the product's operations: the tool list (names, titles, descriptions), their parameters in a small
 host-neutral schema form, the shared result shaping (frames rather than documents, compact project views, large-frame outlines)
 and `createSession`, which resolves a project to the board that owns it. Hosts translate the representation only — the Pi
-adapter renders the parameters as TypeBox and wraps results in Pi's tool envelope, `packages/mcp/` renders the same parameters as
+adapter renders the parameters as TypeBox and wraps results in Pi's tool envelope, `mcp/` renders the same parameters as
 JSON Schema and answers in MCP content blocks — and both call the same implementation, so validation, revision checks and
 domain error codes are identical everywhere. Add a capability once, in the contract.
 
@@ -69,7 +71,7 @@ imported by the core.
 The message itself is built once, in `runtime.askMessage`, so every host receives the same prompt block: a bracketed English
 header with `|key:value` metadata (`[divlet|project:<id>|frames:<n>|nodes:<n>]`), its value on that same line, the details as
 Markdown lists from the following line (`frames:`, `elements in <frame>:`, `next:`), and the request itself after a blank line.
-Per-turn context added by a host follows the same grammar (`packages/pi/lib/extension.js` adds the changes since the last turn
+Per-turn context added by a host follows the same grammar (`pi/lib/extension.js` adds the changes since the last turn
 and the selection snapshot that way), so an agent parses one shape everywhere and the request is never buried in prose. The
 divlet skill names the block, so an installed agent recognises a request that arrives from the board.
 
@@ -159,9 +161,9 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `core/lib/projects.ts` | Project discovery and creation. |
 | `core/lib/launch.ts` | Opening/composition for projects and collections. |
 | `core/lib/hub.ts` | Collection launcher and its local HTTP surface. |
-| `packages/pi/lib/extension.js` | Pi tools, session bridge and board conversation. |
-| `packages/mcp/lib/server.js` | MCP stdio representation and sampling bridge. |
-| `packages/cli/index.js` | Standalone command entry. |
+| `pi/lib/extension.js` | Pi tools, session bridge and board conversation. |
+| `mcp/lib/server.js` | MCP stdio representation and sampling bridge. |
+| `cli/index.js` | Standalone command entry. |
 | `web/` | Native ES-module board, canvas, panels, inspector and palette. |
 
 ## Browser command ownership

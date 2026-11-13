@@ -8,7 +8,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/llblab/divlet.git",
-    "directory": "packages/cli"
+    "directory": "cli"
   },
   "homepage": "https://github.com/llblab/divlet#readme",
   "bugs": {
@@ -34,6 +34,6 @@
     "README.md"
   ],
   "scripts": {
-    "prepack": "node ../../scripts/build.mjs"
+    "prepack": "node ../scripts/build.mjs"
   }
 }

@@ -78,9 +78,9 @@
     "LICENSE"
   ],
   "scripts": {
-    "start": "node scripts/source.mjs ./packages/cli/index.js",
-    "demo": "node scripts/source.mjs ./packages/cli/index.js ./examples/landing/landing.divlet",
-    "demo:site": "node scripts/source.mjs ./packages/cli/index.js --cwd ./examples/handbook",
+    "start": "node scripts/source.mjs ./cli/index.js",
+    "demo": "node scripts/source.mjs ./cli/index.js ./examples/landing/landing.divlet",
+    "demo:site": "node scripts/source.mjs ./cli/index.js --cwd ./examples/handbook",
     "pretest": "npm run typecheck",
     "test": "node scripts/source.mjs --test",
     "test:format": "node scripts/source.mjs --test core/tests/format.test.js core/tests/format-types.test.ts",
@@ -120,8 +120,8 @@
     "test:release": "node core/tests/release/install-smoke.mjs",
     "test:release:pi": "node core/tests/release/install-smoke.mjs --pi",
     "test:pen-fidelity": "node scripts/source.mjs plugins/pen/tests/fidelity.mjs",
-    "test:pi": "node scripts/source.mjs packages/pi/tests/e2e/pi.mjs",
-    "test:mcp": "node scripts/source.mjs --test packages/mcp/tests/*.test.js",
+    "test:pi": "node scripts/source.mjs pi/tests/e2e/pi.mjs",
+    "test:mcp": "node scripts/source.mjs --test mcp/tests/*.test.js",
     "test:contract": "node scripts/source.mjs --test core/tests/contract.test.js",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.web.json",
     "landing:hash": "node scripts/landing-hash.mjs",
@@ -154,7 +154,9 @@
   "workspaces": [
     ".",
     "web",
-    "packages/*",
+    "cli",
+    "mcp",
+    "pi",
     "plugins/*"
   ]
 }

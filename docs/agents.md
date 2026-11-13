@@ -12,14 +12,14 @@ Install dependencies as described in [Quick start](../README.md#quick-start). Wi
 
 ```bash
 # One-off source execution, without a build:
-NODE_OPTIONS=--conditions=divlet-source pi -e /absolute/path/to/divlet/packages/pi/index.js
+NODE_OPTIONS=--conditions=divlet-source pi -e /absolute/path/to/divlet/pi/index.js
 
 # Or build, then install the adapter package persistently:
 npm run build
-pi install /absolute/path/to/divlet/packages/pi
+pi install /absolute/path/to/divlet/pi
 ```
 
-After building, a folder-scanning installation can instead symlink `/absolute/path/to/divlet/packages/pi` into `~/.pi/agent/extensions/`. Its manifest loads `dist/index.js`, not the raw source. Do not install the repository root or combine installation methods: the extension must load only once.
+After building, a folder-scanning installation can instead symlink `/absolute/path/to/divlet/pi` into `~/.pi/agent/extensions/`. Its manifest loads `dist/index.js`, not the raw source. Do not install the repository root or combine installation methods: the extension must load only once.
 
 Open Pi in your workspace, run `/reload` if the session is already running, then `/divlet`. It returns the board URL. `/divlet /absolute/path/to/landing.divlet` opens an exact project; a directory with several projects opens the launcher.
 
@@ -36,7 +36,7 @@ Register this stdio server in your host's configuration; no Pi installation is r
       "command": "node",
       "args": [
         "--conditions=divlet-source",
-        "/absolute/path/to/divlet/packages/mcp/index.js",
+        "/absolute/path/to/divlet/mcp/index.js",
         "--cwd",
         "/absolute/path/to/workspace"
       ]
@@ -45,7 +45,7 @@ Register this stdio server in your host's configuration; no Pi installation is r
 }
 ```
 
-From the checkout root, the equivalent source command is `node scripts/source.mjs packages/mcp/index.js --cwd /absolute/path/to/workspace`. The runner passes the `divlet-source` export condition to child processes through `NODE_OPTIONS`.
+From the checkout root, the equivalent source command is `node scripts/source.mjs mcp/index.js --cwd /absolute/path/to/workspace`. The runner passes the `divlet-source` export condition to child processes through `NODE_OPTIONS`.
 
 The server starts a board when the first tool needs one. Open the URL returned by `open_divlet` in your browser.
 
@@ -60,7 +60,7 @@ A board is the **single writer** of its project. A second client attaches to the
 
 ## npm installation
 
-The product library is `@divlet/core`; the dependency-free browser assets and portable host ports belong to `@divlet/web`. The [CLI adapter](https://github.com/llblab/divlet/blob/main/packages/cli/README.md), [MCP adapter](https://github.com/llblab/divlet/blob/main/packages/mcp/README.md) and [Pi adapter](https://github.com/llblab/divlet/blob/main/packages/pi/README.md) are published as `@divlet/cli`, `@divlet/mcp` and `@divlet/pi`. They own their implementations, not wrappers, and depend on the exact matching `@divlet/core` version, which pins `@divlet/web`.
+The product library is `@divlet/core`; the dependency-free browser assets and portable host ports belong to `@divlet/web`. The [CLI adapter](https://github.com/llblab/divlet/blob/main/cli/README.md), [MCP adapter](https://github.com/llblab/divlet/blob/main/mcp/README.md) and [Pi adapter](https://github.com/llblab/divlet/blob/main/pi/README.md) are published as `@divlet/cli`, `@divlet/mcp` and `@divlet/pi`. They own their implementations, not wrappers, and depend on the exact matching `@divlet/core` version, which pins `@divlet/web`.
 
 ```bash
 npx -y @divlet/cli ./my-project

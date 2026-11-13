@@ -1,12 +1,12 @@
 import test from 'node:test';
-import { legacyProject } from '../../../core/tests/fixtures/legacy-project.js';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import divletExtension from '../index.js';
-import { initProject } from '../../../core/lib/projects.ts';
-import { fixture } from '../../../core/tests/fixtures/source-project.js';
+import { initProject } from '../../core/lib/projects.ts';
+import { fixture } from '../../core/tests/fixtures/source-project.js';
 
 function harness(cwd) {
   const tools = new Map();

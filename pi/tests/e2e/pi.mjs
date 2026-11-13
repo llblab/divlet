@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
+const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const consumer = process.env.PI_DIVLET_INSTALLED_ROOT;
 const version = spawnSync('pi', ['--version'], { encoding: 'utf8' });
 if (version.error || version.status !== 0) {
@@ -19,7 +19,7 @@ if (version.error || version.status !== 0) {
   console.log(JSON.stringify({ status: 'skipped', reason: 'the pi CLI is unavailable on this runtime' }));
   process.exit(0);
 }
-let extension = path.join(ROOT, 'packages/pi/index.js'), installed;
+let extension = path.join(ROOT, 'pi/index.js'), installed;
 if (consumer) {
   console.error('[installed Pi] verify consumer exports');
   const resolve = createRequire(path.join(consumer, 'package.json')).resolve;
@@ -35,7 +35,7 @@ const SP = await mkdtemp(path.join(os.tmpdir(), 'divlet-e2e-'));
 await mkdir(path.join(SP, 'agent'));
 await mkdir(path.join(SP, 'work'));
 if (installed) await writeFile(path.join(SP, 'work/project.divlet'), installed.project.writeProject(installed.project.validateSettings({ name: 'work' }), [installed.model.createDemoDocument()]));
-else await (await import('../../../../core/tests/fixtures/legacy-project.js')).legacyProject(path.join(SP, 'work/project.divlet'), { demo: true });
+else await (await import('../../../core/tests/fixtures/legacy-project.js')).legacyProject(path.join(SP, 'work/project.divlet'), { demo: true });
 const requests = [];
 let scriptedCall = null;
 const chunk = (delta, finish = null, usage) => `data: ${JSON.stringify({ id: 'c1', object: 'chat.completion.chunk', created: 1, model: 'mock-model', choices: [{ index: 0, delta, finish_reason: finish }], ...(usage ? { usage } : {}) })}\n\n`;
@@ -59,7 +59,7 @@ const server = http.createServer(async (req, res) => {
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const port = server.address().port;
-const pi = spawn('pi', ['--mode', 'rpc', '--no-extensions', '-e', extension, '-e', path.join(ROOT, 'packages', 'pi', 'tests', 'e2e', 'mock-provider.js'), '--provider', 'mock', '--model', 'mock-model', '--no-session'], { cwd: `${SP}/work`, env: { ...process.env, PI_CODING_AGENT_DIR: `${SP}/agent`, ...(consumer ? { NODE_OPTIONS: '' } : {}), MOCK_PORT: String(port), MOCK_API_KEY: 'x' }, stdio: ['pipe', 'pipe', 'pipe'] });
+const pi = spawn('pi', ['--mode', 'rpc', '--no-extensions', '-e', extension, '-e', path.join(ROOT, 'pi', 'tests', 'e2e', 'mock-provider.js'), '--provider', 'mock', '--model', 'mock-model', '--no-session'], { cwd: `${SP}/work`, env: { ...process.env, PI_CODING_AGENT_DIR: `${SP}/agent`, ...(consumer ? { NODE_OPTIONS: '' } : {}), MOCK_PORT: String(port), MOCK_API_KEY: 'x' }, stdio: ['pipe', 'pipe', 'pipe'] });
 let stderr = '';
 pi.stderr.on('data', data => { stderr += data; });
 const events = [];
@@ -175,7 +175,7 @@ try {
   result.nativeDefault = { format: nativeState.project.format, starter: descriptor.id, firstDefaultEdit: true, legacyFixturePreserved: true };
   if (consumer) {
     console.error('[installed Pi] legacy and native tool scenarios passed; starting fonts');
-    const { checkInstalledPiFonts } = await import('../../../../web/tests/release/pi-fonts.mjs');
+    const { checkInstalledPiFonts } = await import('../../../web/tests/release/pi-fonts.mjs');
     const fontRequestsStart = requests.length;
     result.installedFonts = await checkInstalledPiFonts({ url: nativeURL, file: path.join(SP, 'work/native-default/project.divlet'), ownBrowser: value => { browser = value; }, invoke: async (name, args) => {
       const start = events.length;

@@ -12,7 +12,7 @@ import { readProject, writeProject } from '../lib/project.ts';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
 test('the standalone CLI advertises the package and project naming contract', () => {
-  const result = spawnSync(process.execPath, ['packages/cli/index.js', '--help'], { cwd: root, encoding: 'utf8', timeout: 10000 });
+  const result = spawnSync(process.execPath, ['cli/index.js', '--help'], { cwd: root, encoding: 'utf8', timeout: 10000 });
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /^divlet \[path\]/);
@@ -20,6 +20,8 @@ test('the standalone CLI advertises the package and project naming contract', ()
   assert.match(result.stdout, /\.divlet\/<filename stem>\/.*outputDir/);
   assert.match(result.stdout, /divlet\.config\.json/);
   assert.match(result.stdout, /pi install npm:@divlet\/pi/);
+  assert.match(result.stdout, /pi install \/absolute\/path\/to\/divlet\/pi/);
+  assert.doesNotMatch(result.stdout, /packages\/pi/);
 });
 
 test('example packaging excludes retained private upload stages but keeps authored assets', async t => {
@@ -52,7 +54,7 @@ test('the npm package includes public entrypoints and a complete documentation l
         else files[name] = createHash('sha256').update(await readFile(file)).digest('hex');
       }
     };
-    for (const name of ['cli', 'mcp', 'pi']) await visit(path.join(root, 'packages', name, 'dist'), name);
+    for (const name of ['cli', 'mcp', 'pi']) await visit(path.join(root, name, 'dist'), name);
     await visit(path.join(root, 'web/dist'), 'web');
     return files;
   };
@@ -107,7 +109,7 @@ test('the npm package includes public entrypoints and a complete documentation l
     const declaration = target.default.replace(/\.js$/, '.d.ts').replace(/^\.\//, '');
     assert.ok(files.has(declaration), `Missing type declaration for export "${condition}": ${declaration}`);
   }
-  assert.equal([...files].some(file => /^(?:dist\/)?(?:adapters|packages|web)\//.test(file)), false, 'adapter and web implementations do not ship in the core tarball');
+  assert.equal([...files].some(file => /^(?:dist\/)?(?:adapters|packages|cli|mcp|pi|web)\//.test(file)), false, 'adapter and web implementations do not ship in the core tarball');
   const webResult = spawnSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: path.join(root, 'web'), encoding: 'utf8', timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
   assert.ifError(webResult.error); assert.equal(webResult.status, 0, webResult.stderr);
   const [webPacked] = JSON.parse(webResult.stdout), webFiles = new Set(webPacked.files.map(file => file.path));

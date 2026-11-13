@@ -2,7 +2,7 @@
 // only after the first turn, and applying a choice must go through Pi rather than the board's own state.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { legacyProject } from '../../../core/tests/fixtures/legacy-project.js';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';

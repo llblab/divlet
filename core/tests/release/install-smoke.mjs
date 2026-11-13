@@ -41,10 +41,10 @@ try {
   assert.throws(() => browserModel.applyDocumentPatch(browserFrame, { nodes: { root: { styles: { color: 'red' } } } }), { code: 'NO_STYLE_ENGINE' });
 
   // Installed paths are the published build: `dist/` holds the compiled JavaScript the package exports.
-  assert.equal(packed.files.some(file => /^dist\/(?:packages|adapters)\//.test(file.path)), false, 'the product contains no adapter implementations');
+  assert.equal(packed.files.some(file => /^dist\/(?:packages|adapters|cli|mcp|pi|web)\//.test(file.path)), false, 'the product contains no adapter implementations');
   const adapters = [];
   for (const name of ['cli', 'mcp', 'pi']) {
-    const adapter = JSON.parse(execFileSync('npm', ['pack', '--json', '--pack-destination', work], { cwd: path.join(root, 'packages', name), encoding: 'utf8' }))[0];
+    const adapter = JSON.parse(execFileSync('npm', ['pack', '--json', '--pack-destination', work], { cwd: path.join(root, name), encoding: 'utf8' }))[0];
     assert.equal(adapter.name, `@divlet/${name}`);
     assert.equal(adapter.version, packed.version);
     assert.equal(adapter.files.some(file => /(?:^|\/)(?:tests|core|web)(?:\/|$)/.test(file.path)), false, 'an adapter contains only its implementation, not another product');
@@ -212,7 +212,7 @@ try {
   execFileSync(process.execPath, ['pi-smoke.mjs'], { cwd: target, stdio: 'pipe' });
   let installedPi;
   if (process.argv.includes('--pi')) {
-    installedPi = JSON.parse(execFileSync(process.execPath, [path.join(root, 'packages/pi/tests/e2e/pi.mjs')], { cwd: target, env: { ...process.env, NODE_OPTIONS: '', PI_DIVLET_INSTALLED_ROOT: target }, encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 }).trim());
+    installedPi = JSON.parse(execFileSync(process.execPath, [path.join(root, 'pi/tests/e2e/pi.mjs')], { cwd: target, env: { ...process.env, NODE_OPTIONS: '', PI_DIVLET_INSTALLED_ROOT: target }, encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 }).trim());
     assert.equal(installedPi.status, 'passed'); assert.equal(installedPi.installed, true); assert.equal(installedPi.installedFonts.status, 'passed', 'required installed Pi mode cannot silently skip the real host/browser case');
   }
   console.log(JSON.stringify({ status: 'passed', files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, pluginTypes: true, browserModelBundle: true, webPackage: webPacked.name, installedFonts, ...(installedPi ? { installedPi } : {}), mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));

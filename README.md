@@ -52,10 +52,10 @@ pi install npm:@divlet/pi@0.0.1
 For checkout development, load the source adapter for a one-off session instead (no build needed):
 
 ```bash
-NODE_OPTIONS=--conditions=divlet-source pi -e /absolute/path/to/divlet/packages/pi/index.js
+NODE_OPTIONS=--conditions=divlet-source pi -e /absolute/path/to/divlet/pi/index.js
 ```
 
-For a persistent local package installation, first run `npm run build`, then `pi install /absolute/path/to/divlet/packages/pi`. Choose one method; never load both.
+For a persistent local package installation, first run `npm run build`, then `pi install /absolute/path/to/divlet/pi`. Choose one method; never load both.
 
 Open Pi in your workspace, run `/reload` if it is already running, then:
 

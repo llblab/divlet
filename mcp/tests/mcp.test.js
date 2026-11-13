@@ -7,10 +7,9 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
-import { findBoard } from '../../../core/lib/boards.ts';
+import { findBoard } from '../../core/lib/boards.ts';
 
 const ENTRY = fileURLToPath(new URL('../index.js', import.meta.url));
-const fixture = fileURLToPath(new URL('../../cli/tests/fixtures/legacy-project.js', import.meta.url));
 
 /** One spawned MCP server plus the request/response plumbing of its stdio transport. */
 function client(cwd, stateDir) {

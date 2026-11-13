@@ -1,14 +1,14 @@
 import test from 'node:test';
-import { legacyProject } from '../../../core/tests/fixtures/legacy-project.js';
+import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import divletExtension, { lastAssistantText } from '../lib/extension.js';
-import { openRuntime } from '../../../core/lib/runtime.js';
-import { applyOperation } from '../../../core/lib/ops.ts';
-import { applyDocumentPatch, createDemoDocument } from '../../../core/lib/model.ts';
-import { exportHtml } from '../../../core/lib/codec.ts';
+import { openRuntime } from '../../core/lib/runtime.js';
+import { applyOperation } from '../../core/lib/ops.ts';
+import { applyDocumentPatch, createDemoDocument } from '../../core/lib/model.ts';
+import { exportHtml } from '../../core/lib/codec.ts';
 
 function harness(cwd) {
   const tools = new Map();

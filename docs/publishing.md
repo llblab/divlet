@@ -22,7 +22,7 @@ npm refused the original unscoped `divlet` name as too similar to `figlet`. The 
 
 Core's HTTP composition imports web's public asset locator; generic model/format modules do not import web. Web's portable contracts own opaque host payloads, not project validation/writes, and have no type/JSDoc back-edge to core. Browser modules use host HTTP/SSE and preview ports, not imports of the Node runtime. Backend plugins consume core contracts; client plugins use the served web module graph. See [architecture](architecture.md).
 
-The root owns `@divlet/core`, `web/` owns `@divlet/web`, and `packages/{cli,mcp,pi}` own the adapters, without wrappers. All five versions match. Adapters pin `@divlet/core@0.0.1`; core pins `@divlet/web@0.0.1`. Core has no bins, Pi manifest/peer requirements or `./pi` export. Its tarball excludes the web and adapter implementations. Web owns its only client copy and portable declarations. Built-in plugins remain bundled in core, not separately published.
+The root owns `@divlet/core`, `web/` owns `@divlet/web`, and `cli/`, `mcp/` and `pi/` own the adapters, without wrappers. All five versions match. Adapters pin `@divlet/core@0.0.1`; core pins `@divlet/web@0.0.1`. Core has no bins, Pi manifest/peer requirements or `./pi` export. Its tarball excludes the web and adapter implementations. Web owns its only client copy and portable declarations. Built-in plugins remain bundled in core, not separately published.
 
 Node.js 22.19 or later is required. Pi is not required for CLI/MCP. Shared configurations should pin adapter versions, including `npm:@divlet/pi@0.0.1`. For MCP:
 
@@ -40,7 +40,7 @@ Node.js 22.19 or later is required. Pi is not required for CLI/MCP. Shared confi
 ## Readiness gates
 
 - Freeze one coherent candidate after intended changes settle. Preserve unrelated work; root `dist/`, `web/dist/` and adapter `dist/` are generated publication output, not source development prerequisites.
-- Align manifests, lockfile, versions and exact dependency pins. The workspace is `.`, `web`, `packages/*`, `plugins/*`.
+- Align manifests, lockfile, versions and exact dependency pins. The workspace is `.`, `web`, `cli`, `mcp`, `pi`, `plugins/*`.
 - Run [testing](testing.md): `npm test`, the source browser battery, MCP/contract/Pi checks and required `npm run test:release:pi`. A skipped Pi test is not installed-host proof.
 - Inspect five tarballs: root, `web`, and each adapter. Check public exports/declarations, native client closure, sole file ownership, bins, manifests, licenses, excluded tests/caches and packaged documentation links. Root documentation links to separately packaged READMEs use absolute GitHub URLs. Repeat builds must not nest outputs or alter bytes.
 - Local release checks install both local web/core tarballs, then adapters, into an empty consumer. They must not fetch unpublished product packages, link checkout code or rescue missing client files from a sibling directory. These checks are not registry-install evidence.

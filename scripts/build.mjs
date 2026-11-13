@@ -36,14 +36,14 @@ for (const asset of ['board.js', 'board.css', 'index.html', 'lib']) await cp(pat
 await cp(path.join(root, 'LICENSE'), path.join(web, 'dist/LICENSE'));
 // Each adapter owns its published output; none of its implementation ships in the core tarball.
 for (const name of ['cli', 'mcp', 'pi']) {
-  const directory = path.join(root, 'packages', name);
+  const directory = path.join(root, name);
   const pkg = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'));
   if (pkg.version !== product.version || pkg.dependencies?.['@divlet/core'] !== product.version) throw new Error(`${pkg.name} must share the product version and pin @divlet/core exactly.`);
   await rm(path.join(directory, 'dist'), { recursive: true, force: true });
-  await cp(path.join(dist, 'packages', name), path.join(directory, 'dist'), { recursive: true });
+  await cp(path.join(dist, name), path.join(directory, 'dist'), { recursive: true });
   await cp(path.join(root, 'LICENSE'), path.join(directory, 'dist/LICENSE'));
   if (pkg.bin) await chmod(path.join(directory, 'dist/index.js'), 0o755);
+  await rm(path.join(dist, name), { recursive: true, force: true });
 }
-await rm(path.join(dist, 'packages'), { recursive: true, force: true });
 // Progress goes to stderr: stdout may be a machine-readable `npm pack --json` stream.
 console.error(`dist: ${(await readdir(dist)).length} entries`);
