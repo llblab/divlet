@@ -96,9 +96,11 @@ const escapeAttribute = (value: string) => value.replace(/&/g, '&amp;').replace(
  */
 export function previewDocument(html: string, id: string, render: number, bridge: string, bridgeUrl: string): string {
   const token = /^[a-f0-9-]{36}$/i.test(bridge) ? bridge : '';
-  const csp = `default-src 'none'; img-src data: https: blob:; media-src data: https:; style-src 'unsafe-inline'; font-src data: https:; script-src ${bridgeUrl}; connect-src 'none'; base-uri 'none'; form-action 'none'`;
+  // A path may legally contain CSP separators; encode them so the bridge address cannot add or end a directive.
+  const source = bridgeUrl.replace(/[;,\s'"]/g, character => `%${character.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
+  const csp = `default-src 'none'; img-src data: https: blob:; media-src data: https:; style-src 'unsafe-inline'; font-src data: https:; script-src ${source}; connect-src 'none'; base-uri 'none'; form-action 'none'`;
   const meta = `<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(csp)}"><meta name="divlet-bridge" content="${escapeAttribute(JSON.stringify({ id, render, token }))}">`;
-  return html.replace(/<head([^>]*)>/i, `<head$1>${meta}`).replace(/<\/body>(\s*<\/html>\s*)?$/i, `<script src="${escapeAttribute(bridgeUrl)}"></script></body>$1`);
+  return html.replace(/<head([^>]*)>/i, `<head$1>${meta}`).replace(/<\/body>(\s*<\/html>\s*)?$/i, `<script src="${escapeAttribute(source)}"></script></body>$1`);
 }
 
 /** The static bridge file: the trusted serialized preview bridge, started with the arguments its page carries. */
