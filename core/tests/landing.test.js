@@ -161,6 +161,7 @@ test('freshness refuses source/embedded-resource drift and metadata-only rebuild
 
 test('CI verifies then copies the prepared public set without compiling a different page in the publication step', async () => {
   const workflow = YAML.parse(await fs.readFile(path.join(root, '.github/workflows/landing.yml'), 'utf8'));
+  assert.equal(workflow.jobs.publish.env.NODE_OPTIONS, '--conditions=divlet-source', 'a fresh CI checkout resolves web sources, never an unbuilt workspace dist');
   const steps = workflow.jobs.publish.steps, publish = steps.find(step => step.name === 'Publish');
   assert.ok(steps.some(step => step.run === 'npm run landing:check'));
   assert.equal(steps.find(step => step.uses?.startsWith('actions/setup-node@')).with['node-version'], 22);

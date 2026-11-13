@@ -35,6 +35,8 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --conditions=divlet-source
     steps:
       - uses: actions/checkout@v4
         with:
