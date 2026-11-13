@@ -2,9 +2,10 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
-## Unreleased
+## 0.0.5 — Domain-first agent tools
 
-- **Domain-first agent tools.** The shared contract now names its seven operations `divlet_open`, `divlet_read`, `divlet_patch`, `divlet_edit`, `divlet_frame_manage`, `divlet_undo` and `divlet_mark`. Legacy `*_divlet` calls retain the same validation, history and single-writer behavior, including attachment to older boards. Pi defaults and local MCP listings prefer canonical names; browser MCP/WebMCP explicitly retain callable aliases. Skills, prompts, guides and the owned landing build use the new vocabulary. This is unreleased source behavior, not a new npm publication.
+- **Predictable tool names across hosts.** The seven shared operations are now `divlet_open`, `divlet_read`, `divlet_patch`, `divlet_edit`, `divlet_frame_manage`, `divlet_undo` and `divlet_mark`. Skills, prompts, guides and the landing use the same domain-first vocabulary.
+- **Compatible operations, unchanged writer authority.** Legacy `*_divlet` names resolve to the same validation, revisions and history; newer clients still attach to older live boards. Pi activates canonical names by default and retains inactive legacy definitions for explicit host activation. Local MCP lists canonical names and accepts legacy calls; browser MCP/WebMCP explicitly list both spellings to preserve transport allowlisting.
 
 ## 0.0.4 — candidate
 

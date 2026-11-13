@@ -1,6 +1,6 @@
 {
   "name": "@divlet/web",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "The divlet browser board, static client assets and transport-free host ports",
   "type": "module",
   "license": "MIT",

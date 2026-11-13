@@ -78,7 +78,7 @@ npx -y @divlet/mcp --cwd /absolute/path/to/workspace
 pi install npm:@divlet/pi
 ```
 
-In an MCP configuration, use `"command": "npx"` and `"args": ["-y", "@divlet/mcp@0.0.4", "--cwd", "/absolute/path/to/workspace"]`. Shared configurations should also pin `@divlet/cli@0.0.4` and `npm:@divlet/pi@0.0.4`; see [npm publication](publishing.md). The `divlet` and `divlet-mcp` binary names belong to the CLI and MCP packages respectively. The root library has no bins, Pi manifest or `divlet/pi` export.
+In an MCP configuration, use `"command": "npx"` and `"args": ["-y", "@divlet/mcp@0.0.5", "--cwd", "/absolute/path/to/workspace"]`. Shared configurations should also pin `@divlet/cli@0.0.5` and `npm:@divlet/pi@0.0.5`; see [npm publication](publishing.md). The `divlet` and `divlet-mcp` binary names belong to the CLI and MCP packages respectively. The root library has no bins, Pi manifest or `divlet/pi` export.
 
 For other hosts, install the skill with `npx skills add llblab/divlet --skill divlet --global` (omit `--global` for one project; pick the target agents when asked), or copy/link `skills/divlet/` into the host's skills directory, and register the MCP server separately. Installing a skill alone does not register tools, and a Pi session that loads the extension must not install the skill again. The skill folder is self-contained: it links to documents by their public address, not through the package's `node_modules`. The [workflow skill](../skills/divlet/SKILL.md) explains the model, component recipes and the read → edit → verify loop.
 
@@ -125,7 +125,7 @@ If the version has changed, the tool returns `REVISION_CONFLICT`: read the frame
 
 ### Tool-name compatibility
 
-Canonical names follow domain → resource → operation, using a reduced domain → operation form when the resource would be redundant. These names describe the current source/unreleased contract; earlier installed packages may advertise only the legacy spellings.
+Canonical names follow domain → resource → operation, using a reduced domain → operation form when the resource would be redundant. These canonical names were introduced in 0.0.5; earlier installed packages may advertise only the legacy spellings.
 
 | Legacy name | Canonical name |
 | --- | --- |

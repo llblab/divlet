@@ -5,7 +5,7 @@ The MCP stdio adapter for divlet. This package owns its implementation and depen
 Install:
 
 ```bash
-npx -y @divlet/mcp@0.0.4 --cwd ./workspace
+npx -y @divlet/mcp@0.0.5 --cwd ./workspace
 ```
 
 From 0.0.3: connect to a website that is its own MCP provider (the tools run in a managed browser page; `playwright-core` drives the installed Chrome or Playwright's Chromium):

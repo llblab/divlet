@@ -13,7 +13,7 @@
         "description": "divlet is a local browser layout board for coding agents: live frames of real HTML and CSS, reusable components, and the same validated tools through Pi, MCP or the board running in your browser.",
         "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgY29sb3I9IiM1YjViZjAiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj48cGF0aCBkPSJNOCA0LjUgMi41IDEwIDggMTUuNSIgZmlsbD0ibm9uZSIvPjxwYXRoIGQ9Ik0xMC41IDQuNUgxMkwxNy41IDEwIDEyIDE1LjVoLTEuNVoiIGZpbGw9ImN1cnJlbnRDb2xvciIgc3Ryb2tlPSJub25lIi8+PC9zdmc+Cg=="
       },
-      "version": 4,
+      "version": 5,
       "artboard": {
         "x": 80,
         "y": 80,
@@ -833,7 +833,7 @@
         "text-187": {
           "id": "text-187",
           "type": "text",
-          "content": "Version 0.0.4 is an early release candidate; the native project format remains a pre-freeze draft, so keep backups of projects you care about.",
+          "content": "Version 0.0.5. The native project format remains a pre-freeze draft, so keep backups of projects you care about.",
           "metadata": {}
         },
         "text-189": {

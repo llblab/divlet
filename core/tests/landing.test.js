@@ -137,7 +137,7 @@ test('installation examples distinguish released packages, commands and draft-fo
   assert.ok(html.includes('npx -y @divlet/cli ./my-project'));
   assert.ok(html.includes('npx -y @divlet/mcp --cwd ./my-project'));
   assert.ok(html.includes(`pi install npm:${wrapper.name}`));
-  assert.ok(html.includes(`Version ${pkg.version} is an early release`));
+  assert.ok(html.includes(`Version ${pkg.version}.`));
   assert.match(html, /pre-freeze draft/);
   // Every way to run it that the page offers is a real command of a real package.
   assert.ok(html.includes('npx -y @divlet/mcp --connect https://llblab.github.io/divlet/'));

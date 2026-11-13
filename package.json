@@ -1,6 +1,6 @@
 {
   "name": "@divlet/core",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "A browser layout board for agents: one project file, live frames, reusable components; the same tools through Pi and MCP",
   "type": "module",
   "license": "MIT",
@@ -142,7 +142,7 @@
     "test:connect": "node scripts/source.mjs mcp/tests/connect.e2e.mjs"
   },
   "dependencies": {
-    "@divlet/web": "0.0.4",
+    "@divlet/web": "0.0.5",
     "@tailwindcss/node": "^4.1.0",
     "@xmldom/xmldom": "0.9.12",
     "lucide-static": "1.67.0",
