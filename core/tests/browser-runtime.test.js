@@ -16,13 +16,23 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const landing = await fs.readFile(path.join(root, 'examples/landing/landing.divlet'), 'utf8');
 const engine = { compile: (tokens, candidates) => compileClasses(tokens, candidates, root), unknown: input => unknownClasses({ ...input, base: root }) };
 
-async function pair() {
+const editable = JSON.stringify({ schemaVersion: 1, frames: [{
+  id: 'index', name: 'Editable parity', version: 1, artboard: { x: 0, y: 0, width: 390, height: 844 }, rootId: 'root',
+  nodes: {
+    root: { id: 'root', type: 'element', tag: 'main', children: ['content'] },
+    content: { id: 'content', type: 'element', tag: 'section', children: ['mark'] },
+    mark: { id: 'mark', type: 'element', tag: 'div', children: ['label'] },
+    label: { id: 'label', type: 'text', content: 'Editable text' },
+  },
+}] });
+
+async function pair(source = landing) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-browser-runtime-'));
   const file = path.join(directory, 'landing.divlet');
-  await fs.writeFile(file, landing);
+  await fs.writeFile(file, source);
   const node = await openRuntime({ file, watch: false, createDemo: false });
   const stored = [];
-  const browser = await BrowserRuntime.open({ source: landing, file: 'landing.divlet', projectId: 'browser-copy', compiler: engine, persist: text => { stored.push(text); } });
+  const browser = await BrowserRuntime.open({ source, file: 'landing.divlet', projectId: 'browser-copy', compiler: engine, persist: text => { stored.push(text); } });
   return { node, browser, stored, close: async () => { await node.close(); await browser.close(); await fs.rm(directory, { recursive: true, force: true }); } };
 }
 
@@ -32,7 +42,7 @@ async function both(writers, name, args) {
   const [node, browser] = [await outcome(writers.node), await outcome(writers.browser)];
   assert.equal(browser.ok, node.ok, `${name}: ${JSON.stringify(node.ok ? null : node.code)} vs ${JSON.stringify(browser.ok ? null : browser.code)} (${browser.message ?? node.message ?? ''})`);
   if (!node.ok) assert.equal(browser.code, node.code, `${name} refuses alike`);
-  return { node: node.value, browser: browser.value, code: node.code };
+  return { ok: node.ok, node: node.value, browser: browser.value, code: node.code };
 }
 
 const pick = (value, keys) => Object.fromEntries(keys.filter(key => value && key in value).map(key => [key, value[key]]));
@@ -91,34 +101,41 @@ test('the browser writer opens a project exactly as the Node runtime renders it'
 });
 
 test('patches, structural edits, components, frames, refusals and history agree step by step', async () => {
-  const writers = await pair();
+  const writers = await pair(editable);
   try {
-    const step = async (label, name, args) => { const result = await both(writers, name, args); if (result.node) assert.deepEqual(pick(result.browser, RESULT), pick(result.node, RESULT), `${label}: result`); sameState(writers, label); return result; };
+    const step = async (label, name, args, error) => {
+      const result = await both(writers, name, args);
+      assert.equal(result.ok, !error, `${label}: expected ${error ?? 'success'}, received ${result.code ?? 'success'}`);
+      if (error) assert.equal(result.code, error, label);
+      else assert.deepEqual(pick(result.browser, RESULT), pick(result.node, RESULT), `${label}: result`);
+      sameState(writers, label);
+      return result;
+    };
     const frame = 'index';
     const v = () => writers.node.documents.get(frame).document.version;
-    await step('text patch', 'divlet_patch', { frameId: frame, expectedVersion: v(), label: 'retitle', patch: { nodes: { 'text-11': { content: 'divlet in a browser' }, 'node-10': { style: { color: 'rgb(200, 0, 0)' } } } } });
-    const stale = await step('stale patch', 'divlet_patch', { frameId: frame, expectedVersion: 1, patch: { name: 'x' } });
+    await step('text patch', 'divlet_patch', { frameId: frame, expectedVersion: v(), label: 'retitle', patch: { nodes: { 'label': { content: 'divlet in a browser' }, 'mark': { style: { color: 'rgb(200, 0, 0)' } } } } });
+    const stale = await step('stale patch', 'divlet_patch', { frameId: frame, expectedVersion: 1, patch: { name: 'x' } }, 'REVISION_CONFLICT');
     assert.equal(stale.code, 'REVISION_CONFLICT');
-    await step('no-op patch', 'divlet_patch', { frameId: frame, expectedVersion: v(), patch: { nodes: { 'text-11': { content: 'divlet in a browser' } } } });
-    await step('insert', 'divlet_edit', { frameId: frame, expectedVersion: v(), op: { type: 'insert', parentId: 'node-2', index: 0, spec: { tag: 'p', className: 'eyebrow', text: 'Inserted from both writers' } } });
-    await step('html insert', 'divlet_edit', { frameId: frame, expectedVersion: v(), op: { type: 'insert', parentId: 'node-2', index: 1, html: '<span class="pill" onclick="evil()">Safe <b>bold</b></span><script>alert(1)</script>' } });
-    const inserted = writers.node.documents.get(frame).document.nodes['node-2'].children[0];
-    await step('move', 'divlet_edit', { frameId: frame, expectedVersion: v(), op: { type: 'move', id: inserted, parentId: 'node-2', index: 2 } });
+    await step('no-op patch', 'divlet_patch', { frameId: frame, expectedVersion: v(), patch: { nodes: { 'label': { content: 'divlet in a browser' } } } });
+    await step('insert', 'divlet_edit', { frameId: frame, expectedVersion: v(), op: { type: 'insert', parentId: 'content', index: 0, spec: { tag: 'p', className: 'eyebrow', text: 'Inserted from both writers' } } });
+    await step('html insert', 'divlet_edit', { frameId: frame, expectedVersion: v(), op: { type: 'insert', parentId: 'content', index: 1, html: '<span class="pill" onclick="evil()">Safe <b>bold</b></span><script>alert(1)</script>' } });
+    const inserted = writers.node.documents.get(frame).document.nodes['content'].children[0];
+    await step('move', 'divlet_edit', { frameId: frame, expectedVersion: v(), op: { type: 'move', id: inserted, parentId: 'content', index: 2 } });
     await step('wrap', 'divlet_edit', { frameId: frame, expectedVersion: v(), op: { type: 'wrap', ids: [inserted] } });
-    await step('bad op', 'divlet_edit', { frameId: frame, expectedVersion: v(), op: { type: 'remove', id: 'missing-node' } });
-    await step('component', 'divlet_patch', { frameId: frame, expectedVersion: v(), patch: { nodes: { 'node-4': { reusable: true } } } });
+    await step('bad op', 'divlet_edit', { frameId: frame, expectedVersion: v(), op: { type: 'remove', id: 'missing-node' } }, 'NOT_FOUND');
+    await step('component', 'divlet_patch', { frameId: frame, expectedVersion: v(), patch: { nodes: { 'mark': { reusable: true } } } });
     await step('new frame', 'divlet_frame_manage', { action: 'create', name: 'Phone', width: 390, height: 844 });
-    await step('instance', 'divlet_edit', { frameId: 'phone', expectedVersion: 1, op: { type: 'insert', parentId: 'root', spec: { ref: 'index/node-4' } } });
-    await step('component edit rerenders dependents', 'divlet_patch', { frameId: frame, expectedVersion: v(), patch: { nodes: { 'text-11': { content: 'shared mark' } } } });
-    await step('delete in use', 'divlet_frame_manage', { action: 'delete', frameId: frame, expectedVersion: v() });
+    await step('instance', 'divlet_edit', { frameId: 'phone', expectedVersion: 1, op: { type: 'insert', parentId: 'root', spec: { ref: 'index/mark' } } });
+    await step('component edit rerenders dependents', 'divlet_patch', { frameId: frame, expectedVersion: v(), patch: { nodes: { 'label': { content: 'shared mark' } } } });
+    await step('delete in use', 'divlet_frame_manage', { action: 'delete', frameId: frame, expectedVersion: v() }, 'COMPONENT_IN_USE');
     await step('duplicate', 'divlet_frame_manage', { action: 'duplicate', frameId: 'phone', expectedVersion: writers.node.documents.get('phone').document.version, width: 768 });
     await step('project tokens', 'divlet_patch', { expectedVersion: writers.node.settings.version, patch: { tokens: { '--brand': '#5b5bf0' }, css: ':root { --gap: 12px; }' } });
     await step('undo project', 'divlet_undo', {});
     await step('undo duplicate', 'divlet_undo', {});
     await step('redo duplicate', 'divlet_undo', { redo: true });
     await step('undo frame-scoped', 'divlet_undo', { frameId: frame });
-    await step('mark', 'divlet_mark', { frameId: frame, nodeIds: ['node-2'], note: 'checking parity' });
-    await step('mark unknown', 'divlet_mark', { frameId: frame, nodeIds: ['nope'] });
+    await step('mark', 'divlet_mark', { frameId: frame, nodeIds: ['content'], note: 'checking parity' });
+    await step('mark unknown', 'divlet_mark', { frameId: frame, nodeIds: ['nope'] }, 'NOT_FOUND');
     await step('read nodes', 'divlet_read', { view: 'nodes', frameId: frame, query: 'shared', limit: 5 });
     const components = await both(writers, 'divlet_read', { view: 'components' });
     assert.deepEqual(components.browser, components.node);
@@ -129,6 +146,46 @@ test('patches, structural edits, components, frames, refusals and history agree 
     assert.deepEqual(frameRead.browser, frameRead.node);
     assert.equal(writers.browser.source(), await fs.readFile(writers.node.projectPath, 'utf8'), 'both writers serialize the same project');
     assert.equal(writers.stored.at(-1), writers.browser.source(), 'every accepted change reached the persistence callback');
+  } finally { await writers.close(); }
+});
+
+test('shared replay keeps multi-step traversal atomic and preserves both writers on a late conflict', async () => {
+  const writers = await pair(editable);
+  try {
+    const runtimes = [writers.node, writers.browser];
+    const initialPoints = runtimes.map(runtime => runtime.historyHead().pointId);
+    for (const runtime of runtimes) {
+      await runtime.patch({ documentId: 'index', expectedVersion: runtime.getEntry('index').document.version, patch: { nodes: { 'label': { content: 'Grouped text' } } } });
+      await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { name: 'Grouped project' } });
+    }
+    sameState(writers, 'two independent history groups');
+    const endpoints = runtimes.map(runtime => runtime.historyHead().pointId);
+    let stored = writers.stored.length;
+    for (const runtime of runtimes) await runtime.undo({ steps: 2 });
+    assert.equal(writers.stored.length, stored + 1, 'one browser persistence callback for the full traversal');
+    assert.deepEqual(runtimes.map(runtime => runtime.historyHead().pointId), initialPoints);
+    sameState(writers, 'multi-step Undo');
+    stored = writers.stored.length;
+    for (const runtime of runtimes) await runtime.redo({ steps: 2 });
+    assert.equal(writers.stored.length, stored + 1);
+    assert.deepEqual(runtimes.map(runtime => runtime.historyHead().pointId), endpoints);
+    sameState(writers, 'multi-step Redo');
+    for (const runtime of runtimes) await runtime.patch({ documentId: 'index', expectedVersion: runtime.getEntry('index').document.version, patch: { nodes: { 'label': { content: 'Later overlapping content' } } }, undoable: false });
+    const snapshot = runtime => structuredClone({
+      settings: runtime.settings, documents: [...runtime.documents].map(([id, item]) => [id, item.document, item.render, item.html]),
+      selection: runtime.selection, revision: runtime.revision, history: runtime.history,
+      undo: runtime.undoStack, redo: runtime.redoStack, timeline: runtime.readTimeline(),
+    });
+    const before = runtimes.map(snapshot), disk = await fs.readFile(writers.node.projectPath, 'utf8'), browserSource = writers.browser.source();
+    stored = writers.stored.length;
+    for (let i = 0; i < runtimes.length; i++) {
+      await assert.rejects(runtimes[i].undo({ steps: 2 }), error => error.code === 'CANNOT_UNDO' && /Later changes touched the same content/.test(error.message));
+      assert.deepEqual(snapshot(runtimes[i]), before[i], 'the candidate project-field prefix does not become accepted or move stack/point authority');
+    }
+    assert.equal(writers.stored.length, stored);
+    assert.equal(writers.browser.source(), browserSource);
+    assert.equal(await fs.readFile(writers.node.projectPath, 'utf8'), disk);
+    sameState(writers, 'refused multi-step traversal');
   } finally { await writers.close(); }
 });
 

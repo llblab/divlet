@@ -1,4 +1,4 @@
-/** Session-only point identity and linear stack lineage. Replay, validation, stacks and persistence belong to the runtime. */
+/** Session-only point identity/lineage. history-replay owns candidates; writers own preparation, stacks and persistence. */
 export type HistoryDirection = 'undo' | 'redo';
 export type HistoryBoundary = 'opened' | 'untracked' | 'nonlinear' | 'retained';
 export interface HistoryNavigation {

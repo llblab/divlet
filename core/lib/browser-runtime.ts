@@ -5,13 +5,14 @@
  * agent conversation; those stay with the local Node host and are reported as absent capabilities, never emulated.
  *
  * Validation, patch application, operations, component expansion, rendering checks, diffs, acceptance rules and the history
- * line are the shared kernel modules the Node runtime uses. The orchestration below mirrors `runtime.js` step for step;
+ * line and item replay are shared with Node. The remaining orchestration below mirrors `runtime.js` step for step;
  * `core/tests/browser-runtime.test.js` runs the same tool sequences through both writers and compares their results.
  * Persistence is a host callback that receives the serialized project after each accepted change.
  */
 import { applyDocumentPatch, colourNames, inspectDocument, validateDocument, DivletError, LIMITS } from './model.ts';
 import type { DocumentModel } from './model.ts';
-import { diffDocuments, matchesPatch, summarizeChange, touchedNodeIds } from './diff.ts';
+import { diffDocuments, summarizeChange, touchedNodeIds } from './diff.ts';
+import { replayHistory } from './history-replay.ts';
 import { operationPatch } from './ops.ts';
 import { HistoryLine } from './history.ts';
 import { readProject, writeProject, patchSettings, listComponents, instancesOf, expandFrame } from './project.ts';
@@ -462,41 +463,14 @@ export class BrowserRuntime {
   }
 
   async _applyEntry(entry: any, direction: 'undo' | 'redo', actor: string) {
-    const undoing = direction === 'undo';
-    const items = undoing ? [...entry.items].reverse() : entry.items;
     const previous = this.documents;
     const previousSettings = this.settings;
-    let frames = new Map([...previous].map(([id, item]) => [id, item.document as any]));
-    let settings: any = previousSettings;
+    let settings = previousSettings;
     let prepared: Map<string, PreparedFrame>;
     try {
-      for (const item of items) {
-        const change = undoing ? item.inverse : item.forward;
-        const expected = undoing ? item.forward : item.inverse;
-        if (item.type === 'patch') {
-          const current = frames.get(item.documentId);
-          if (!current || !matchesPatch(current, expected, change)) fail('CANNOT_UNDO', 'Later changes touched the same content.');
-          frames.set(item.documentId, { ...applyDocumentPatch(current, change), version: current.version + 1 });
-        } else if (item.type === 'project') {
-          if (!matchesPatch({ ...settings, outputDir: settings.outputDir ?? undefined }, expected, change)) fail('CANNOT_UNDO', 'Later changes touched the same project fields.');
-          settings = patchSettings(settings, change);
-        } else if ((item.type === 'create') === undoing) {
-          const current = frames.get(item.documentId);
-          if (!current || !sameDocument(current, item.document)) fail('CANNOT_UNDO', `Frame ${item.documentId} has changed since this step.`);
-          frames.delete(item.documentId);
-        } else {
-          if (frames.has(item.documentId)) fail('CANNOT_UNDO', `Frame ${item.documentId} already exists.`);
-          const ordered = [...frames];
-          ordered.splice(item.index ?? ordered.length, 0, [item.documentId, item.document]);
-          frames = new Map(ordered);
-        }
-      }
-      for (const [id, frame] of frames) {
-        const current = previous.get(id)?.document;
-        if (current) frames.set(id, sameDocument(current, frame) ? current : { ...frame, version: current.version + 1 });
-      }
-      settings = { ...settings, version: previousSettings.version + (sameSettings(previousSettings, settings) ? 0 : 1) };
-      prepared = await this.prepareAll([...frames.keys()], frames, settings);
+      const candidate = replayHistory(new Map([...previous].map(([id, item]) => [id, item.document])), previousSettings, entry.items, direction);
+      settings = candidate.settings;
+      prepared = await this.prepareAll([...candidate.frames.keys()], candidate.frames, settings);
     } catch (error: any) {
       fail('CANNOT_UNDO', `This step no longer applies cleanly (${error.message}).`);
     }
