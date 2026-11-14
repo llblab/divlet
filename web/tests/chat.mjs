@@ -6,6 +6,7 @@ import os from 'node:os';
 import { chromium } from 'playwright';
 import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import { openRuntime } from '@divlet/core/runtime';
+import { waitForPage } from './fixtures/wait-for-page.js';
 
 const launch = { headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] };
 if (process.env.PI_DIVLET_CHROMIUM_EXECUTABLE) launch.executablePath = process.env.PI_DIVLET_CHROMIUM_EXECUTABLE;
@@ -54,7 +55,7 @@ try {
           runtime.setAgent({ busy: false }); await page.waitForFunction(() => document.querySelector('.ask-send').textContent === 'Send');
           await input.fill('');
         }
-        runtime.setAgent({ connected: false, controls: null }); await input.waitFor({ state: 'visible' });
+        runtime.setAgent({ connected: false, controls: null, busy: true, activity: 'working before reconnect' }); await input.waitFor({ state: 'visible' });
         await page.waitForFunction(() => document.querySelector('.ask-input').disabled); await sendCorner('disconnected');
         assert.equal(await list.locator('.quiet').count(), 0, 'disconnection removes the empty-conversation invitation');
         const command = page.getByRole('textbox', { name: 'Agent connection command', exact: true });
@@ -64,8 +65,9 @@ try {
         await command.focus();
         await command.evaluate(node => node.setSelectionRange(0, 7));
         runtime.setAgent({ activity: 'waiting for a connection' });
-        await page.waitForFunction(async () => (await import('./lib/store.js')).store.state.agent.activity === 'waiting for a connection' && document.querySelector('.agent-connect-value') === document.activeElement && document.activeElement.selectionEnd === 7);
-        runtime.setAgent({ connected: true }); await page.waitForFunction(() => !document.querySelector('.ask-input').disabled);
+        assert.equal(runtime.info().agent.activity, 'waiting for a connection', 'the fixture publishes a real activity-only update; idle activity is deliberately cleared');
+        await waitForPage(page, async () => (await import('./lib/store.js')).store.state.agent.activity === 'waiting for a connection' && document.querySelector('.agent-connect-value') === document.activeElement && document.activeElement.selectionEnd === 7);
+        runtime.setAgent({ connected: true, busy: false }); await page.waitForFunction(() => !document.querySelector('.ask-input').disabled);
         assert.equal(await page.locator('.agent-connect').count(), 0, 'the connection card leaves when the host reports an agent');
         if (!await list.locator('.bubble').count()) assert.match(await list.innerText(), /No conversation yet/);
       };

@@ -7,6 +7,7 @@ import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import { openRuntime } from '@divlet/core/runtime';
 import { resolveOpenFile } from '../../core/lib/launch.ts';
 import { decodeHtml } from '../../core/lib/codec.ts';
+import { waitForPage } from './fixtures/wait-for-page.js';
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-size-editor-'));
 const browser = await chromium.launch({ headless: true, executablePath: process.env.PI_DIVLET_CHROMIUM_EXECUTABLE, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
@@ -24,7 +25,7 @@ try {
     await page.goto(runtime.url); await page.waitForFunction(() => document.querySelector('.artboard')?.dataset.status === 'live');
     await page.evaluate(async id => { const s = await import('./lib/store.js'), c = await import('./lib/canvas.js'); s.selectArtboards([id]); c.fit([id], { animate: false }); }, frameId);
     const size = page.locator('.artboard .ab-size'), input = page.getByRole('textbox', { name: 'Artboard size, width × height', exact: true });
-    const installed = async () => page.waitForFunction(async ({ id, version, width, height }) => { const c = await import('./lib/canvas.js'), e = c.entries.get(id); return e?.doc.version === version && e.doc.artboard.width === width && e.doc.artboard.height === height && !e.size.querySelector('input'); }, { id: frameId, version: entry().document.version, width: entry().document.artboard.width, height: entry().document.artboard.height });
+    const installed = async () => waitForPage(page, async ({ id, version, width, height }) => { const c = await import('./lib/canvas.js'), e = c.entries.get(id); return e?.doc.version === version && e.doc.artboard.width === width && e.doc.artboard.height === height && !e.size.querySelector('input'); }, { id: frameId, version: entry().document.version, width: entry().document.artboard.width, height: entry().document.artboard.height });
     const submit = async status => {
       const count = requests.length;
       const [response] = await Promise.all([page.waitForResponse(r => r.request().method() === 'POST' && r.url().endsWith('/api/patch')), input.press('Enter')]);
@@ -49,7 +50,7 @@ try {
     await size.dblclick(); await input.fill('16:9');
     const stale = { version: entry().document.version, render: entry().render }, oldInput = await input.elementHandle();
     await runtime.patch({ documentId: frameId, expectedVersion: stale.version, expectedRender: stale.render, patch: { artboard: { width: 600 } } });
-    await page.waitForFunction(async ({ id, version }) => (await import('./lib/canvas.js')).entries.get(id)?.doc.version === version, { id: frameId, version: entry().document.version });
+    await waitForPage(page, async ({ id, version }) => (await import('./lib/canvas.js')).entries.get(id)?.doc.version === version, { id: frameId, version: entry().document.version });
     assert.equal(await oldInput.evaluate(e => e.isConnected && document.activeElement === e && e.value === '16:9'), true);
     const acceptedWire = await fs.readFile(file), acceptedHistory = runtime.historyHead(), count = requests.length;
     await submit(409);
@@ -73,7 +74,7 @@ try {
   await page.goto(runtime.url);
   await page.waitForSelector(`.artboard[data-artboard-id="${fitted.id}"]`);
   await page.evaluate(async id => { const s = await import('./lib/store.js'); s.selectArtboards([id]); (await import('./lib/canvas.js')).fit([id], { animate: false }); }, fitted.id);
-  await page.waitForFunction(async id => (await import('./lib/actions.js')).canFitHeight(id), fitted.id);
+  await waitForPage(page, async id => (await import('./lib/actions.js')).canFitHeight(id), fitted.id);
   await page.locator('#viewport').focus(); await page.mouse.move(5, 5);
   await page.locator('#inspector .smart-bar button[aria-label="Fit height to content"]:enabled').waitFor({ timeout: 4000 }).catch(async error => {
     console.error('fit-height readiness', await page.evaluate(async id => { const s = await import('./lib/store.js'); return { ids: [...s.store.selected], view: document.querySelector('#inspector').dataset.view, height: s.descriptor(id)?.artboard.height, measured: s.store.observations.get(id)?.contentHeight, ready: (await import('./lib/actions.js')).canFitHeight(id) }; }, fitted.id));
@@ -87,19 +88,19 @@ try {
   await page.screenshot({ path: 'artifacts/fit-height-desktop.png' });
   const [fitResponse] = await Promise.all([page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/api/patch')), page.locator('#inspector .smart-bar button[aria-label="Fit height to content"]').click()]);
   assert.equal(fitResponse.status(), 200); await runtime.queue;
-  await page.waitForFunction(async ({ id, height }) => (await import('./lib/store.js')).descriptor(id)?.artboard.height === height, { id: fitted.id, height: Math.min(16384, measured) });
+  await waitForPage(page, async ({ id, height }) => (await import('./lib/store.js')).descriptor(id)?.artboard.height === height, { id: fitted.id, height: Math.min(16384, measured) });
   assert.equal(runtime.read({ view: 'frame', documentId: fitted.id }).artboard.height, Math.min(16384, measured), 'the lower action fits to the actual measurement');
   await page.locator('#viewport').focus();
   const [undoResponse] = await Promise.all([page.waitForResponse(response => response.request().method() === 'POST' && response.url().endsWith('/api/undo')), page.keyboard.press('Control+z')]);
   assert.equal(undoResponse.status(), 200); await runtime.queue;
-  await page.waitForFunction(async id => (await import('./lib/store.js')).descriptor(id)?.artboard.height === 200, fitted.id);
+  await waitForPage(page, async id => (await import('./lib/store.js')).descriptor(id)?.artboard.height === 200, fitted.id);
   assert.equal(runtime.read({ view: 'frame', documentId: fitted.id }).artboard.height, 200, 'one Undo restores authored height');
   assert.equal(await page.locator('#inspector [data-key="fit-height"]').count(), 0, 'Undo does not reintroduce the duplicate');
   for (const scale of [100, 200]) {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.evaluate(async size => (await import('./lib/help.js')).setUiSize(size), scale);
     await page.mouse.move(5, 5);
-    await page.waitForFunction(async id => (await import('./lib/actions.js')).canFitHeight(id), fitted.id);
+    await waitForPage(page, async id => (await import('./lib/actions.js')).canFitHeight(id), fitted.id);
     const lowerFit = page.locator('#inspector .smart-bar button[aria-label="Fit height to content"]');
     await page.locator('#inspector .smart-bar button[aria-label="Fit height to content"]:enabled').waitFor({ state: 'attached' });
     await lowerFit.click({ trial: true });

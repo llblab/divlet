@@ -23,6 +23,19 @@ const walk = async directory => {
 };
 const exists = async file => { try { return (await stat(file)).isFile(); } catch { return false; } };
 const relativeImports = source => ts.preProcessFile(source, true, true).importedFiles.map(file => file.fileName).filter(name => name.startsWith('.'));
+const asyncPollLines = source => {
+  const file = ts.createSourceFile('browser-test.mjs', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS), lines = [];
+  const visit = node => {
+    if (ts.isCallExpression(node)) {
+      const method = node.expression, callback = node.arguments[0];
+      const name = ts.isPropertyAccessExpression(method) ? method.name.text : ts.isElementAccessExpression(method) && ts.isStringLiteral(method.argumentExpression) ? method.argumentExpression.text : null;
+      if (name === 'waitForFunction' && callback && (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback)) && callback.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.AsyncKeyword)) lines.push(file.getLineAndCharacterOfPosition(callback.getStart(file)).line + 1);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return lines;
+};
 
 /** Every production client module: `web/` without its tests, plus each plugin's client directory. */
 const clientModules = async () => {
@@ -60,6 +73,26 @@ test('browser test entries keep their local imports and npm suite coverage after
       assert.ok(await exists(path.resolve(directory, specifier)), `${name}: local Node import resolves: ${specifier}`);
     }
   }
+});
+
+test('async polling guard inspects inline callbacks, not comments or quoted examples', () => {
+  assert.deepEqual(asyncPollLines(`
+    // page.waitForFunction(async () => false);
+    const example = 'page.waitForFunction(async () => false)';
+    page.waitForFunction(() => false);
+    waitForPage(page, async () => false);
+    page.waitForFunction(async () => false);
+    page['waitForFunction'](async function () { return false; });
+    page?.waitForFunction(async () => true);
+  `), [6, 7, 8]);
+});
+
+test('browser entries never pass inline async callbacks to the Promise-truthy Playwright poller', async () => {
+  const directory = path.join(WEB, 'tests'), broken = [];
+  for (const name of (await readdir(directory)).filter(name => name.endsWith('.mjs'))) {
+    for (const line of asyncPollLines(await readFile(path.join(directory, name), 'utf8'))) broken.push(`${name}:${line}`);
+  }
+  assert.deepEqual(broken, [], 'resolve async setup before synchronous polling, or use fixtures/wait-for-page.js');
 });
 
 test('every browser module imports a file that exists, and never TypeScript', async () => {

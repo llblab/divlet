@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { openRuntime } from '@divlet/core/runtime';
+import { waitForPage } from './fixtures/wait-for-page.js';
 
 const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-bridge-security-'));
 const forged = { type: 'divlet:text-edit', documentId: 'welcome', version: 999999, nodeId: 'title', content: 'Forged edit' };
@@ -91,7 +92,7 @@ try {
   const title = page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="title"]');
   await title.fill('Trusted edit after reset');
   await title.press('Control+Enter');
-  await page.waitForFunction(async () => {
+  await waitForPage(page, async () => {
     const doc = await fetch('api/documents/welcome').then(response => response.json());
     return doc.nodes['title-text'].content === 'Trusted edit after reset';
   });

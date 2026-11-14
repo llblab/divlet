@@ -6,6 +6,7 @@ import os from 'node:os';
 import { createRequire } from 'node:module';
 import { openRuntime } from '@divlet/core/runtime';
 import { validateDocument } from '../../core/lib/model.ts';
+import { waitForPage } from './fixtures/wait-for-page.js';
 
 const require = createRequire(import.meta.url);
 let playwright;
@@ -155,10 +156,10 @@ try {
   await local.goto(runtime.info().url);
   await local.waitForSelector('#loading', { state: 'hidden' });
   await local.evaluate(async () => (await import('./lib/store.js')).selectArtboards(['test-board']));
-  await local.waitForFunction(async () => (await import('./lib/store.js')).store.observations.get('test-board')?.nodes.some(node => node.id === 'a'));
+  await waitForPage(local, async () => (await import('./lib/store.js')).store.observations.get('test-board')?.nodes.some(node => node.id === 'a'));
   const localFrame = local.frameLocator('iframe[data-document-id="test-board"]');
   await localFrame.locator('[data-divlet-id="a"]').evaluate(node => { node.style.width = '205px'; dispatchEvent(new Event('resize')); });
-  await local.waitForFunction(async () => (await import('./lib/store.js')).store.observations.get('test-board')?.nodes.some(node => node.id === 'a' && Math.round(node.rect.width) === 205));
+  await waitForPage(local, async () => (await import('./lib/store.js')).store.observations.get('test-board')?.nodes.some(node => node.id === 'a' && Math.round(node.rect.width) === 205));
   assert.deepEqual(await local.evaluate(async () => {
     const { entries } = await import('./lib/canvas.js'); const entry = entries.get('test-board');
     return { timer: entry.reportTimer, queued: entry.latestReport };
