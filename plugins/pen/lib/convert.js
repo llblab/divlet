@@ -62,7 +62,7 @@ function styleAttribute(projections, tokens, css) {
 /** Preserve declaration order/priority in ordinary CSS; remove projection-only metadata and attributes. */
 function convertFrame(projection, id, attribute) {
   const { document } = projection;
-  const sheet = postcss.parse(document.css);
+  const sheet = postcss.parse(document.css, { map: false });
   const bundles = new Map(), residual = [];
   for (const rule of sheet.nodes) {
     const match = rule.type === 'rule' && /^\[data-pen-style="([^"]+)"\]$/.exec(rule.selector);

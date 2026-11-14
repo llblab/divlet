@@ -293,7 +293,7 @@ function attr(node: P5Node, name: string): string | undefined {
 
 function parseInlineStyle(value: string): Record<string, string> {
   let root: postcss.Root;
-  try { root = postcss.parse(`div{${value}}`); } catch (cause) { const reason = cause as { reason?: string; message: string }; error(`Invalid inline style: ${reason.reason || reason.message}`); }
+  try { root = postcss.parse(`div{${value}}`, { map: false }); } catch (cause) { const reason = cause as { reason?: string; message: string }; error(`Invalid inline style: ${reason.reason || reason.message}`); }
   const rule = root.first as postcss.Rule | undefined;
   if (root.nodes.length !== 1 || rule?.type !== 'rule' || rule.selector !== 'div') error('Inline style escapes its declaration block');
   const style: Record<string, string> = {};
@@ -380,7 +380,7 @@ export function decodeHtml(source: unknown, { fallbackId = 'imported', previous,
         if (tokenStyleSeen) error('Duplicate token stylesheet');
         tokenStyleSeen = true;
         let parsed;
-        try { parsed = postcss.parse(text); } catch { error('Invalid token stylesheet'); }
+        try { parsed = postcss.parse(text, { map: false }); } catch { error('Invalid token stylesheet'); }
         for (const rule of parsed.nodes) {
           if (rule.type !== 'rule' || rule.selector !== ':root') error('Token stylesheet only supports :root declarations');
           for (const declaration of rule.nodes) {

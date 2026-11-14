@@ -26,7 +26,7 @@ export interface FrameCompiler {
 export interface PrepareWithOptions { lookup?: FrameLookup; settings?: ProjectSettings | null; limits?: Limits; compiler: FrameCompiler }
 
 function checkAtRules(css: string): void {
-  const tree = postcss.parse(css || '');
+  const tree = postcss.parse(css || '', { map: false });
   const allowed = new Set(['media', 'supports', 'layer', 'keyframes', '-webkit-keyframes', 'font-face', 'container', 'property', 'starting-style', 'scope']);
   tree.walkAtRules(rule => {
     if (!allowed.has(rule.name.toLowerCase())) fail('UNSUPPORTED_CSS', `CSS @${rule.name} is not allowed in a divlet project. Build directives and imports are disabled.`);

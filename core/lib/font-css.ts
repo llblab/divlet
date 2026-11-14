@@ -95,7 +95,7 @@ export function fontFaceRules(face: FontFaceMetadata, reference: string, { files
   }
   for (const [css, isProjection] of sheets) {
     let root;
-    try { root = postcss.parse(css); } catch { return fail('Existing CSS could not be inspected before font upload.'); }
+    try { root = postcss.parse(css, { map: false }); } catch { return fail('Existing CSS could not be inspected before font upload.'); }
     root.walkAtRules(rule => {
       const name = decodeCss(rule.name).toLowerCase();
       if (name === 'import') fail('Font upload cannot inspect stylesheet imports yet. Keep the project unchanged and edit its CSS explicitly.');

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { buildSite } from '../lib/site.ts';
 import { decodeHtml, encodeHtml } from '../lib/codec.ts';
 import { DivletError, validateDocument } from '../lib/model.ts';
+import { cssAnnotationCases } from './fixtures/css-annotations.js';
 
 const siteBase = 'http://127.0.0.1:4242/token/site/';
 const assetBase = 'http://127.0.0.1:4242/token/files/';
@@ -67,6 +68,18 @@ test('site is opt-in and removing its configuration disables the projection', as
   assert.ok(accepted);
   await fs.rm(path.join(divletDir, 'site.json'));
   assert.equal(await build(accepted), null);
+});
+
+test('site CSS rewriting leaves source-map-looking comments and quoted values inert', async t => {
+  const { build, saveConfig, write, document } = await fixture(t);
+  await saveConfig(); await write('content/index.md', '# Native CSS');
+  for (const { name, literal, comment } of cssAnnotationCases) {
+    document.css = `article{content:${literal}}${comment}`;
+    const before = structuredClone(document);
+    const site = await build();
+    assert.equal(site.pages.get('/').document.css, before.css, name);
+    assert.deepEqual(document, before, 'rewriting a derived page must not author the template');
+  }
 });
 
 test('one template composes a Markdown tree without mutating canonical sources', async t => {

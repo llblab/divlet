@@ -268,7 +268,7 @@ async function rewriteModel(document: DocumentModel, { projectDir, sourcePath, c
     }
     for (const [property, value] of Object.entries(node.style)) node.style[property] = await rewriteCss(value);
   }
-  const css = postcss.parse(document.css);
+  const css = postcss.parse(document.css, { map: false });
   const declarations: postcss.Declaration[] = [];
   css.walkDecls(declaration => { declarations.push(declaration); });
   for (const declaration of declarations) declaration.value = await rewriteCss(declaration.value);

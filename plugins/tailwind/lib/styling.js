@@ -158,7 +158,7 @@ function classesInSelector(selector) {
 export function customClasses(css) {
   const out = new Map();
   let root;
-  try { root = postcss.parse(css || ''); } catch { return out; }
+  try { root = postcss.parse(css || '', { map: false }); } catch { return out; }
   root.walkRules(rule => {
     if (rule.parent?.type === 'atrule' && /keyframes$/i.test(rule.parent.name)) return;
     const context = [];
@@ -218,7 +218,7 @@ const pxOf = value => (/^-?[\d.]+rem$/.test(value) ? ` /* ${round(Number.parseFl
 /** What a utility does, as short lines of CSS: context (media, state) first, then declarations. */
 function explainUtility(name, css, design) {
   let root;
-  try { root = postcss.parse(css); } catch { return [css.trim()]; }
+  try { root = postcss.parse(css, { map: false }); } catch { return [css.trim()]; }
   const initial = new Map();
   root.walkAtRules('property', rule => {
     rule.walkDecls('initial-value', declaration => initial.set(rule.params.trim(), declaration.value));
@@ -294,7 +294,7 @@ function rulesText(rules) {
 
 function colorOf(css, design) {
   let root;
-  try { root = postcss.parse(css); } catch { return null; }
+  try { root = postcss.parse(css, { map: false }); } catch { return null; }
   let color = null;
   root.walkDecls(declaration => {
     if (color || !COLOR_PROPS.test(declaration.prop)) return;

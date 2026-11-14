@@ -3,11 +3,21 @@ import assert from 'node:assert/strict';
 import { convertPen } from '../lib/convert.js';
 import postcss from 'postcss';
 import { styleEngine, setStyleEngines } from '../../../core/lib/engine.ts';
+import { cssAnnotationCases } from '../../../core/tests/fixtures/css-annotations.js';
 
 const original = styleEngine();
 test.before(() => setStyleEngines([]));
 test.after(() => setStyleEngines([original]));
-const declarationsFor = (project, node) => postcss.parse(project.css).nodes.find(rule => rule.selector === `[data-import-style="${node.attrs['data-import-style']}"]`).nodes.map(item => [item.prop, item.value]);
+const declarationsFor = (project, node) => postcss.parse(project.css, { map: false }).nodes.find(rule => rule.selector === `[data-import-style="${node.attrs['data-import-style']}"]`).nodes.map(item => [item.prop, item.value]);
+
+test('projected CSS keeps source-map-looking font names as literal data without an engine', () => {
+  for (const { name, comment, literal } of cssAnnotationCases) {
+    const { text } = convertPen({ version: '2.21', children: [{ id: 'label', type: 'text', content: 'Literal', fontFamily: comment }] });
+    const project = JSON.parse(text), frame = project.frames[0];
+    const family = declarationsFor(project, frame.nodes[frame.rootId]).find(([property]) => property === 'font-family');
+    assert.equal(family[1], `${literal},system-ui,sans-serif`, name);
+  }
+});
 
 test('conversion covers every native node kind and leaves no PEN-specific carrier behind', () => {
   const source = { version: '2.21', children: [

@@ -9,13 +9,15 @@ import { fileURLToPath } from 'node:url';
 import * as nodeModel from '../../core/lib/model.ts';
 import { captureFrame, frameCases, resourceFrame } from '../../core/tests/fixtures/frame-portability.js';
 import { prepareFrame } from '../../core/lib/render.ts';
-import { bundleBrowserModel } from '../../scripts/browser-model.mjs';
+import { bundleBrowserModel, bundleBrowserCodec } from '../../scripts/browser-model.mjs';
+import { cssAnnotationCases } from '../../core/tests/fixtures/css-annotations.js';
 import { landingDemoSnapshot } from '../../scripts/landing-demo.mjs';
 import { buildStatic } from '../../core/lib/static.js';
 import { svgResourceCases } from '../../core/tests/fixtures/svg-resources.js';
 
 const prefix = '/divlet-kernel/';
 const bundle = await bundleBrowserModel(fileURLToPath(new URL('../../', import.meta.url)), { source: true });
+const codecBundle = await bundleBrowserCodec(fileURLToPath(new URL('../../', import.meta.url)), { source: true });
 const expectedFrames = frameCases.map(({ name, run }) => ({ name, result: captureFrame(nodeModel, run) }));
 const publicSnapshot = await landingDemoSnapshot();
 const files = new Map([
@@ -29,6 +31,8 @@ const files = new Map([
   [`${prefix}cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/validation.js', import.meta.url), 'utf8')]],
   [`${prefix}json-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/native-json.js', import.meta.url), 'utf8')]],
   [`${prefix}model.js`, ['text/javascript', bundle.code]],
+  [`${prefix}codec.js`, ['text/javascript', codecBundle.code]],
+  [`${prefix}css-annotations.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/css-annotations.js', import.meta.url), 'utf8')]],
   [`${prefix}frames.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/frame-portability.js', import.meta.url), 'utf8')]],
   [`${prefix}read-session.js`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../lib/board-session.ts', import.meta.url), 'utf8'))]],
   [`${prefix}session-cases.js`, ['text/javascript', await readFile(new URL('./fixtures/board-session.js', import.meta.url), 'utf8')]],
@@ -128,7 +132,20 @@ try {
       element.remove();
       return padding;
     });
+    const [codec, { cssAnnotationCases }] = await Promise.all(['codec.js', 'css-annotations.js'].map(file => import(new URL(file, location.href).href)));
+    const cssAnnotations = cssAnnotationCases.map(({ name, literal, comment, html }) => {
+      const inline = codec.decodeHtml(html), pasted = codec.htmlToSpecs(html);
+      const frame = frameApi.validateDocument({ ...inline, tokens: { '--note': literal }, css: `.note{content:${literal}}${comment}` });
+      const reopened = codec.decodeHtml(codec.encodeHtml(frame));
+      const refusals = [`<main style='color:red;${comment}'></main>`, `<style data-divlet-tokens>:root{--note:red;${comment}}</style><main></main>`].map(source => {
+        try { codec.decodeHtml(source); return 'accepted'; } catch (error) { return error.code; }
+      });
+      const element = document.createElement('span'); element.style.content = literal; document.body.append(element);
+      const computed = getComputedStyle(element).content; element.remove();
+      return { name, inline: inline.nodes[inline.rootId].style.content, pasted: pasted[0].style.content, frame, reopened, refusals, computed };
+    });
     return {
+      cssAnnotations,
       orderedCssPadding,
       requirements: requirementResults,
       nativeJson,
@@ -184,6 +201,13 @@ try {
   assert.ok(result.cases.length > 25, 'the shared acceptance/refusal regions are exercised');
   for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.references, ...result.requirements, ...result.nativeJson, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
   assert.deepEqual(result.frames, expectedFrames, 'the same full-frame validation, patch and inspection semantics run in Node and browser');
+  for (let index = 0; index < cssAnnotationCases.length; index++) {
+    const { name, literal } = cssAnnotationCases[index], row = result.cssAnnotations[index];
+    assert.equal(row.name, name);
+    for (const value of [row.inline, row.pasted, row.frame.tokens['--note'], row.computed]) assert.equal(value, literal, name);
+    assert.deepEqual(row.reopened, row.frame, name);
+    assert.deepEqual(row.refusals, ['INVALID_HTML', 'INVALID_HTML'], name);
+  }
   assert.deepEqual(result.publicPage.keys.sort(), ['clientPlugins', 'diagnostics', 'documents', 'project', 'projectId', 'revision', 'selection', 'stateVersion', 'work']);
   assert.equal(result.publicPage.descriptor.viewUrl, 'index.html');
   assert.equal(result.publicPage.metadataEmpty && result.publicPage.versionMatches, true);
@@ -192,7 +216,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

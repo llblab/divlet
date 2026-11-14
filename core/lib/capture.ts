@@ -33,7 +33,7 @@ export interface CaptureFontResources {
 export async function captureFontCSS(html: string, assets: AssetTree, resources?: CaptureFontResources): Promise<string> {
   const faces: string[] = [];
   for (const css of styles(html)) {
-    const root = postcss.parse(css);
+    const root = postcss.parse(css, { map: false });
     root.walkAtRules(rule => {
       if (decodeCss(rule.name).toLowerCase() === 'import') fail();
       if (decodeCss(rule.name).toLowerCase() !== 'font-face') return;
@@ -52,7 +52,7 @@ export async function captureFontCSS(html: string, assets: AssetTree, resources?
   const css = styles(embedded).join('\n');
   let expandedBytes = Buffer.byteLength(css);
   if (expandedBytes > SOURCE_LIMITS.bytes) fail();
-  const root = postcss.parse(css);
+  const root = postcss.parse(css, { map: false });
   root.walkDecls(decl => {
     const parsed = valueParser(decl.value);
     parsed.walk(node => {

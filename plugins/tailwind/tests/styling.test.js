@@ -1,8 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { compileClasses } from '../lib/styling.js';
+import { compileClasses, customClasses, unknownClasses, explainClasses } from '../lib/styling.js';
+import { cssAnnotationCases } from '../../../core/tests/fixtures/css-annotations.js';
 
 const base = process.cwd();
+
+test('class analysis preserves authored rules with inert source-map-looking CSS data', async () => {
+  for (const { name, literal, comment } of cssAnnotationCases) {
+    const css = `.annotated{content:${literal};color:#123456}${comment}`;
+    assert.deepEqual(customClasses(css).get('annotated'), [{ context: [], selector: '.annotated', declarations: [`content: ${literal}`, 'color: #123456'] }], name);
+    assert.deepEqual(await unknownClasses({ tokens: {}, css, byNode: { root: 'annotated' }, base }), {}, name);
+    const explanation = await explainClasses({ tokens: {}, css, names: ['annotated'], base });
+    assert.equal(explanation.annotated.kind, 'custom', name);
+    assert.ok(explanation.annotated.lines.some(line => line.includes(literal)), name);
+  }
+});
 
 test('Tailwind output contains exactly the requested candidate set, not prior project URL utilities', async () => {
   const tokens = { '--color-isolation': '#123456' };
