@@ -12,12 +12,14 @@ const root = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-selection-completio
 const browser = await chromium.launch({ headless: true, executablePath: process.env.PI_DIVLET_CHROMIUM_EXECUTABLE, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
 const checks = [], evidence = [];
 try {
-  for (const phase of ['accepted-only', 'selection-complete']) {
+  for (const phase of ['accepted-only', 'selection-complete', 'dom-id-refusal']) {
     let runtime, page, release;
     try {
       await legacyProject(path.join(root, phase, 'project.divlet'));
       runtime = await openRuntime({ file: path.join(root, phase, 'project.divlet'), watch: false, createDemo: false });
-      await runtime.create({ document: decodeHtml('<main id="root" class="p-8"><div id="hero"><button id="cta" type="button">Original</button></div></main>', { fallbackId: 'screen' }) });
+      // Successful duplication needs only native identity; the refusal case deliberately authors a real DOM ID.
+      const identity = phase === 'dom-id-refusal' ? 'id="cta"' : 'data-divlet-id="cta"';
+      await runtime.create({ document: decodeHtml(`<main id="root" class="p-8"><div id="hero"><button ${identity} type="button">Original</button></div></main>`, { fallbackId: 'screen' }) });
       page = await browser.newPage({ viewport: { width: 1280, height: 800 } }); const errors = [], requests = [];
       page.on('pageerror', error => errors.push(error.message));
       await page.goto(runtime.url); await page.waitForSelector('#loading', { state: 'hidden' });
@@ -48,7 +50,32 @@ try {
         if (body.op.type === 'duplicate') { reply = await response.json(); entered(); await gate; }
         await route.fulfill({ response });
       });
+      const refusedBaseline = phase === 'dom-id-refusal' ? {
+        document: runtime.read({ view: 'document', documentId: 'screen' }), history: structuredClone(runtime.historyHead()),
+        source: await fs.readFile(path.join(root, phase, 'project.divlet')), html: await fs.readFile(runtime.getEntry('screen').htmlPath), render: runtime.getEntry('screen').render,
+      } : null;
       await duplicate.click(); await entry;
+      if (refusedBaseline) {
+        assert.equal(requests[0].status, 400); assert.equal(reply.error, 'INVALID_DOCUMENT'); release();
+        await page.waitForFunction(() => /Duplicate nonempty DOM id/.test(document.querySelector('#toast')?.textContent || ''));
+        const refusalVisible = await page.locator('#toast').isVisible();
+        assert.equal(refusalVisible, true, 'DOM-ID refusal feedback is visible, not merely populated in a hidden toast');
+        assert.deepEqual(runtime.read({ view: 'document', documentId: 'screen' }), refusedBaseline.document);
+        assert.deepEqual(runtime.historyHead(), refusedBaseline.history);
+        assert.deepEqual(await fs.readFile(path.join(root, phase, 'project.divlet')), refusedBaseline.source);
+        assert.deepEqual(await fs.readFile(runtime.getEntry('screen').htmlPath), refusedBaseline.html);
+        assert.equal(runtime.getEntry('screen').render, refusedBaseline.render);
+        assert.deepEqual(runtime.info().selection.selectedNodes.nodeIds, ['cta']);
+        assert.deepEqual(await page.evaluate(() => window.selectionTest.store.node.nodeIds), ['cta']);
+        assert.equal(await page.evaluate(() => !!window.selectionTest.cachedModel('screen')?.nodes['cta-copy']), false);
+        assert.equal(await page.evaluate(() => window.selectionTest.isSelectionPending()), false);
+        assert.equal(await page.evaluate(() => document.activeElement === document.getElementById('viewport')), true);
+        assert.deepEqual(requests.map(request => [request.type, request.ids, request.status]), [['duplicate', ['cta'], 400]], 'ambiguous DOM duplication is refused once, not rebased or retried');
+        assert.deepEqual(errors, []);
+        evidence.push({ phase, requests, error: reply.error, refusalVisible });
+        checks.push('a real DOM-ID duplicate is visibly refused without source/history/render/selection changes or retries');
+        continue;
+      }
       assert.ok(runtime.read({ view: 'document', documentId: 'screen' }).nodes['cta-copy']);
       await page.waitForFunction(version => window.selectionTest.descriptor('screen')?.version === version, reply.version);
       await page.evaluate(() => window.selectionTest.freshModel('screen'));

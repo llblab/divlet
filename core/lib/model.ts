@@ -301,6 +301,7 @@ export function validateDocument(input: unknown, { limits = LIMITS }: { limits?:
   }
   if (at(nodes, raw.rootId).type !== 'element') fail('Document root must be an element');
   const seen = new Set<NodeId>();
+  const domIds = new Map<string, NodeId>();
   function visit(id: NodeId, ancestors: NodeId[] = []): void {
     if (!Object.hasOwn(nodes, id)) fail(`Unknown child node: ${id}`);
     if (ancestors.length > limits.depth) fail('Tree exceeds maximum depth');
@@ -324,6 +325,12 @@ export function validateDocument(input: unknown, { limits = LIMITS }: { limits?:
           normalized[key] = value as string;
         }
         node.attrs = normalized;
+      }
+      const domId = node.attrs.id as string | undefined;
+      if (domId) {
+        const previous = domIds.get(domId);
+        if (previous !== undefined) fail(`Duplicate nonempty DOM id on nodes ${previous} and ${id}`);
+        domIds.set(domId, id);
       }
       for (const child of node.children) {
         // Instances are checked once expanded, when their component's tags are known.

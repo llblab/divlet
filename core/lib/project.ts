@@ -97,7 +97,7 @@ export function patchSettings(settings: ProjectSettings, patch: unknown): Projec
   return validateSettings(merge(settings, patch));
 }
 
-/** Read a project source without expansion; legacy frame projects remain available during the runtime transition. */
+/** Admit stored frames and their expanded candidates, returning the stored frames rather than flattened copies. */
 export function readProject(source: unknown): ProjectFile {
   if (!isObject(source)) fail('INVALID_PROJECT', 'A .divlet project must be a JSON object');
   const input = source;

@@ -6,6 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { openRuntime } from '@divlet/core/runtime';
 import { readProject } from '../lib/project.ts';
+import { domReferenceProject } from './fixtures/dom-ids.js';
 
 async function fixture(t) {
   const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-components-'));
@@ -199,6 +200,31 @@ test('metadata alias conflicts retain selected instances and writer history', as
   assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.feature.descendants['card-action'], undefined);
   await runtime.redo({});
   assert.deepEqual(runtime.read({ view: 'document', documentId: 'landing' }).nodes.feature.descendants['card-action/button'].metadata.shared, { b: 2 });
+});
+
+test('DOM ID conflicts in dependent instances retain accepted source, selection and history', async t => {
+  const { runtime, cwd } = await fixture(t);
+  const source = domReferenceProject('for', { unique: true });
+  for (const document of source.frames) await runtime.create({ document });
+  runtime.setSelection({ ids: ['consumer'], nodes: { documentId: 'consumer', nodeIds: ['second'] } });
+  const before = runtime.read({ view: 'document', documentId: 'consumer' });
+  const definitions = runtime.read({ view: 'document', documentId: 'definitions' });
+  const bytes = await fs.readFile(path.join(cwd, 'project.divlet')), html = await fs.readFile(runtime.getEntry('consumer').htmlPath);
+  const history = structuredClone(runtime.historyHead()), selection = structuredClone(runtime.info().selection), render = runtime.getEntry('consumer').render;
+  // The definition stays locally unique, but its first occurrence would collide with the explicit second-instance ID.
+  await assert.rejects(runtime.patch({ documentId: 'definitions', expectedVersion: definitions.version, patch: { nodes: { target: { attrs: { id: 'field-2' } } } } }), { code: 'INVALID_DOCUMENT' });
+  assert.deepEqual(runtime.read({ view: 'document', documentId: 'consumer' }), before);
+  assert.deepEqual(runtime.read({ view: 'document', documentId: 'definitions' }), definitions);
+  assert.deepEqual(await fs.readFile(path.join(cwd, 'project.divlet')), bytes);
+  assert.deepEqual(await fs.readFile(runtime.getEntry('consumer').htmlPath), html);
+  assert.deepEqual(runtime.historyHead(), history); assert.deepEqual(runtime.info().selection, selection);
+  assert.equal(runtime.getEntry('consumer').render, render);
+  await runtime.patch({ documentId: 'consumer', expectedVersion: before.version, patch: { nodes: { second: { descendants: { target: { attrs: { id: 'field-3' } }, referrer: { attrs: { for: 'field-3' } } } } } } });
+  assert.match(runtime.render('consumer').html, /for="field-3"/);
+  await runtime.undo({});
+  assert.match(runtime.render('consumer').html, /for="field-2"/);
+  await runtime.redo({});
+  assert.match(runtime.render('consumer').html, /for="field-3"/);
 });
 
 test('instances cannot break HTML nesting rules once expanded', async t => {
