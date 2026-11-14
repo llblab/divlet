@@ -14,7 +14,7 @@ import type { DocumentModel } from './model.ts';
 import { diffDocuments, summarizeChange, touchedNodeIds } from './diff.ts';
 import { replayHistory } from './history-replay.ts';
 import { operationPatch } from './ops.ts';
-import { HistoryLine } from './history.ts';
+import { HistoryLine, planHistoryTraversal } from './history.ts';
 import { readProject, writeProject, patchSettings, listComponents, instancesOf, expandFrame } from './project.ts';
 import { exportHtml } from './codec.ts';
 import type { ProjectSettings } from './project.ts';
@@ -501,15 +501,9 @@ export class BrowserRuntime {
     }
   }
 
-  async _replay(from: any[], to: any[], direction: 'undo' | 'redo', { documentId, actor = 'user', steps = 1 }: any = {}) {
-    if (!Number.isInteger(steps) || steps < 1 || steps > UNDO_LIMIT) fail('INVALID_QUERY', `steps must be an integer from 1 to ${UNDO_LIMIT}.`);
-    const indexes: number[] = [];
-    for (let i = from.length - 1; i >= 0 && indexes.length < steps; i--) if (!documentId || from[i].items.some((item: any) => item.documentId === documentId || item.documentIds?.includes(documentId))) indexes.push(i);
-    if (indexes.length < steps) fail('NOTHING_TO_UNDO', steps === 1 ? `Nothing to ${direction}.` : `Not enough history to ${direction} ${steps} steps.`);
-    const entries = indexes.map(index => from[index]);
-    const label = steps === 1 ? entries[0].label : `${direction} ${steps} steps`;
+  async _replay(from: any[], to: any[], direction: 'undo' | 'redo', { documentId, actor = 'user', steps }: any = {}) {
+    const { indexes, entries, ordered, label } = planHistoryTraversal(from, direction, { documentId, steps }, UNDO_LIMIT);
     const seq = this.seq;
-    const ordered = direction === 'undo' ? [...entries].reverse() : entries;
     await this._applyEntry({ label, items: ordered.flatMap(entry => entry.items) }, direction, actor);
     for (const index of indexes) from.splice(index, 1);
     to.push(...entries);

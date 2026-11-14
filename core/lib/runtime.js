@@ -14,7 +14,7 @@ import { buildSite } from './site.ts';
 import { diffDocuments, diffValue, summarizeChange, touchedNodeIds } from './diff.ts';
 import { replayHistory } from './history-replay.ts';
 import { operationPatch } from './ops.ts';
-import { HistoryLine } from './history.ts';
+import { HistoryLine, planHistoryTraversal } from './history.ts';
 import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertExpectedVersion, assertExpectedRender, assertReplayableStyleTransition } from './acceptance.ts';
 import { expandPath, inspectPath, initProject, resolveProject, isProjectFile } from './projects.ts';
 import { OutputStore, safeDirectory } from './output.ts';
@@ -1240,16 +1240,9 @@ await this.importProject(project.settings, project.frames, hash);
     return this.enqueue(() => this._replay(from, to, direction, options));
   }
 
-  async _replay(from, to, direction, { documentId, actor = 'user', steps = 1 } = {}) {
-    if (!Number.isInteger(steps) || steps < 1 || steps > UNDO_LIMIT) fail('INVALID_QUERY', `steps must be an integer from 1 to ${UNDO_LIMIT}.`);
-    const indexes = [];
-    for (let i = from.length - 1; i >= 0 && indexes.length < steps; i--) if (!documentId || from[i].items.some(item => item.documentId === documentId || item.documentIds?.includes(documentId))) indexes.push(i);
-    if (indexes.length < steps) fail('NOTHING_TO_UNDO', steps === 1 ? `Nothing to ${direction}.` : `Not enough history to ${direction} ${steps} steps.`);
-    const entries = indexes.map(index => from[index]);
-    const label = steps === 1 ? entries[0].label : `${direction} ${steps} steps`;
+  async _replay(from, to, direction, { documentId, actor = 'user', steps } = {}) {
+    const { indexes, entries, ordered, label } = planHistoryTraversal(from, direction, { documentId, steps }, UNDO_LIMIT);
     const seq = this.seq;
-    // _applyEntry reverses an undo's items; compose chronological entries so it reverses the whole traversal once.
-    const ordered = direction === 'undo' ? [...entries].reverse() : entries;
     await this._applyEntry({ label, items: ordered.flatMap(entry => entry.items) }, direction, actor);
     // Stacks and point identity change only after the complete candidate has validated and persisted.
     for (const index of indexes) from.splice(index, 1);

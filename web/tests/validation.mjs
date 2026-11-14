@@ -12,6 +12,8 @@ import { prepareFrame } from '../../core/lib/render.ts';
 import { bundleBrowserModel, bundleBrowserCodec, bundleBrowserProject, bundleBrowserReplay } from '../../scripts/browser-model.mjs';
 import { replayHistory } from '../../core/lib/history-replay.ts';
 import { historyReplayCases, captureHistoryReplay } from '../../core/tests/fixtures/history-replay.js';
+import { planHistoryTraversal } from '../../core/lib/history.ts';
+import { historyTraversalCases, captureHistoryTraversal } from '../../core/tests/fixtures/history-traversal.js';
 import { cssAnnotationCases } from '../../core/tests/fixtures/css-annotations.js';
 import { landingDemoSnapshot } from '../../scripts/landing-demo.mjs';
 import { buildStatic } from '../../core/lib/static.js';
@@ -26,6 +28,7 @@ const codecBundle = await bundleBrowserCodec(fileURLToPath(new URL('../../', imp
 const projectBundle = await bundleBrowserProject(fileURLToPath(new URL('../../', import.meta.url)), { source: true });
 const replayBundle = await bundleBrowserReplay(fileURLToPath(new URL('../../', import.meta.url)));
 const expectedHistoryReplay = historyReplayCases.map(({ name, run }) => ({ name, result: captureHistoryReplay({ ...nodeModel, readProject, replayHistory }, run) }));
+const expectedHistoryTraversal = historyTraversalCases.map(({ name, run }) => ({ name, result: captureHistoryTraversal({ planHistoryTraversal, replayHistory, readProject }, run) }));
 const expectedFrames = frameCases.map(({ name, run }) => ({ name, result: captureFrame(nodeModel, run) }));
 const publicSnapshot = await landingDemoSnapshot();
 const expectedScopeHtml = {};
@@ -50,6 +53,8 @@ const files = new Map([
   [`${prefix}project.js`, ['text/javascript', projectBundle.code]],
   [`${prefix}history-replay.js`, ['text/javascript', replayBundle.code]],
   [`${prefix}history-replay-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/history-replay.js', import.meta.url), 'utf8')]],
+  [`${prefix}history.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/history.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}history-traversal-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/history-traversal.js', import.meta.url), 'utf8')]],
   [`${prefix}component-text.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/component-text.js', import.meta.url), 'utf8')]],
   [`${prefix}component-values.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/component-values.js', import.meta.url), 'utf8')]],
   [`${prefix}component-attrs.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/component-attrs.js', import.meta.url), 'utf8')]],
@@ -173,6 +178,10 @@ try {
     const componentTexts = componentCases(componentTextCases), componentValues = componentCases(componentValueCases), componentAttributes = componentCases(componentAttributeCases), componentMetadata = componentCases(componentMetadataCases);
     const [replayApi, { historyReplayCases, captureHistoryReplay }] = await Promise.all(['history-replay.js', 'history-replay-cases.js'].map(file => import(new URL(file, location.href).href)));
     const historyReplay = historyReplayCases.map(({ name, run }) => ({ name, result: captureHistoryReplay({ ...frameApi, ...project, ...replayApi }, run) }));
+    const [historyApi, { historyTraversalCases, captureHistoryTraversal }] = await Promise.all(['history.ts', 'history-traversal-cases.js'].map(file => import(new URL(file, location.href).href)));
+    const historyTraversal = historyTraversalCases.map(({ name, run }) => ({ name, result: captureHistoryTraversal({ ...project, ...replayApi, ...historyApi }, run) }));
+    let traversalDomainError = false;
+    try { historyApi.planHistoryTraversal([], 'undo', { steps: 0 }, 200); } catch (error) { traversalDomainError = error instanceof api.DivletError; }
     const { domIdCases, domReferenceProject } = await import(new URL('dom-ids.js', location.href).href);
     const domIds = componentCases(domIdCases);
     const [codec, { cssAnnotationCases }] = await Promise.all(['codec.js', 'css-annotations.js'].map(file => import(new URL(file, location.href).href)));
@@ -264,6 +273,7 @@ try {
       return { name, inline: inline.nodes[inline.rootId].style.content, pasted: pasted[0].style.content, frame, reopened, refusals, computed };
     });
     return {
+      historyTraversal, traversalDomainError,
       historyReplay,
       componentTexts,
       componentValues,
@@ -354,6 +364,8 @@ try {
   assert.equal(result.deepNativeEqual, true, 'caller-selected deep native value normalization/equality is iterative in Chromium');
   assert.deepEqual(result.frames, expectedFrames, 'the same full-frame validation, patch and inspection semantics run in Node and browser');
   assert.deepEqual(result.historyReplay, expectedHistoryReplay, 'the shared history candidate kernel runs actual replay/refusal and input-isolation vectors in Chromium');
+  assert.deepEqual(result.historyTraversal, expectedHistoryTraversal, 'native browser ESM runs the same traversal, refusal, identity and replay-composition vectors');
+  assert.equal(result.traversalDomainError, true, 'native traversal refusals use the shared domain error identity');
   for (let index = 0; index < cssAnnotationCases.length; index++) {
     const { name, literal } = cssAnnotationCases[index], row = result.cssAnnotations[index];
     assert.equal(row.name, name);
@@ -369,7 +381,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.historyTraversal.length} history-traversal + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

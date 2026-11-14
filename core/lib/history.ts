@@ -1,4 +1,6 @@
-/** Session-only point identity/lineage. history-replay owns candidates; writers own preparation, stacks and persistence. */
+/** Session lineage and read-only traversal planning. Replay candidates and writer acceptance/stack authority stay separate. */
+import { DivletError } from './validation.ts';
+
 export type HistoryDirection = 'undo' | 'redo';
 export type HistoryBoundary = 'opened' | 'untracked' | 'nonlinear' | 'retained';
 export interface HistoryNavigation {
@@ -21,6 +23,37 @@ export interface HistoryTimeline {
   pastLimited: boolean;
   futureLimited: boolean;
 }
+/** Session items need only their frame addresses for selection; their replay payload remains opaque here. */
+export interface HistoryAddressedItem {
+  readonly type: string;
+  readonly documentId?: string;
+  readonly documentIds?: readonly string[];
+}
+export interface HistoryTraversalEntry {
+  readonly label?: unknown;
+  readonly items: readonly HistoryAddressedItem[];
+}
+export interface HistoryTraversalOptions { readonly documentId?: string; readonly steps?: unknown }
+export interface HistoryTraversalPlan<Entry> {
+  /** Descending source-stack indexes, safe to remove only after acceptance. */
+  readonly indexes: readonly number[];
+  /** Original entries in actual traversal order; identity belongs to HistoryLine. */
+  readonly entries: readonly Entry[];
+  /** Group composition order before the candidate kernel reverses an Undo's items. */
+  readonly ordered: readonly Entry[];
+  readonly label: unknown;
+}
+
+/** Select without mutating stacks or lineage. The writer supplies its retained traversal bound. */
+export function planHistoryTraversal<Entry extends HistoryTraversalEntry>(stack: readonly Entry[], direction: HistoryDirection, { documentId, steps = 1 }: HistoryTraversalOptions, limit: number): HistoryTraversalPlan<Entry> {
+  if (typeof steps !== 'number' || !Number.isInteger(steps) || steps < 1 || steps > limit) throw new DivletError('INVALID_QUERY', `steps must be an integer from 1 to ${limit}.`);
+  const indexes: number[] = [];
+  for (let index = stack.length - 1; index >= 0 && indexes.length < steps; index--) if (!documentId || stack[index]!.items.some(item => item.documentId === documentId || item.documentIds?.includes(documentId))) indexes.push(index);
+  if (indexes.length < steps) throw new DivletError('NOTHING_TO_UNDO', steps === 1 ? `Nothing to ${direction}.` : `Not enough history to ${direction} ${steps} steps.`);
+  const entries = indexes.map(index => stack[index]!);
+  return { indexes, entries, ordered: direction === 'undo' ? [...entries].reverse() : entries, label: steps === 1 ? entries[0]!.label : `${direction} ${steps} steps` };
+}
+
 interface PointInfo {
   seq: number | null;
   firstSeq?: number | null;
