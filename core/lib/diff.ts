@@ -4,6 +4,7 @@
  */
 import { sameJson as isDeepStrictEqual } from './validation.ts';
 import type { Artboard, DocumentModel, Node, NodeId } from './model.ts';
+import type { CssDeclarationOperation } from './declarations.ts';
 
 const PATCH_KEYS = ['name', 'head', 'artboard', 'rootId', 'tokens', 'css', 'metadata', 'nodes'] as const;
 const plain = (value: unknown): value is Record<string, any> => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -43,6 +44,70 @@ export function diffDocuments(from: DocumentModel, to: DocumentModel): ValuePatc
   return patch;
 }
 
+/** Ordered snapshots of native fields only; node/address record order and opaque metadata remain unordered. */
+function nodeStyleSequence(node: Node | undefined): Array<readonly [string | null, readonly CssDeclarationOperation[]]> {
+  if (node?.type === 'element') return [[null, Object.entries(node.style)]];
+  if (node?.type !== 'ref') return [];
+  return Object.keys(node.descendants).sort().flatMap(address => {
+    const style = node.descendants[address]!.style;
+    return style === undefined ? [] : [[address, Object.entries(style)] as const];
+  });
+}
+
+export function documentStyleSequence(document: DocumentModel): Array<readonly [string, string | null, readonly CssDeclarationOperation[]]> {
+  return Object.keys(document.nodes).sort().flatMap(id => nodeStyleSequence(document.nodes[id]).map(([address, entries]) => [id, address, entries] as const));
+}
+
+/** A trusted session record, not a patch field or a persisted document representation. */
+export interface HistoryStyleBlock {
+  readonly nodeId: string;
+  readonly address: string | null;
+  readonly before: readonly CssDeclarationOperation[] | undefined;
+  readonly after: readonly CssDeclarationOperation[] | undefined;
+}
+export interface DocumentHistoryPatch { inverse: ValuePatch; forward: ValuePatch; styleBlocks?: readonly HistoryStyleBlock[] }
+
+/** Check atomic style snapshots first; their per-key sparse-patch encoding is not a stored-null guard. */
+export function matchesDocumentHistoryPatch(current: DocumentModel, item: DocumentHistoryPatch, undoing: boolean): boolean {
+  const expected = undoing ? item.forward : item.inverse, change = undoing ? item.inverse : item.forward;
+  const styleBlocks = item.styleBlocks ?? [];
+  if (styleBlocks.some(block => !isDeepStrictEqual(readStyleBlock(current, block.nodeId, block.address), block[undoing ? 'after' : 'before']))) return false;
+  if (!styleBlocks.length) return matchesPatch(current, expected, change);
+  const paths = new Set(styleBlocks.map(block => JSON.stringify(['nodes', block.nodeId, ...(block.address === null ? ['style'] : ['descendants', block.address, 'style'])])));
+  function matches(value: unknown, prior: unknown, patch: unknown, path: string[]): boolean {
+    if (paths.has(JSON.stringify(path))) return true;
+    if (plain(patch) && plain(prior)) return Object.keys(patch).every(key => matches((value as any)?.[key], prior[key], patch[key], [...path, key]));
+    return matchesPatch(value, prior, patch);
+  }
+  return matches(current, expected, change, []);
+}
+
+export function readStyleBlock(document: DocumentModel, nodeId: string, address: string | null): readonly CssDeclarationOperation[] | undefined {
+  const node = document.nodes[nodeId];
+  const style = address === null ? node?.type === 'element' ? node.style : undefined : node?.type === 'ref' ? node.descendants[address]?.style : undefined;
+  return style === undefined ? undefined : Object.entries(style);
+}
+
+/** Native style blocks are atomic history fields; other fields retain ordinary merge-patch guards. */
+export function documentHistoryPatch(from: DocumentModel, to: DocumentModel): DocumentHistoryPatch {
+  const forward = diffDocuments(from, to), inverse = diffDocuments(to, from);
+  const locations = new Map([...documentStyleSequence(from), ...documentStyleSequence(to)].map(([id, address]) => [JSON.stringify([id, address]), [id, address] as const]));
+  const styleBlocks: HistoryStyleBlock[] = [];
+  for (const [nodeId, address] of locations.values()) {
+    const before = readStyleBlock(from, nodeId, address), after = readStyleBlock(to, nodeId, address);
+    if (!isDeepStrictEqual(before, after)) styleBlocks.push({ nodeId, address, before, after });
+  }
+  return { forward, inverse, ...(styleBlocks.length ? { styleBlocks } : {}) };
+}
+
+function sameNodeField(before: any, after: any, key: string): boolean {
+  if (!isDeepStrictEqual(before[key], after[key])) return false;
+  if (key === 'style' && before.type === 'element' && after.type === 'element') return isDeepStrictEqual(Object.entries(before.style), Object.entries(after.style));
+  if (key === 'descendants' && before.type === 'ref' && after.type === 'ref') return isDeepStrictEqual(nodeStyleSequence(before), nodeStyleSequence(after));
+  return true;
+}
+const sameNode = (before: Node, after: Node): boolean => isDeepStrictEqual(before, after) && isDeepStrictEqual(nodeStyleSequence(before), nodeStyleSequence(after));
+
 const describe = (node: Node): string => (node.type === 'text' ? 'text' : node.type === 'ref' ? 'instance' : node.tag);
 
 /** What a transition changed, as the history row and the agent's account of it. */
@@ -71,8 +136,8 @@ export function summarizeChange(from: DocumentModel | null | undefined, to: Docu
   const after: Record<NodeId, any> = (to?.nodes || {}) as Record<NodeId, any>;
   for (const id of Object.keys(after)) {
     if (!Object.hasOwn(before, id)) added.push(id);
-    else if (!isDeepStrictEqual(before[id], after[id])) {
-      changed[id] = [...Object.keys(after[id]), ...Object.keys(before[id])].filter((key, index, all) => all.indexOf(key) === index && !isDeepStrictEqual(before[id][key], after[id][key]));
+    else if (!sameNode(before[id], after[id])) {
+      changed[id] = [...Object.keys(after[id]), ...Object.keys(before[id])].filter((key, index, all) => all.indexOf(key) === index && !sameNodeField(before[id], after[id], key));
     }
   }
   for (const id of Object.keys(before)) if (!Object.hasOwn(after, id)) removed.push(id);

@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateDocument, DivletError } from '../lib/model.ts';
+import { validateDocument, applyDocumentPatch, DivletError } from '../lib/model.ts';
 import { readProject } from '../lib/project.ts';
-import { replayHistory } from '../lib/history-replay.ts';
+import { replayHistory, documentHistoryPatch } from '../lib/history-replay.ts';
 import { historyReplayCases, captureHistoryReplay } from './fixtures/history-replay.js';
 
-const api = { validateDocument, readProject, replayHistory };
+const api = { validateDocument, applyDocumentPatch, readProject, replayHistory, documentHistoryPatch };
 for (const { name, run, expected, error } of historyReplayCases) test(name, () => {
   const result = captureHistoryReplay(api, run);
   if (error) { assert.equal(result.ok, false, name); assert.equal(result.code, error, result.message); }

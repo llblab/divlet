@@ -11,7 +11,7 @@ import { exportHtml } from './codec.ts';
 import { startServer } from './server.ts';
 import { registerBoard, unregisterBoard } from './boards.ts';
 import { buildSite } from './site.ts';
-import { diffDocuments, diffValue, summarizeChange, touchedNodeIds } from './diff.ts';
+import { documentHistoryPatch, diffValue, summarizeChange, touchedNodeIds } from './diff.ts';
 import { replayHistory } from './history-replay.ts';
 import { operationPatch } from './ops.ts';
 import { HistoryLine, planHistoryTraversal, validateHistoryNavigation, planHistoryNavigation } from './history.ts';
@@ -888,7 +888,7 @@ await this.importProject(project.settings, project.frames, hash);
       const from = previous.get(id).document;
       const to = next.get(id).document;
       this.record({ actor: 'file', kind: 'external', documentId: id, fromVersion: from.version, toVersion: to.version, group, label: 'project.divlet edit', from, to });
-      items.push({ type: 'patch', documentId: id, inverse: diffDocuments(to, from), forward: diffDocuments(from, to) });
+      items.push({ type: 'patch', documentId: id, ...documentHistoryPatch(from, to) });
     }
     const previousOrder = [...previous.keys()], nextOrder = [...next.keys()];
     const previousIndex = new Map(previousOrder.map((id, index) => [id, index]));
@@ -1069,7 +1069,7 @@ await this.importProject(project.settings, project.frames, hash);
     await this.refreshSite();
     const change = this.record({ actor, kind, documentId, fromVersion: previous.document.version, toVersion: entry.document.version, group, label, from: previous.document, to: entry.document });
     if (undoable && change.summary !== 'no change') {
-      this.pushUndo({ group: group ?? this.newGroup(), label: label ?? change.summary, items: [{ type: 'patch', documentId, inverse: diffDocuments(entry.document, previous.document), forward: diffDocuments(previous.document, entry.document) }] }, { seq: change.seq });
+      this.pushUndo({ group: group ?? this.newGroup(), label: label ?? change.summary, items: [{ type: 'patch', documentId, ...documentHistoryPatch(previous.document, entry.document) }] }, { seq: change.seq });
     } else this.#historyLine.reset({ seq: change.seq, label: change.summary });
     this.publish();
     const nodeIds = new Set([...Object.keys(previous.document.nodes), ...Object.keys(entry.document.nodes)]);

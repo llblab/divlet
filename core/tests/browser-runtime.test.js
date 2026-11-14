@@ -81,6 +81,99 @@ async function holdQueue(runtime) {
 const snapshotText = state => state.documents.find(([id]) => id === 'index')[1].nodes.label.content;
 const outcome = promise => promise.then(value => ({ ok: true, value }), error => ({ ok: false, code: error.code }));
 
+test('Undo restores declaration order after removing a literal style property in both writers', async () => {
+  const source = JSON.parse(editable);
+  source.frames[0].nodes.root.style = { 'padding-left': '20px', padding: '10px' };
+  const original = Object.entries(source.frames[0].nodes.root.style);
+  const writers = await pair(JSON.stringify(source));
+  try {
+    const changed = await both(writers, 'divlet_patch', { frameId: 'index', expectedVersion: 1, patch: { nodes: { root: { style: { 'padding-left': null } } } } });
+    assert.equal(changed.ok, true);
+    const restored = [];
+    for (const runtime of [writers.node, writers.browser]) {
+      assert.deepEqual(Object.entries(runtime.documents.get('index').document.nodes.root.style), [['padding', '10px']]);
+      await runtime.undo();
+      restored.push(Object.entries(runtime.documents.get('index').document.nodes.root.style));
+    }
+    assert.deepEqual(restored, [original, original], 'both writers must restore authored order, not just equal property values');
+    for (const runtime of [writers.node, writers.browser]) {
+      await runtime.redo();
+      assert.deepEqual(Object.entries(runtime.documents.get('index').document.nodes.root.style), [['padding', '10px']]);
+      await runtime.undo();
+      assert.deepEqual(Object.entries(runtime.documents.get('index').document.nodes.root.style), original);
+    }
+    const disk = JSON.parse(await fs.readFile(writers.node.projectPath, 'utf8'));
+    const browser = JSON.parse(writers.browser.source());
+    for (const source of [disk, browser]) assert.deepEqual(Object.entries(source.frames[0].nodes.root.style), original, 'accepted serialization retains declaration order');
+    sameState(writers, 'exact repeated style history');
+  } finally { await writers.close(); }
+});
+
+test('grouped Undo commits declaration-order changes even when values return equal', async () => {
+  const source = JSON.parse(editable);
+  source.frames[0].nodes.root.style = { 'padding-left': '20px', padding: '10px' };
+  const writers = await pair(JSON.stringify(source));
+  try {
+    for (const runtime of [writers.node, writers.browser]) {
+      await runtime.patch({ documentId: 'index', expectedVersion: 1, group: 'style-order', patch: { nodes: { root: { style: { 'padding-left': null } } } } });
+      await runtime.patch({ documentId: 'index', expectedVersion: 2, group: 'style-order', patch: { nodes: { root: { style: { 'padding-left': '20px' } } } } });
+      assert.deepEqual(Object.keys(runtime.documents.get('index').document.nodes.root.style), ['padding', 'padding-left']);
+      const revision = runtime.revision;
+      await runtime.undo();
+      assert.deepEqual(Object.keys(runtime.documents.get('index').document.nodes.root.style), ['padding-left', 'padding']);
+      assert.equal(runtime.documents.get('index').document.version, 4);
+      assert.equal(runtime.revision, revision + 1);
+      await runtime.redo();
+      assert.deepEqual(Object.keys(runtime.documents.get('index').document.nodes.root.style), ['padding', 'padding-left']);
+      assert.equal(runtime.documents.get('index').document.version, 5);
+    }
+    sameState(writers, 'value-equal ordered history');
+  } finally { await writers.close(); }
+});
+
+test('whole-style history refuses later same-block edits but retains unrelated metadata', async () => {
+  const source = JSON.parse(editable);
+  source.frames[0].nodes.root.style = { 'padding-left': '20px', padding: '10px' };
+  for (const conflict of [true, false]) {
+    const writers = await pair(JSON.stringify(source));
+    try {
+      for (const runtime of [writers.node, writers.browser]) {
+        await runtime.patch({ documentId: 'index', expectedVersion: 1, patch: { nodes: { root: { style: { 'padding-left': null } } } } });
+        await runtime.patch({ documentId: 'index', expectedVersion: 2, undoable: false, patch: conflict ? { nodes: { root: { style: { 'padding-right': '30px' } } } } : { metadata: { later: true } } });
+        if (conflict) {
+          const before = historyState(runtime), serialized = runtime === writers.node ? await fs.readFile(runtime.projectPath, 'utf8') : runtime.source(), writes = writers.stored.length;
+          await assert.rejects(runtime.undo(), { code: 'CANNOT_UNDO' });
+          assert.deepEqual(historyState(runtime), before);
+          assert.equal(runtime === writers.node ? await fs.readFile(runtime.projectPath, 'utf8') : runtime.source(), serialized);
+          assert.equal(writers.stored.length, writes);
+        } else {
+          await runtime.undo();
+          assert.deepEqual(runtime.documents.get('index').document.metadata, { later: true });
+          assert.deepEqual(Object.keys(runtime.documents.get('index').document.nodes.root.style), ['padding-left', 'padding']);
+        }
+      }
+      sameState(writers, conflict ? 'atomic style conflict' : 'unrelated metadata preservation');
+    } finally { await writers.close(); }
+  }
+});
+
+test('stored-null override style operations survive real writer Undo and Redo', async () => {
+  const source = JSON.parse(editable), nodes = source.frames[0].nodes;
+  nodes.content.reusable = true; nodes.root.children = ['content', 'instance'];
+  nodes.instance = { id: 'instance', type: 'ref', ref: 'index/content', descendants: { content: { style: { padding: null, color: 'red' } } } };
+  const writers = await pair(JSON.stringify(source));
+  try {
+    const changed = await both(writers, 'divlet_patch', { frameId: 'index', expectedVersion: 1, patch: { nodes: { instance: { descendants: { content: { style: { padding: '4px' } } } } } } });
+    assert.equal(changed.ok, true);
+    for (const runtime of [writers.node, writers.browser]) {
+      const style = () => Object.entries(runtime.documents.get('index').document.nodes.instance.descendants.content.style);
+      await runtime.undo(); assert.deepEqual(style(), [['padding', null], ['color', 'red']]);
+      await runtime.redo(); assert.deepEqual(style(), [['padding', '4px'], ['color', 'red']]);
+    }
+    sameState(writers, 'stored-null style history');
+  } finally { await writers.close(); }
+});
+
 test('opt-in native text refusal does not silently replace draft readers or touch accepted writers', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-draft-json-'));
   const file = path.join(directory, 'draft.divlet');

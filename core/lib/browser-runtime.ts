@@ -11,7 +11,7 @@
  */
 import { applyDocumentPatch, colourNames, inspectDocument, validateDocument, DivletError, LIMITS } from './model.ts';
 import type { DocumentModel } from './model.ts';
-import { diffDocuments, summarizeChange, touchedNodeIds } from './diff.ts';
+import { documentHistoryPatch, summarizeChange, touchedNodeIds } from './diff.ts';
 import { replayHistory } from './history-replay.ts';
 import { operationPatch } from './ops.ts';
 import { HistoryLine, planHistoryTraversal, validateHistoryNavigation, planHistoryNavigation } from './history.ts';
@@ -368,7 +368,7 @@ export class BrowserRuntime {
     this.revision++;
     const change = this.record({ actor, kind, documentId, fromVersion: previous.document.version, toVersion: entry.document.version, group, label, from: previous.document, to: entry.document });
     if (undoable && change.summary !== 'no change') {
-      this.pushUndo({ group: group ?? this.newGroup(), label: label ?? change.summary, items: [{ type: 'patch', documentId, inverse: diffDocuments(entry.document, previous.document), forward: diffDocuments(previous.document, entry.document) }] }, { seq: change.seq });
+      this.pushUndo({ group: group ?? this.newGroup(), label: label ?? change.summary, items: [{ type: 'patch', documentId, ...documentHistoryPatch(previous.document, entry.document) }] }, { seq: change.seq });
     } else this.#historyLine.reset({ seq: change.seq, label: change.summary });
     this.publish();
     const nodeIds = new Set([...Object.keys(previous.document.nodes), ...Object.keys(entry.document.nodes)]);

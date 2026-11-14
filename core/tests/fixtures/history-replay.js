@@ -19,7 +19,98 @@ function replay(api, before, items, direction) {
 }
 const endpoint = candidate => ({ ids: [...candidate.frames.keys()], versions: [...candidate.frames.values()].map(document => document.version), text: [...candidate.frames.values()].map(document => document.nodes.label.content), settingsVersion: candidate.settings.version });
 
+function overrideContext(api, descendants) {
+  const source = frame('a'); source.nodes.root.children = ['definition', 'instance'];
+  source.nodes.definition = { id: 'definition', type: 'element', tag: 'section', reusable: true, children: ['label'], style: { padding: '10px', color: 'black' } };
+  source.nodes.instance = { id: 'instance', type: 'ref', ref: 'a/definition', descendants };
+  const admitted = api.readProject({ schemaVersion: 1, frames: [source] });
+  return { frames: new Map([['a', admitted.frames[0]]]), settings: admitted.settings };
+}
+
+function styleStep(api, before, patch) {
+  const after = { ...api.applyDocumentPatch(before, patch), version: before.version + 1 };
+  return { after, item: { type: 'patch', documentId: before.id, ...api.documentHistoryPatch(before, after) } };
+}
+
+export function literalStyleReplay(api) {
+  const before = context(api), original = before.frames.get('a');
+  const { after, item } = styleStep(api, original, { nodes: { root: { style: { 'padding-left': null } } } });
+  const removed = { ...before, frames: new Map([['a', after]]) };
+  const restored = replay(api, removed, [item], 'undo');
+  const redone = replay(api, restored, [item], 'redo');
+  return [original, after, restored.frames.get('a'), redone.frames.get('a')];
+}
+
 export const historyReplayCases = [
+  { name: 'literal whole-block history restores order and repeats in both directions', expected: { styles: [[['padding-left', '20px'], ['padding', '10px']], [['padding', '10px']], [['padding-left', '20px'], ['padding', '10px']], [['padding', '10px']]], versions: [5, 6, 7, 8] }, run: api => {
+    const documents = literalStyleReplay(api);
+    return { styles: documents.map(document => Object.entries(document.nodes.root.style)), versions: documents.map(document => document.version) };
+  } },
+  { name: 'value-equal traversal still commits a changed declaration order', expected: { style: [['padding-left', '20px'], ['padding', '10px']], identity: false, version: 8 }, run: api => {
+    const before = context(api), original = before.frames.get('a');
+    const first = styleStep(api, original, { nodes: { root: { style: { 'padding-left': null } } } });
+    const second = styleStep(api, first.after, { nodes: { root: { style: { 'padding-left': '20px' } } } });
+    const current = { ...before, frames: new Map([['a', second.after]]) };
+    const undo = replay(api, current, [first.item, second.item], 'undo').frames.get('a');
+    return { style: Object.entries(undo.nodes.root.style), identity: undo === second.after, version: undo.version };
+  } },
+  { name: 'later edits in the same style block refuse without erasing another property', error: 'CANNOT_UNDO', run: api => {
+    const before = context(api), step = styleStep(api, before.frames.get('a'), { nodes: { root: { style: { 'padding-left': null } } } });
+    const later = api.applyDocumentPatch(step.after, { nodes: { root: { style: { 'padding-right': '30px' } } } });
+    return replay(api, { ...before, frames: new Map([['a', later]]) }, [step.item], 'undo');
+  } },
+  { name: 'order-only later edits are overlapping native style changes', error: 'CANNOT_UNDO', run: api => {
+    const before = context(api), step = styleStep(api, before.frames.get('a'), { nodes: { root: { style: { padding: '12px' } } } });
+    const later = api.validateDocument({ ...step.after, nodes: { ...step.after.nodes, root: { ...step.after.nodes.root, style: { padding: '12px', 'padding-left': '20px' } } } });
+    return replay(api, { ...before, frames: new Map([['a', later]]) }, [step.item], 'undo');
+  } },
+  { name: 'unrelated metadata survives whole-style-block replay', expected: { style: [['padding-left', '20px'], ['padding', '10px']], metadata: { later: true } }, run: api => {
+    const before = context(api), step = styleStep(api, before.frames.get('a'), { nodes: { root: { style: { 'padding-left': null } } } });
+    const later = api.applyDocumentPatch(step.after, { metadata: { later: true } });
+    const undo = replay(api, { ...before, frames: new Map([['a', later]]) }, [step.item], 'undo').frames.get('a');
+    return { style: Object.entries(undo.nodes.root.style), metadata: undo.metadata };
+  } },
+  { name: 'whole override blocks restore stored-null operations, not sparse deletions', expected: [[['padding', null], ['color', 'red']], [['padding', '4px'], ['color', 'red']]], run: api => {
+    const before = overrideContext(api, { definition: { style: { padding: null, color: 'red' } } }), original = before.frames.get('a');
+    const step = styleStep(api, original, { nodes: { instance: { descendants: { definition: { style: { padding: '4px' } } } } } });
+    const current = { ...before, frames: new Map([['a', step.after]]) };
+    const undo = replay(api, current, [step.item], 'undo');
+    const redo = replay(api, undo, [step.item], 'redo');
+    return [undo, redo].map(value => Object.entries(value.frames.get('a').nodes.instance.descendants.definition.style));
+  } },
+  ...[{}, { definition: {} }, { definition: { style: {} } }].map((descendants, index) => ({
+    name: `override absent/empty containers replay exactly (${index})`, expected: { undo: descendants, redo: { definition: { style: { padding: null } } } }, run: api => {
+      const before = overrideContext(api, descendants), original = before.frames.get('a');
+      const after = api.validateDocument({ ...original, nodes: { ...original.nodes, instance: { ...original.nodes.instance, descendants: { definition: { style: { padding: null } } } } } });
+      const item = { type: 'patch', documentId: 'a', ...api.documentHistoryPatch(original, after) };
+      const current = { ...before, frames: new Map([['a', after]]) };
+      const undo = replay(api, current, [item], 'undo'), redo = replay(api, undo, [item], 'redo');
+      return { undo: undo.frames.get('a').nodes.instance.descendants, redo: redo.frames.get('a').nodes.instance.descendants };
+    },
+  })),
+  { name: 'whole-node patch creation and removal retain stored-null style operations', expected: { removed: false, restored: [['padding', null], ['color', 'red']] }, run: api => {
+    const before = overrideContext(api, { definition: { style: { padding: null, color: 'red' } } }), original = before.frames.get('a');
+    const step = styleStep(api, original, { nodes: { root: { children: ['definition'] }, instance: null } });
+    const current = { ...before, frames: new Map([['a', step.after]]) };
+    const undo = replay(api, current, [step.item], 'undo'), redo = replay(api, undo, [step.item], 'redo');
+    return { removed: Object.hasOwn(redo.frames.get('a').nodes, 'instance'), restored: Object.entries(undo.frames.get('a').nodes.instance.descendants.definition.style) };
+  } },
+  { name: 'style snapshots do not bypass ordinary patch-field admission', error: 'INVALID_DOCUMENT', run: api => {
+    const before = context(api), step = styleStep(api, before.frames.get('a'), { nodes: { root: { style: { padding: '12px' } } } });
+    const item = { ...step.item, forward: { ...step.item.forward, id: 'other' }, inverse: { ...step.item.inverse, id: 'a' } };
+    return replay(api, before, [item], 'redo');
+  } },
+  { name: 'lifecycle replay refuses value-equal changed declaration order', error: 'CANNOT_UNDO', run: api => {
+    const before = context(api), original = before.frames.get('a');
+    const current = api.validateDocument({ ...original, nodes: { ...original.nodes, root: { ...original.nodes.root, style: { padding: '10px', 'padding-left': '20px' } } } });
+    return replay(api, { ...before, frames: new Map([['a', current]]) }, [{ type: 'create', documentId: 'a', document: original }], 'undo');
+  } },
+  { name: 'a late whole-block conflict cannot leak an earlier replay item', error: 'CANNOT_UNDO', run: api => {
+    const before = context(api), step = styleStep(api, before.frames.get('a'), { nodes: { root: { style: { padding: '12px' } } } });
+    const current = api.applyDocumentPatch(step.after, { nodes: { root: { style: { color: 'red' } } } });
+    return replay(api, { ...before, frames: new Map([['a', current]]) }, [step.item, patch('a', 'Beta', 'Alpha')], 'undo');
+  } },
+
   { name: 'grouped patches replay forward once and undo in reverse, one version per endpoint', expected: {
     redo: { ids: ['a'], versions: [6], text: ['Gamma'], settingsVersion: 7 }, undo: { ids: ['a'], versions: [7], text: ['Alpha'], settingsVersion: 7 },
   }, run: api => {

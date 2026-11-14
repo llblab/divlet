@@ -12,8 +12,8 @@ import { cssCascadeCases, cascadeDocuments } from '../../core/tests/fixtures/css
 import { captureFrame, frameCases, resourceFrame } from '../../core/tests/fixtures/frame-portability.js';
 import { prepareFrame } from '../../core/lib/render.ts';
 import { bundleBrowserModel, bundleBrowserCodec, bundleBrowserProject, bundleBrowserReplay, bundleBrowserAcceptance } from '../../scripts/browser-model.mjs';
-import { replayHistory } from '../../core/lib/history-replay.ts';
-import { historyReplayCases, captureHistoryReplay } from '../../core/tests/fixtures/history-replay.js';
+import { replayHistory, documentHistoryPatch } from '../../core/lib/history-replay.ts';
+import { historyReplayCases, captureHistoryReplay, literalStyleReplay } from '../../core/tests/fixtures/history-replay.js';
 import { HistoryLine, planHistoryTraversal, validateHistoryNavigation, planHistoryNavigation } from '../../core/lib/history.ts';
 import * as nodeAcceptance from '../../core/lib/acceptance.ts';
 import { patchVersionCases, capturePatchVersion } from '../../core/tests/fixtures/patch-version.js';
@@ -34,10 +34,11 @@ const projectBundle = await bundleBrowserProject(fileURLToPath(new URL('../../',
 const replayBundle = await bundleBrowserReplay(fileURLToPath(new URL('../../', import.meta.url)));
 const acceptanceBundle = await bundleBrowserAcceptance(fileURLToPath(new URL('../../', import.meta.url)));
 const expectedPatchVersions = patchVersionCases.map(({ name, run }) => ({ name, result: capturePatchVersion(nodeAcceptance, run) }));
-const expectedHistoryReplay = historyReplayCases.map(({ name, run }) => ({ name, result: captureHistoryReplay({ ...nodeModel, readProject, replayHistory }, run) }));
+const expectedHistoryReplay = historyReplayCases.map(({ name, run }) => ({ name, result: captureHistoryReplay({ ...nodeModel, readProject, replayHistory, documentHistoryPatch }, run) }));
 const expectedHistoryTraversal = historyTraversalCases.map(({ name, run }) => ({ name, result: captureHistoryTraversal({ planHistoryTraversal, replayHistory, readProject }, run) }));
 const expectedHistoryNavigation = historyNavigationCases.map(({ name, run }) => ({ name, result: captureHistoryNavigation({ HistoryLine, validateHistoryNavigation, planHistoryNavigation }, run) }));
 const expectedFrames = frameCases.map(({ name, run }) => ({ name, result: captureFrame(nodeModel, run) }));
+const expectedStyleReplayHtml = literalStyleReplay({ ...nodeModel, readProject, replayHistory, documentHistoryPatch }).map(frame => nodeCodec.renderFile(frame));
 const expectedCssCascade = cssCascadeCases.flatMap(row => cascadeDocuments(nodeCodec, row).map(value => ({ name: row.name, ...value })));
 const publicSnapshot = await landingDemoSnapshot();
 const expectedScopeHtml = {};
@@ -190,7 +191,7 @@ try {
       return { name, actual, expected: error ? { error } : { value: expected } };
     });
     const componentTexts = componentCases(componentTextCases), componentValues = componentCases(componentValueCases), componentAttributes = componentCases(componentAttributeCases), componentMetadata = componentCases(componentMetadataCases);
-    const [replayApi, { historyReplayCases, captureHistoryReplay }] = await Promise.all(['history-replay.js', 'history-replay-cases.js'].map(file => import(new URL(file, location.href).href)));
+    const [replayApi, { historyReplayCases, captureHistoryReplay, literalStyleReplay }] = await Promise.all(['history-replay.js', 'history-replay-cases.js'].map(file => import(new URL(file, location.href).href)));
     const historyReplay = historyReplayCases.map(({ name, run }) => ({ name, result: captureHistoryReplay({ ...frameApi, ...project, ...replayApi }, run) }));
     const [historyApi, { historyTraversalCases, captureHistoryTraversal }] = await Promise.all(['history.ts', 'history-traversal-cases.js'].map(file => import(new URL(file, location.href).href)));
     const historyTraversal = historyTraversalCases.map(({ name, run }) => ({ name, result: captureHistoryTraversal({ ...project, ...replayApi, ...historyApi }, run) }));
@@ -271,6 +272,14 @@ try {
       iframe.remove();
     }
     const { cssCascadeCases, cascadeDocuments } = await import(new URL('css-cascade.js', location.href).href);
+    const styleReplayRendering = [];
+    for (const frame of literalStyleReplay({ ...frameApi, ...project, ...replayApi })) {
+      const html = codec.renderFile(frame), iframe = document.createElement('iframe');
+      const loaded = new Promise(resolve => { iframe.onload = resolve; });
+      iframe.srcdoc = html; document.body.append(iframe); await loaded;
+      styleReplayRendering.push({ html, padding: iframe.contentWindow.getComputedStyle(iframe.contentDocument.querySelector('main')).paddingLeft });
+      iframe.remove();
+    }
     const cssCascade = [];
     for (const row of cssCascadeCases) for (const specimen of cascadeDocuments(codec, row)) {
       const iframe = document.createElement('iframe');
@@ -321,6 +330,7 @@ try {
       componentScopes,
       scopeRendering,
       cssCascade,
+      styleReplayRendering,
       inlineCss,
       parsedCssRendering,
       draftDuplicateRefusal,
@@ -382,6 +392,8 @@ try {
   assert.deepEqual(result.orderedCssPadding, ['10px', '20px'], 'validated declaration order survives the shared serializer and actual browser cascade');
   assert.ok(result.cases.length > 25, 'the shared acceptance/refusal regions are exercised');
   for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.references, ...result.requirements, ...result.nativeJson, ...result.nativeValues, ...result.nativeEquality, ...result.inlineCss, ...result.componentTexts, ...result.componentValues, ...result.componentAttributes, ...result.componentMetadata, ...result.domIds, ...result.componentScopes, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
+  assert.deepEqual(result.styleReplayRendering.map(value => value.html), expectedStyleReplayHtml);
+  assert.deepEqual(result.styleReplayRendering.map(value => value.padding), ['10px', '10px', '10px', '10px'], 'removal, Undo and Redo preserve the actual padding cascade');
   assert.equal(result.cssCascade.length, expectedCssCascade.length);
   for (const { name, mode, html, expected } of expectedCssCascade) {
     const observed = result.cssCascade.find(value => value.name === name && value.mode === mode);
@@ -430,7 +442,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

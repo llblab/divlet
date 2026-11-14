@@ -2,19 +2,20 @@
  * Owns: host-independent history-item replay into a private frame/settings candidate and endpoint version coalescing.
  * Excludes: queues, stack/point authority, whole-project preparation, persistence, publication and host capabilities.
  */
-import { applyDocumentPatch, DivletError } from './model.ts';
+import { applyDocumentPatch, validateDocument, DivletError } from './model.ts';
 import type { DocumentModel } from './model.ts';
 import { patchSettings } from './project.ts';
 import type { ProjectSettings } from './project.ts';
-import { matchesPatch } from './diff.ts';
-import type { ValuePatch } from './diff.ts';
+import { matchesPatch, matchesDocumentHistoryPatch } from './diff.ts';
+import type { ValuePatch, HistoryStyleBlock } from './diff.ts';
 import { sameDocument, sameSettings } from './acceptance.ts';
 import { sameJson } from './validation.ts';
 import type { HistoryDirection } from './history.ts';
+export { documentHistoryPatch } from './diff.ts';
 
 /** Session-owned records, not a wire format or an admission boundary for foreign history. */
 export type HistoryReplayItem = Readonly<
-  | { type: 'patch'; documentId: string; inverse: ValuePatch; forward: ValuePatch }
+  | { type: 'patch'; documentId: string; inverse: ValuePatch; forward: ValuePatch; styleBlocks?: readonly HistoryStyleBlock[] }
   | { type: 'project'; inverse: ValuePatch; forward: ValuePatch }
   | { type: 'order'; inverse: readonly string[]; forward: readonly string[] }
   | { type: 'create' | 'delete'; documentId: string; index?: number; document: DocumentModel }>;
@@ -29,10 +30,27 @@ export function replayHistory(previous: ReadonlyMap<string, DocumentModel>, prev
   for (const item of undoing ? [...items].reverse() : items) {
     switch (item.type) {
       case 'patch': {
-        const change = undoing ? item.inverse : item.forward, expected = undoing ? item.forward : item.inverse;
+        const change = undoing ? item.inverse : item.forward;
         const current = frames.get(item.documentId);
-        if (!current || !matchesPatch(current, expected, change)) refuse('Later changes touched the same content.');
-        frames.set(item.documentId, { ...applyDocumentPatch(current, change), version: current.version + 1 });
+        if (!current || !matchesDocumentHistoryPatch(current, item, undoing)) refuse('Later changes touched the same content.');
+        let candidate: DocumentModel;
+        if (item.styleBlocks?.length) {
+          // Keep ordinary patch admission, then validate exact snapshot restoration before acceptance.
+          const raw: Record<string, any> = applyDocumentPatch(current, change);
+          for (const block of item.styleBlocks) {
+            const node = raw.nodes?.[block.nodeId], value = block[undoing ? 'before' : 'after'];
+            if (block.address === null) {
+              if (value === undefined) { if (node?.type === 'element') refuse('History style block no longer matches its element.'); }
+              else { if (node?.type !== 'element') refuse('History style element is missing.'); node.style = Object.fromEntries(value); }
+            } else {
+              const override = node?.type === 'ref' ? node.descendants?.[block.address] : undefined;
+              if (value === undefined) { if (override) delete override.style; }
+              else { if (!override) refuse('History style override is missing.'); override.style = Object.fromEntries(value); }
+            }
+          }
+          candidate = validateDocument(raw);
+        } else candidate = applyDocumentPatch(current, change);
+        frames.set(item.documentId, { ...candidate, version: current.version + 1 });
         break;
       }
       case 'project': {

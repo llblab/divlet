@@ -25,7 +25,7 @@ const file = path.resolve(process.argv[2], 'project.divlet');
 let runtime;
 try {
   runtime = await api.openRuntime({ file, watch: false, createDemo: false });
-  await runtime.create({ document: decodeHtml('<main id="root" style="color:red"><p>One</p></main>', { fallbackId: 'plain' }) });
+  await runtime.create({ document: decodeHtml('<main id="root" style="color:red;padding-left:20px;padding:10px"><p>One</p></main>', { fallbackId: 'plain' }) });
   const read = () => runtime.read({ view: 'frame', documentId: 'plain' });
   const version = read().version, textId = Object.values(read().nodes).find(node => node.type === 'text').id;
   assert.deepEqual(runtime.info().clientPlugins, []);
@@ -41,6 +41,11 @@ try {
   }
   await runtime.undo(); assert.equal(read().nodes.root.style.color, 'red');
   await runtime.redo(); assert.equal(read().nodes.root.style.color, 'blue');
+  const ordered = Object.entries(read().nodes.root.style);
+  await runtime.patch({ documentId: 'plain', expectedVersion: read().version, patch: { nodes: { root: { style: { 'padding-left': null } } } } });
+  await runtime.undo(); assert.deepEqual(Object.entries(read().nodes.root.style), ordered);
+  await runtime.redo(); assert.equal(read().nodes.root.style['padding-left'], undefined);
+  await runtime.undo(); assert.deepEqual(Object.entries(read().nodes.root.style), ordered);
   const rendered = await fetch(runtime.info().documents[0].viewUrl);
   assert.equal(rendered.status, 200); assert.match(await rendered.text(), /color:blue/);
   assert.equal((await fetch(runtime.url)).status, 200);
