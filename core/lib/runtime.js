@@ -14,7 +14,7 @@ import { buildSite } from './site.ts';
 import { diffDocuments, diffValue, matchesPatch, summarizeChange, touchedNodeIds } from './diff.ts';
 import { operationPatch } from './ops.ts';
 import { HistoryLine } from './history.ts';
-import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertExpectedVersion, assertExpectedRender } from './acceptance.ts';
+import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertExpectedVersion, assertExpectedRender, assertReplayableStyleTransition } from './acceptance.ts';
 import { expandPath, inspectPath, initProject, resolveProject, isProjectFile } from './projects.ts';
 import { OutputStore, safeDirectory } from './output.ts';
 import { buildStatic, inlineDeclaredAssets, readResourceBytes, normalizeExternalFiles } from './static.js';
@@ -856,6 +856,7 @@ await this.importProject(project.settings, project.frames, hash);
     const created = [];
     for (const frame of frames) {
       const current = this.documents.get(frame.id);
+      if (current) assertReplayableStyleTransition(current.document, frame);
       if (current && sameDocument(current.document, frame)) docs.set(frame.id, current.document);
       else if (current) { docs.set(frame.id, { ...frame, version: current.document.version + 1 }); changed.push(frame.id); }
       else { docs.set(frame.id, frame); created.push(frame.id); }
