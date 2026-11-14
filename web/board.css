@@ -594,7 +594,7 @@ textarea.field { overflow: auto; }
 .expanded-bar { position: fixed; z-index: 60; top: 10px; left: 50%; display: flex; align-items: center; gap: 4px; padding: 3px; transform: translateX(-50%); border: 1px solid var(--hair); border-radius: var(--radius); background: var(--panel); backdrop-filter: blur(18px); box-shadow: var(--shadow); animation: rise .2s var(--ease); }
 .expanded-bar.moved { transform: none; }
 .expanded-bar.dragging { cursor: grabbing; box-shadow: 0 6px 24px rgba(0, 0, 0, .3); }
-.expanded-back { display: inline-flex; align-items: center; gap: 8px; min-height: 30px; max-width: calc(var(--vw) * 0.6); padding: 0 12px 0 9px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font-weight: 500; cursor: grab; touch-action: none; user-select: none; }
+.expanded-back { display: inline-flex; align-items: center; gap: 8px; min-height: 30px; max-width: calc(var(--vw) * 0.6); padding: 0 9px 0 12px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font-weight: 500; cursor: grab; touch-action: none; user-select: none; }
 .expanded-back:hover { background: var(--field-hover); }
 .expanded-back:active, .expanded-bar.dragging .expanded-back { cursor: grabbing; }
 .expanded-back .icon { width: 15px; height: 15px; flex: none; color: var(--muted); }

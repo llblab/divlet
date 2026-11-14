@@ -90,7 +90,7 @@ function paintHistory() {
   redoButton.dataset.tip = head?.redoLabel ? `Redo ${head.redoLabel} · ${keys('Mod+Shift+Z')}` : 'Nothing to redo';
 }
 
-/* The corner: panels on the left of the search, the project indicator that turns into Back. */
+/* Project menu, sidebar tabs and the expanded page's collapse control. */
 $('#status-dot').append(icon('divlet'));
 $('#open-layers .tab-mark').prepend(icon('layers'));
 $('#open-history .tab-mark').prepend(icon('clock'));
@@ -98,7 +98,7 @@ $('#open-agent .tab-mark').prepend(icon('sparkle'));
 $('#open-layers').addEventListener('click', () => sidebar.toggle('layers'));
 $('#open-history').addEventListener('click', () => sidebar.toggle('activity'));
 $('#open-agent').addEventListener('click', () => sidebar.toggle('agent'));
-$('#expanded-back').prepend(icon('back'));
+$('#expanded-back').append(icon('collapse'));
 $('#status').setAttribute('aria-haspopup', 'menu');
 $('#status').addEventListener('click', () => {
   openMenu([

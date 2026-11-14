@@ -29,6 +29,27 @@ test.after(async () => { await browser.close(); server.close(); });
 const frameText = (page, selector) => page.frameLocator('iframe[data-document-id="index"]').locator(selector).first().textContent();
 const parse = result => { assert.equal(result.isError, false, result.content?.[0]?.text); return result.structuredContent; };
 
+async function assertCollapseControl(page) {
+  const control = page.getByRole('button', { name: 'Collapse to the board', exact: true });
+  assert.equal(await control.count(), 1, 'expanded viewing has one collapse action, not browser-history navigation');
+  const layout = await control.evaluate(async node => {
+    const { icon } = await import('./lib/util.js');
+    const label = node.querySelector('#expanded-title'), glyph = node.querySelector('svg');
+    return {
+      order: [...node.children].map(child => child.tagName.toLowerCase()),
+      glyph: glyph.innerHTML, expectedGlyph: icon('collapse').innerHTML, hiddenGlyph: glyph.getAttribute('aria-hidden'),
+      label: label.getBoundingClientRect().toJSON(), icon: glyph.getBoundingClientRect().toJSON(),
+      button: node.getBoundingClientRect().toJSON(), viewport: innerWidth,
+    };
+  });
+  assert.deepEqual(layout.order, ['span', 'svg'], 'the label precedes the collapse icon');
+  assert.equal(layout.glyph, layout.expectedGlyph, 'the glyph is collapse, not the back arrow');
+  assert.equal(layout.hiddenGlyph, 'true', 'the decorative icon does not duplicate the accessible action name');
+  assert.ok(layout.label.right <= layout.icon.left + 1, 'the complete label stays to the left of the icon');
+  assert.ok(layout.icon.width > 0 && layout.icon.right <= layout.button.right && layout.icon.top >= layout.button.top && layout.icon.bottom <= layout.button.bottom, 'the icon stays visible inside the control');
+  assert.ok(layout.button.left >= 0 && layout.button.right <= layout.viewport, 'the whole control stays within the viewport');
+}
+
 test('the static board opens the landing project with no backend', async () => {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   const errors = [];
@@ -42,6 +63,7 @@ test('the static board opens the landing project with no backend', async () => {
   // A first visit reads the page at its real size; the board is one step back and is remembered afterwards.
   await page.waitForSelector('#expanded-preview:not([hidden])');
   assert.equal((await page.locator('#expanded-title').textContent()).trim(), 'Edit on the board');
+  await assertCollapseControl(page);
   const readable = async () => page.evaluate(() => {
     const frame = document.querySelector('iframe[data-document-id="index"]').getBoundingClientRect();
     return { width: frame.width, viewport: innerWidth };
@@ -83,7 +105,14 @@ test('a first visit on a phone reads the landing as a phone page', async () => {
   const layout = await frame.locator('h1').first().evaluate(node => ({ font: Number.parseFloat(getComputedStyle(node).fontSize), right: node.getBoundingClientRect().right, width: document.documentElement.clientWidth }));
   assert.ok(layout.width <= 400 && layout.right <= layout.width + 1, `the page lays out at phone width (${JSON.stringify(layout)})`);
   assert.ok(layout.font >= 24, 'and its heading stays readable');
+  await assertCollapseControl(phone);
   await phone.screenshot({ path: 'artifacts/pages-first-visit-phone.png' }).catch(() => {});
+  await phone.locator('#expanded-preview').screenshot({ path: 'artifacts/pages-collapse-control.png' });
+  await phone.evaluate(async () => (await import('./lib/help.js')).setUiSize(200));
+  await assertCollapseControl(phone);
+  await phone.getByRole('button', { name: 'Collapse to the board', exact: true }).focus();
+  await phone.keyboard.press('Enter');
+  await phone.waitForSelector('#expanded-preview', { state: 'hidden' });
   await phone.close();
 });
 

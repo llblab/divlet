@@ -4,6 +4,7 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased
 
+- **Collapse from expanded viewing.** The return control now places four inward-pointing arrows to the right of its label instead of a leading back arrow. The standalone landing keeps “Edit on the board”; the accessible label and tooltip describe collapsing, not browser-history navigation. Dragging, Escape and keyboard activation retain their existing behaviour.
 - **Style ownership clarified (documentation only).** The target contract assigns native CSS and ordinary inspector controls to the core in Node and browser hosts; Tailwind adds a linked atomic-class editor/compiler, including the standalone landing composition. Existing WEB/BROWSER tasks now separate native operations, inspector migration, provider admission, linked representation and demo integration with explicit checks. No runtime implementation, format migration or browser Tailwind delivery is claimed.
 
 ## 0.0.5 — Domain-first agent tools
