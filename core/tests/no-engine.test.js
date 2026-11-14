@@ -6,6 +6,34 @@ import path from 'node:path';
 import { decodeHtml } from '../lib/codec.ts';
 import { openRuntime } from '../lib/runtime.js';
 import { styleEngine, setStyleEngines } from '../lib/engine.ts';
+import { importSource } from '../lib/import.ts';
+
+test('foreign conversion, native opening and editing retain CSS without a registered style engine', async t => {
+  const original = styleEngine();
+  t.after(() => setStyleEngines([original]));
+  setStyleEngines([]);
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-no-engine-import-'));
+  let runtime;
+  t.after(async () => { await runtime?.close(); await fs.rm(root, { recursive: true, force: true }); });
+  const file = path.join(root, 'plain.pen');
+  const source = JSON.stringify({ version: '2.21', children: [{ id: 'page', name: 'Plain', type: 'frame', width: 200, height: 100, layout: 'vertical', padding: 12, fill: '#abcdef', children: [{ id: 'label', type: 'text', content: 'Native CSS', fontSize: 16 }] }] });
+  await fs.writeFile(file, source);
+  const imported = await importSource(file);
+  assert.equal(imported.created, true);
+  assert.equal(imported.utilities, 0);
+  assert.equal(imported.arbitrary, 0);
+  runtime = await openRuntime({ file: imported.file, watch: false, createDemo: false });
+  const info = runtime.info();
+  assert.deepEqual(info.clientPlugins, []);
+  const entry = info.documents[0];
+  const html = await fs.readFile(entry.htmlPath, 'utf8');
+  for (const value of ['display:flex', 'padding:12px', 'background-color:#abcdef', 'font-size:16px']) assert.ok(html.includes(value), value);
+  const document = runtime.read({ view: 'document', documentId: entry.id });
+  const label = Object.values(document.nodes).find(node => node.type === 'text');
+  await runtime.patch({ documentId: entry.id, expectedVersion: 1, patch: { nodes: { [label.id]: { content: 'Edited' } } } });
+  assert.match(await fs.readFile(entry.htmlPath, 'utf8'), /Edited/);
+  assert.equal(await fs.readFile(file, 'utf8'), source);
+});
 
 test('the core runs with plain CSS when no style engine is installed', async t => {
   const engines = [styleEngine()];

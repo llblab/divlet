@@ -1,0 +1,25 @@
+{
+  "version": "2.21",
+  "variables": {
+    "ink": { "type": "color", "value": "#123456" },
+    "gap": { "type": "number", "value": 8 }
+  },
+  "divlet": {
+    "theme": { "--authored-ink": "$ink" },
+    "css": ".paint{background-color:#f0d080;outline:2px solid var(--authored-ink)}[data-import-style]{opacity:.85}[data-import-st\\79 le-2]{opacity:.1}[class]{border-top-color:#123456}"
+  },
+  "children": [
+    { "id": "card", "type": "frame", "name": "Card", "reusable": true, "width": 180, "height": 80, "layout": "vertical", "padding": 8, "gap": "$gap", "fill": "#ddeeff", "cornerRadius": 6, "children": [
+      { "id": "label", "type": "text", "content": "Native CSS", "fontSize": 16, "fill": "$ink" }
+    ] },
+    { "id": "page", "type": "frame", "name": "Page", "x": 220, "width": 460, "height": 260, "layout": "vertical", "padding": 12, "gap": 12, "fill": "#fafafa", "children": [
+      { "id": "one", "type": "ref", "ref": "card" },
+      { "id": "two", "type": "ref", "ref": "card", "descendants": { "label": { "content": "Second card" } } }
+    ] },
+    { "id": "graphics", "type": "frame", "name": "Graphics", "x": 720, "width": 360, "height": 180, "fill": "#eeeeee", "divlet": { "className": "paint", "attrs": { "data-import-style": "authored" }, "style": { "padding-left": "3px !important" } }, "children": [
+      { "id": "rect", "type": "rectangle", "x": 20, "y": 25, "width": 80, "height": 50, "fill": "#123456", "rotation": 15, "cornerRadius": 6 },
+      { "id": "ellipse", "type": "ellipse", "x": 135, "y": 25, "width": 70, "height": 50, "fill": "#d94c77" },
+      { "id": "caption", "type": "text", "x": 20, "y": 115, "content": "CSS without utilities", "fontSize": 18, "fill": "$ink" }
+    ] }
+  ]
+}

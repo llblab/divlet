@@ -1,33 +1,35 @@
 /*
  * PEN → Divlet conversion. A PEN source is read through its native projection (which already renders it correctly) and every
- * frame is re-expressed as Divlet HTML: elements with Tailwind classes, shared tokens and ordinary project CSS. Nothing is
- * left in a PEN-specific style bundle: a declaration with a Tailwind utility becomes that utility, any other declaration an
- * arbitrary-property class (`[prop:value]`, see core `styles.js`), and only CSS that is not a per-node style (page resets)
- * stays as CSS. Component instances that equal their definition plus overrides stay instances.
+ * frame is re-expressed as ordinary HTML/SVG/CSS with live variable references. Generated CSS uses ordinary data-attribute
+ * selectors at the projection's original specificity; no utility compiler or normalization is involved. Component instances
+ * that equal their definition plus overrides stay instances.
  */
 import postcss from 'postcss';
 import { readProject } from './source.js';
 import { sourceFrame } from './projection.js';
 import { validateSettings, writeProject } from '../../../core/lib/project.ts';
 import { validateDocument } from '../../../core/lib/model.ts';
-import { declarationClass } from '../../../core/lib/engine.ts';
+import { decodeCss } from '../../../core/lib/css-literals.ts';
 
-export { declarationClass };
+function unsupported(message) { throw Object.assign(new Error(message), { code: 'UNSUPPORTED_PEN_RENDER' }); }
+function refuseProjectionReferences(css) {
+  if (decodeCss(css).toLowerCase().includes('data-pen-style')) unsupported('Authored CSS contains a projection-only style carrier name; ambiguous references are not converted.');
+}
 
 const slug = text => String(text).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '');
 
-/** Theme tokens for the PEN color variables; a color used by exactly one variable can then refer to its token. */
-function colorTokens(variables) {
-  const tokens = {}, byColor = new Map();
+/** Keep authored tokens and explicit colour variables separate; never infer a variable from a matching literal. */
+function colorTokens(variables, inherited, theme = {}) {
+  const tokens = { ...inherited };
   for (const [name, variable] of Object.entries(variables || {})) {
     if (variable?.type !== 'color' || typeof variable.value !== 'string' || !/^#[0-9a-f]{3,8}$/i.test(variable.value)) continue;
     const token = `--color-${slug(name) || 'color'}`;
-    if (Object.hasOwn(tokens, token)) continue;
+    const alias = theme[token];
+    const sameVariable = alias === `$${name}` || alias?.variable === name && !alias.unit;
+    if (Object.hasOwn(tokens, token) && !sameVariable) unsupported('Colour variables require distinct native token names; ambiguous aliases are not converted.');
     tokens[token] = variable.value;
-    const key = variable.value.toLowerCase();
-    byColor.set(key, byColor.has(key) ? null : token);
   }
-  return { tokens, colorOf: value => byColor.get(value.toLowerCase()) ?? null };
+  return tokens;
 }
 
 function uniqueId(base, taken) {
@@ -38,33 +40,59 @@ function uniqueId(base, taken) {
   return id;
 }
 
-/** Re-express one projected frame: per-node style bundles become classes; everything PEN-specific is dropped. */
-function convertFrame(projection, id, colorOf) {
+/** Select a styling hook absent from authored attributes and CSS, including escaped references and inline attr(). */
+function styleAttribute(projections, tokens, css) {
+  const used = new Set();
+  const scan = css => { for (const match of decodeCss(css).toLowerCase().matchAll(/data-import-style(?:-\d+)?/g)) used.add(match[0]); };
+  scan(css);
+  for (const value of Object.values(tokens)) scan(value);
+  for (const { document } of projections) {
+    scan(document.css);
+    for (const value of Object.values(document.tokens)) scan(value);
+    for (const node of Object.values(document.nodes)) if (node.type === 'element') {
+      for (const name of Object.keys(node.attrs)) used.add(name.toLowerCase());
+      for (const value of Object.values(node.style)) scan(value);
+    }
+  }
+  let name = 'data-import-style';
+  for (let suffix = 2; used.has(name); suffix++) name = `data-import-style-${suffix}`;
+  return name;
+}
+
+/** Preserve declaration order/priority in ordinary CSS; remove projection-only metadata and attributes. */
+function convertFrame(projection, id, attribute) {
   const { document } = projection;
   const sheet = postcss.parse(document.css);
   const bundles = new Map(), residual = [];
   for (const rule of sheet.nodes) {
     const match = rule.type === 'rule' && /^\[data-pen-style="([^"]+)"\]$/.exec(rule.selector);
-    if (match && rule.nodes.every(item => item.type === 'decl' && !item.important)) bundles.set(match[1], rule.nodes.map(item => [item.prop, item.value]));
-    else residual.push(rule.toString());
+    if (match && rule.nodes.every(item => item.type === 'decl')) {
+      bundles.set(match[1], rule.nodes.length);
+      residual.push(rule.clone({ selector: `[${attribute}="${match[1]}"]` }).toString());
+    } else {
+      refuseProjectionReferences(rule.toString());
+      residual.push(rule.toString());
+    }
   }
   const nodes = {}, origin = new Map();
-  let lowered = 0, arbitraryClasses = 0;
+  let declarations = 0;
   for (const [nodeId, node] of Object.entries(document.nodes)) {
     origin.set(nodeId, projection.provenance.get(nodeId) ?? null);
     if (node.type !== 'element') { nodes[nodeId] = structuredClone(node); if (node.type === 'text') delete nodes[nodeId].metadata?.pen; continue; }
     const attrs = { ...node.attrs };
     const key = attrs['data-pen-style'];
     delete attrs['data-pen-style'];
-    const classes = [];
-    for (const [property, value] of bundles.get(key) ?? []) {
-      for (const item of declarationClass(property, value, colorOf).split(' ')) { classes.push(item); if (item.startsWith('[')) arbitraryClasses++; else lowered++; }
+    if (key !== undefined) {
+      if (!bundles.has(key)) unsupported('A projection style reference has no matching declaration block.');
+      attrs[attribute] = key;
+      declarations += bundles.get(key);
     }
+    for (const value of Object.values(node.style)) refuseProjectionReferences(value);
     const metadata = { ...node.metadata };
     delete metadata.pen;
-    nodes[nodeId] = { ...structuredClone(node), attrs, className: [...new Set([...(node.className || '').split(/\s+/), ...classes])].filter(Boolean).join(' '), metadata };
+    nodes[nodeId] = { ...structuredClone(node), attrs, metadata };
   }
-  return { id, name: document.name, rootId: document.rootId, artboard: document.artboard, nodes, origin, residual, lowered, arbitraryClasses };
+  return { id, name: document.name, rootId: document.rootId, artboard: document.artboard, nodes, origin, residual, declarations };
 }
 
 /* ---- components: a PEN instance becomes a Divlet instance when it differs from its definition only by overrides ---- */
@@ -207,22 +235,25 @@ function variableReferences(variables, tokens) {
  */
 export function convertPen(input, { name, provenance } = {}) {
   const project = readProject(input);
-  const { tokens, colorOf } = colorTokens(project.source.variables);
+  const tokens = colorTokens(project.source.variables, project.settings.tokens, project.source.divlet?.theme);
   const taken = new Set(), shared = new Set(), converted = [];
   const reference = variableReferences(project.source.variables, tokens);
-  const stats = { frames: 0, nodes: 0, utilities: 0, arbitrary: 0, tokens: Object.keys(tokens).length, instances: 0 };
-  for (const root of project.source.children) {
-    const projection = sourceFrame(project, root.id, { reference });
-    const frame = convertFrame(projection, uniqueId(slug(projection.document.name) || slug(root.id) || 'frame', taken), colorOf);
+  const projections = project.source.children.map(root => sourceFrame(project, root.id, { reference, includeProjectCss: false }));
+  const attribute = styleAttribute(projections, tokens, project.settings.css);
+  refuseProjectionReferences(project.settings.css);
+  const stats = { frames: 0, nodes: 0, utilities: 0, arbitrary: 0, declarations: 0, tokens: Object.keys(tokens).length, instances: 0 };
+  for (const [index, root] of project.source.children.entries()) {
+    const projection = projections[index];
+    const frame = convertFrame(projection, uniqueId(slug(projection.document.name) || slug(root.id) || 'frame', taken), attribute);
     for (const rule of frame.residual) shared.add(rule);
-    stats.utilities += frame.lowered; stats.arbitrary += frame.arbitraryClasses;
+    stats.declarations += frame.declarations;
     converted.push(frame);
   }
   stats.instances = linkComponents(converted, reusableIds(project.source.children));
   const frames = converted.map(frame => validateDocument({ schemaVersion: 1, id: frame.id, name: frame.name, version: 1, rootId: frame.rootId, artboard: frame.artboard, tokens: {}, css: '', metadata: {}, nodes: frame.nodes }));
   stats.frames = frames.length;
   stats.nodes = frames.reduce((total, frame) => total + Object.keys(frame.nodes).length, 0);
-  const settings = validateSettings({ name, tokens, css: [...shared].join('\n'), metadata: provenance ? { import: provenance } : {} });
+  const settings = validateSettings({ name, tokens, css: [...shared, project.settings.css].filter(Boolean).join('\n'), metadata: provenance ? { import: provenance } : {} });
   return { text: writeProject(settings, frames), stats };
 }
 

@@ -154,7 +154,7 @@ The size check applies to the stored patch, not just the expanded result: a null
 
 ## Declarative styles
 
-A node patch may carry `styles: { property: value }`; this is an editing input, not a stored node field. Currently it delegates to the active style engine and reports `NO_STYLE_ENGINE` without one; direct `style` declarations remain available. The native fallback and cascade-preserving normalization required by the [target contract](web-native.md#tailwind-style-plugin) remain WEB-1 implementation work. The current PEN converter also uses the Tailwind declaration codec; decoupling it is WEB-2 work, not a new node syntax.
+A node patch may carry `styles: { property: value }`; this is an editing input, not a stored node field. Currently it delegates to the active style engine and reports `NO_STYLE_ENGINE` without one; direct `style` declarations remain available. The native fallback and cascade-preserving normalization required by the [target contract](web-native.md#tailwind-style-plugin) remain WEB-1 implementation work. PEN conversion now emits ordinary project CSS and data-attribute selector hooks without a declaration-to-class engine. This does not change node syntax or activate optional utility normalization; cold provider/bootstrap independence remains WEB-2 work.
 
 ## Approved embedded-resource ownership
 

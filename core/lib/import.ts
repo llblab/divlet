@@ -80,8 +80,8 @@ async function nativeImportText(text: string, file: string, projectDir: string):
 
 /**
  * Return the Divlet project that stands for `source`, converting it on first use.
- * `{ file, created, frames, utilities, arbitrary }`: counts of converted frames and of Tailwind utility / arbitrary-property
- * classes written (zero for an existing project).
+ * `{ file, created, frames, utilities, arbitrary }`: converted frame count plus legacy utility/arbitrary-class counters.
+ * CSS-native importers leave class-normalization counts at zero; existing projects report zero counts.
  */
 export async function importSource(input: string, importer?: SourceReader): Promise<ImportResult> {
   const source = path.resolve(input);

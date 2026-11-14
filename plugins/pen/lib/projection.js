@@ -47,9 +47,9 @@ export function sourceFrame(input, rootId, options = {}) {
 /**
  * `options.reference(name, type, unit)` lets the caller keep variables live: for a `$name` property it returns the CSS to
  * use (typically `var(--token)`, declaring the token itself) or null to inline the literal. Without it every variable is
- * resolved to its literal value.
+ * resolved to its literal value. `includeProjectCss: false` leaves shared authored CSS with the converter for final ordering.
  */
-function sourceFrameView(project, rootId, { reference } = {}) {
+function sourceFrameView(project, rootId, { reference, includeProjectCss = true } = {}) {
   const settings = project.settings;
   const view = materializeProject(project, { rootIds: [rootId] });
   const root = view.roots[0];
@@ -313,7 +313,7 @@ function sourceFrameView(project, rootId, { reference } = {}) {
   };
   if (icons) warn('ICON_LIBRARY_POLICY', 'Lucide 1.67.0 with stroke width 2 is used; the PEN document does not pin an icon-library version.', rootId);
   const name = String(root.properties.name || rootId).slice(0, 512);
-  const css = `${icons ? `/*! Lucide 1.67.0 (ISC/MIT)\n${ICON_LICENSE.replaceAll('*/', '* /')}*/\n` : ''}html,body{margin:0;padding:0;font-family:system-ui,sans-serif}*{box-sizing:border-box}\n${[...styles.values()].map(({ key, declarations }) => `[data-pen-style="${key}"]{${declarations}}`).join('\n')}\n${settings.css}`;
+  const css = `${icons ? `/*! Lucide 1.67.0 (ISC/MIT)\n${ICON_LICENSE.replaceAll('*/', '* /')}*/\n` : ''}html,body{margin:0;padding:0;font-family:system-ui,sans-serif}*{box-sizing:border-box}\n${[...styles.values()].map(({ key, declarations }) => `[data-pen-style="${key}"]{${declarations}}`).join('\n')}\n${includeProjectCss ? settings.css : ''}`;
   const document = validateDocument({ schemaVersion: 1, id: `pen-${digest(rootId)}`, name, version: 1, rootId: rootIdView, artboard: { x: rawRoot.x === undefined ? 0 : number(rawRoot.x), y: rawRoot.y === undefined ? 0 : number(rawRoot.y), width: viewport('width', 1280), height: viewport('height', 800) }, nodes, tokens: settings.tokens, css, metadata: { ...root.properties.divlet?.metadata, pen: { rootId, projection: true, presentation: htmlRoot ? 'html' : 'native', ...(htmlRoot ? { viewport: { width: rawRoot.divlet.viewport.width, height: rawRoot.divlet.viewport.height }, viewportEditable: ['frame', 'text', 'rectangle'].includes(rawRoot.type) && !!rawRoot.divlet?.html } : {}), intrinsicHeight: htmlRoot ? rawRoot.divlet.viewport.height === 'content' : root.type === 'frame' && (root.properties.height === undefined || typeof root.properties.height === 'string' && /^fit_content(?:\([^)]*\))?$/.test(root.properties.height)) } } }, { limits: PROJECTION_LIMITS });
   return { format: 'pen-projection', document, provenance, diagnostics };
 }

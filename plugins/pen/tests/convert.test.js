@@ -1,27 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { declarationClass, convertPen } from '../lib/convert.js';
+import { convertPen } from '../lib/convert.js';
+import postcss from 'postcss';
+import { styleEngine, setStyleEngines } from '../../../core/lib/engine.ts';
 
-test('declarations become Tailwind utilities, and anything without a utility an arbitrary-property class', () => {
-  const c = (property, value, colorOf) => declarationClass(property, value, colorOf);
-  assert.equal(c('display', 'flex'), 'flex');
-  assert.equal(c('flex-direction', 'column'), 'flex-col');
-  assert.equal(c('align-items', 'flex-end'), 'items-end');
-  assert.equal(c('justify-content', 'space-between'), 'justify-between');
-  assert.equal(c('width', '100%'), 'w-full');
-  assert.equal(c('width', '320px'), 'w-[320px]');
-  assert.equal(c('gap', '8px'), 'gap-[8px]');
-  assert.equal(c('padding', '16px'), 'p-[16px]');
-  assert.equal(c('padding', '8px 16px'), 'py-[8px] px-[16px]');
-  assert.equal(c('padding', '1px 2px 3px 4px'), 'pt-[1px] pr-[2px] pb-[3px] pl-[4px]');
-  assert.equal(c('font-size', '14px'), 'text-[length:14px]');
-  assert.equal(c('border-radius', '12px'), 'rounded-[12px]');
-  assert.equal(c('background-color', '#15131E'), 'bg-[#15131E]');
-  assert.equal(c('color', '#15131E', () => '--color-ink'), 'text-[color:var(--color-ink)]');
-  assert.equal(c('font-family', '"Inter", system-ui, sans-serif'), '[font-family:"Inter",_system-ui,_sans-serif]');
-  assert.equal(c('box-shadow', '0 1px 2px rgba(0,0,0,.2)'), '[box-shadow:0_1px_2px_rgba(0,0,0,.2)]');
-  assert.equal(c('content', '"a_b"'), '[content:"a\\_b"]', 'a literal underscore is escaped');
-});
+const original = styleEngine();
+test.before(() => setStyleEngines([]));
+test.after(() => setStyleEngines([original]));
+const declarationsFor = (project, node) => postcss.parse(project.css).nodes.find(rule => rule.selector === `[data-import-style="${node.attrs['data-import-style']}"]`).nodes.map(item => [item.prop, item.value]);
 
 test('conversion covers every native node kind and leaves no PEN-specific carrier behind', () => {
   const source = { version: '2.21', children: [
@@ -36,7 +22,9 @@ test('conversion covers every native node kind and leaves no PEN-specific carrie
   assert.equal(stats.frames, 1);
   assert.equal(project.frames.length, 1);
   assert.ok(!text.includes('data-pen-'), 'no data-pen attributes');
-  assert.ok(stats.utilities > 0);
+  assert.ok(stats.declarations > 0);
+  assert.equal(stats.utilities, 0);
+  assert.equal(stats.arbitrary, 0);
 });
 
 test('instances that differ from their component only by overrides stay instances with overrides', () => {
@@ -69,9 +57,8 @@ test('variables stay live: colour, length, number and font variables become toke
   assert.equal(project.tokens['--weight-bold'], '700');
   assert.equal(project.tokens['--font-family'], '"Inter",system-ui,sans-serif');
   assert.equal(project.tokens['--color-ink'], '#112233');
-  const classes = Object.values(project.frames[0].nodes).map(node => node.className || '').join(' ');
-  for (const reference of ['var(--space-2)', 'var(--line-body)', 'var(--weight-bold)', 'var(--font-family)', 'var(--color-ink)']) assert.ok(classes.includes(reference), reference);
-  assert.ok(!classes.includes('[8px]') && !classes.includes('#112233'), 'no literal copy of a variable value');
+  for (const reference of ['var(--space-2)', 'var(--line-body)', 'var(--weight-bold)', 'var(--font-family)', 'var(--color-ink)']) assert.ok(project.css.includes(reference), reference);
+  assert.ok(Object.values(project.frames[0].nodes).every(node => !node.className), 'no generated utility classes');
 });
 
 test('nested instances stay instances: an instance of a component that contains instances is linked, with overrides addressed through the nested one', async () => {
@@ -99,4 +86,44 @@ test('nested instances stay instances: an instance of a component that contains 
   const { document } = expandFrame(page, id => lookup.get(id), settings);
   const texts = Object.values(document.nodes).filter(node => node.type === 'text').map(node => node.content);
   assert.deepEqual(texts, ['Title', 'Open', 'Second', 'Buy']);
+});
+
+test('literal colours stay literal; only authored variable references become live CSS', () => {
+  const source = { version: '2.21', variables: { ink: { type: 'color', value: '#112233' } }, children: [{ id: 'f', type: 'frame', width: 200, height: 100, children: [
+    { id: 'literal', name: 'Literal', type: 'rectangle', width: 20, height: 20, fill: '#112233' },
+    { id: 'variable', name: 'Variable', type: 'rectangle', x: 30, width: 20, height: 20, fill: '$ink' },
+  ] }] };
+  const before = structuredClone(source);
+  const project = JSON.parse(convertPen(source).text);
+  const node = name => Object.values(project.frames[0].nodes).find(node => node.metadata.name === name);
+  assert.ok(declarationsFor(project, node('Literal')).some(([property, value]) => property === 'background-color' && value === '#112233'));
+  assert.ok(declarationsFor(project, node('Variable')).some(([property, value]) => property === 'background-color' && value === 'var(--color-ink)'));
+  assert.deepEqual(source, before);
+});
+
+test('native styling hooks avoid authored attributes and escaped CSS without changing classes or inline priority', () => {
+  const source = { version: '2.21', variables: { ink: { type: 'color', value: '#112233' } }, divlet: { theme: { '--app-accent': '$ink' }, css: String.raw`[data-import-st\79 le-2]{opacity:.1}.paint{color:var(--app-accent)}` }, children: [{ id: 'f', type: 'frame', width: 100, height: 100, fill: '#eee', divlet: { className: 'paint', attrs: { 'data-import-style': 'authored' }, style: { 'padding-left': '3px !important' } } }] };
+  const project = JSON.parse(convertPen(source).text), frame = project.frames[0], root = frame.nodes[frame.rootId];
+  assert.equal(root.className, 'paint');
+  assert.equal(root.attrs['data-import-style'], 'authored');
+  assert.match(root.attrs['data-import-style-3'], /^[a-f0-9]{20}$/);
+  assert.equal(root.style['padding-left'], '3px !important');
+  assert.equal(project.tokens['--app-accent'], '#112233');
+  assert.ok(project.css.endsWith(source.divlet.css), 'authored shared CSS follows every generated frame rule');
+});
+
+test('token namespace aliases are reused only for a proven identical variable', () => {
+  const source = { version: '2.21', variables: { ink: { type: 'color', value: '#112233' }, other: { type: 'color', value: '#445566' } }, divlet: { theme: { '--color-ink': '$ink' } }, children: [{ id: 'f', type: 'frame', width: 100, height: 100, fill: '$ink' }] };
+  assert.equal(JSON.parse(convertPen(source).text).tokens['--color-ink'], '#112233');
+  source.divlet.theme['--color-ink'] = '$other';
+  const before = structuredClone(source);
+  assert.throws(() => convertPen(source), { code: 'UNSUPPORTED_PEN_RENDER' });
+  assert.deepEqual(source, before);
+});
+
+test('projection-only CSS references refuse conversion rather than silently losing their target', () => {
+  const source = { version: '2.21', divlet: { css: '[data-pen-style]{opacity:.5}' }, children: [{ id: 'f', type: 'frame', width: 100, height: 100 }] };
+  const before = structuredClone(source);
+  assert.throws(() => convertPen(source), { code: 'UNSUPPORTED_PEN_RENDER' });
+  assert.deepEqual(source, before);
 });

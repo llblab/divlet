@@ -81,3 +81,24 @@ test('a project colour name is a colour class: bg-brand and text-paper are repla
   assert.equal(propertyOfClass('bg-brand'), null, 'without the theme a bare name stays unknown');
   assert.equal(propertyOfClass('bg-brand', names), 'background-color');
 });
+
+test('declarations become Tailwind utilities, and anything without a utility an arbitrary-property class', () => {
+  const c = (property, value, colorOf) => declarationClass(property, value, colorOf);
+  assert.equal(c('display', 'flex'), 'flex');
+  assert.equal(c('flex-direction', 'column'), 'flex-col');
+  assert.equal(c('align-items', 'flex-end'), 'items-end');
+  assert.equal(c('justify-content', 'space-between'), 'justify-between');
+  assert.equal(c('width', '100%'), 'w-full');
+  assert.equal(c('width', '320px'), 'w-[320px]');
+  assert.equal(c('gap', '8px'), 'gap-[8px]');
+  assert.equal(c('padding', '16px'), 'p-[16px]');
+  assert.equal(c('padding', '8px 16px'), 'py-[8px] px-[16px]');
+  assert.equal(c('padding', '1px 2px 3px 4px'), 'pt-[1px] pr-[2px] pb-[3px] pl-[4px]');
+  assert.equal(c('font-size', '14px'), 'text-[length:14px]');
+  assert.equal(c('border-radius', '12px'), 'rounded-[12px]');
+  assert.equal(c('background-color', '#15131E'), 'bg-[#15131E]');
+  assert.equal(c('color', '#15131E', () => '--color-ink'), 'text-[color:var(--color-ink)]');
+  assert.equal(c('font-family', '"Inter", system-ui, sans-serif'), '[font-family:"Inter",_system-ui,_sans-serif]');
+  assert.equal(c('box-shadow', '0 1px 2px rgba(0,0,0,.2)'), '[box-shadow:0_1px_2px_rgba(0,0,0,.2)]');
+  assert.equal(c('content', '"a_b"'), '[content:"a\\_b"]', 'a literal underscore is escaped');
+});

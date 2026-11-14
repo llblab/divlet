@@ -8,6 +8,7 @@ import { importSource as importPen, importedName } from '../lib/import.ts';
 import { launch } from '../lib/launch.ts';
 import { listProjects, resolveProject } from '../lib/projects.ts';
 import { openRuntime } from '../lib/runtime.js';
+import { LIMITS } from '../lib/model.ts';
 
 const simple = () => ({ version: '2.21', fileToken: 'private-token', variables: { 'ink/primary': { type: 'color', value: '#123456' } }, children: [
   { id: 'page', type: 'frame', name: 'Landing Page', x: 0, y: 0, width: 320, height: 200, layout: 'vertical', padding: 16, gap: 8, fill: '#e8d5a8', children: [
@@ -30,7 +31,8 @@ test('opening a .pen converts it into a sibling Divlet project and leaves the .p
   const result = await importPen(pen);
   assert.equal(result.file, path.join(dir, 'landing.divlet')); assert.equal(importedName(pen), result.file);
   assert.equal(result.created, true); assert.equal(result.frames, 3);
-  assert.ok(result.utilities > 0);
+  assert.equal(result.utilities, 0);
+  assert.equal(result.arbitrary, 0);
   assert.equal(await fs.readFile(pen, 'utf8'), text, 'the PEN file is never rewritten');
   const project = JSON.parse(await fs.readFile(result.file, 'utf8'));
   assert.equal(project.schemaVersion, 1, 'a Divlet project, not a PEN document');
@@ -40,9 +42,9 @@ test('opening a .pen converts it into a sibling Divlet project and leaves the .p
   const page = project.frames[0], serialized = JSON.stringify(page);
   assert.ok(!serialized.includes('data-pen-style') && !serialized.includes('"pen"'), 'no PEN style bundles or provenance remain');
   const root = page.nodes[page.rootId];
-  for (const expected of ['flex', 'flex-col', 'gap-[8px]', 'p-[16px]', 'w-[320px]', 'bg-[#e8d5a8]']) assert.ok(root.className.split(' ').includes(expected), `${expected} in ${root.className}`);
-  const title = Object.values(page.nodes).find(node => node.type === 'element' && node.className.includes('text-[length:14px]'));
-  assert.ok(title.className.includes('text-[color:var(--color-ink-primary)]'), 'a literal that is one variable\'s value refers to its token');
+  assert.equal(root.className, '', 'the importer does not generate utility classes');
+  assert.match(root.attrs['data-import-style'], /^[a-f0-9]{20}$/);
+  for (const declaration of ['display:flex', 'flex-direction:column', 'gap:8px', 'padding:16px', 'width:320px', 'background-color:#e8d5a8', 'font-size:14px', 'color:var(--color-ink-primary)']) assert.ok(project.css.includes(declaration), declaration);
   const screen = project.frames[2], instance = Object.values(screen.nodes).find(node => node.type === 'ref');
   assert.ok(instance, 'a component instance stays an instance of its component');
   const definition = Object.values(project.frames[1].nodes).find(node => node.reusable === true);
@@ -86,6 +88,29 @@ test('invalid or unsupported PEN sources are not converted: nothing is created a
   const opened = [];
   const result = await launch(pen, { openBoard: async location => { opened.push(location.file); return { info: () => ({ url: 'x' }) }; } });
   assert.equal(result.kind, 'project'); assert.deepEqual(opened, [pen]); assert.equal(result.imported, undefined);
+});
+
+test('ambiguous projection CSS refuses sibling publication while retaining foreign source bytes', async t => {
+  const dir = await workspace(t), pen = path.join(dir, 'ambiguous.pen');
+  const input = simple(); input.divlet = { css: '[data-pen-style]{opacity:.5}' };
+  const bytes = JSON.stringify(input, null, 1);
+  await fs.writeFile(pen, bytes);
+  await assert.rejects(importPen(pen), { code: 'UNSUPPORTED_PEN_RENDER' });
+  assert.equal(await fs.readFile(pen, 'utf8'), bytes);
+  await assert.rejects(fs.lstat(path.join(dir, 'ambiguous.divlet')), { code: 'ENOENT' });
+  const opened = [];
+  await launch(pen, { openBoard: async location => { opened.push(location.file); return { info: () => ({ url: 'x' }) }; } });
+  assert.deepEqual(opened, [pen]);
+});
+
+test('native CSS capacity refusal retains source and creates no partial project', async t => {
+  const dir = await workspace(t), pen = path.join(dir, 'capacity.pen');
+  const input = simple(); input.divlet = { css: '/*' + 'x'.repeat(LIMITS.text - 4) + '*/' };
+  const bytes = JSON.stringify(input);
+  await fs.writeFile(pen, bytes);
+  await assert.rejects(importPen(pen), { code: 'INVALID_DOCUMENT' });
+  assert.equal(await fs.readFile(pen, 'utf8'), bytes);
+  await assert.rejects(fs.lstat(path.join(dir, 'capacity.divlet')), { code: 'ENOENT' });
 });
 
 test('launch opens the converted project, reports the import once and reuses it afterwards', async t => {

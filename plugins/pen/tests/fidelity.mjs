@@ -1,5 +1,5 @@
 // Pixel fidelity of the PEN converter: every root frame of a .pen is rendered twice in a real browser, once from the
-// native PEN projection and once from the converted Divlet frame (HTML + Tailwind), and the screenshots must be identical.
+// native PEN projection and once from the converted Divlet frame (ordinary HTML/SVG/CSS), and screenshots must be identical.
 //   npm run test:pen-fidelity -- file.pen [file.pen ...]   (explicit caller-owned input required)
 //   PI_DIVLET_FIDELITY_LIMIT=10 node ...                    (compare only the first N frames of each file)
 import assert from 'node:assert/strict';
@@ -11,10 +11,13 @@ import { sourceFrame } from '../lib/projection.js';
 import { readProject as readSource } from '../lib/source.js';
 import { readProject } from '../../../core/lib/project.ts';
 import { prepareFrame } from '../../../core/lib/render.ts';
+import { setStyleEngines } from '../../../core/lib/engine.ts';
 
-const files = process.argv.slice(2);
+const noEngine = process.argv.includes('--no-engine');
+if (noEngine) setStyleEngines([]);
+const files = process.argv.slice(2).filter(value => value !== '--no-engine');
 if (!files.length) {
-  console.error('Usage: npm run test:pen-fidelity -- file.pen [file.pen ...]');
+  console.error('Usage: npm run test:pen-fidelity -- [--no-engine] file.pen [file.pen ...]');
   process.exit(2);
 }
 const limit = Number(process.env.PI_DIVLET_FIDELITY_LIMIT) || Infinity;
@@ -60,5 +63,5 @@ try {
 
 // A flat (single-colour) screenshot would make an identical match meaningless, so it counts as a failure too.
 const bad = report.filter(item => !item.size || item.different > 0 || item.flat);
-console.log(JSON.stringify({ status: bad.length ? 'failed' : 'passed', frames: report.length, differing: bad }, null, 1));
+console.log(JSON.stringify({ status: bad.length ? 'failed' : 'passed', noEngine, frames: report.length, differing: bad }, null, 1));
 assert.equal(bad.length, 0, 'converted frames render pixel-identically to the native projection');
