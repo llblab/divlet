@@ -424,6 +424,14 @@ window.addEventListener('scroll', hideTip, true);
 /* Panel widths: the inspector and the sidebar can be dragged wider or narrower. */
 // The inspector is as wide as the toolbar under it until the user drags its edge; a double-click on the edge returns to that.
 resizable($('#inspector'), { side: 'right', key: 'inspector', cssVar: '--inspector-w', min: 280, max: 640, follow: dock, fallback: () => Math.round(dock.getBoundingClientRect().width / uiScale()) || 336 });
-resizable($('#sidebar'), { side: 'left', key: 'sidebar', cssVar: '--sidebar-w', min: 240, max: 560, fallback: 300 });
+const brand = $('#brand');
+let sidebarBase = 300;
+const sidebarWidth = () => {
+  const measured = brand.getBoundingClientRect().width / uiScale();
+  // Expanded viewing hides the row; retain its last measured width until it is visible again.
+  if (measured > 0) sidebarBase = Math.round(measured);
+  return sidebarBase;
+};
+resizable($('#sidebar'), { side: 'left', key: 'sidebar', cssVar: '--sidebar-w', min: sidebarWidth, max: 560, fallback: sidebarWidth, follow: brand });
 
 on('edit-step', info => actions.stepEdit(info));

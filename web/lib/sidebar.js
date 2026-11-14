@@ -54,7 +54,7 @@ if (inspector) new MutationObserver(paintPanels).observe(inspector, { attributes
 function measure() {
   // Density thresholds are interface pixels, not the scaled screen pixels returned by the rectangle.
   const width = panel.hidden ? 0 : panel.getBoundingClientRect().width / uiScale();
-  // The sidebar's own floor is 240px (resize.js), so the steps live inside that range: tiny 240–264, narrow 265–319.
+  // Density follows the rendered width, independently of the header-derived minimum or saved preference.
   const size = width && width < 265 ? 'tiny' : width && width < 320 ? 'narrow' : 'wide';
   if (document.documentElement.dataset.sidebar !== size) {
     document.documentElement.dataset.sidebar = size;

@@ -113,7 +113,8 @@ try {
   assert.ok(Math.abs(labelBefore.x - labelAfter.x) < 0.6 && Math.abs(labelBefore.y - labelAfter.y) < 0.6,
     `a tab label does not move when the sidebar opens (${labelBefore.x},${labelBefore.y} → ${labelAfter.x},${labelAfter.y})`);
   assert.ok(Math.abs(side.width - t2.width) < 1 && side.bottom <= t2.y + 2 && t2.y - side.bottom < 3, 'open: the tabs join the sidebar into one panel');
-  assert.ok(side.y >= b2.bottom + 4 && Math.abs(b2.width - side.width) > 20, 'the logo and search stay separate islands, not tied to the sidebar width');
+  assert.ok(side.y >= b2.bottom + 4 && Math.abs(b2.x - side.x) < 1 && Math.abs(b2.right - side.right) <= 1, `the default sidebar aligns with the complete DIVLET/search row: ${JSON.stringify({ brand: b2, sidebar: side })}`);
+  await page.screenshot({ path: 'artifacts/sidebar-aligned.png', clip: { x: 0, y: 0, width: Math.ceil(b2.right + 10), height: 860 } });
   assert.equal(await page.locator('#activity .chip').count(), 0);
   await page.locator('#open-history').click();
   assert.equal(await page.locator('#activity').isVisible(), true); assert.equal(await page.locator('#layers').isVisible(), false);
@@ -125,12 +126,21 @@ try {
   assert.equal(await page.locator('#open-agent').getAttribute('aria-selected'), 'false');
   checks.push('the logo/search islands stay put, the tabs join the sidebar when it opens; a tab switches panes and, when open, folds the sidebar while the tabs and logo row stay');
 
-  // The actual 240px edge resize must keep complete labels, even with counters, open or folded.
+  // The measured header is the floor; manual widening still stops at the existing 560px maximum.
   await page.locator('#open-agent').click();
-  const edge = await page.locator('.resize-handle[data-panel="sidebar"]').boundingBox();
+  const grip = page.locator('.resize-handle[data-panel="sidebar"]');
+  const start = await grip.boundingBox();
+  await page.mouse.move(start.x + 4, start.y + start.height / 2); await page.mouse.down();
+  await page.mouse.move(start.x + 1000, start.y + start.height / 2, { steps: 6 }); await page.mouse.up();
+  await waitUntil(async () => Math.abs((await rect(page, '#sidebar')).width - 560) < 1, 'sidebar retains its 560px maximum');
+  assert.equal(await grip.getAttribute('aria-valuemax'), '560');
+  assert.deepEqual(await rect(page, '#brand'), b2, 'widening the sidebar never moves or stretches the top buttons');
+  const minimum = Math.round((await rect(page, '#brand')).width);
+  assert.equal(await grip.getAttribute('aria-valuemin'), String(minimum));
+  const edge = await grip.boundingBox();
   await page.mouse.move(edge.x + 4, edge.y + edge.height / 2); await page.mouse.down();
-  await page.mouse.move(edge.x - 160, edge.y + edge.height / 2, { steps: 6 }); await page.mouse.up();
-  await waitUntil(async () => Math.abs((await rect(page, '#sidebar')).width - 240) < 1, 'sidebar reaches its 240px minimum');
+  await page.mouse.move(10, edge.y + edge.height / 2, { steps: 6 }); await page.mouse.up();
+  await waitUntil(async () => Math.abs((await rect(page, '#sidebar')).width - minimum) < 1, 'sidebar stops at the complete DIVLET/search row width');
   await page.evaluate(() => { for (const [id, count] of [['diag-count', '1234'], ['agent-count', '99+']]) { const n = document.getElementById(id); n.hidden = false; n.textContent = count; } });
   for (const mode of ['board', 'frame', 'node']) {
     const scope = await page.evaluate(async mode => {
@@ -152,7 +162,7 @@ try {
   }
   await page.locator('#open-agent').click(); await page.locator('.resize-handle[data-panel="sidebar"]').dblclick(); await page.locator('#open-agent').click();
   await page.evaluate(() => { document.getElementById('diag-count').hidden = true; document.getElementById('agent-count').hidden = true; });
-  checks.push('all tab labels and counters fit at the actual 240px minimum; folding preserves their layout');
+  checks.push('the default and draggable minimum align with DIVLET/search, the maximum remains 560px, and full tab labels/counters keep their layout when folded');
 
   const inspector = await rect(page, '#inspector'), tools = await rect(page, '#dock');
   assert.ok(inspector && inspector.bottom <= tools.y - 4 && inspector.bottom >= tools.y - 16 && inspector.right <= tools.right + 1 && inspector.right >= tools.right - 4, 'the inspector sits just above the tools, attached to the bottom right');
@@ -174,6 +184,22 @@ try {
   assert.ok(await rect(page, '#crumbs'), 'the path stays at the bottom centre while the Agent tab is open');
   await page.close();
   checks.push('a narrow bottom row keeps the end of the path; the Agent tab repeats the path in its composer');
+
+  // Logical measurements include both button borders and their gap, at every supported interface scale.
+  const scaled = await open(2600, 1000);
+  await scaled.locator('#open-layers').click();
+  for (const size of [100, 125, 150, 175, 200]) {
+    await scaled.evaluate(async size => (await import('./lib/help.js')).setUiSize(size), size);
+    await waitUntil(async () => {
+      const row = await rect(scaled, '#brand'), panel = await rect(scaled, '#sidebar');
+      return Math.abs(row.x - panel.x) < 1 && Math.abs(row.right - panel.right) <= 1;
+    }, `default left-column edges align at ${size}%`);
+    const row = await rect(scaled, '#brand');
+    assert.equal(await scaled.locator('.resize-handle[data-panel="sidebar"]').getAttribute('aria-valuemin'), String(Math.round(row.width / (size / 100))));
+    assert.equal(await scaled.evaluate(() => localStorage.getItem('divlet:width:sidebar')), null, 'automatic measurement never creates a preference');
+  }
+  await scaled.close();
+  checks.push('the default left column and live minimum follow the measured button row at 100/125/150/175/200% without storing automatic widths');
 
   /* ---- phone -------------------------------------------------------------- */
   const phone = await open(390, 800);

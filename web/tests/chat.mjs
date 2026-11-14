@@ -101,7 +101,10 @@ try {
       assert.ok(Math.abs(await page.locator('.agent-composer').evaluate(n => n.getBoundingClientRect().top) - composerTop) <= 1, 'conversation growth never moves the composer');
 
       if (width === 1280) {
-        const edge = await page.locator('.resize-handle[data-panel="sidebar"]').boundingBox();
+        // The default is already the minimum: widen first so the following drag really narrows the conversation.
+        const grip = page.locator('.resize-handle[data-panel="sidebar"]');
+        await grip.focus(); await grip.press('Shift+ArrowRight'); await grip.press('Shift+ArrowRight'); await bottom();
+        const edge = await grip.boundingBox();
         const previousWidth = await list.evaluate(n => n.clientWidth);
         await page.mouse.move(edge.x + 4, edge.y + edge.height / 2); await page.mouse.down();
         await page.mouse.move(edge.x - 100, edge.y + edge.height / 2, { steps: 6 }); await page.mouse.up();

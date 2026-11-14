@@ -100,6 +100,11 @@ try {
         await waitUntil(async () => Math.abs(await size(key) - wanted) < 1, 'cancellation restores preferred width');
       }
     }
+    await memory.locator('#brand').evaluate(node => { node.style.gap = '240px'; });
+    await waitUntil(async () => Math.abs(await size('sidebar') - await memory.locator('#brand').evaluate(node => Math.round(node.getBoundingClientRect().width))) < 1, 'a larger header raises the live minimum even for a saved width');
+    assert.equal(await saved('sidebar'), '432', 'the changing minimum must not rewrite the saved choice');
+    await memory.locator('#brand').evaluate(node => { node.style.gap = ''; });
+    await waitUntil(async () => Math.abs(await size('sidebar') - 432) < 1, 'a smaller header restores the user preference rather than following the default');
     await memory.reload(); await prepare();
     for (const [key, wanted] of [['sidebar', 432], ['inspector', 608]]) await waitUntil(async () => Math.abs(await size(key) - wanted) < 1, `${key} survives reload (stored ${await saved(key)})`);
     await memory.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', ['nav']));
@@ -117,11 +122,14 @@ try {
     }
     for (const [key, wanted] of [['sidebar', 432], ['inspector', 608]]) await waitUntil(async () => Math.abs(await size(key) - wanted) < 1, `${key}: wide/100% restores the original choice after clamping/sheet layout`);
     const sibling = await context.newPage(); await sibling.goto(runtime.info().url);
+    await sibling.evaluate(() => localStorage.setItem('divlet:width:sidebar', '200'));
+    await waitUntil(async () => Math.abs(await size('sidebar') - await memory.locator('#brand').evaluate(node => Math.round(node.getBoundingClientRect().width))) < 1, 'an older narrow preference is constrained to the measured minimum');
+    assert.equal(await saved('sidebar'), '200', 'rendering a new minimum must not migrate the stored preference');
     await sibling.evaluate(() => localStorage.setItem('divlet:width:sidebar', '448'));
     await waitUntil(async () => Math.abs(await size('sidebar') - 448) < 1, 'same-origin storage updates are authoritative in an already open tab');
     for (const invalid of ['Infinity', '-1', 'not a number']) {
       await sibling.evaluate(value => localStorage.setItem('divlet:width:sidebar', value), invalid);
-      await waitUntil(async () => Math.abs(await size('sidebar') - 300) < 1, 'invalid stored values cannot mask the default');
+      await waitUntil(async () => Math.abs(await size('sidebar') - await memory.locator('#brand').evaluate(node => Math.round(node.getBoundingClientRect().width))) < 1, 'invalid stored values cannot mask the measured header default');
     }
     await sibling.close();
     for (const key of ['sidebar', 'inspector']) { await memory.locator(`.resize-handle[data-panel="${key}"]`).dblclick(); assert.equal(await saved(key), null, 'explicit reset clears the preference'); }

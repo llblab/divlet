@@ -12,6 +12,7 @@ const store = {
  * `panel` hugs `side` of the window; `cssVar` carries its width (the stylesheet reads it).
  * `fallback` is the default width (a number or a function returning one); while the user has not set a width the panel keeps
  * it, and when `follow` is given it tracks that element's width (the inspector is as wide as the toolbar under it).
+ * `min` may also be a function; changes to `follow` then refresh that bound even for a saved width.
  * Double-clicking the handle returns to the default. Returns { width() } for tests.
  */
 export function resizable(panel, { side, key, cssVar, min = 260, max = 640, fallback, follow }) {
@@ -30,8 +31,9 @@ export function resizable(panel, { side, key, cssVar, min = 260, max = 640, fall
   let preferred = store.get(key);
   let width = preferred ?? base();
   // Widths are layout pixels of the scaled interface; the pointer and rectangles are screen pixels.
-  const limit = () => Math.max(min, Math.min(max, innerWidth / uiScale() - 20 - 120));
-  const apply = value => { width = clamp(Math.round(value), min, limit()); document.documentElement.style.setProperty(cssVar, `${width}px`); place(); };
+  const minimum = () => Math.min(max, typeof min === 'function' ? min() : min);
+  const limit = () => Math.max(minimum(), Math.min(max, innerWidth / uiScale() - 20 - 120));
+  const apply = value => { width = clamp(Math.round(value), minimum(), limit()); document.documentElement.style.setProperty(cssVar, `${width}px`); place(); };
   // Constraints affect the rendered width, never the remembered user choice.
   const restore = () => apply(preferred ?? base());
   const remember = () => { preferred = width; store.set(key, preferred); };
@@ -45,7 +47,7 @@ export function resizable(panel, { side, key, cssVar, min = 260, max = 640, fall
     handle.style.height = `${r.height}px`;
     handle.style.left = `${(side === 'right' ? r.left : r.right) - 4}px`;
     handle.setAttribute('aria-valuenow', String(width));
-    handle.setAttribute('aria-valuemin', String(min));
+    handle.setAttribute('aria-valuemin', String(minimum()));
     handle.setAttribute('aria-valuemax', String(limit()));
   }
 
@@ -100,7 +102,7 @@ export function resizable(panel, { side, key, cssVar, min = 260, max = 640, fall
   // Intro transforms do not resize the layout box; place the grip again at the final painted edge.
   for (const type of ['animationend', 'animationcancel']) panel.addEventListener(type, event => { if (event.target === panel) place(); });
   new MutationObserver(place).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
-  if (follow) new ResizeObserver(() => { if (preferred === null) restore(); }).observe(follow);
+  if (follow) new ResizeObserver(() => { if (preferred === null || typeof min === 'function') restore(); }).observe(follow);
   addEventListener('resize', restore);
   addEventListener('storage', event => {
     if (event.key !== null && event.key !== `divlet:width:${key}`) return;

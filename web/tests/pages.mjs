@@ -84,6 +84,11 @@ test('the static board opens the landing project with no backend', async () => {
   await page.click('#open-agent');
   await page.waitForSelector('#agent .ask-copy');
   assert.match(await page.locator('#agent').innerText(), /Connect an agent to this page/);
+  const columnEdges = await page.evaluate(() => {
+    const row = document.querySelector('#brand').getBoundingClientRect(), panel = document.querySelector('#sidebar').getBoundingClientRect();
+    return { left: Math.abs(row.left - panel.left), right: Math.abs(row.right - panel.right) };
+  });
+  assert.ok(columnEdges.left < 1 && columnEdges.right <= 1, 'the static board retains header-aligned defaults after its initially expanded view');
   assert.equal(await page.locator('#agent .chat-list .quiet').count(), 0, 'disconnected visitors are not told to start an unavailable conversation');
   const command = page.getByRole('textbox', { name: 'Agent connection command', exact: true });
   assert.equal(await command.count(), 1, 'the command is visible before it is copied');
