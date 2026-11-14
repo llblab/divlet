@@ -7,6 +7,8 @@ import { stripTypeScriptTypes } from 'node:module';
 import { chromium } from 'playwright';
 import { fileURLToPath } from 'node:url';
 import * as nodeModel from '../../core/lib/model.ts';
+import * as nodeCodec from '../../core/lib/codec.ts';
+import { cssCascadeCases, cascadeDocuments } from '../../core/tests/fixtures/css-cascade.js';
 import { captureFrame, frameCases, resourceFrame } from '../../core/tests/fixtures/frame-portability.js';
 import { prepareFrame } from '../../core/lib/render.ts';
 import { bundleBrowserModel, bundleBrowserCodec, bundleBrowserProject, bundleBrowserReplay, bundleBrowserAcceptance } from '../../scripts/browser-model.mjs';
@@ -36,6 +38,7 @@ const expectedHistoryReplay = historyReplayCases.map(({ name, run }) => ({ name,
 const expectedHistoryTraversal = historyTraversalCases.map(({ name, run }) => ({ name, result: captureHistoryTraversal({ planHistoryTraversal, replayHistory, readProject }, run) }));
 const expectedHistoryNavigation = historyNavigationCases.map(({ name, run }) => ({ name, result: captureHistoryNavigation({ HistoryLine, validateHistoryNavigation, planHistoryNavigation }, run) }));
 const expectedFrames = frameCases.map(({ name, run }) => ({ name, result: captureFrame(nodeModel, run) }));
+const expectedCssCascade = cssCascadeCases.flatMap(row => cascadeDocuments(nodeCodec, row).map(value => ({ name: row.name, ...value })));
 const publicSnapshot = await landingDemoSnapshot();
 const expectedScopeHtml = {};
 for (const row of scopeRenderCases) {
@@ -73,6 +76,8 @@ const files = new Map([
   [`${prefix}css-annotations.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/css-annotations.js', import.meta.url), 'utf8')]],
   [`${prefix}inline-css-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/inline-css.js', import.meta.url), 'utf8')]],
   [`${prefix}frames.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/frame-portability.js', import.meta.url), 'utf8')]],
+  [`${prefix}frame-portability.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/frame-portability.js', import.meta.url), 'utf8')]],
+  [`${prefix}css-cascade.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/css-cascade.js', import.meta.url), 'utf8')]],
   [`${prefix}read-session.js`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../lib/board-session.ts', import.meta.url), 'utf8'))]],
   [`${prefix}session-cases.js`, ['text/javascript', await readFile(new URL('./fixtures/board-session.js', import.meta.url), 'utf8')]],
   [`${prefix}public-snapshot.json`, ['application/json', JSON.stringify({ state: publicSnapshot.state, frames: [...publicSnapshot.frames] })]],
@@ -265,6 +270,16 @@ try {
       scopeRendering.push({ name: row.name, html, actual: { color: cs.color, background: cs.backgroundColor, width: cs.width, borderTop: cs.borderTopWidth, borderLeft: cs.borderLeftWidth, marginLeft: ls.marginLeft, paddingTop: ls.paddingTop, paddingBottom: ls.paddingBottom, paddingRight: ls.paddingRight, wordSpacing: ls.wordSpacing } });
       iframe.remove();
     }
+    const { cssCascadeCases, cascadeDocuments } = await import(new URL('css-cascade.js', location.href).href);
+    const cssCascade = [];
+    for (const row of cssCascadeCases) for (const specimen of cascadeDocuments(codec, row)) {
+      const iframe = document.createElement('iframe');
+      const loaded = new Promise(resolve => { iframe.onload = resolve; });
+      iframe.srcdoc = specimen.html; document.body.append(iframe); await loaded;
+      const element = iframe.contentDocument.querySelector('.sample');
+      cssCascade.push({ name: row.name, mode: specimen.mode, html: specimen.html, actual: iframe.contentWindow.getComputedStyle(element).color });
+      iframe.remove();
+    }
     const { inlineCssCases, captureInlineCss } = await import(new URL('inline-css-cases.js', location.href).href);
     const inlineCss = inlineCssCases.map(({ name, input, expected }) => ({ name, actual: captureInlineCss(codec, input), expected }));
     const parsedCssRendering = [
@@ -305,6 +320,7 @@ try {
       attributeReferences,
       componentScopes,
       scopeRendering,
+      cssCascade,
       inlineCss,
       parsedCssRendering,
       draftDuplicateRefusal,
@@ -366,6 +382,12 @@ try {
   assert.deepEqual(result.orderedCssPadding, ['10px', '20px'], 'validated declaration order survives the shared serializer and actual browser cascade');
   assert.ok(result.cases.length > 25, 'the shared acceptance/refusal regions are exercised');
   for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.references, ...result.requirements, ...result.nativeJson, ...result.nativeValues, ...result.nativeEquality, ...result.inlineCss, ...result.componentTexts, ...result.componentValues, ...result.componentAttributes, ...result.componentMetadata, ...result.domIds, ...result.componentScopes, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
+  assert.equal(result.cssCascade.length, expectedCssCascade.length);
+  for (const { name, mode, html, expected } of expectedCssCascade) {
+    const observed = result.cssCascade.find(value => value.name === name && value.mode === mode);
+    assert.equal(observed.html, html, `${name}: ${mode} Node/browser codec parity`);
+    assert.equal(observed.actual, expected, `${name}: ${mode} authored CSSOM outcome`);
+  }
   for (const row of scopeRenderCases) {
     const rendered = result.scopeRendering.find(value => value.name === row.name);
     assert.deepEqual(rendered.actual, row.expected, `${row.name} uses the browser's actual CSS/token context`);
@@ -408,7 +430,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.patchVersions.length} patch-version + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();
