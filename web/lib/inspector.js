@@ -376,12 +376,14 @@ function multiView(docs) {
 }
 
 /* ---- node ----------------------------------------------------------------- */
+const cssPropertyName = name => name.startsWith('--') ? name : name.toLowerCase();
+
 function parseDeclarations(text) {
   const out = {};
   for (const part of text.split(';')) {
     const at = part.indexOf(':');
     if (at < 1) continue;
-    const key = part.slice(0, at).trim().toLowerCase();
+    const key = cssPropertyName(part.slice(0, at).trim());
     const value = part.slice(at + 1).trim();
     if (key && value) out[key] = value;
   }
@@ -403,7 +405,7 @@ function kvEditor(documentId, node, field, save) {
   }
   box.append(addRow(field, field === 'style' ? ['property', 'value'] : ['attribute', 'value'], (key, value) => {
     if (field === 'style' && key.includes(':')) { const all = parseDeclarations(key); if (Object.keys(all).length) patch(all, 'set styles'); return; }
-    patch({ [field === 'style' ? key.toLowerCase() : key]: value }, `set ${key}`);
+    patch({ [field === 'style' ? cssPropertyName(key) : key]: value }, `set ${key}`);
   }, field === 'style' ? CSS_PROPERTIES.map(name => ({ name })) : ATTRIBUTES.map(name => ({ name }))));
   return box;
 }

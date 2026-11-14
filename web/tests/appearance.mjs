@@ -38,6 +38,54 @@ try {
   const select = id => page.evaluate(async id => { document.activeElement?.blur?.(); const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', [id]); }, id);
   const afterVersion = () => runtime.read({ view: 'document', documentId: 'welcome' }).version;
 
+  const inlineCase = async (owner, documentId, nodeId) => {
+    const current = () => owner.getEntry(documentId).document;
+    const initial = structuredClone(current().nodes[nodeId].style), classes = current().nodes[nodeId].className;
+    await owner.patch({ documentId, expectedVersion: current().version, patch: { nodes: { [nodeId]: { style: { '--Ink': '#ff0000', '--ink': '#0000ff', color: 'var(--Ink)', 'background-color': 'var(--ink)' } } } } });
+    await page.evaluate(async ({ documentId, nodeId }) => {
+      document.activeElement?.blur?.(); const store = await import('./lib/store.js');
+      store.selectArtboards([documentId]); store.selectNodes(documentId, [nodeId]);
+    }, { documentId, nodeId });
+    const section = page.locator('#inspector [data-section="style"]');
+    await section.waitFor();
+    if (!await section.locator('details').evaluate(node => node.open)) await section.locator('summary').click();
+    await waitUntil(() => section.locator('[data-key="style:--Ink"]').inputValue().then(value => value === '#ff0000'), 'prepared authored variables reach the real inspector');
+    const rgb = hex => `rgb(${[1, 3, 5].map(at => parseInt(hex.slice(at, at + 2), 16)).join(', ')})`;
+    const verify = async expected => {
+      await waitUntil(() => { assert.deepEqual(current().nodes[nodeId].style, expected); return true; }, 'accepted variable spelling and unrelated declarations');
+      await owner.queue;
+      await waitUntil(async () => {
+        const actual = await page.locator(`iframe[data-document-id="${documentId}"]`).contentFrame().locator(`[data-divlet-id="${nodeId}"]`).evaluate(node => {
+          const css = getComputedStyle(node); return [css.color, css.backgroundColor];
+        });
+        return actual[0] === rgb(expected['--Ink']) && actual[1] === rgb(expected['--ink']);
+      }, 'case-sensitive variables paint distinct foreground/background colours');
+      assert.equal(current().nodes[nodeId].className, classes);
+      const saved = JSON.parse(await readFile(owner.projectPath, 'utf8')).frames.find(frame => frame.id === documentId);
+      assert.deepEqual(saved.nodes[nodeId].style, expected, 'the writer saves exact custom-property names');
+    };
+    for (const [name, value, patch] of [
+      ['--Ink', '#008000', { '--Ink': '#008000' }],
+      ['BoRdEr-ToP-CoLoR', '#123456', { 'border-top-color': '#123456' }],
+      ['--Ink:#ff00ff;--ink:#ffff00;OuTlInE-CoLoR:#654321', '', { '--Ink': '#ff00ff', '--ink': '#ffff00', 'outline-color': '#654321' }],
+    ]) {
+      const before = structuredClone(current().nodes[nodeId].style), version = current().version;
+      await section.locator('[data-key="style-new-key"]').fill(name);
+      if (value) await section.locator('[data-key="style-new-value"]').fill(value);
+      await page.keyboard.press('Enter');
+      await page.locator('#viewport').focus();
+      const next = { ...before, ...patch };
+      await verify(next);
+      assert.equal(current().version, version + 1, 'one submission is one accepted change');
+      await page.keyboard.press('Control+z'); await verify(before);
+      await page.keyboard.press('Control+Shift+z'); await verify(next);
+    }
+    // Restore the caller's authored inline data by undoing the three edits and the setup.
+    for (let i = 0; i < 4; i++) await owner.undo();
+    assert.deepEqual(current().nodes[nodeId].style, initial);
+    checks.push(`core inline custom-property case, ordinary-name normalization, saved source, actual CSS and one-step Undo/Redo (${documentId})`);
+  };
+
   // A project colour exists: it shows up as a swatch.
   await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), actor: 'user', patch: { tokens: { '--color-brand': '#5b5bf0' } } });
   await select('cta');
@@ -436,6 +484,9 @@ try {
   await select('cta'); await effect('z').waitFor();
   await typeZ('auto'); await scrub('z', 6);
   await waitUntil(() => classesOf('cta').includes('z-2'), 'z-index scrubbing works at 200% interface size');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(100));
+  await inlineCase(runtime, 'welcome', 'cta');
   await runtime.close();
   setStyleEngines([]);
   native = await openRuntime({ file: path.join(cwd, 'no-engine.divlet'), watch: false, createDemo: false });
@@ -544,6 +595,9 @@ try {
   await page.getByRole('button', { name: 'Upload font', exact: true }).click({ trial: true });
   await page.locator('#inspector').screenshot({ path: 'artifacts/font-family-no-engine-phone-200.png' });
   checks.push('provider-free native family choice and real embedded face loading, narrow/200% whole-value keyboard panning');
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(100));
+  await inlineCase(native, 'plain', 'first');
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'passed', checks }, null, 2));
 } finally { await browser?.close(); await native?.close(); await runtime.close(); await rm(cwd, { recursive: true, force: true }); }
