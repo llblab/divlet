@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import draft, { createRenderer } from '../index.js';
 import { rendererVersion } from '../lib/identity.ts';
 import { compileClasses, resolveStyleEngine, setStyleEngines, styleEngine } from '../../../core/lib/engine.ts';
@@ -68,6 +69,18 @@ test('renderer identity includes the compiler and each owned stylesheet, and ref
   assert.notEqual(rendererVersion(fixture.from), original, 'removing a nested copy selects a different installed version');
   await fs.rm(path.join(root, 'node_modules/transitive'), { recursive: true });
   assert.throws(() => rendererVersion(fixture.from), { code: 'RENDERER_IDENTITY_UNAVAILABLE' });
+});
+
+test('identity diagnostics capture the real recipe and selected manifests without a second hash algorithm', () => {
+  const probe = fileURLToPath(new URL('./fixtures/renderer-probe.mjs', import.meta.url));
+  const entry = fileURLToPath(new URL('../lib/renderer.ts', import.meta.url));
+  const report = JSON.parse(execFileSync(process.execPath, [probe, entry], { env: { ...process.env, NODE_OPTIONS: '' }, encoding: 'utf8', timeout: 30000 }));
+  assert.equal(report.version, createRenderer().version);
+  assert.equal(report.inputs.policy, 'divlet-tailwind-1');
+  assert.equal(report.inputs.stylesheets.length, 4);
+  for (const [name, version] of report.inputs.roots) assert.ok(report.manifests.some(manifest => manifest.name === name && manifest.version === version));
+  for (const manifest of report.manifests) assert.equal(JSON.stringify(report.inputs).includes(manifest.file), false, 'installation paths are diagnostics, not identity');
+  assert.match(report.cssHash, /^[a-f0-9]{64}$/);
 });
 
 test('versioned compilation is provider-owned while draft compilation retains its ambient stylesheet behavior', async t => {

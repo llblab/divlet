@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bundleBrowserModel } from '../../../scripts/browser-model.mjs';
+import { auditRendererIdentity } from '../../../plugins/tailwind/tests/identity-audit.mjs';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const work = await mkdtemp(path.join(os.tmpdir(), 'divlet-release-'));
@@ -156,6 +157,9 @@ try {
   const { renderer, ...board } = result;
   assert.deepEqual(board, { frames: 1, index: 200, board: 200, lib: 200, panel: 200 }, 'the installed package starts a board and serves it');
   assert.match(renderer, /^divlet-tailwind-1-[a-f0-9]{64}$/, 'the installed build establishes and executes an exact renderer identity');
+  const identityAudit = auditRendererIdentity(path.join(target, 'node_modules/@divlet/core'));
+  assert.equal(identityAudit.reports.installed.version, renderer, 'the audit observes the same installed renderer the smoke exercised');
+  const rendererIdentity = { phase: 'core-cli-mcp', comparisons: identityAudit.comparisons, inputs: Object.fromEntries(Object.entries(identityAudit.reports).map(([name, report]) => [name, report.inputs])) };
 
   // The MCP server from the installed package: initialize, list the shared tools, open a project, read it, and stop on EOF.
   await writeFile(path.join(target, 'mcp-smoke.mjs'), `
@@ -237,5 +241,5 @@ try {
     installedPi = JSON.parse(execFileSync(process.execPath, [path.join(root, 'pi/tests/e2e/pi.mjs')], { cwd: target, env: { ...process.env, NODE_OPTIONS: '', PI_DIVLET_INSTALLED_ROOT: target }, encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 }).trim());
     assert.equal(installedPi.status, 'passed'); assert.equal(installedPi.installed, true); assert.equal(installedPi.installedFonts.status, 'passed', 'required installed Pi mode cannot silently skip the real host/browser case');
   }
-  console.log(JSON.stringify({ status: 'passed', registryInstallation: registry, frozenManifest: Boolean(candidate), files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, pluginTypes: true, browserModelBundle: true, webPackage: webPacked.name, installedFonts, ...(installedPi ? { installedPi } : {}), mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
+  console.log(JSON.stringify({ status: 'passed', registryInstallation: registry, frozenManifest: Boolean(candidate), files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, rendererIdentity, pluginTypes: true, browserModelBundle: true, webPackage: webPacked.name, installedFonts, ...(installedPi ? { installedPi } : {}), mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
 } finally { await rm(work, { recursive: true, force: true }); }
