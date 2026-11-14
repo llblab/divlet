@@ -30,8 +30,8 @@ test('missing browser lowering matches the existing no-engine Node refusal', () 
   } finally { setStyleEngines([saved]); }
 });
 
-test('cold source model keeps its Node provider without package-source conditions or a build', () => {
-  const file = new URL('../lib/model.ts', import.meta.url).href;
+test('cold public source model entry keeps its Node provider without package-source conditions or a build', () => {
+  const file = new URL('../model.ts', import.meta.url).href;
   execFileSync(process.execPath, ['--input-type=module', '-e', `
     import assert from 'node:assert/strict';
     const api = await import(${JSON.stringify(file)});

@@ -37,8 +37,12 @@
       "default": "./dist/core/lib/codec.js"
     },
     "./model": {
-      "divlet-source": "./core/lib/model.ts",
-      "default": "./dist/core/lib/model.js"
+      "browser": {
+        "divlet-source": "./core/lib/model.ts",
+        "default": "./dist/core/lib/model.js"
+      },
+      "divlet-source": "./core/model.ts",
+      "default": "./dist/core/model.js"
     },
     "./project": {
       "divlet-source": "./core/lib/project.ts",

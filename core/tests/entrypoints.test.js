@@ -26,6 +26,17 @@ test('@divlet/core is the shared product library, not a host or command package'
   assert.ok(pkg.workspaces.includes('.'), 'source adapters can resolve the product workspace without a registry release');
 });
 
+test('the public model selects native semantics for browser exports and explicit composition for Node', async () => {
+  assert.deepEqual(pkg.exports['./model'], {
+    browser: { 'divlet-source': './core/lib/model.ts', default: './dist/core/lib/model.js' },
+    'divlet-source': './core/model.ts', default: './dist/core/model.js',
+  });
+  const native = await import('../lib/model.ts');
+  const composed = await import('@divlet/core/model');
+  assert.deepEqual(Object.keys(composed), Object.keys(native));
+  for (const name of Object.keys(native)) assert.equal(composed[name], native[name], 'one vocabulary/validator, not host-specific model implementations');
+});
+
 test('@divlet/web owns client files and portable ports with no reverse package dependency', async () => {
   const web = JSON.parse(await readFile(path.join(root, 'web/package.json'), 'utf8'));
   assert.equal(web.name, '@divlet/web'); assert.equal(web.version, pkg.version);

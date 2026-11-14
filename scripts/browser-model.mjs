@@ -12,7 +12,7 @@ async function bundleEntry(entry, resolveDir, { source = false } = {}) {
     define: { 'process.env.NODE_ENV': '"production"' },
   });
   const inputs = Object.keys(result.metafile.inputs);
-  const host = inputs.filter(file => /(?:^|\/)core\/lib\/(?:engine|model-styles|runtime|server|boards)\.(?:js|ts)$|(?:^|\/)(?:plugins\/tailwind|@tailwindcss|tailwindcss)\//.test(file));
+  const host = inputs.filter(file => /(?:^|\/)core\/(?:model|lib\/(?:engine|model-styles|runtime|server|boards))\.(?:js|ts)$|(?:^|\/)(?:plugins\/tailwind|@tailwindcss|tailwindcss)\//.test(file));
   if (host.length) throw new Error(`Browser kernel reached Node/provider bootstrap: ${host.join(', ')}`);
   const external = Object.values(result.metafile.outputs).flatMap(output => output.imports);
   if (external.length) throw new Error('Browser kernel retained external imports');

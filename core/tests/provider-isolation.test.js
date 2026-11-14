@@ -1,4 +1,4 @@
-// Physical dependency isolation for a prototype host port, not a replacement for public Node defaults.
+// Physical dependency isolation for production native semantics, separate from public bundled-default composition.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -29,13 +29,8 @@ async function capsule(t) {
   t.after(() => rm(root, { recursive: true, force: true }));
   const copy = (from, to) => cp(from, to, { recursive: true, dereference: true, filter: source => path.basename(source) !== 'node_modules' });
   await writeFile(path.join(root, 'package.json'), JSON.stringify({ name: 'divlet-provider-isolation', type: 'module' }));
-  for (const directory of ['core/lib', 'plugins/pen/lib', 'plugins/tailwind/lib']) {
-    await mkdir(path.dirname(path.join(root, directory)), { recursive: true });
-    await copy(path.join(checkout, directory), path.join(root, directory));
-  }
-  for (const plugin of ['pen', 'tailwind']) for (const file of ['index.js', 'package.json']) {
-    await copy(path.join(checkout, 'plugins', plugin, file), path.join(root, 'plugins', plugin, file));
-  }
+  await mkdir(path.join(root, 'core'), { recursive: true });
+  await copy(path.join(checkout, 'core/lib'), path.join(root, 'core/lib'));
   await mkdir(path.join(root, 'core/tests/fixtures'), { recursive: true });
   await copy(new URL('./fixtures/frame-portability.js', import.meta.url), path.join(root, 'core/tests/fixtures/frame-portability.js'));
   const versions = {};
@@ -51,13 +46,10 @@ async function capsule(t) {
     versions[name] = manifest.version;
     await copy(directory, path.join(root, 'node_modules', name));
   }
-  const pkg = JSON.parse(await readFile(path.join(checkout, 'package.json'), 'utf8'));
-  const source = './core/lib/model-styles.ts', replacement = pkg.browser[source];
-  assert.equal(replacement, './core/lib/browser-styles.ts', 'use the declared style port, not a test validator');
-  return { root, source, replacement, versions };
+  return { root, versions };
 }
 
-function probe(isolate, { mapped = false, escape = false } = {}) {
+function probe(isolate, { escape = false } = {}) {
   const script = `
     import assert from 'node:assert/strict';
     import { realpathSync, readdirSync } from 'node:fs';
@@ -66,11 +58,8 @@ function probe(isolate, { mapped = false, escape = false } = {}) {
     import path from 'node:path';
     const root = realpathSync(process.cwd());
     const loaded = new Set();
-    const port = new URL(${JSON.stringify(isolate.source)}, import.meta.url).href;
-    const replacement = new URL(${JSON.stringify(isolate.replacement)}, import.meta.url).href;
     registerHooks({ resolve(specifier, context, next) {
-      let resolved = next(specifier, context);
-      if (${mapped} && resolved.url === port) resolved = next(replacement, context);
+      const resolved = next(specifier, context);
       if (resolved.url.startsWith('file:')) {
         const file = realpathSync(fileURLToPath(resolved.url));
         const relative = path.relative(root, file);
@@ -105,9 +94,9 @@ function probe(isolate, { mapped = false, escape = false } = {}) {
       const accepted = structuredClone(next);
       assert.throws(() => api.applyDocumentPatch(next, { nodes: { label: null } }), { code: 'INVALID_DOCUMENT' });
       assert.deepEqual(next, accepted);
-      ${mapped ? `assert.throws(() => api.applyDocumentPatch(next, { nodes: { root: { styles: { color: 'red' } } } }), { code: 'NO_STYLE_ENGINE' });
-      assert.ok(loaded.has('core/lib/browser-styles.ts'));
-      assert.ok(![...loaded].some(file => file.startsWith('plugins/') || /^core\\/lib\\/(engine|model-styles)\\.ts$/.test(file)));` : ''}
+      assert.throws(() => api.applyDocumentPatch(next, { nodes: { root: { styles: { color: 'red' } } } }), { code: 'NO_STYLE_ENGINE' });
+      assert.ok(loaded.has('core/lib/model-styles.ts') && loaded.has('core/lib/style-engines.ts'));
+      assert.ok(![...loaded].some(file => file.startsWith('plugins/') || /^core\\/lib\\/(engine|browser-styles)\\.ts$/.test(file)));
       console.log(JSON.stringify({ ok: true, witnesses: frameCases.length, modules: [...loaded].sort() }));
     } catch (error) { console.log(JSON.stringify({ ok: false, code: error.code, missingPackage: /Cannot find package '([^']+)'/.exec(error.message)?.[1], message: error.message, modules: [...loaded].sort() })); }
   `;
@@ -163,19 +152,17 @@ test('the production style registry dispatches from a single copied source file 
   `], { cwd: directory, env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' }, encoding: 'utf8', timeout: 10000 });
 });
 
-test('a physically parser-only copy exercises the declared provider-free port without changing Node defaults', async t => {
+test('a physically parser-only copy runs the production model binding without a port remap or plugin source', async t => {
   const isolate = await capsule(t);
-  // Characterize default loading, but do not fossilize today's provider coupling as a required failure.
-  const baseline = probe(isolate);
-  t.diagnostic(`unmapped Node control: ${baseline.ok ? 'loaded' : baseline.code}${baseline.missingPackage ? ' (' + baseline.missingPackage + ')' : ''}; parser versions: ${JSON.stringify(isolate.versions)}`);
+  t.diagnostic(`production binding; parser versions: ${JSON.stringify(isolate.versions)}`);
   await t.test('shared admission, native inline patches, refusal integrity and HTML/project round trips', () => {
-    const result = probe(isolate, { mapped: true });
+    const result = probe(isolate);
     assert.equal(result.ok, true, JSON.stringify(result));
     assert.ok(result.witnesses > 0);
     t.diagnostic(`${result.witnesses} shared frame witnesses; ${result.modules.length} isolated source/parser files loaded`);
   });
   await t.test('checkout fallback is refused before any external module can execute', () => {
-    const result = probe(isolate, { mapped: true, escape: true });
+    const result = probe(isolate, { escape: true });
     assert.equal(result.ok, false);
     assert.equal(result.code, 'ISOLATION_ESCAPE');
   });
@@ -183,7 +170,7 @@ test('a physically parser-only copy exercises the declared provider-free port wi
     // Keep the declared directory list unchanged while removing the owned parser bytes.
     await rm(path.join(isolate.root, 'node_modules/postcss'), { recursive: true });
     await mkdir(path.join(isolate.root, 'node_modules/postcss'));
-    const result = probe(isolate, { mapped: true });
+    const result = probe(isolate);
     assert.equal(result.ok, false);
     assert.ok(['ERR_MODULE_NOT_FOUND', 'ISOLATION_ESCAPE'].includes(result.code), JSON.stringify(result));
   });

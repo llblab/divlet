@@ -18,7 +18,7 @@ test('a declaration replaces the class that set the same property and keeps ever
 });
 
 test('transient property maps retain string, numeric and removal semantics without changing stored inline data', async () => {
-  const { applyDocumentPatch, createDemoDocument } = await import('../../../core/lib/model.ts');
+  const { applyDocumentPatch, createDemoDocument } = await import('@divlet/core/model');
   const input = Object.freeze({ display: 'grid', opacity: 0.5, 'flex-grow': 1, width: null });
   const original = 'block opacity-[1] grow-0 w-4 hover:w-8 marker';
   const expected = 'grid opacity-[0.5] grow hover:w-8 marker';
@@ -64,7 +64,7 @@ test('every class the transpiler writes is recognised as the property it sets', 
 });
 
 test('a node patch with styles rewrites the element classes through the ordinary patch path', async () => {
-  const { applyDocumentPatch, createDemoDocument } = await import('../../../core/lib/model.ts');
+  const { applyDocumentPatch, createDemoDocument } = await import('@divlet/core/model');
   const doc = createDemoDocument(), id = 'cta';
   const next = applyDocumentPatch(doc, { nodes: { [id]: { styles: { width: '320px', 'padding-left': '4px', 'font-family': 'Georgia, serif' } } } });
   const classes = next.nodes[id].className.split(' ');
