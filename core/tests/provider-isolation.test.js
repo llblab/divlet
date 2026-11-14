@@ -116,6 +116,53 @@ function probe(isolate, { mapped = false, escape = false } = {}) {
   }));
 }
 
+test('the production style registry dispatches from a single copied source file with no provider or parser packages', async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'divlet-registry-isolation-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(path.join(directory, 'package.json'), JSON.stringify({ type: 'module' }));
+  await cp(new URL('../lib/style-engines.ts', import.meta.url), path.join(directory, 'style-engines.ts'));
+  execFileSync(process.execPath, ['--input-type=module', '-e', `
+    import assert from 'node:assert/strict';
+    import { registerHooks } from 'node:module';
+    const onlySource = new URL('./style-engines.ts', import.meta.url).href;
+    const loaded = new Set();
+    registerHooks({ resolve(specifier, context, next) {
+      const result = next(specifier, context);
+      assert.ok(result.url === onlySource || result.url.startsWith('node:'), 'no checkout, parser, provider or model runtime rescue');
+      loaded.add(result.url); return result;
+    } });
+    const api = await import('./style-engines.ts');
+    assert.equal(api.styleEngine(), undefined);
+    assert.deepEqual(api.clientPlugins(), []);
+    assert.equal(api.clientPluginFile('missing', 'panel.js'), null);
+    assert.equal(api.resolveStyleEngine(null), null);
+    assert.equal(await api.compileClasses({}, ['opaque']), '');
+    assert.deepEqual(await api.unknownClasses({ tokens: {}, byNode: {} }), {});
+    assert.deepEqual(await api.explainClasses({ tokens: {}, names: [] }), {});
+    assert.deepEqual(await api.suggestClasses({ tokens: {}, query: '' }), []);
+    assert.deepEqual(api.customClasses(''), new Map());
+    assert.equal(api.warmSuggestions({}), undefined);
+    for (const name of ['applyStyles', 'declarationClass', 'propertyOfClass', 'createClassResourceMapper']) assert.throws(() => api[name]('', {}), { code: 'NO_STYLE_ENGINE' });
+    const defaults = [{ id: 'default' }];
+    api.seedStyleEngines(defaults); defaults.length = 0;
+    assert.equal(api.styleEngine().id, 'default', 'read fallbacks do not select the registry; default lists are copied');
+    api.setStyleEngines([]);
+    const requirement = { id: 'host', version: 'exact' };
+    assert.throws(() => api.resolveStyleEngine(requirement), { code: 'STYLE_ENGINE_UNAVAILABLE' });
+    const host = { ...requirement, async compileClasses() { assert.equal(this, host); return 'host CSS'; } };
+    api.registerStyleEngine(host);
+    api.registerStyleEngine({ ...host, version: 'wrong' });
+    api.seedStyleEngines([{ id: 'default' }]);
+    assert.equal(api.styleEngine(), host);
+    assert.equal(api.resolveStyleEngine(requirement), host);
+    assert.equal(await api.compileClasses({}, [], undefined, requirement), 'host CSS');
+    assert.throws(() => api.resolveStyleEngine({ ...requirement, version: 'other' }), { code: 'STYLE_ENGINE_VERSION_MISMATCH' });
+    api.setStyleEngines([]); api.seedStyleEngines([host]);
+    assert.equal(api.styleEngine(), undefined, 'explicit absence is not an uninitialized registry');
+    assert.deepEqual([...loaded], [onlySource], 'type-only vocabulary dependencies do not load the model');
+  `], { cwd: directory, env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' }, encoding: 'utf8', timeout: 10000 });
+});
+
 test('a physically parser-only copy exercises the declared provider-free port without changing Node defaults', async t => {
   const isolate = await capsule(t);
   // Characterize default loading, but do not fossilize today's provider coupling as a required failure.

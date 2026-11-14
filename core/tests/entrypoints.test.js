@@ -140,6 +140,26 @@ test('cold public plugins keep the bundled importer without the library root', (
   assert.equal(await api.importerFor('scene.PEN', () => assert.fail('extension dispatch must not read source')), pen);
 `));
 
+for (const selection of ['empty', 'set', 'register']) test(`provider-free ${selection} selection survives the first default facade import`, () => coldStandalone(`
+  const kernel = await import('./core/lib/style-engines.ts');
+  assert.equal(kernel.styleEngine(), undefined);
+  const input = Object.freeze({ opacity: 0.5, width: null });
+  const host = { id: 'early-host', applyStyles(className, edits) {
+    assert.equal(this, host); assert.equal(edits, input); return 'host-authored';
+  } };
+  ${selection === 'empty' ? 'kernel.setStyleEngines([]);' : selection === 'set' ? 'kernel.setStyleEngines([host]);' : 'kernel.registerStyleEngine(host);'}
+  const facade = await import('@divlet/core/engine');
+  assert.equal(Object.hasOwn(facade, 'seedStyleEngines'), false, 'composition initializer is not a public capability');
+  assert.deepEqual(Object.keys(facade), Object.keys(kernel).filter(name => name !== 'seedStyleEngines'), 'the facade retains every capability without exposing composition authority');
+  for (const name of Object.keys(facade)) assert.equal(facade[name], kernel[name], 'the facade delegates to one registry/dispatcher, not a second state');
+  assert.equal(facade.styleEngine(), ${selection === 'empty' ? 'undefined' : 'host'});
+  if (${selection !== 'empty'}) assert.equal(facade.applyStyles('', input), 'host-authored');
+  const model = await import('@divlet/core/model');
+  const base = model.createDemoDocument();
+  const patch = { nodes: { [base.rootId]: { styles: input } } };
+  ${selection === 'empty' ? "assert.throws(() => model.applyDocumentPatch(base, patch), { code: 'NO_STYLE_ENGINE' });" : "assert.equal(model.applyDocumentPatch(base, patch).nodes[base.rootId].className, 'host-authored');"}
+`));
+
 test('explicit engine absence survives late model, importer and root imports', () => coldStandalone(`
   const engine = await import('@divlet/core/engine');
   engine.setStyleEngines([]);
