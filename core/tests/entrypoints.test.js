@@ -210,6 +210,23 @@ test('host engine selection, ID deduplication and exact identity survive late co
   assert.equal(next.nodes[base.rootId].className, 'host-authored');
 `));
 
+for (const selection of ['empty', 'register', 'seed', 'exporter-only']) test(`early importer ${selection} choice survives the first public plugin facade import`, () => coldStandalone(`
+  const registry = await import('./core/lib/plugin-registry.ts');
+  assert.deepEqual(registry.importerList(), []);
+  const host = { id: 'early-host', label: 'Host', extensions: ['.host'], async claims() { return false; }, convert() { assert.fail('not converting'); } };
+  ${selection === 'empty' ? 'registry.seedImporters([]);' : selection === 'register' ? 'registry.registerImporter(host);' : selection === 'seed' ? 'const defaults = [host]; registry.seedImporters(defaults); defaults.length = 0;' : "registry.registerExporter({ id: 'host-export', label: 'Host', extension: '.host', mime: 'text/plain', export() { return { name: 'host', bytes: 'kept' }; } });"}
+  const api = await import('@divlet/core/plugins');
+  assert.deepEqual(Object.keys(api), Object.keys(registry).filter(name => name !== 'seedImporters'));
+  for (const name of Object.keys(api)) assert.equal(api[name], registry[name], 'one registry, not a facade-owned copy');
+  assert.deepEqual(api.importerList().map(item => item.id), ${selection === 'empty' ? '[]' : selection === 'exporter-only' ? "['pen']" : "['early-host']"});
+  if (${selection === 'register' || selection === 'seed'}) assert.equal(await api.importerFor('scene.HOST', () => assert.fail('extension shortcut must not read')), host);
+  if (${selection === 'exporter-only'}) assert.equal((await api.exportAs('host-export', { project: {}, frames: [] })).bytes.toString(), 'kept');
+  const selected = api.importerList();
+  await import('@divlet/core/model'); await import('@divlet/core/engine');
+  rootGuard.deregister(); await import('@divlet/core');
+  assert.deepEqual(api.importerList(), selected, 'late composition preserves the early choice');
+`));
+
 test('importer registration preserves first claim, ID deduplication and order across late composition', () => coldStandalone(`
   const api = await import('@divlet/core/plugins');
   const original = api.importerList();

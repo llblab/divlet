@@ -152,6 +152,64 @@ test('the production style registry dispatches from a single copied source file 
   `], { cwd: directory, env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' }, encoding: 'utf8', timeout: 10000 });
 });
 
+test('the Node plugin registry dispatches from one copied source without provider/model/parser packages', async t => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'divlet-plugin-registry-isolation-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(path.join(directory, 'package.json'), JSON.stringify({ type: 'module' }));
+  await cp(new URL('../lib/plugin-registry.ts', import.meta.url), path.join(directory, 'plugin-registry.ts'));
+  execFileSync(process.execPath, ['--input-type=module', '-e', `
+    import assert from 'node:assert/strict';
+    import { registerHooks } from 'node:module';
+    const onlySource = new URL('./plugin-registry.ts', import.meta.url).href;
+    const loaded = new Set();
+    registerHooks({ resolve(specifier, context, next) {
+      const result = next(specifier, context);
+      assert.ok(result.url === onlySource || result.url.startsWith('node:'), 'no provider, parser or checkout rescue');
+      loaded.add(result.url); return result;
+    } });
+    const api = await import('./plugin-registry.ts');
+    const read = () => assert.fail('dispatch need not read source for these mocks');
+    assert.deepEqual(api.importerList(), []);
+    assert.deepEqual([...api.importExtensions()], []);
+    assert.deepEqual([...api.pageExtensions()], []);
+    assert.equal(await api.importerFor('unknown.foo', read), null);
+    api.seedImporters([]); api.seedImporters([{ id: 'ignored' }]);
+    assert.deepEqual(api.importerList(), [], 'an explicit empty choice survives default seeding');
+    const calls = [];
+    const first = { id: 'first', label: 'First', listed: false, extensions: ['.foo'],
+      async claims(file, actualRead) { assert.equal(this, first); assert.equal(actualRead, read); calls.push('first'); if (file.endsWith('.alias')) return true; throw new Error('not mine'); },
+      page() { assert.fail('not projecting'); }, convert() { assert.fail('not converting'); } };
+    const second = { id: 'second', label: 'Second', extensions: ['.bar'], async claims() { calls.push('second'); return true; }, convert() {} };
+    api.registerImporter(first); api.registerImporter({ ...first, async claims() { assert.fail('duplicate ID'); } }); api.registerImporter(second);
+    api.seedImporters([{ id: 'ignored' }]);
+    assert.deepEqual(api.importerList(), [first, second]);
+    const listing = api.importerList(); listing.length = 0; assert.equal(api.importerList().length, 2);
+    assert.deepEqual([...api.importExtensions()], ['.bar']);
+    assert.deepEqual([...api.importExtensions({ all: true })], ['.foo', '.bar']);
+    assert.deepEqual([...api.pageExtensions()], ['.foo']);
+    assert.equal(await api.importerFor('scene.FOO', read), first); assert.deepEqual(calls, [], 'extension shortcuts do not sniff');
+    assert.equal(await api.importerFor('scene.alias', read), first); assert.deepEqual(calls, ['first'], 'first claim wins');
+    calls.length = 0;
+    assert.equal(await api.importerFor('scene.other', read), second); assert.deepEqual(calls, ['first', 'second'], 'rejected claims continue in order');
+    assert.deepEqual(api.exporterList(), []);
+    await assert.rejects(api.exportAs('missing', {}), { code: 'UNKNOWN_EXPORTER' });
+    assert.throws(() => api.registerExporter({ id: 'invalid' }), TypeError);
+    const bytes = new Uint8Array([1, 2, 3]);
+    const exporter = { id: 'host', label: 'Host', extension: '.bin', mime: 'application/octet-stream', export() { assert.equal(this, exporter); return { name: 'a/b', bytes }; } };
+    api.registerExporter(exporter); api.registerExporter(exporter);
+    assert.throws(() => api.registerExporter({ ...exporter }), /already registered/);
+    assert.equal(api.exporterList().length, 1);
+    const result = await api.exportAs('host', { project: {}, frames: [] });
+    assert.equal(result.name, 'a_b.bin'); assert.equal(result.mime, exporter.mime);
+    assert.deepEqual([...result.bytes], [1, 2, 3]); assert.notEqual(result.bytes, bytes);
+    api.registerExporter({ id: 'text', label: 'Text', extension: '.txt', mime: 'text/plain', export() { return { name: 'note.txt', bytes: 'é' }; } });
+    assert.equal((await api.exportAs('text', {})).bytes.toString('utf8'), 'é');
+    api.registerExporter({ id: 'broken', label: 'Broken', extension: '.txt', mime: 'text/plain', export() { return { name: 'no bytes' }; } });
+    await assert.rejects(api.exportAs('broken', {}), { code: 'EXPORT_FAILED' });
+    assert.deepEqual([...loaded].filter(url => url.startsWith('file:')), [onlySource], 'type-only contracts never load their model/project owners');
+  `], { cwd: directory, env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' }, encoding: 'utf8', timeout: 10000 });
+});
+
 test('a physically parser-only copy runs the production model binding without a port remap or plugin source', async t => {
   const isolate = await capsule(t);
   t.diagnostic(`production binding; parser versions: ${JSON.stringify(isolate.versions)}`);
