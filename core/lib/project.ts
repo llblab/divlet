@@ -51,6 +51,7 @@ export type FrameLookup = (id: NodeId) => DocumentModel | undefined;
 interface PartText { key: string; type: 'text'; content: string; metadata: Metadata }
 interface PartElement { key: string; type: 'element'; tag: string; attrs: Attrs; className: string; style: Style; metadata: Metadata; children: string[] }
 type Part = PartText | PartElement;
+type LiteralOverrideField = 'tag' | 'className' | 'text' | 'content';
 
 /** A domain error with its own code; declared as a function so its `never` return narrows a preceding guard. */
 function fail(code: string, message: string, details?: unknown): never { throw new DivletError(code, message, details); }
@@ -169,21 +170,21 @@ export function instancesOf(frame: DocumentModel): InstanceInfo[] {
 }
 
 /**
- * Apply one instance override to a cloned part. `writeText` plans text/content at its effective destination; an override
+ * Apply one instance override to a cloned part. `writeLiteral` plans literal fields at their effective destination; an override
  * that names a field the target cannot hold fails with the address, because a silent no-op would look like a bug in the board.
  */
-function applyOverride(node: Part, override: Override, where: string, writeText: (node: Part, content: string, label: string) => void): void {
+function applyOverride(node: Part, override: Override, where: string, writeLiteral: (node: Part, field: LiteralOverrideField, value: string, label: string) => void): void {
   if (node.type === 'text') {
     for (const key of Object.keys(override)) if (key !== 'content' && key !== 'metadata') fail('INVALID_OVERRIDE', `${where} is text; override its content (not ${key}).`);
-    if (override.content !== undefined) writeText(node, override.content, where);
+    if (override.content !== undefined) writeLiteral(node, 'content', override.content, where);
     if (override.metadata !== undefined) node.metadata = merge(node.metadata, override.metadata);
     return;
   }
   if (override.content !== undefined) fail('INVALID_OVERRIDE', `${where} is an element; use text to replace its text, or address its text node.`);
-  if (override.tag !== undefined) node.tag = override.tag;
-  if (override.className !== undefined) node.className = override.className;
+  if (override.tag !== undefined) writeLiteral(node, 'tag', override.tag, where);
+  if (override.className !== undefined) writeLiteral(node, 'className', override.className, where);
   for (const key of ['style', 'attrs', 'metadata'] as const) if (override[key] !== undefined) node[key] = merge(node[key], override[key]);
-  if (override.text !== undefined) writeText(node, override.text, where);
+  if (override.text !== undefined) writeLiteral(node, 'text', override.text, where);
 }
 
 /**
@@ -216,18 +217,20 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
     if (stack.length >= MAX_INSTANCE_DEPTH) fail('TOO_DEEP', `Instances are nested more than ${MAX_INSTANCE_DEPTH} levels deep at ${where}.`);
     uses.add(key);
     const nodes = new Map<string, Part>();
-    // Resolve peers before creating text parts: aliases and element-text/child-content may name one destination.
-    const textWrites = new Map<Part, { content: string; label: string }>();
-    const writeText = (node: Part, content: string, label: string): void => {
+    // Literal peers share one per-occurrence field plan; text shortcuts resolve to their existing child when present.
+    const literalWrites = new Map<Part, Map<LiteralOverrideField, { value: string; label: string }>>();
+    const writeLiteral = (node: Part, field: LiteralOverrideField, value: string, label: string): void => {
       let target = node;
-      if (node.type === 'element') {
+      if (field === 'text' && node.type === 'element') {
         const child = node.children.length === 1 ? nodes.get(node.children[0] as string) : undefined;
-        if (child?.type === 'text') target = child;
+        if (child?.type === 'text') { target = child; field = 'content'; }
         else if (node.children.length) fail('INVALID_OVERRIDE', `${label} mixes text and elements; address one of its text nodes with content instead.`);
       }
-      const previous = textWrites.get(target);
-      if (previous && previous.content !== content) fail('INVALID_OVERRIDE', `Conflicting text overrides: ${[previous.label, label].sort().join(' and ')}.`);
-      if (!previous) textWrites.set(target, { content, label });
+      let writes = literalWrites.get(target);
+      if (!writes) { writes = new Map(); literalWrites.set(target, writes); }
+      const previous = writes.get(field);
+      if (previous && previous.value !== value) fail('INVALID_OVERRIDE', `Conflicting ${field === 'content' ? 'text' : field} overrides: ${[previous.label, label].sort().join(' and ')}.`);
+      if (!previous) writes.set(field, { value, label });
     };
     // Clone the definition; nested instances become address-prefixed subtrees.
     const clone = (id: NodeId, prefix: string): string => {
@@ -259,14 +262,21 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
     for (const [address, override] of Object.entries(refNode.descendants ?? {})) {
       const target = nodes.get(address);
       if (!target) fail('INVALID_OVERRIDE', `${where} overrides ${address}, which is not a node of ${refNode.ref}. Read the component (divlet_read view:components) for its node IDs.`);
-      applyOverride(target, override, `${where} → ${address}`, writeText);
+      applyOverride(target, override, `${where} → ${address}`, writeLiteral);
     }
-    for (const [target, { content }] of textWrites) {
-      if (target.type === 'text') target.content = content;
-      else {
-        const id = `${target.key}#t1`;
-        nodes.set(id, { key: id, type: 'text', content, metadata: {} });
-        target.children = [id];
+    for (const [target, writes] of literalWrites) {
+      if (target.type === 'text') {
+        const content = writes.get('content');
+        if (content) target.content = content.value;
+      } else {
+        const tag = writes.get('tag'), className = writes.get('className'), text = writes.get('text');
+        if (tag) target.tag = tag.value;
+        if (className) target.className = className.value;
+        if (text) {
+          const id = `${target.key}#t1`;
+          nodes.set(id, { key: id, type: 'text', content: text.value, metadata: {} });
+          target.children = [id];
+        }
       }
     }
     return { rootKey: nodeId, nodes };

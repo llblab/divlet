@@ -25,7 +25,7 @@ export function componentTextProject(ref, descendants, { empty = false } = {}) {
   })] };
 }
 
-function expansion(api, input) {
+export function expandComponentProject(api, input) {
   const before = JSON.stringify(input);
   try {
     const project = api.readProject(input), lookup = new Map(project.frames.map(frame => [frame.id, frame]));
@@ -35,11 +35,11 @@ function expansion(api, input) {
 }
 const conflicting = (name, ref, entries, options) => [false, true].map(reverse => ({
   name: `${name}, ${reverse ? 'reversed' : 'forward'}`, error: 'INVALID_OVERRIDE',
-  run: api => expansion(api, componentTextProject(ref, Object.fromEntries(reverse ? [...entries].reverse() : entries), options)),
+  run: api => expandComponentProject(api, componentTextProject(ref, Object.fromEntries(reverse ? [...entries].reverse() : entries), options)),
 }));
 const stable = (name, ref, entries, expected, options) => ({ name, expected, run: api => {
-  const forward = expansion(api, componentTextProject(ref, Object.fromEntries(entries), options));
-  const backward = expansion(api, componentTextProject(ref, Object.fromEntries([...entries].reverse()), options));
+  const forward = expandComponentProject(api, componentTextProject(ref, Object.fromEntries(entries), options));
+  const backward = expandComponentProject(api, componentTextProject(ref, Object.fromEntries([...entries].reverse()), options));
   if (JSON.stringify(forward) !== JSON.stringify(backward)) throw new Error('Peer text order changed expanded identity, content or provenance');
   const textNodes = Object.values(forward.document.nodes).filter(node => node.type === 'text');
   return { text: textNodes.map(node => node.content), addresses: textNodes.map(node => forward.parts.find(([id]) => id === node.id)?.[1].address), metadata: textNodes.map(node => node.metadata), literal: forward.document.nodes.instance.metadata.literal };

@@ -105,7 +105,7 @@ test('text peer conflicts preserve accepted source/output/history and identical 
   await runtime.patch({ documentId: 'landing', expectedVersion: 1, patch: { nodes: { cta: { descendants: { button: { text: 'Agreed' }, 'button-label': { content: 'Agreed' } } } } } });
   const before = runtime.read({ view: 'document', documentId: 'landing' });
   const source = await fs.readFile(path.join(cwd, 'project.divlet')), html = await fs.readFile(runtime.getEntry('landing').htmlPath);
-  const history = runtime.historyHead(), selection = runtime.info().selection, render = runtime.getEntry('landing').render;
+  const history = structuredClone(runtime.historyHead()), selection = structuredClone(runtime.info().selection), render = runtime.getEntry('landing').render;
   await assert.rejects(runtime.patch({ documentId: 'landing', expectedVersion: before.version, patch: { nodes: { cta: { descendants: { button: { text: 'Different' } } } } } }), { code: 'INVALID_OVERRIDE' });
   assert.deepEqual(runtime.read({ view: 'document', documentId: 'landing' }), before);
   assert.deepEqual(await fs.readFile(path.join(cwd, 'project.divlet')), source);
@@ -117,6 +117,28 @@ test('text peer conflicts preserve accepted source/output/history and identical 
   await runtime.redo({});
   assert.match(runtime.render('landing').html, /Agreed/);
   assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.cta.descendants['button-label'].content, 'Agreed');
+});
+
+test('literal alias conflicts retain accepted state and equal tag/class peers remain undoable', async t => {
+  const { runtime, cwd } = await fixture(t);
+  await runtime.patch({ documentId: 'landing', expectedVersion: 1, patch: { nodes: { feature: { descendants: {
+    'card-action': { tag: 'button', className: 'rounded' }, 'card-action/button': { tag: 'button', className: 'rounded' },
+  } } } } });
+  const before = runtime.read({ view: 'document', documentId: 'landing' });
+  const source = await fs.readFile(path.join(cwd, 'project.divlet')), html = await fs.readFile(runtime.getEntry('landing').htmlPath);
+  const history = structuredClone(runtime.historyHead()), selection = structuredClone(runtime.info().selection), render = runtime.getEntry('landing').render;
+  for (const [field, value] of [['tag', 'div'], ['className', 'px-8']]) {
+    await assert.rejects(runtime.patch({ documentId: 'landing', expectedVersion: before.version, patch: { nodes: { feature: { descendants: { 'card-action': { [field]: value } } } } } }), { code: 'INVALID_OVERRIDE' });
+    assert.deepEqual(runtime.read({ view: 'document', documentId: 'landing' }), before);
+    assert.deepEqual(await fs.readFile(path.join(cwd, 'project.divlet')), source);
+    assert.deepEqual(await fs.readFile(runtime.getEntry('landing').htmlPath), html);
+    assert.deepEqual(runtime.historyHead(), history); assert.deepEqual(runtime.info().selection, selection);
+    assert.equal(runtime.getEntry('landing').render, render);
+  }
+  await runtime.undo({});
+  assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.feature.descendants['card-action'], undefined);
+  await runtime.redo({});
+  assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.feature.descendants['card-action/button'].className, 'rounded');
 });
 
 test('instances cannot break HTML nesting rules once expanded', async t => {
