@@ -141,6 +141,36 @@ test('literal alias conflicts retain accepted state and equal tag/class peers re
   assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.feature.descendants['card-action/button'].className, 'rounded');
 });
 
+test('attribute alias conflicts preserve writer state and equal peers remain undoable', async t => {
+  const { runtime, cwd } = await fixture(t);
+  await runtime.patch({ documentId: 'landing', expectedVersion: 1, patch: { nodes: { feature: { descendants: {
+    'card-action': { attrs: { title: 'Agreed', 'data-retain': 'keep' } }, 'card-action/button': { attrs: { title: 'Agreed' } },
+  } } } } });
+  const before = runtime.read({ view: 'document', documentId: 'landing' });
+  const source = await fs.readFile(path.join(cwd, 'project.divlet')), html = await fs.readFile(runtime.getEntry('landing').htmlPath);
+  const history = structuredClone(runtime.historyHead()), selection = structuredClone(runtime.info().selection), render = runtime.getEntry('landing').render;
+  const candidate = page(); candidate.id = 'refused-attributes';
+  candidate.nodes.feature.descendants['card-action'] = { attrs: { title: null } };
+  candidate.nodes.feature.descendants['card-action/button'] = { attrs: { title: 'Agreed' } };
+  // Whole-frame admission preserves a stored null operation; sparse tool-patch null would remove the override key instead.
+  for (const refuse of [
+    () => runtime.patch({ documentId: 'landing', expectedVersion: before.version, patch: { nodes: { feature: { descendants: { 'card-action': { attrs: { title: 'Different' } } } } } } }),
+    () => runtime.create({ document: candidate }),
+  ]) {
+    await assert.rejects(refuse(), { code: 'INVALID_OVERRIDE' });
+    assert.deepEqual(runtime.read({ view: 'document', documentId: 'landing' }), before);
+    assert.deepEqual(await fs.readFile(path.join(cwd, 'project.divlet')), source);
+    assert.deepEqual(await fs.readFile(runtime.getEntry('landing').htmlPath), html);
+    assert.deepEqual(runtime.historyHead(), history); assert.deepEqual(runtime.info().selection, selection);
+    assert.equal(runtime.getEntry('landing').render, render);
+    assert.equal(runtime.documents.has('refused-attributes'), false);
+  }
+  await runtime.undo({});
+  assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.feature.descendants['card-action'], undefined);
+  await runtime.redo({});
+  assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.feature.descendants['card-action/button'].attrs.title, 'Agreed');
+});
+
 test('instances cannot break HTML nesting rules once expanded', async t => {
   const { runtime } = await fixture(t);
   await assert.rejects(runtime.patch({ documentId: 'components', expectedVersion: 1, patch: { nodes: { card: { tag: 'button' } } } }), /Buttons cannot be nested/);

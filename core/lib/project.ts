@@ -219,6 +219,7 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
     const nodes = new Map<string, Part>();
     // Literal peers share one per-occurrence field plan; text shortcuts resolve to their existing child when present.
     const literalWrites = new Map<Part, Map<LiteralOverrideField, { value: string; label: string }>>();
+    const attributeWrites = new Map<PartElement, Map<string, { value: string | null; label: string }>>();
     const writeLiteral = (node: Part, field: LiteralOverrideField, value: string, label: string): void => {
       let target = node;
       if (field === 'text' && node.type === 'element') {
@@ -262,7 +263,22 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
     for (const [address, override] of Object.entries(refNode.descendants ?? {})) {
       const target = nodes.get(address);
       if (!target) fail('INVALID_OVERRIDE', `${where} overrides ${address}, which is not a node of ${refNode.ref}. Read the component (divlet_read view:components) for its node IDs.`);
-      applyOverride(target, override, `${where} → ${address}`, writeLiteral);
+      const label = `${where} → ${address}`;
+      let applied = override;
+      if (target.type === 'element' && override.attrs !== undefined) {
+        let writes = attributeWrites.get(target);
+        if (!writes) { writes = new Map(); attributeWrites.set(target, writes); }
+        const attrs: Array<[string, string | null]> = [];
+        // Compare exact authored names here; final validation still owns HTML/SVG name normalization and URL context.
+        for (const [name, raw] of Object.entries(override.attrs)) {
+          const value = raw === null ? null : string(raw, `attribute ${name}`);
+          const previous = writes.get(name);
+          if (previous && previous.value !== value) fail('INVALID_OVERRIDE', `Conflicting attribute ${name} overrides: ${[previous.label, label].sort().join(' and ')}.`);
+          if (!previous) { writes.set(name, { value, label }); attrs.push([name, value]); }
+        }
+        applied = { ...override, attrs: Object.fromEntries(attrs) };
+      }
+      applyOverride(target, applied, label, writeLiteral);
     }
     for (const [target, writes] of literalWrites) {
       if (target.type === 'text') {
