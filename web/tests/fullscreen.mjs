@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { openRuntime } from '../../core/lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { decodeHtml } from '../../core/lib/codec.ts';
 
 const require = createRequire(import.meta.url);

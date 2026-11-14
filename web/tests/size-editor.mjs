@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
-import { openRuntime } from '../../core/lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { resolveOpenFile } from '../../core/lib/launch.ts';
 import { decodeHtml } from '../../core/lib/codec.ts';
 

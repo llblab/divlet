@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { decodeHtml } from '../lib/codec.ts';
 import { DivletError } from '../lib/model.ts';
 import { readAssets } from '../lib/assets.ts';

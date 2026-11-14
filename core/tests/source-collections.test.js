@@ -7,7 +7,7 @@ import path from 'node:path';
 import { listProjects, resolveProject, inspectPath } from '../lib/projects.ts';
 import { SOURCE_LIMITS } from '../lib/model.ts';
 import { launch, makeHost } from '../lib/launch.ts';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import extension from '@divlet/pi';
 
 const secret = 'S3cr3t!';

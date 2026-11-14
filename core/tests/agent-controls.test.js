@@ -6,7 +6,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { legacyProject } from './fixtures/legacy-project.js';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 
 const fixture = async t => {
   const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-controls-'));

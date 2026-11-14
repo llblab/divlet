@@ -7,7 +7,7 @@ import path from 'node:path';
 import { importSource as importPen, importedName } from '../lib/import.ts';
 import { launch } from '../lib/launch.ts';
 import { listProjects, resolveProject } from '../lib/projects.ts';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { LIMITS } from '../lib/model.ts';
 
 const simple = () => ({ version: '2.21', fileToken: 'private-token', variables: { 'ink/primary': { type: 'color', value: '#123456' } }, children: [

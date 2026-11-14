@@ -6,7 +6,7 @@ import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { openRuntime } from '../../core/lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 
 const playwright = await import('playwright');
 const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-text-render-'));

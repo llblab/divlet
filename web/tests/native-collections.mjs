@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { launch, makeHost } from '../../core/lib/launch.ts';
-import { openRuntime } from '../../core/lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { importedName } from '../../core/lib/import.ts';
 
 const { chromium } = await import('playwright');

@@ -5,7 +5,7 @@ import { cp, mkdtemp, rm, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { openRuntime } from '../../core/lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { fontDataUrl, fontBytes } from '../../core/tests/fixtures/font.js';
 import { woffBytes } from '../../core/tests/fixtures/font-woff.js';
 import { woff2Bytes } from '../../core/tests/fixtures/font-woff2.js';

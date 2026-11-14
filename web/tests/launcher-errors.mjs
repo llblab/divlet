@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startHub } from '../../core/lib/hub.ts';
+import '@divlet/core/plugins';
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-launcher-errors-')), calls = [], errors = [], checks = [];
 const files = [1, 2, 3, 4].map(n => path.join(root, `${n}.divlet`));

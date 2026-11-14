@@ -9,7 +9,7 @@ import type { HistoryNavigation } from './history.ts';
 import { fileURLToPath } from 'node:url';
 import { clientRoot } from '@divlet/web';
 import { previewBridge } from './bridge.js';
-import { clientPluginFile } from './engine.ts';
+import { clientPluginFile } from './style-engines.ts';
 import { FONT_LIMITS } from './font.ts';
 import { mediaTypeForExtension } from './media-type.ts';
 /**

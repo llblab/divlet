@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
-import { openRuntime } from '../../core/lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 
 const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-history-browser-'));
 await legacyProject(path.join(cwd, 'project.divlet'), { demo: true });

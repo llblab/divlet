@@ -26,7 +26,7 @@ import { assetReference } from './asset-reference.ts';
 import { canonicalMediaType } from './media-type.ts';
 import { readProject, writeProject, validateSettings, patchSettings, expandFrame, listComponents, instancesOf } from './project.ts';
 import { importStatus, importAgain, sourceFor, pageSourceExtensions } from './import.ts';
-import { clientPlugins, compileClasses, customClasses, explainClasses, suggestClasses, warmSuggestions } from './engine.ts';
+import { clientPlugins, compileClasses, customClasses, explainClasses, suggestClasses, warmSuggestions } from './style-engines.ts';
 
 const PACKAGE_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const PROJECT_FILE = 'project.divlet';

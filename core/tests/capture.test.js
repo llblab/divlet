@@ -5,7 +5,7 @@ import os from 'node:os';
 import { setTimeout as wait } from 'node:timers/promises';
 import path from 'node:path';
 import { captureFontCSS } from '../lib/capture.ts';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { decodeHtml } from '../lib/codec.ts';
 import { validateSettings, writeProject } from '../lib/project.ts';
 import { fontBytes, fontDataUrl } from './fixtures/font.js';

@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { readProject, writeProject, validateSettings, patchSettings } from '../lib/project.ts';
 import { readAssets } from '../lib/assets.ts';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { resourceFrame, sampleFrame } from './fixtures/frame-portability.js';
 import { fontDataUrl, fontBytes } from './fixtures/font.js';
 import { inlineDeclaredAssets } from '../lib/static.js';

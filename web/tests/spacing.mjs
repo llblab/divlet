@@ -6,7 +6,7 @@ import { decodeHtml } from '../../core/lib/codec.ts';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { openRuntime } from '../../core/lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 
 const playwright = await import('playwright');
 const root = fileURLToPath(new URL('../../', import.meta.url));

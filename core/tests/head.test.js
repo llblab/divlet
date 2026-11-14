@@ -8,7 +8,7 @@ import { encodeHtml, decodeHtml, exportHtml, renderFile } from '../lib/codec.ts'
 import { decodePage } from '../lib/html-import.ts';
 import { diffDocuments } from '../lib/diff.ts';
 import { writeProject, validateSettings, readProject, expandFrame } from '../lib/project.ts';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 
 const base = () => decodeHtml('<main>Hello</main>', { fallbackId: 'home' });
 const description = 'A "quoted" & <safe> description';

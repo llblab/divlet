@@ -5,7 +5,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { OutputStore, outputDirectory } from '../lib/output.ts';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { validateSettings, patchSettings, readProject, writeProject } from '../lib/project.ts';
 
 async function workspace(t) {

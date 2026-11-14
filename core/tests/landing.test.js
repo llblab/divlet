@@ -13,7 +13,7 @@ import { landingSource, landingDirectory, landingFiles, landingEntries, landingH
 import { landingDemoSnapshot } from '../../scripts/landing-demo.mjs';
 import { checkLanding, buildLanding } from '../../scripts/landing-build.mjs';
 import { OutputStore } from '../lib/output.ts';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const read = name => fs.readFile(path.join(landingDirectory, name), 'utf8');

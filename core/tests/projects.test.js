@@ -7,7 +7,7 @@ import os from 'node:os';
 import { resolveProject, listProjects, createProject, initProject, inspectPath } from '../lib/projects.ts';
 import { launch } from '../lib/launch.ts';
 import divletExtension from '@divlet/pi';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { writeProject, validateSettings, readProject } from '../lib/project.ts';
 import { decodeHtml } from '../lib/codec.ts';
 

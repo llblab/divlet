@@ -11,7 +11,7 @@ import { buildStatic } from '../lib/static.js';
 import { convertHtml, decodePage } from '../lib/html-import.ts';
 import { resolveOpenFile } from '../lib/import.ts';
 import { initProject } from '../lib/projects.ts';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { frameCases, resourceFrame } from './fixtures/frame-portability.js';
 
 for (const { name, run } of frameCases.filter(row => row.name.startsWith('declared resource attribute') || row.name.startsWith('declared head icon'))) test(`native asset carrier codec: ${name}`, () => {

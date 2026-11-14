@@ -4,7 +4,7 @@ import { mkdtemp, readFile, writeFile, rm, mkdir, copyFile } from 'node:fs/promi
 import path from 'node:path';
 import os from 'node:os';
 import { createRequire } from 'node:module';
-import { openRuntime } from '../../core/lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { validateDocument } from '../../core/lib/model.ts';
 
 const require = createRequire(import.meta.url);

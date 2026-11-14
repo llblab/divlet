@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { createSession } from '../core/lib/contract.ts';
-import { openRuntime } from '../core/lib/runtime.js';
+import { openRuntime } from '../core/runtime.ts';
 import { OutputStore, safeDirectory } from '../core/lib/output.ts';
 import { readResourceBytes } from '../core/lib/static.js';
 import { landingSource } from './landing-hash.mjs';

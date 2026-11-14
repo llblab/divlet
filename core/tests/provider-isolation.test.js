@@ -24,7 +24,7 @@ async function packageRoot(name, resolver = require) {
   }
 }
 
-async function capsule(t) {
+async function capsule(t, { writer = false } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'divlet-provider-isolation-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const copy = (from, to) => cp(from, to, { recursive: true, dereference: true, filter: source => path.basename(source) !== 'node_modules' });
@@ -33,18 +33,25 @@ async function capsule(t) {
   await copy(path.join(checkout, 'core/lib'), path.join(root, 'core/lib'));
   await mkdir(path.join(root, 'core/tests/fixtures'), { recursive: true });
   await copy(new URL('./fixtures/frame-portability.js', import.meta.url), path.join(root, 'core/tests/fixtures/frame-portability.js'));
+  const packages = writer ? [...parsers, 'postcss-value-parser', '@xmldom/xmldom', 'marked', 'yaml', '@divlet/web'] : parsers;
   const versions = {};
-  for (const name of parsers) {
-    const directory = await packageRoot(name);
+  for (const name of packages) {
+    const directory = await packageRoot(name, name === '@divlet/web' ? { resolve: name => fileURLToPath(import.meta.resolve(name)) } : require);
     const manifest = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'));
     assert.deepEqual(Object.keys(manifest.optionalDependencies ?? {}), [], 'parser closure must not acquire optional providers');
     const fromPackage = createRequire(path.join(directory, 'package.json'));
     for (const dependency of Object.keys(manifest.dependencies ?? {})) {
-      assert.ok(parsers.includes(dependency), `Undeclared parser dependency: ${dependency}`);
+      assert.ok(packages.includes(dependency), `Undeclared native dependency: ${dependency}`);
       assert.equal(await packageRoot(dependency, fromPackage), await packageRoot(dependency), 'flattening must not change the selected parser graph');
     }
     versions[name] = manifest.version;
-    await copy(directory, path.join(root, 'node_modules', name));
+    if (name === '@divlet/web') {
+      const target = path.join(root, 'node_modules', name), dist = path.join(target, 'dist');
+      await cp(directory, target, { recursive: true, dereference: true, filter: source => !['node_modules', 'dist', 'tests'].includes(path.basename(source)) });
+      // Node does not strip TS inside node_modules. Build only this peer into the isolate, never race shared dist output.
+      execFileSync(process.execPath, [require.resolve('typescript/bin/tsc'), '-p', path.join(directory, 'tsconfig.build.json'), '--outDir', dist], { encoding: 'utf8', timeout: 20000 });
+      for (const asset of ['board.js', 'board.css', 'index.html', 'lib']) await cp(path.join(directory, asset), path.join(dist, asset), { recursive: true, filter: source => !source.endsWith('.ts') });
+    } else await copy(directory, path.join(root, 'node_modules', name));
   }
   return { root, versions };
 }
@@ -208,6 +215,59 @@ test('the Node plugin registry dispatches from one copied source without provide
     await assert.rejects(api.exportAs('broken', {}), { code: 'EXPORT_FAILED' });
     assert.deepEqual([...loaded].filter(url => url.startsWith('file:')), [onlySource], 'type-only contracts never load their model/project owners');
   `], { cwd: directory, env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' }, encoding: 'utf8', timeout: 10000 });
+});
+
+test('the native Node writer/server runs without plugin source or provider packages', async t => {
+  const isolate = await capsule(t, { writer: true });
+  const script = `
+    import assert from 'node:assert/strict';
+    import { promises as fs, realpathSync } from 'node:fs';
+    import { registerHooks } from 'node:module';
+    import { fileURLToPath } from 'node:url';
+    import path from 'node:path';
+    const root = realpathSync(process.cwd()), loaded = new Set();
+    registerHooks({ resolve(specifier, context, next) {
+      const result = next(specifier, context);
+      if (result.url.startsWith('file:')) {
+        const relative = path.relative(root, realpathSync(fileURLToPath(result.url))).split(path.sep).join('/');
+        assert.ok(relative !== '..' && !relative.startsWith('../') && !path.isAbsolute(relative), 'no checkout rescue');
+        assert.ok(!relative.startsWith('plugins/') && !/^core\\/lib\\/(engine|plugins)\\.ts$/.test(relative), 'no default composition in native writer/server');
+        loaded.add(relative);
+      } else assert.ok(result.url.startsWith('node:'));
+      return result;
+    } });
+    const { openRuntime } = await import('./core/lib/runtime.js');
+    const { decodeHtml } = await import('./core/lib/codec.ts');
+    const file = path.join(root, 'workspace/project.divlet');
+    let runtime;
+    try {
+      runtime = await openRuntime({ file, watch: false, createDemo: false });
+      await runtime.create({ document: decodeHtml('<main id="root" style="color:red"><p id="label">One</p></main>', { fallbackId: 'plain' }) });
+      const read = () => runtime.read({ view: 'frame', documentId: 'plain' });
+      const version = read().version, textId = Object.values(read().nodes).find(node => node.type === 'text').id;
+      assert.deepEqual(runtime.info().clientPlugins, []);
+      await runtime.patch({ documentId: 'plain', expectedVersion: version, patch: { nodes: { root: { style: { color: 'blue' } }, [textId]: { content: 'Two' } } } });
+      const accepted = read(), source = await fs.readFile(file, 'utf8');
+      await assert.rejects(runtime.patch({ documentId: 'plain', expectedVersion: version, patch: { name: 'stale' } }), { code: 'REVISION_CONFLICT' });
+      await assert.rejects(runtime.patch({ documentId: 'plain', expectedVersion: accepted.version, patch: { nodes: { root: { style: { color: 'red;display:none' } } } } }), { code: 'INVALID_DOCUMENT' });
+      await assert.rejects(runtime.patch({ documentId: 'plain', expectedVersion: accepted.version, patch: { nodes: { root: { styles: { color: 'green' } } } } }), { code: 'NO_STYLE_ENGINE' });
+      assert.deepEqual(read(), accepted); assert.equal(await fs.readFile(file, 'utf8'), source);
+      await runtime.undo(); assert.equal(read().nodes.root.style.color, 'red');
+      await runtime.redo(); assert.equal(read().nodes.root.style.color, 'blue');
+      const rendered = await fetch(runtime.info().documents[0].viewUrl);
+      assert.equal(rendered.status, 200); const html = await rendered.text();
+      assert.match(html, /color:blue/); assert.match(html, /Two/);
+      assert.equal((await fetch(runtime.url)).status, 200, 'the loopback board serves the actual portable web peer');
+      assert.match((await runtime.exportDocument('plain')).html, /Two/);
+      const saved = read(); await runtime.close(); runtime = null;
+      await fs.rm(path.join(root, 'workspace/.divlet'), { recursive: true, force: true });
+      runtime = await openRuntime({ file, watch: false, createDemo: false });
+      assert.deepEqual(runtime.read({ view: 'frame', documentId: 'plain' }), saved, 'cache-free reopen retains the accepted native source');
+      assert.ok(loaded.has('core/lib/server.ts') && loaded.has('core/lib/import.ts') && loaded.has('core/lib/plugin-registry.ts'));
+    } finally { await runtime?.close(); }
+  `;
+  execFileSync(process.execPath, ['--input-type=module', '-e', script], { cwd: isolate.root, env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '', PI_DIVLET_STATE_DIR: path.join(isolate.root, 'board-state') }, encoding: 'utf8', timeout: 20000 });
+  t.diagnostic(`native writer closure: ${JSON.stringify(isolate.versions)}`);
 });
 
 test('a physically parser-only copy runs the production model binding without a port remap or plugin source', async t => {

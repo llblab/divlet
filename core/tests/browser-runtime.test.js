@@ -6,7 +6,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { BrowserRuntime } from '../lib/browser-runtime.ts';
 import { runOnRuntime } from '../lib/tools.ts';
 import { compileClasses, unknownClasses } from '../lib/engine.ts';

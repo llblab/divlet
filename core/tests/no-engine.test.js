@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { decodeHtml } from '../lib/codec.ts';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { styleEngine, setStyleEngines } from '../lib/engine.ts';
 import { importSource } from '../lib/import.ts';
 

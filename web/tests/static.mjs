@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import http from 'node:http';
 import { chromium } from 'playwright';
-import { openRuntime } from '../../core/lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { decodeHtml } from '../../core/lib/codec.ts';
 import { validateSettings, writeProject } from '../../core/lib/project.ts';
 import { fontDataUrl, fontBytes } from '../../core/tests/fixtures/font.js';

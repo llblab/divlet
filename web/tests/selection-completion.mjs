@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { openRuntime } from '../../core/lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { decodeHtml } from '../../core/lib/codec.ts';
 
 const root = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-selection-completion-'));

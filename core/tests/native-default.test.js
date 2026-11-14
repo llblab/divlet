@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { createDemoDocument } from '../lib/model.ts';
 import { initProject } from '../lib/projects.ts';
 import { OutputStore } from '../lib/output.ts';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 
 const hash = data => createHash('sha256').update(data).digest('hex');
 async function fixture(t) { const root = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-native-default-')); t.after(() => fs.rm(root, { recursive: true, force: true })); return root; }

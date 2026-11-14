@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { chromium } from 'playwright';
 import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
-import { openRuntime } from '../../core/lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 
 const launch = { headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] };
 if (process.env.PI_DIVLET_CHROMIUM_EXECUTABLE) launch.executablePath = process.env.PI_DIVLET_CHROMIUM_EXECUTABLE;

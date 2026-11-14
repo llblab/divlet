@@ -5,7 +5,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import divletExtension, { lastAssistantText } from '../lib/extension.js';
-import { openRuntime } from '../../core/lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { applyOperation } from '../../core/lib/ops.ts';
 import { applyDocumentPatch, createDemoDocument } from '../../core/lib/model.ts';
 import { exportHtml } from '../../core/lib/codec.ts';

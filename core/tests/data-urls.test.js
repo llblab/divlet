@@ -7,7 +7,7 @@ import { safeAttribute, validateDocument } from '../lib/model.ts';
 import { decodeHtml, encodeHtml, exportHtml } from '../lib/codec.ts';
 import { decodePage } from '../lib/html-import.ts';
 import { readProject, writeProject, validateSettings } from '../lib/project.ts';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 
 const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M0 0h20v20H0z"/></svg>';
 const images = [`data:image/svg+xml,${encodeURIComponent(svg)}`, `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`];

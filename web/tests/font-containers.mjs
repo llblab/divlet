@@ -9,7 +9,7 @@ import { legacyProject } from '../../core/tests/fixtures/legacy-project.js';
 import { fontBytes } from '../../core/tests/fixtures/font.js';
 import { cffWoff2Bytes, nullWoff2Bytes, woff2Bytes } from '../../core/tests/fixtures/font-woff2.js';
 import { referenceCffWoffBytes, referenceCff2Bytes } from '../../core/tests/fixtures/font-reference.js';
-import { openRuntime } from '../../core/lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { decodeHtml } from '../../core/lib/codec.ts';
 import { setStyleEngines } from '../../core/lib/engine.ts';
 setStyleEngines([]);

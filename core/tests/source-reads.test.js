@@ -6,7 +6,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';
 import path from 'node:path';
-import { DivletRuntime, openRuntime } from '../lib/runtime.js';
+import { DivletRuntime, openRuntime } from '@divlet/core/runtime';
 import { SOURCE_LIMITS } from '../lib/model.ts';
 
 async function setup(t) {

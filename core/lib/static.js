@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { parse, parseFragment, serialize } from 'parse5';
 import postcss from 'postcss';
 import valueParser from 'postcss-value-parser';
-import { createClassResourceMapper } from './engine.ts';
+import { createClassResourceMapper } from './style-engines.ts';
 import { readAssets, readAssetText } from './assets.ts';
 import { assetReference, readAssetReference, resolveAssetDependency } from './asset-reference.ts';
 import { DivletError } from './validation.ts';

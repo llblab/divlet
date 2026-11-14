@@ -7,8 +7,8 @@
 import { createHash } from 'node:crypto';
 import { constants, promises as fs } from 'node:fs';
 import path from 'node:path';
-import { importerFor, importExtensions, pageExtensions } from './plugins.ts';
-import type { Importer, ReadSource } from './plugins.ts';
+import { importerFor, importExtensions, pageExtensions } from './plugin-registry.ts';
+import type { Importer, ReadSource } from './plugin-registry.ts';
 import { convertHtml, decodePage, summarizeHtml, isHtmlSource, HTML_EXTENSIONS } from './html-import.ts';
 import { SOURCE_LIMITS } from './model.ts';
 import { readProject, writeProject } from './project.ts';

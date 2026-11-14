@@ -13,7 +13,7 @@ const exists = async file => { try { return (await stat(file)).isFile(); } catch
 test('@divlet/core is the shared product library, not a host or command package', async () => {
   assert.equal(pkg.name, '@divlet/core');
   assert.equal(pkg.exports['.'].default, './dist/core/index.js');
-  assert.equal(pkg.exports['./runtime'].default, './dist/core/lib/runtime.js');
+  assert.equal(pkg.exports['./runtime'].default, './dist/core/runtime.js');
   assert.equal(pkg.bin, undefined);
   assert.equal(pkg.pi, undefined);
   assert.equal(pkg.exports['./pi'], undefined, 'the Pi adapter now belongs to @divlet/pi');
@@ -123,6 +123,65 @@ function coldStandalone(script) {
     ${script}
   `], { cwd: root, stdio: 'pipe', timeout: 10000 });
 }
+
+test('cold public runtime composes both bundled defaults without the library root', () => coldStandalone(`
+  const api = await import('@divlet/core/runtime');
+  const native = await import('./core/lib/runtime.js');
+  assert.equal(api.openRuntime, native.openRuntime); assert.equal(api.DivletRuntime, native.DivletRuntime);
+  const styles = await import('./core/lib/style-engines.ts');
+  const plugins = await import('./core/lib/plugin-registry.ts');
+  assert.equal(styles.styleEngine().id, 'tailwind');
+  assert.equal(styles.applyStyles('', { 'padding-top': '12px' }), 'pt-3');
+  assert.deepEqual(plugins.importerList().map(item => item.id), ['pen']);
+  rootGuard.deregister();
+  assert.equal((await import('@divlet/core')).openRuntime, api.openRuntime, 'root and named entry share the native writer');
+`));
+
+test('public runtime composition retains explicit native host absence', () => coldStandalone(`
+  const styles = await import('./core/lib/style-engines.ts'); styles.setStyleEngines([]);
+  const plugins = await import('./core/lib/plugin-registry.ts'); plugins.seedImporters([]);
+  const api = await import('@divlet/core/runtime');
+  assert.equal(typeof api.openRuntime, 'function');
+  assert.equal(styles.styleEngine(), undefined); assert.deepEqual(plugins.importerList(), []);
+  await import('@divlet/core/model');
+  rootGuard.deregister(); await import('@divlet/core');
+  assert.equal(styles.styleEngine(), undefined); assert.deepEqual(plugins.importerList(), []);
+`));
+
+for (const mode of ['resolve', 'lazy-session']) test(`cold public contract retains foreign admission before runtime loading (${mode})`, () => coldStandalone(`
+  const { promises: fs } = await import('node:fs');
+  const os = await import('node:os'); const path = await import('node:path');
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-cold-contract-'));
+  const file = path.join(directory, 'source.pen');
+  const source = JSON.stringify({ version: '2.21', children: [{ id: 'page', name: 'Cold contract', type: 'frame', width: 100, height: 60 }] });
+  let session;
+  try {
+    await fs.writeFile(file, source);
+    const contract = await import('@divlet/core/contract');
+    if (${mode === 'resolve'}) {
+      const result = await contract.resolveOpenFile(file);
+      assert.notEqual(result.file, file, 'contract-only admission must convert before any runtime import');
+      assert.equal(result.created, true); assert.equal(JSON.parse(await fs.readFile(result.file, 'utf8')).schemaVersion, 1);
+    } else {
+      session = contract.createSession({ cwd: directory, attach: false, async openBoard({ file: admitted }) {
+        assert.equal(admitted, path.join(directory, 'source.divlet'), 'source admission precedes the lazy runtime callback');
+        const { openRuntime } = await import('@divlet/core/runtime');
+        return openRuntime({ file: admitted, watch: false, createDemo: false });
+      } });
+      const opened = await session.open({ path: file });
+      assert.equal(opened.kind, 'project'); assert.notEqual(opened.info.project.file, file);
+    }
+    assert.equal(await fs.readFile(file, 'utf8'), source);
+  } finally { await session?.close(); await fs.rm(directory, { recursive: true, force: true }); }
+`));
+
+test('cold public contract preserves explicit native selection', () => coldStandalone(`
+  const styles = await import('./core/lib/style-engines.ts'); styles.setStyleEngines([]);
+  const plugins = await import('./core/lib/plugin-registry.ts'); plugins.seedImporters([]);
+  const contract = await import('@divlet/core/contract');
+  assert.equal(typeof contract.resolveOpenFile, 'function');
+  assert.equal(styles.styleEngine(), undefined); assert.deepEqual(plugins.importerList(), []);
+`));
 
 for (const mode of ['import', 'require']) {
   const load = entry => mode === 'import' ? `await import('@divlet/core/${entry}')` : `require('@divlet/core/${entry}')`;

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { openRuntime } from '../lib/runtime.js';
+import { openRuntime } from '@divlet/core/runtime';
 import { legacyProject } from './fixtures/legacy-project.js';
 
 const frame = (id, extra = {}) => ({ schemaVersion: 1, id, name: id, version: 1, artboard: { x: 0, y: 0, width: 100, height: 100 }, rootId: 'root', tokens: {}, css: '', metadata: {}, nodes: { root: { id: 'root', type: 'element', tag: 'main', children: [] } }, ...extra });

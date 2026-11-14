@@ -4,7 +4,7 @@ import { promises as fs } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
-import { DivletRuntime, openRuntime } from '../lib/runtime.js';
+import { DivletRuntime, openRuntime } from '@divlet/core/runtime';
 import { sampleFrame } from './fixtures/frame-portability.js';
 
 async function sourceFixture(t, outputDir = null) {

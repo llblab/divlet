@@ -6,7 +6,7 @@ import { LIMITS } from './model.ts';
 import type { DocumentModel, Limits, NodeId } from './model.ts';
 import { storedFrame } from './project.ts';
 import type { FrameLookup, ProjectSettings } from './project.ts';
-import { compileClasses, unknownClasses } from './engine.ts';
+import { compileClasses, unknownClasses } from './style-engines.ts';
 import { prepareFrameWith } from './prepare.ts';
 import type { FrameCompiler, PreparedFrame } from './prepare.ts';
 export type { PreparedFrame, FrameCompiler } from './prepare.ts';

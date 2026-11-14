@@ -29,8 +29,8 @@
       "default": "./dist/core/index.js"
     },
     "./runtime": {
-      "divlet-source": "./core/lib/runtime.js",
-      "default": "./dist/core/lib/runtime.js"
+      "divlet-source": "./core/runtime.ts",
+      "default": "./dist/core/runtime.js"
     },
     "./codec": {
       "divlet-source": "./core/lib/codec.ts",
@@ -49,8 +49,8 @@
       "default": "./dist/core/lib/project.js"
     },
     "./contract": {
-      "divlet-source": "./core/lib/contract.ts",
-      "default": "./dist/core/lib/contract.js"
+      "divlet-source": "./core/contract.ts",
+      "default": "./dist/core/contract.js"
     },
     "./boards": {
       "divlet-source": "./core/lib/boards.ts",
