@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { AssetTree, AssetFile, Attrs, Override, CssDeclaration, CssDeclarationOperation } from '../lib/model.ts';
+import type { AssetTree, AssetFile, Attrs, Override, CssDeclaration, CssDeclarationOperation, DocumentModel } from '../lib/model.ts';
 import type { StyleEngine, StyleEngineRequirement, ResolvedStyleEngine } from '../lib/engine.ts';
-import { validDeclarations, parseNativeJson } from '../lib/model.ts';
-import type { JsonTextLimits } from '../lib/model.ts';
+import { validDeclarations, parseNativeJson, normalizeNativeJson, sameNativeJson } from '../lib/model.ts';
+import type { JsonTextLimits, JsonValueLimits } from '../lib/model.ts';
 import type { ProjectRequirements } from '../lib/project.ts';
 import { validateRequirements } from '../lib/project.ts';
 
@@ -42,6 +42,13 @@ const decodedText: unknown = parseNativeJson('{"schemaVersion":1}', jsonTextLimi
 const uncheckedDocument: DocumentModel = decodedText;
 // @ts-expect-error JSON container nesting is not the source/DOM depth capacity.
 const wrongJsonLimits: JsonTextLimits = { bytes: 1024, depth: 16 };
+const jsonValueLimits: JsonValueLimits = { nodes: 1024, nesting: 16 };
+const decodedValue: unknown = normalizeNativeJson({ value: -0 }, jsonValueLimits);
+const equalNativeValues: boolean = sameNativeJson(decodedValue, { value: 0 });
+// @ts-expect-error Object-only value normalization does not attest a document's schema or fields.
+const uncheckedValueDocument: DocumentModel = decodedValue;
+// @ts-expect-error Object-only expanded-value capacities are not text-byte capacities.
+const wrongValueLimits: JsonValueLimits = { bytes: 1024, nesting: 16 };
 const nativeRequirements: ProjectRequirements = {};
 const declaredRequirements: ProjectRequirements = { styleEngine: requiredEngine };
 const decodedRequirements: ProjectRequirements = validateRequirements(declaredRequirements);
@@ -63,6 +70,11 @@ test('renderer types distinguish legacy capabilities from exact compiling requir
   assert.deepEqual(decodedText, { schemaVersion: 1 });
   assert.deepEqual(nativeRequirements, {});
   assert.deepEqual(decodedEngine, requiredEngine);
+});
+
+test('native value types distinguish bounded JSON data from admitted documents', () => {
+  assert.deepEqual(decodedValue, { value: 0 });
+  assert.equal(equalNativeValues, true);
 });
 
 test('ordered CSS types distinguish literal declarations from property operations', () => {

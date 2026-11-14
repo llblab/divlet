@@ -30,6 +30,7 @@ const files = new Map([
   [`${prefix}asset-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/asset-references.js', import.meta.url), 'utf8')]],
   [`${prefix}cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/validation.js', import.meta.url), 'utf8')]],
   [`${prefix}json-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/native-json.js', import.meta.url), 'utf8')]],
+  [`${prefix}value-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/native-values.js', import.meta.url), 'utf8')]],
   [`${prefix}model.js`, ['text/javascript', bundle.code]],
   [`${prefix}codec.js`, ['text/javascript', codecBundle.code]],
   [`${prefix}css-annotations.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/css-annotations.js', import.meta.url), 'utf8')]],
@@ -132,6 +133,13 @@ try {
       element.remove();
       return padding;
     });
+    const { nativeValueCases, nativeEqualityCases, captureNativeValue } = await import(new URL('value-cases.js', location.href).href);
+    const nativeValues = nativeValueCases.map(({ name, input, limits, expected }) => ({ name, actual: captureNativeValue(api, input(), limits), expected }));
+    const nativeEquality = nativeEqualityCases.map(({ name, a, b, expected }) => ({ name, actual: api.sameNativeJson(a(), b()), expected }));
+    let deepValue = -0;
+    for (let index = 0; index < 10000; index++) deepValue = [deepValue];
+    const deepCopy = api.normalizeNativeJson(deepValue, { nodes: 10001, nesting: 10000 });
+    const deepNativeEqual = api.sameNativeJson(deepValue, deepCopy);
     const [codec, { cssAnnotationCases }] = await Promise.all(['codec.js', 'css-annotations.js'].map(file => import(new URL(file, location.href).href)));
     const cssAnnotations = cssAnnotationCases.map(({ name, literal, comment, html }) => {
       const inline = codec.decodeHtml(html), pasted = codec.htmlToSpecs(html);
@@ -145,6 +153,9 @@ try {
       return { name, inline: inline.nodes[inline.rootId].style.content, pasted: pasted[0].style.content, frame, reopened, refusals, computed };
     });
     return {
+      nativeValues,
+      nativeEquality,
+      deepNativeEqual,
       cssAnnotations,
       orderedCssPadding,
       requirements: requirementResults,
@@ -199,7 +210,8 @@ try {
   assert.deepEqual(result.nodeGlobals, [], 'no Node globals/polyfills supply the kernel');
   assert.deepEqual(result.orderedCssPadding, ['10px', '20px'], 'validated declaration order survives the shared serializer and actual browser cascade');
   assert.ok(result.cases.length > 25, 'the shared acceptance/refusal regions are exercised');
-  for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.references, ...result.requirements, ...result.nativeJson, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
+  for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.references, ...result.requirements, ...result.nativeJson, ...result.nativeValues, ...result.nativeEquality, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
+  assert.equal(result.deepNativeEqual, true, 'caller-selected deep native value normalization/equality is iterative in Chromium');
   assert.deepEqual(result.frames, expectedFrames, 'the same full-frame validation, patch and inspection semantics run in Node and browser');
   for (let index = 0; index < cssAnnotationCases.length; index++) {
     const { name, literal } = cssAnnotationCases[index], row = result.cssAnnotations[index];
@@ -216,7 +228,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

@@ -12,8 +12,8 @@ import type { CssDeclaration, CssDeclarationOperation } from './declarations.ts'
 import postcssParse from 'postcss/lib/parse';
 import type postcss from 'postcss';
 import { DivletError, ID, fail, object, string, keys, json, withinUtf8Budget } from './validation.ts';
-export { DivletError, ID, fail, object, string, keys, json, parseNativeJson } from './validation.ts';
-export type { JsonTextLimits } from './validation.ts';
+export { DivletError, ID, fail, object, string, keys, json, parseNativeJson, normalizeNativeJson, sameNativeJson } from './validation.ts';
+export type { JsonTextLimits, JsonValueLimits } from './validation.ts';
 
 /** A JSON value as it may be stored in metadata, overrides and tokens. */
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
