@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import type { AssetTree, AssetFile, Attrs, Override, CssDeclaration, CssDeclarationOperation } from '../lib/model.ts';
 import type { StyleEngine, StyleEngineRequirement, ResolvedStyleEngine } from '../lib/engine.ts';
 import { validDeclarations } from '../lib/model.ts';
+import type { ProjectRequirements } from '../lib/project.ts';
+import { validateRequirements } from '../lib/project.ts';
 
 const assets: AssetTree = { brand: { logo: 'data:image/svg+xml;base64,AA==' } };
 const decodedAsset: AssetFile = { mediaType: 'image/png', bytes: new Uint8Array([1]) };
@@ -33,6 +35,14 @@ const invalidTuple: CssDeclaration = ['color', 'red', 'blue'];
 
 const requiredEngine: StyleEngineRequirement = { id: 'example', version: 'renderer-1' };
 const legacyEngine: StyleEngine = { id: 'legacy' };
+const nativeRequirements: ProjectRequirements = {};
+const declaredRequirements: ProjectRequirements = { styleEngine: requiredEngine };
+const decodedRequirements: ProjectRequirements = validateRequirements(declaredRequirements);
+const decodedEngine: StyleEngineRequirement | undefined = decodedRequirements.styleEngine;
+// @ts-expect-error The native dependency profile is not a plugin-defined bag of fields.
+const unknownRequirements: ProjectRequirements = { scripts: [] };
+// @ts-expect-error A declared renderer requires an exact string version.
+const incompleteRequirements: ProjectRequirements = { styleEngine: { id: 'example' } };
 // @ts-expect-error Exact renderer requirements cannot omit the version.
 const missingRendererVersion: StyleEngineRequirement = { id: 'example' };
 // @ts-expect-error A resolved rendering requirement must provide compilation.
@@ -43,6 +53,8 @@ const numericRendererVersion: StyleEngineRequirement = { id: 'example', version:
 test('renderer types distinguish legacy capabilities from exact compiling requirements', () => {
   assert.equal(requiredEngine.version, 'renderer-1');
   assert.equal(legacyEngine.version, undefined);
+  assert.deepEqual(nativeRequirements, {});
+  assert.deepEqual(decodedEngine, requiredEngine);
 });
 
 test('ordered CSS types distinguish literal declarations from property operations', () => {

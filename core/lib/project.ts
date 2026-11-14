@@ -15,6 +15,8 @@ import {
 } from './model.ts';
 import { withinUtf8Budget } from './validation.ts';
 import type { Attrs, DocumentModel, Limits, Metadata, Node, NodeId, Override, Style } from './model.ts';
+export type { ProjectRequirements } from './model.ts';
+export { validateRequirements } from './requirements.ts';
 
 export const PROJECT_SCHEMA = 1;
 const MAX_FRAMES = SOURCE_LIMITS.roots;

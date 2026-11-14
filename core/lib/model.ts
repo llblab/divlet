@@ -11,8 +11,8 @@ import { readAssetReference } from './asset-reference.ts';
 import type { CssDeclaration, CssDeclarationOperation } from './declarations.ts';
 import postcssParse from 'postcss/lib/parse';
 import type postcss from 'postcss';
-import { DivletError, fail, object, string, keys, json, withinUtf8Budget } from './validation.ts';
-export { DivletError, fail, object, string, keys, json } from './validation.ts';
+import { DivletError, ID, fail, object, string, keys, json, withinUtf8Budget } from './validation.ts';
+export { DivletError, ID, fail, object, string, keys, json } from './validation.ts';
 
 /** A JSON value as it may be stored in metadata, overrides and tokens. */
 export type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
@@ -24,6 +24,10 @@ export type Style = Record<string, string>;
 export type StyleOverrides = Record<string, string | null>;
 /** Ordered CSS contracts; stored Style fields remain maps until the coherent draft cutover. */
 export type { CssDeclaration, CssDeclarationOperation } from './declarations.ts';
+/** Exact renderer identity: an opaque case-sensitive version, never a semver range to resolve. */
+export interface StyleEngineRequirement { id: string; version: string }
+/** Target native dependency profile; not yet activated in project settings or wire readers. */
+export interface ProjectRequirements { styleEngine?: StyleEngineRequirement }
 /** Project-owned resource directories; leaves are canonical base64 Data URLs, not filesystem paths. */
 export interface AssetTree { [name: string]: string | AssetTree }
 /** A decoded resource for a prepared output candidate, never persisted as JSON. */
@@ -106,7 +110,6 @@ const TABLE_PARENTS = new Map<string, string[]>();
 for (const [parent, children] of Object.entries(TABLE_CHILDREN)) {
   for (const child of children) TABLE_PARENTS.set(child, [...(TABLE_PARENTS.get(child) ?? []), parent]);
 }
-export const ID = /^[A-Za-z][A-Za-z0-9_.:-]{0,95}$/;
 const TOKEN = /^--[A-Za-z_][A-Za-z0-9_-]*$/;
 const DOC_KEYS: ReadonlySet<string> = new Set('schemaVersion id name head version artboard rootId tokens css metadata nodes'.split(' '));
 const ELEMENT_KEYS: ReadonlySet<string> = new Set('id type tag attrs className style metadata children reusable'.split(' '));

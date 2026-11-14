@@ -124,7 +124,8 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | Module | Responsibility |
 | --- | --- |
 | `core/lib/model.ts` | Native vocabulary, validation/resource URL contexts, limits and patches. |
-| `core/lib/validation.ts` | Host-free JSON/text/UTF-8 checks and the shared domain error. |
+| `core/lib/validation.ts` | Host-free JSON/text/UTF-8 checks, shared identifier grammar and domain error. |
+| `core/lib/requirements.ts` | Opt-in requirements; no provider lookup/loading or project activation. |
 | `web/lib/board-session.ts` | Opaque reads/snapshots and optional view-state publication; no project writes. |
 | `web/lib/board-host.ts` | Writer, preview, export and component ports, optional History/source-update services and the alternative `BoardHostComposition`. |
 | `web/lib/mcp-tools.ts`, `mcp-provider.ts`, `webmcp.ts` | `@divlet/web/mcp`: one tool registry with bounded schema validation, the MCP 2026-07-28 browser provider and its page endpoint, optional WebMCP registration. |

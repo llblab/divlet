@@ -17,6 +17,8 @@ export class DivletError extends Error {
 
 /** An object at the admission boundary, before its fields have been validated. */
 type Unchecked = Record<string, any>;
+/** Shared native identifier grammar; consumers decide the field's diagnostics. */
+export const ID = /^[A-Za-z][A-Za-z0-9_.:-]{0,95}$/;
 const BAD_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
 
 export function fail(message: string, details?: unknown, code = 'INVALID_DOCUMENT'): never {

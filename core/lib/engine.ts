@@ -8,7 +8,8 @@
  * here so callers stay typed no matter which engine is registered.
  */
 import tailwind from '../../plugins/tailwind/index.js';
-import type { Style, StyleOptions } from './model.ts';
+import type { Style, StyleOptions, StyleEngineRequirement } from './model.ts';
+export type { StyleEngineRequirement } from './model.ts';
 
 /** What one explanation says about a class: a utility with its CSS, a rule of the project's own CSS, a marker, or nothing. */
 export interface ClassExplanation { kind: 'utility' | 'custom' | 'marker' | 'unknown'; lines: string[]; color?: string; custom?: string }
@@ -27,9 +28,6 @@ export interface ClassResourceOptions {
   onNumericReference?: (name: string) => void;
   onVariableDefinition?: (name: string) => void;
 }
-
-/** Exact renderer identity in a validated requirement; version is an opaque token, not a semver range. */
-export interface StyleEngineRequirement { id: string; version: string }
 
 /** Everything a style engine may provide. Capabilities are optional; a required renderer must provide compilation. */
 export interface StyleEngine {
