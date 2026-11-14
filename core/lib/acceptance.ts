@@ -3,9 +3,9 @@
  * project-field diffs for history, and the expected version/render guards. Excludes: state, persistence and scheduling.
  * The Node runtime and the browser runtime both import these, so a revision or no-op decision cannot differ between hosts.
  */
-import { applyDocumentPatch, DivletError } from './model.ts';
+import { DivletError } from './model.ts';
 import type { DocumentModel } from './model.ts';
-import { diffDocuments, diffValue, documentStyleSequence } from './diff.ts';
+import { diffValue, documentStyleSequence } from './diff.ts';
 import { sameJson } from './validation.ts';
 
 export const SETTINGS_FIELDS = ['name', 'tokens', 'css', 'metadata', 'outputDir', 'assets'] as const;
@@ -13,15 +13,6 @@ export const SETTINGS_FIELDS = ['name', 'tokens', 'css', 'metadata', 'outputDir'
 export const sameDocument = (a: DocumentModel, b: DocumentModel): boolean => sameJson({ ...a, version: 0 }, { ...b, version: 0 }) && sameJson(documentStyleSequence(a), documentStyleSequence(b));
 export const sameSettings = (a: any, b: any): boolean => SETTINGS_FIELDS.every(key => sameJson(a[key], b[key]));
 export const settingsPatch = (from: any, to: any): Record<string, unknown> => Object.fromEntries(SETTINGS_FIELDS.map(key => [key, diffValue(from[key], to[key])]).filter(([, value]) => value !== undefined));
-
-/** A live source edit must not accept a hash whose style order its merge-patch history would lose. */
-export function assertReplayableStyleTransition(from: DocumentModel, to: DocumentModel): void {
-  const before = documentStyleSequence(from), after = documentStyleSequence(to);
-  if (sameJson(before, after)) return;
-  const forward = documentStyleSequence(applyDocumentPatch(from, diffDocuments(from, to)));
-  const inverse = documentStyleSequence(applyDocumentPatch(to, diffDocuments(to, from)));
-  if (!sameJson(forward, after) || !sameJson(inverse, before)) throw new DivletError('UNSUPPORTED_STYLE_REPLAY', 'This live source edit cannot preserve inline declarations or override operations through current merge-patch Undo/Redo. Restore the accepted source or explicitly reopen it; the board keeps its last working state.');
-}
 
 /** Patches require the read version, including no-ops; lifecycle callers retain the separate optional guard below. */
 export function assertPatchVersion(expected: unknown, target: { readonly version: number }, what: 'frame' | 'project' = 'frame'): void {

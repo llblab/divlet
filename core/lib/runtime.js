@@ -12,10 +12,10 @@ import { startServer } from './server.ts';
 import { registerBoard, unregisterBoard } from './boards.ts';
 import { buildSite } from './site.ts';
 import { documentHistoryPatch, diffValue, summarizeChange, touchedNodeIds } from './diff.ts';
-import { replayHistory } from './history-replay.ts';
+import { replayHistory, projectHistoryItems, assertProjectHistoryRoundTrip } from './history-replay.ts';
 import { operationPatch } from './ops.ts';
 import { HistoryLine, planHistoryTraversal, validateHistoryNavigation, planHistoryNavigation } from './history.ts';
-import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertPatchVersion, assertExpectedVersion, assertExpectedRender, assertReplayableStyleTransition } from './acceptance.ts';
+import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertPatchVersion, assertExpectedVersion, assertExpectedRender } from './acceptance.ts';
 import { expandPath, inspectPath, initProject, resolveProject, isProjectFile } from './projects.ts';
 import { OutputStore, safeDirectory } from './output.ts';
 import { buildStatic, inlineDeclaredAssets, readResourceBytes, normalizeExternalFiles } from './static.js';
@@ -857,7 +857,6 @@ await this.importProject(project.settings, project.frames, hash);
     const created = [];
     for (const frame of frames) {
       const current = this.documents.get(frame.id);
-      if (current) assertReplayableStyleTransition(current.document, frame);
       if (current && sameDocument(current.document, frame)) docs.set(frame.id, current.document);
       else if (current) { docs.set(frame.id, { ...frame, version: current.document.version + 1 }); changed.push(frame.id); }
       else { docs.set(frame.id, frame); created.push(frame.id); }
@@ -869,9 +868,13 @@ await this.importProject(project.settings, project.frames, hash);
     const prepared = await this.prepareAll(rerender, docs, nextSettings);
     const next = new Map();
     for (const id of docs.keys()) next.set(id, prepared.has(id) ? this.entryFor(prepared.get(id), this.documents.get(id)) : this.documents.get(id));
-    await this.persist(next, { settings: nextSettings, write: rerender, removed: removed.map(id => this.documents.get(id)), sourceHash: hash });
     const previous = this.documents;
     const previousSettings = this.settings;
+    const previousFrames = new Map([...previous].map(([id, entry]) => [id, entry.document]));
+    const nextFrames = new Map([...next].map(([id, entry]) => [id, entry.document]));
+    const items = projectHistoryItems(previousFrames, previousSettings, nextFrames, nextSettings);
+    assertProjectHistoryRoundTrip(previousFrames, previousSettings, nextFrames, nextSettings, items);
+    await this.persist(next, { settings: nextSettings, write: rerender, removed: removed.map(id => this.documents.get(id)), sourceHash: hash });
     this.documents = next;
     this.settings = nextSettings;
     this.revision++;
@@ -879,35 +882,27 @@ await this.importProject(project.settings, project.frames, hash);
     await this.refreshSite();
     const group = this.newGroup();
     const firstSeq = this.seq + 1;
-    const items = [];
     if (settingsChanged) {
       this.record({ actor: 'file', kind: 'external', documentId: null, name: nextSettings.name, group, label: 'project.divlet edit', text: `project ${SETTINGS_FIELDS.filter(key => !isDeepStrictEqual(previousSettings[key], nextSettings[key])).join(', ')}` });
-      items.push({ type: 'project', inverse: settingsPatch(nextSettings, previousSettings), forward: settingsPatch(previousSettings, nextSettings) });
     }
     for (const id of changed) {
       const from = previous.get(id).document;
       const to = next.get(id).document;
       this.record({ actor: 'file', kind: 'external', documentId: id, fromVersion: from.version, toVersion: to.version, group, label: 'project.divlet edit', from, to });
-      items.push({ type: 'patch', documentId: id, ...documentHistoryPatch(from, to) });
     }
     const previousOrder = [...previous.keys()], nextOrder = [...next.keys()];
-    const previousIndex = new Map(previousOrder.map((id, index) => [id, index]));
-    const nextIndex = new Map(nextOrder.map((id, index) => [id, index]));
-    // Remove from the end, then insert at final positions: reverse replay restores original positions from the start.
+    // Audit membership in the same order as the preflighted transaction.
     for (const id of [...removed].reverse()) {
       const from = previous.get(id).document;
       this.record({ actor: 'file', kind: 'delete', documentId: id, name: from.name, fromVersion: from.version, group, from, to: { ...from, nodes: {} }, text: `frame removed “${from.name}”` });
-      items.push({ type: 'delete', documentId: id, index: previousIndex.get(id), document: structuredClone(from) });
     }
     for (const id of created) {
       const to = next.get(id).document;
       this.record({ actor: 'file', kind: 'create', documentId: id, toVersion: to.version, group, from: { ...to, nodes: {} }, to, text: `new frame “${to.name}” · ${Object.keys(to.nodes).length} nodes` });
-      items.push({ type: 'create', documentId: id, index: nextIndex.get(id), document: structuredClone(to) });
     }
     const before = previousOrder.filter(id => next.has(id)), after = nextOrder.filter(id => previous.has(id));
     if (!isDeepStrictEqual(before, after)) {
       this.record({ actor: 'file', kind: 'external', documentId: null, group, label: 'project.divlet edit', text: 'frame order changed' });
-      items.push({ type: 'order', inverse: before, forward: after });
     }
     if (items.length) this.pushUndo({ group, label: 'edit of project.divlet', items }, { firstSeq });
     this.publish();

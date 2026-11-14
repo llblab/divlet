@@ -42,6 +42,41 @@ export function literalStyleReplay(api) {
 }
 
 export const historyReplayCases = [
+  { name: 'project transaction planning proves mixed settings/style/membership/order replay', expected: { types: ['project', 'patch', 'delete', 'create', 'order'], redo: ['d', 'c', 'a'], undo: ['a', 'b', 'c'], style: [['padding', '10px'], ['padding-left', '20px']], createdMetadata: { literal: null } }, run: api => {
+    const before = context(api, ['a', 'b', 'c']), original = before.frames.get('a');
+    const changed = api.validateDocument({ ...original, nodes: { ...original.nodes, root: { ...original.nodes.root, style: { padding: '10px', 'padding-left': '20px' } } } });
+    const created = api.validateDocument({ ...frame('d'), metadata: { literal: null } });
+    const next = new Map([['d', created], ['c', before.frames.get('c')], ['a', changed]]), settings = { ...before.settings, name: 'Next' };
+    const items = api.projectHistoryItems(before.frames, before.settings, next, settings);
+    const bytes = JSON.stringify([[...before.frames], before.settings, [...next], settings, items]);
+    api.assertProjectHistoryRoundTrip(before.frames, before.settings, next, settings, items);
+    if (JSON.stringify([[...before.frames], before.settings, [...next], settings, items]) !== bytes) throw new Error('Transaction proof mutated its inputs');
+    const redo = replay(api, before, items, 'redo'), undo = replay(api, redo, items, 'undo');
+    return { types: items.map(item => item.type), redo: [...redo.frames.keys()], undo: [...undo.frames.keys()], style: Object.entries(redo.frames.get('a').nodes.root.style), createdMetadata: redo.frames.get('d').metadata };
+  } },
+  { name: 'transaction proof refuses lossy project metadata null', error: 'UNSUPPORTED_SOURCE_REPLAY', run: api => {
+    const before = context(api), nextSettings = { ...before.settings, metadata: { literal: null } };
+    return api.assertProjectHistoryRoundTrip(before.frames, before.settings, before.frames, nextSettings, api.projectHistoryItems(before.frames, before.settings, before.frames, nextSettings));
+  } },
+  { name: 'transaction proof refuses node metadata loss even when its style is replayable', error: 'UNSUPPORTED_SOURCE_REPLAY', run: api => {
+    const before = overrideContext(api, { definition: { style: { padding: null } } }), frame = before.frames.get('a');
+    const original = api.validateDocument({ ...frame, nodes: { ...frame.nodes, instance: { ...frame.nodes.instance, metadata: { literal: null } } } });
+    const previous = new Map([['a', original]]), removed = api.applyDocumentPatch(original, { nodes: { root: { children: ['definition'] }, instance: null } }), next = new Map([['a', removed]]);
+    return api.assertProjectHistoryRoundTrip(previous, before.settings, next, before.settings, api.projectHistoryItems(previous, before.settings, next, before.settings));
+  } },
+  { name: 'transaction proof retains untouched metadata null through a style change', expected: { literal: null }, run: api => {
+    const before = context(api), frame = before.frames.get('a');
+    const original = api.validateDocument({ ...frame, metadata: { literal: null } }), previous = new Map([['a', original]]);
+    const next = new Map([['a', api.applyDocumentPatch(original, { nodes: { root: { style: { padding: '12px' } } } })]]);
+    api.assertProjectHistoryRoundTrip(previous, before.settings, next, before.settings, api.projectHistoryItems(previous, before.settings, next, before.settings));
+    return next.get('a').metadata;
+  } },
+  { name: 'transaction proof refuses a missing order-only history item', error: 'UNSUPPORTED_SOURCE_REPLAY', run: api => {
+    const before = context(api), frame = before.frames.get('a');
+    const next = new Map([['a', api.validateDocument({ ...frame, nodes: { ...frame.nodes, root: { ...frame.nodes.root, style: { padding: '10px', 'padding-left': '20px' } } } })]]);
+    return api.assertProjectHistoryRoundTrip(before.frames, before.settings, next, before.settings, []);
+  } },
+
   { name: 'literal whole-block history restores order and repeats in both directions', expected: { styles: [[['padding-left', '20px'], ['padding', '10px']], [['padding', '10px']], [['padding-left', '20px'], ['padding', '10px']], [['padding', '10px']]], versions: [5, 6, 7, 8] }, run: api => {
     const documents = literalStyleReplay(api);
     return { styles: documents.map(document => Object.entries(document.nodes.root.style)), versions: documents.map(document => document.version) };

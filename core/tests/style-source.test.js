@@ -1,11 +1,12 @@
-// The draft map profile cannot express every ordered style transition as reversible merge patches.
-// Refuse those live source edits before accepting their hash, rather than overwriting them on a later unrelated write.
+// Live source styles use the same exact session blocks as tool history; invalid/racing candidates stay unaccepted.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { openRuntime } from '@divlet/core/runtime';
+import { readProject } from '@divlet/core/project';
 import { componentTextProject } from './fixtures/component-text.js';
 
 const initial = { 'padding-left': '20px', padding: '10px' };
@@ -20,7 +21,7 @@ async function fixture(t, kind = 'literal', style = initial, setup = () => {}) {
   await fs.writeFile(file, JSON.stringify(source));
   const runtime = await openRuntime({ file, watch: false, createDemo: false });
   t.after(async () => { await runtime.close(); await fs.rm(directory, { recursive: true, force: true }); });
-  // Retain real stack/point authority and a captured selection through the refusal.
+  // Keep real Undo/Redo groups and a captured selection across source acceptance or refusal.
   await runtime.patch({ documentId: 'definitions', expectedVersion: runtime.getEntry('definitions').document.version, patch: { nodes: { label: { content: 'Accepted' } } } });
   await runtime.patch({ documentId: 'consumer', expectedVersion: runtime.getEntry('consumer').document.version, patch: { name: 'Temporary' } });
   await runtime.undo(); // Leave both a real Undo group and a real Redo group available.
@@ -37,49 +38,155 @@ async function state(runtime) {
   };
 }
 
-const refusals = ['literal', 'override'].flatMap(kind => [
+for (const kind of ['literal', 'override']) test(`live ${kind} order-only source edits use exact history blocks`, async t => {
+  const { runtime, file } = await fixture(t, kind);
+  const read = () => location({ frames: [runtime.getEntry('definitions').document, runtime.getEntry('consumer').document] }, kind).style;
+  const original = Object.entries(read()), selected = structuredClone(runtime.selection), point = runtime.historyHead().pointId;
+  const source = JSON.parse(await fs.readFile(file, 'utf8'));
+  location(source, kind).style = reordered;
+  await fs.writeFile(file, JSON.stringify(source)); await runtime.scan();
+  assert.equal(runtime.diagnostics.has(file), false, 'whole-block history makes the old merge-only source refusal obsolete');
+  assert.deepEqual(Object.entries(read()), Object.entries(reordered));
+  assert.deepEqual(runtime.selection, selected, 'content/history do not manufacture a new captured selection');
+  assert.notEqual(runtime.historyHead().pointId, point);
+  await runtime.undo(); assert.deepEqual(Object.entries(read()), original);
+  await runtime.redo(); assert.deepEqual(Object.entries(read()), Object.entries(reordered));
+});
+
+const transitions = ['literal', 'override'].flatMap(kind => [
   ['order only', reordered],
   ['order and value', { padding: '11px', 'padding-left': '20px' }],
   ['inverse cannot restore removed first property', { padding: '10px' }],
   ...(kind === 'override' ? [['stored null operation cannot become a sparse patch deletion', { 'padding-left': '20px', padding: null }]] : []),
 ].map(([name, style]) => ({ kind, name, edit: source => { location(source, kind).style = style; } })));
 const storedNull = { 'padding-left': null, padding: '10px' };
-refusals.push(
-  { kind: 'override', name: 'stored-null node removal', initialStyle: storedNull, edit: source => { delete source.frames[1].nodes.instance; source.frames[1].nodes.root.children = []; } },
+transitions.push(
+  { kind: 'override', name: 'stored-null node removal', initialStyle: storedNull, setup: source => { source.frames[1].nodes.instance.metadata = { literal: 'retained' }; }, edit: source => { delete source.frames[1].nodes.instance; source.frames[1].nodes.root.children = []; } },
   { kind: 'override', name: 'stored-null address removal', initialStyle: storedNull, edit: source => { delete source.frames[1].nodes.instance.descendants.button; } },
   { kind: 'override', name: 'stored-null node creation', edit: source => {
-    source.frames[1].nodes.second = { ...structuredClone(source.frames[1].nodes.instance), id: 'second', descendants: { button: { style: storedNull } } };
+    source.frames[1].nodes.second = { ...structuredClone(source.frames[1].nodes.instance), id: 'second', metadata: { literal: 'retained' }, descendants: { button: { style: storedNull } } };
     source.frames[1].nodes.root.children.push('second');
   } },
   { kind: 'override', name: 'stored-null address creation', setup: source => { delete source.frames[1].nodes.instance.descendants.button; }, edit: source => { source.frames[1].nodes.instance.descendants.button = { style: storedNull }; } },
 );
-for (const { kind, name, edit, initialStyle, setup } of refusals) test(`live ${kind} source refuses ${name} without accepting its hash or losing bytes`, async t => {
+const digest = text => createHash('sha256').update(text).digest('hex');
+const stylesOf = frames => frames.flatMap(frame => Object.keys(frame.nodes).sort().flatMap(id => {
+  const node = frame.nodes[id];
+  if (node.type === 'element') return [[frame.id, id, null, Object.entries(node.style ?? {})]];
+  return node.type !== 'ref' ? [] : Object.keys(node.descendants ?? {}).sort().flatMap(address => {
+    const style = node.descendants[address].style;
+    return style === undefined ? [] : [[frame.id, id, address, Object.entries(style)]];
+  });
+}));
+const acceptedStyles = runtime => stylesOf([...runtime.documents.values()].map(entry => entry.document));
+
+for (const { kind, name, edit, initialStyle, setup } of transitions) test(`live ${kind} source accepts and replays ${name} exactly`, async t => {
   const { runtime, file } = await fixture(t, kind, initialStyle, setup);
-  const before = await state(runtime);
-  const accepted = await fs.readFile(file, 'utf8');
-  const source = JSON.parse(accepted);
-  edit(source);
-  source.name = 'Collateral change must not commit';
+  runtime.setSelection({ documentId: 'consumer', ids: [runtime.getEntry('consumer').document.rootId] });
+  const before = await state(runtime), original = acceptedStyles(runtime), originalName = runtime.settings.name;
+  const source = JSON.parse(await fs.readFile(file, 'utf8'));
+  edit(source); source.name = 'Accepted external style edit';
+  const expected = stylesOf(source.frames);
+  await fs.writeFile(file, JSON.stringify(source, null, '\t') + '\r\n');
+  await runtime.scan();
+  assert.equal(runtime.diagnostics.has(file), false);
+  assert.deepEqual(acceptedStyles(runtime), expected);
+  assert.deepEqual(stylesOf(JSON.parse(await fs.readFile(file, 'utf8')).frames), expected);
+  assert.equal(runtime.knownHashes.get(file), digest(await fs.readFile(file, 'utf8')));
+  assert.deepEqual(runtime.selection, before.selection, 'captured selection is not refreshed by content/history');
+  assert.equal(runtime.settings.name, source.name);
+  assert.equal(runtime.revision, before.revision + 1);
+  assert.equal(runtime.redoStack.length, 0, 'source acceptance discards the prior future');
+  assert.ok(runtime.undoStack.at(-1).items.some(item => item.styleBlocks?.length));
+  const point = runtime.historyHead().pointId, accepted = await state(runtime);
+  await runtime.scan(); assert.deepEqual(await state(runtime), accepted, 'own canonical write produces no echo');
+  for (let iteration = 0; iteration < 2; iteration++) {
+    await runtime.undo();
+    assert.deepEqual(acceptedStyles(runtime), original);
+    assert.deepEqual(stylesOf(JSON.parse(await fs.readFile(file, 'utf8')).frames), original);
+    assert.equal(runtime.settings.name, originalName);
+    assert.equal(runtime.historyHead().pointId, before.point);
+    await runtime.redo();
+    assert.deepEqual(acceptedStyles(runtime), expected);
+    assert.deepEqual(stylesOf(JSON.parse(await fs.readFile(file, 'utf8')).frames), expected);
+    assert.equal(runtime.historyHead().pointId, point);
+    assert.deepEqual(runtime.selection, before.selection);
+  }
+  await runtime.patch({ documentId: 'definitions', expectedVersion: runtime.getEntry('definitions').document.version, patch: { nodes: { label: { content: 'Unrelated' } } } });
+  assert.deepEqual(acceptedStyles(runtime), expected, 'an unrelated accepted write retains exact style state');
+});
+
+async function refusedSource(t, { kind = 'literal', initialStyle, edit, code }) {
+  const { runtime, file } = await fixture(t, kind, initialStyle);
+  const before = await state(runtime), accepted = await fs.readFile(file, 'utf8');
+  const source = JSON.parse(accepted); edit(source);
+  if (code === 'UNSUPPORTED_SOURCE_REPLAY') assert.doesNotThrow(() => readProject(source), 'live replay refusal does not change fresh reader grammar');
   const authored = JSON.stringify(source, null, '\t') + '\r\n';
-  await fs.writeFile(file, authored);
-  await runtime.scan();
-  assert.equal(runtime.diagnostics.get(file)?.code, 'UNSUPPORTED_STYLE_REPLAY');
-  assert.deepEqual(await state(runtime), before, 'accepted model, output, selection, hashes and complete stacks stay unchanged');
+  await fs.writeFile(file, authored); await runtime.scan();
+  assert.equal(runtime.diagnostics.get(file)?.code, code);
+  assert.deepEqual(await state(runtime), before, 'models/output/selection/revision/settings/history/stacks/point/known hash stay unchanged');
   assert.equal(await fs.readFile(file, 'utf8'), authored);
-  await runtime.scan();
-  assert.deepEqual(await state(runtime), before, 'repeat reads do not accept the rejected source hash');
+  assert.equal(runtime.badHashes.get(file), digest(authored));
+  await runtime.scan(); assert.deepEqual(await state(runtime), before);
   for (const write of [
     () => runtime.patch({ documentId: 'definitions', expectedVersion: runtime.getEntry('definitions').document.version, patch: { nodes: { label: { content: 'Unrelated' } } } }),
-    () => runtime.undo(),
-    () => runtime.redo(),
+    () => runtime.undo(), () => runtime.redo(),
   ]) await assert.rejects(write, { code: 'EXTERNAL_PENDING' });
   assert.deepEqual(await state(runtime), before);
-  assert.equal(await fs.readFile(file, 'utf8'), authored, 'an unrelated edit cannot overwrite the authored declaration order');
-  await fs.writeFile(file, accepted);
-  await runtime.scan();
-  assert.equal(runtime.diagnostics.has(file), false, 'restoring the accepted source clears the guard');
+  assert.equal(await fs.readFile(file, 'utf8'), authored);
+  await fs.writeFile(file, accepted); await runtime.scan();
+  assert.equal(runtime.diagnostics.has(file), false);
   await runtime.patch({ documentId: 'definitions', expectedVersion: runtime.getEntry('definitions').document.version, patch: { nodes: { label: { content: 'Recovered' } } } });
   assert.equal(runtime.getEntry('definitions').document.nodes.label.content, 'Recovered');
+}
+
+for (const row of [
+  { name: 'node removal with opaque metadata null', kind: 'override', initialStyle: storedNull, edit: source => { delete source.frames[1].nodes.instance; source.frames[1].nodes.root.children = []; } },
+  { name: 'node creation with opaque metadata null', kind: 'override', edit: source => {
+    source.frames[1].nodes.second = { ...structuredClone(source.frames[1].nodes.instance), id: 'second', descendants: { button: { style: storedNull } } };
+    source.frames[1].nodes.root.children.push('second');
+  } },
+  { name: 'collateral project metadata null', edit: source => { source.frames[0].nodes.button.style = reordered; source.metadata = { literal: null }; } },
+  { name: 'metadata-only null insertion', edit: source => { source.frames[0].metadata = { literal: null }; } },
+]) test(`unreplayable source refuses ${row.name} before accepting its hash`, t => refusedSource(t, { ...row, code: 'UNSUPPORTED_SOURCE_REPLAY' }));
+
+for (const row of [
+  { name: 'unsafe CSS', edit: source => { source.frames[0].nodes.button.style = { color: 'red;display:none' }; } },
+  { name: 'unactivated declaration arrays', edit: source => { source.frames[0].nodes.button.style = [['color', 'red']]; } },
+  { name: 'invalid override value', kind: 'override', edit: source => { source.frames[1].nodes.instance.descendants.button.style = { padding: { value: '4px' } }; } },
+  { name: 'missing root', edit: source => { source.frames[0].rootId = 'missing'; } },
+]) test(`invalid source retains state and authored bytes for ${row.name}`, t => refusedSource(t, { ...row, code: 'INVALID_DOCUMENT' }));
+
+for (const phase of ['prepared candidate', 'output preflight']) test(`source replacement after ${phase} is not overwritten or accepted prematurely`, async t => {
+  const { runtime, file } = await fixture(t), before = await state(runtime);
+  const base = JSON.parse(await fs.readFile(file, 'utf8'));
+  const first = structuredClone(base); first.frames[0].nodes.button.style = reordered; first.name = 'First candidate';
+  const winner = structuredClone(base); winner.frames[0].nodes.button.style = { padding: '5px', 'padding-left': '30px' }; winner.name = 'Later source';
+  const winnerBytes = JSON.stringify(winner, null, '\t') + '\r\n';
+  let injected = false;
+  if (phase === 'prepared candidate') {
+    const prepare = runtime.prepareAll.bind(runtime);
+    runtime.prepareAll = async (...args) => { const value = await prepare(...args); if (!injected) { injected = true; await fs.writeFile(file, winnerBytes); } return value; };
+  } else {
+    const contents = runtime.fileContents.bind(runtime); let reads = 0;
+    runtime.fileContents = async (...args) => {
+      const value = await contents(...args);
+      if (args[0] === file && ++reads === 2) { injected = true; await fs.writeFile(file, winnerBytes); }
+      return value;
+    };
+  }
+  await fs.writeFile(file, JSON.stringify(first)); await runtime.scan();
+  assert.equal(injected, true);
+  assert.equal(runtime.diagnostics.get(file)?.code, 'FILE_CONFLICT');
+  assert.deepEqual(await state(runtime), before);
+  assert.equal(await fs.readFile(file, 'utf8'), winnerBytes);
+  await runtime.scan();
+  assert.equal(runtime.diagnostics.has(file), false);
+  assert.deepEqual(acceptedStyles(runtime), stylesOf(winner.frames));
+  assert.equal(runtime.settings.name, winner.name);
+  assert.equal(runtime.knownHashes.get(file), digest(await fs.readFile(file, 'utf8')));
+  await runtime.undo(); assert.deepEqual(acceptedStyles(runtime), stylesOf(base.frames));
+  await runtime.redo(); assert.deepEqual(acceptedStyles(runtime), stylesOf(winner.frames));
 });
 
 for (const kind of ['literal', 'override']) test(`replayable ${kind} style source edits still accept, save and replay exact declaration sequences`, async t => {

@@ -54,6 +54,21 @@ try {
   await rm(path.join(path.dirname(file), '.divlet'), { recursive: true, force: true });
   runtime = await api.openRuntime({ file, watch: false, createDemo: false });
   assert.deepEqual(read(), saved, 'cache-free reopen uses the accepted source');
+  const beforeSource = Object.entries(read().nodes.root.style), external = JSON.parse(await readFile(file, 'utf8'));
+  external.frames[0].nodes.root.style = { padding: '10px', 'padding-left': '20px', color: 'blue' };
+  const afterSource = Object.entries(external.frames[0].nodes.root.style);
+  await writeFile(file, JSON.stringify(external)); await runtime.scan();
+  assert.deepEqual(runtime.info().diagnostics, []);
+  assert.deepEqual(Object.entries(read().nodes.root.style), afterSource);
+  await runtime.undo(); assert.deepEqual(Object.entries(read().nodes.root.style), beforeSource);
+  await runtime.redo(); assert.deepEqual(Object.entries(read().nodes.root.style), afterSource);
+  const acceptedBytes = await readFile(file, 'utf8'), acceptedModel = read();
+  const unsupported = JSON.parse(acceptedBytes); unsupported.metadata = { literal: null };
+  const unacceptedBytes = JSON.stringify(unsupported);
+  await writeFile(file, unacceptedBytes); await runtime.scan();
+  assert.ok(runtime.info().diagnostics.some(item => item.code === 'UNSUPPORTED_SOURCE_REPLAY'));
+  assert.deepEqual(read(), acceptedModel); assert.equal(await readFile(file, 'utf8'), unacceptedBytes);
+  await writeFile(file, acceptedBytes); await runtime.scan(); assert.deepEqual(runtime.info().diagnostics, []);
   const importer = { id: 'host-input', label: 'Host input', extensions: ['.host'], async claims() { return false; }, convert(bytes) {
     assert.equal(new TextDecoder().decode(bytes), 'host input'); return { text: source };
   } };
@@ -70,5 +85,5 @@ try {
   api.registerStyleEngine(engine);
   await runtime.patch({ documentId: 'plain', expectedVersion: read().version, patch: { nodes: { root: { styles: { padding: '2px' } } } } });
   assert.equal(lowered, 1); assert.match(read().nodes.root.className, /host-custom/);
-  console.log(JSON.stringify({ status: 'passed', mode: 'installed-native', modules: loaded.size, registeredHostProviders: true }));
+  console.log(JSON.stringify({ status: 'passed', mode: 'installed-native', modules: loaded.size, registeredHostProviders: true, sourceHistoryRoundTrip: true }));
 } finally { await runtime?.close(); }

@@ -6,9 +6,9 @@ import { applyDocumentPatch, validateDocument, DivletError } from './model.ts';
 import type { DocumentModel } from './model.ts';
 import { patchSettings } from './project.ts';
 import type { ProjectSettings } from './project.ts';
-import { matchesPatch, matchesDocumentHistoryPatch } from './diff.ts';
+import { matchesPatch, matchesDocumentHistoryPatch, documentHistoryPatch } from './diff.ts';
 import type { ValuePatch, HistoryStyleBlock } from './diff.ts';
-import { sameDocument, sameSettings } from './acceptance.ts';
+import { sameDocument, sameSettings, settingsPatch } from './acceptance.ts';
 import { sameJson } from './validation.ts';
 import type { HistoryDirection } from './history.ts';
 export { documentHistoryPatch } from './diff.ts';
@@ -22,6 +22,34 @@ export type HistoryReplayItem = Readonly<
 export interface HistoryCandidate { frames: Map<string, DocumentModel>; settings: ProjectSettings }
 
 function refuse(message: string): never { throw new DivletError('CANNOT_UNDO', message); }
+
+/** A canonical project transition in replay order; logging, source hashes and publication remain writer-owned. */
+export function projectHistoryItems(previous: ReadonlyMap<string, DocumentModel>, previousSettings: ProjectSettings, next: ReadonlyMap<string, DocumentModel>, nextSettings: ProjectSettings): HistoryReplayItem[] {
+  const items: HistoryReplayItem[] = [];
+  if (!sameSettings(previousSettings, nextSettings)) items.push({ type: 'project', inverse: settingsPatch(nextSettings, previousSettings), forward: settingsPatch(previousSettings, nextSettings) });
+  for (const [id, to] of next) {
+    const from = previous.get(id);
+    if (from && !sameDocument(from, to)) items.push({ type: 'patch', documentId: id, ...documentHistoryPatch(from, to) });
+  }
+  const before = [...previous.keys()], after = [...next.keys()];
+  for (let index = before.length - 1; index >= 0; index--) {
+    const id = before[index]!;
+    if (!next.has(id)) items.push({ type: 'delete', documentId: id, index, document: structuredClone(previous.get(id)!) });
+  }
+  for (const [index, id] of after.entries()) if (!previous.has(id)) items.push({ type: 'create', documentId: id, index, document: structuredClone(next.get(id)!) });
+  const orderBefore = before.filter(id => next.has(id)), orderAfter = after.filter(id => previous.has(id));
+  if (!sameJson(orderBefore, orderAfter)) items.push({ type: 'order', inverse: orderBefore, forward: orderAfter });
+  return items;
+}
+
+/** Prove the actual transaction in both directions before adopting external source bytes; not foreign-history admission. */
+export function assertProjectHistoryRoundTrip(previous: ReadonlyMap<string, DocumentModel>, previousSettings: ProjectSettings, next: ReadonlyMap<string, DocumentModel>, nextSettings: ProjectSettings, items: readonly HistoryReplayItem[]): void {
+  const matches = (candidate: HistoryCandidate, frames: ReadonlyMap<string, DocumentModel>, settings: ProjectSettings): boolean => sameSettings(candidate.settings, settings) && sameJson([...candidate.frames.keys()], [...frames.keys()]) && [...frames].every(([id, frame]) => sameDocument(candidate.frames.get(id)!, frame));
+  try {
+    if (matches(replayHistory(previous, previousSettings, items, 'redo'), next, nextSettings) && matches(replayHistory(next, nextSettings, items, 'undo'), previous, previousSettings)) return;
+  } catch { /* An unrepresentable replay is a source refusal, never a partially accepted transaction. */ }
+  throw new DivletError('UNSUPPORTED_SOURCE_REPLAY', 'This live source edit cannot round-trip through current Undo/Redo. Restore the accepted source or explicitly reopen it; the board keeps its last working state.');
+}
 
 /** Does not mutate inputs; unchanged documents may be shared. Callers prepare and persist the full candidate before acceptance. */
 export function replayHistory(previous: ReadonlyMap<string, DocumentModel>, previousSettings: ProjectSettings, items: readonly HistoryReplayItem[], direction: HistoryDirection): HistoryCandidate {

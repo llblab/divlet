@@ -12,7 +12,7 @@ import { cssCascadeCases, cascadeDocuments } from '../../core/tests/fixtures/css
 import { captureFrame, frameCases, resourceFrame } from '../../core/tests/fixtures/frame-portability.js';
 import { prepareFrame } from '../../core/lib/render.ts';
 import { bundleBrowserModel, bundleBrowserCodec, bundleBrowserProject, bundleBrowserReplay, bundleBrowserAcceptance } from '../../scripts/browser-model.mjs';
-import { replayHistory, documentHistoryPatch } from '../../core/lib/history-replay.ts';
+import { replayHistory, documentHistoryPatch, projectHistoryItems, assertProjectHistoryRoundTrip } from '../../core/lib/history-replay.ts';
 import { historyReplayCases, captureHistoryReplay, literalStyleReplay } from '../../core/tests/fixtures/history-replay.js';
 import { HistoryLine, planHistoryTraversal, validateHistoryNavigation, planHistoryNavigation } from '../../core/lib/history.ts';
 import * as nodeAcceptance from '../../core/lib/acceptance.ts';
@@ -34,7 +34,7 @@ const projectBundle = await bundleBrowserProject(fileURLToPath(new URL('../../',
 const replayBundle = await bundleBrowserReplay(fileURLToPath(new URL('../../', import.meta.url)));
 const acceptanceBundle = await bundleBrowserAcceptance(fileURLToPath(new URL('../../', import.meta.url)));
 const expectedPatchVersions = patchVersionCases.map(({ name, run }) => ({ name, result: capturePatchVersion(nodeAcceptance, run) }));
-const expectedHistoryReplay = historyReplayCases.map(({ name, run }) => ({ name, result: captureHistoryReplay({ ...nodeModel, readProject, replayHistory, documentHistoryPatch }, run) }));
+const expectedHistoryReplay = historyReplayCases.map(({ name, run }) => ({ name, result: captureHistoryReplay({ ...nodeModel, readProject, replayHistory, documentHistoryPatch, projectHistoryItems, assertProjectHistoryRoundTrip }, run) }));
 const expectedHistoryTraversal = historyTraversalCases.map(({ name, run }) => ({ name, result: captureHistoryTraversal({ planHistoryTraversal, replayHistory, readProject }, run) }));
 const expectedHistoryNavigation = historyNavigationCases.map(({ name, run }) => ({ name, result: captureHistoryNavigation({ HistoryLine, validateHistoryNavigation, planHistoryNavigation }, run) }));
 const expectedFrames = frameCases.map(({ name, run }) => ({ name, result: captureFrame(nodeModel, run) }));
