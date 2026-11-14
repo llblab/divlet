@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { AssetTree, AssetFile, Attrs, Override, CssDeclaration, CssDeclarationOperation, DocumentModel, Style, StyleInput } from '../lib/model.ts';
+import type { AssetTree, AssetFile, Attrs, Override, CssDeclaration, CssDeclarationOperation, DocumentModel, Style, StyleInput, StyleOptions, StyleEngineRequirement as ModelStyleEngineRequirement } from '../lib/model.ts';
 import { parseInlineDeclarations } from '../lib/codec.ts';
 import type { StyleEngine, StyleEngineRequirement, ResolvedStyleEngine, StyleInput as EngineStyleInput, applyStyles } from '../lib/engine.ts';
 import type { applyStyles as browserApplyStyles } from '../lib/browser-styles.ts';
@@ -44,6 +44,13 @@ const engineEdits: EngineStyleInput = propertyEdits;
 const capabilityEdits: Parameters<NonNullable<StyleEngine['applyStyles']>>[1] = propertyEdits;
 const facadeEdits: Parameters<typeof applyStyles>[1] = propertyEdits;
 const browserEdits: Parameters<typeof browserApplyStyles>[1] = propertyEdits;
+const loweringOptions: StyleOptions = { colourNames: new Set(['brand']) };
+const facadeOptions: Parameters<typeof applyStyles>[2] = loweringOptions;
+const browserOptions: Parameters<typeof browserApplyStyles>[2] = loweringOptions;
+// @ts-expect-error Known token colours are read-only context, not a mutable provider-owned set.
+const mutableColours: Set<string> = loweringOptions.colourNames!;
+// @ts-expect-error Lowering context remains a set of names, not a token-value map.
+const wrongLoweringOptions: StyleOptions = { colourNames: { brand: '#123456' } };
 // @ts-expect-error Transient property maps are not ordered literal declaration lists.
 const orderedEdits: StyleInput = parsedDeclarations;
 // @ts-expect-error Transient string/number/null values do not admit booleans.
@@ -52,6 +59,8 @@ const booleanEdits: StyleInput = { opacity: true };
 const persistedEdits: Style = propertyEdits;
 
 const requiredEngine: StyleEngineRequirement = { id: 'example', version: 'renderer-1' };
+const modelRequirement: ModelStyleEngineRequirement = requiredEngine;
+const facadeRequirement: StyleEngineRequirement = modelRequirement;
 const legacyEngine: StyleEngine = { id: 'legacy' };
 const jsonTextLimits: JsonTextLimits = { bytes: 1024, nesting: 16 };
 const decodedText: unknown = parseNativeJson('{"schemaVersion":1}', jsonTextLimits);

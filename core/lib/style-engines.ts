@@ -1,6 +1,10 @@
 /* Owns: provider-free style contracts, selection and capability dispatch. Excludes: concrete defaults and host bootstrap. */
-import type { StyleInput, StyleOptions, StyleEngineRequirement } from './model.ts';
-export type { StyleInput, StyleEngineRequirement } from './model.ts';
+/** Transient property-map edits, independent of persisted inline/override data. */
+export type StyleInput = Record<string, string | number | null>;
+/** Context for declarative lowering; the native model may supply known token colours. */
+export interface StyleOptions { colourNames?: ReadonlySet<string> }
+/** Exact renderer identity: opaque and case-sensitive, never a version range to resolve. */
+export interface StyleEngineRequirement { id: string; version: string }
 
 /** What one explanation says about a class: a utility with its CSS, a rule of the project's own CSS, a marker, or nothing. */
 export interface ClassExplanation { kind: 'utility' | 'custom' | 'marker' | 'unknown'; lines: string[]; color?: string; custom?: string }

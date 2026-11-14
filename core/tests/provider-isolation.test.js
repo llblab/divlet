@@ -117,6 +117,12 @@ test('the production style registry dispatches from a single copied source file 
   t.after(() => rm(directory, { recursive: true, force: true }));
   await writeFile(path.join(directory, 'package.json'), JSON.stringify({ type: 'module' }));
   await cp(new URL('../lib/style-engines.ts', import.meta.url), path.join(directory, 'style-engines.ts'));
+  // Erased imports still couple source contracts: the copied registry must typecheck without a model or Node/DOM ambient types.
+  await writeFile(path.join(directory, 'tsconfig.json'), JSON.stringify({
+    compilerOptions: { strict: true, erasableSyntaxOnly: true, noEmit: true, target: 'ES2023', module: 'NodeNext', moduleResolution: 'NodeNext', lib: ['ES2023'], types: [], skipLibCheck: false },
+    files: ['style-engines.ts'],
+  }));
+  execFileSync(process.execPath, [require.resolve('typescript/bin/tsc'), '-p', path.join(directory, 'tsconfig.json')], { cwd: directory, encoding: 'utf8', timeout: 20000 });
   execFileSync(process.execPath, ['--input-type=module', '-e', `
     import assert from 'node:assert/strict';
     import { registerHooks } from 'node:module';

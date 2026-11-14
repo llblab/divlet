@@ -9,6 +9,7 @@
 import { applyStyles } from './model-styles.ts';
 import { readAssetReference } from './asset-reference.ts';
 import type { CssDeclaration, CssDeclarationOperation } from './declarations.ts';
+import type { StyleOptions, StyleEngineRequirement } from './style-engines.ts';
 import postcssParse from 'postcss/lib/parse';
 import type postcss from 'postcss';
 import { DivletError, ID, fail, object, string, keys, json, withinUtf8Budget } from './validation.ts';
@@ -23,12 +24,10 @@ export type Metadata = { [key: string]: Json };
 export type Style = Record<string, string>;
 /** Override declarations may delete a property with null. */
 export type StyleOverrides = Record<string, string | null>;
-/** Transient property-map edits, not stored inline data. The legacy helper accepts numbers and null removals. */
-export type StyleInput = Record<string, string | number | null>;
+/** Core style-capability contracts; persisted document/override declarations remain owned here. */
+export type { StyleInput, StyleOptions, StyleEngineRequirement } from './style-engines.ts';
 /** Ordered CSS contracts; stored Style fields remain maps until the coherent draft cutover. */
 export type { CssDeclaration, CssDeclarationOperation } from './declarations.ts';
-/** Exact renderer identity: an opaque case-sensitive version, never a semver range to resolve. */
-export interface StyleEngineRequirement { id: string; version: string }
 /** Target native dependency profile; not yet activated in project settings or wire readers. */
 export interface ProjectRequirements { styleEngine?: StyleEngineRequirement }
 /** Project-owned resource directories; leaves are canonical base64 Data URLs, not filesystem paths. */
@@ -90,8 +89,6 @@ export interface DocumentModel {
 export type ProjectedNode = Node & { parentId: NodeId | null; ancestors: NodeId[]; childNodes?: ProjectedNode[] };
 export interface InspectQuery { ids?: NodeId[]; query?: string; depth?: number; limit?: number }
 export interface InspectResult { documentId: NodeId; version: number; rootId: NodeId; total: number; truncated: boolean; nodes: ProjectedNode[] }
-/** Declarative styles and the class patch they become. */
-export interface StyleOptions { colourNames?: ReadonlySet<string> }
 
 export const LIMITS: Readonly<Limits> = Object.freeze({ nodes: 2000, depth: 64, bytes: 2 * 1024 * 1024, text: 262144 });
 export const PROJECTION_LIMITS: Readonly<Limits> = Object.freeze({ nodes: 100000, bytes: 64 * 1024 * 1024, depth: 128, text: 262144, instanceDepth: 32 });
