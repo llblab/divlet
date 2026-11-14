@@ -114,14 +114,13 @@ try {
   runtime.setAgent({ controls: { model: { value: 'anthropic/claude-sonnet-4-5', options: [{ id: 'anthropic/claude-sonnet-4-5', label: 'claude-sonnet-4-5' }, { id: 'anthropic/claude-haiku-4-5', label: 'claude-haiku-4-5' }] }, thinking: { value: 'medium', options: ['off', 'low', 'medium', 'high'] } } });
   await waitUntil(async () => (await page.locator('#agent .agent-chip').count()) === 2, 'the session chips appear for a host that offers them');
   assert.deepEqual(await page.locator('#agent .agent-chip').allInnerTexts(), ['claude-sonnet-4-5', 'medium'], 'values only, no labels');
-  // One slot, two occupants: on Pi the selectors take the place of the key hints (in the same footer row), on MCP the hints stay.
+  // One footer slot, two occupants: selectors replace the key hints; either occupant may wrap without moving Send from its corner.
   assert.equal(await page.locator('#agent .ask-hint').isHidden(), true, 'the selectors replace the hints rather than stacking under them');
-  const footRow = await page.evaluate(() => {
-    const chips = document.querySelector('#agent .agent-session').getBoundingClientRect();
-    const send = document.querySelector('#agent .ask-send').getBoundingClientRect();
-    return Math.abs((chips.y + chips.height / 2) - (send.y + send.height / 2));
+  const footCorner = await page.locator('#agent .ask-foot').evaluate(foot => {
+    const box = foot.getBoundingClientRect(), send = foot.querySelector('.ask-send').getBoundingClientRect();
+    return { right: Math.abs(box.right - send.right) <= 1, bottom: Math.abs(box.bottom - send.bottom) <= 1 };
   });
-  assert.ok(footRow < 8, `the selectors and Send share one row (${footRow.toFixed(1)}px apart)`);
+  assert.deepEqual(footCorner, { right: true, bottom: true }, 'Send keeps the footer bottom-right even when selectors wrap');
   const settingsAsked = [];
   runtime.on('agent-setting', request => settingsAsked.push(request));
   const versionBefore = runtime.info().project.version;

@@ -12,7 +12,7 @@ if (process.env.PI_DIVLET_CHROMIUM_EXECUTABLE) launch.executablePath = process.e
 const browser = await chromium.launch(launch);
 const errors = [], checks = [];
 try {
-  for (const [width, size] of [[1280, 100], [390, 100], [390, 200]]) {
+  for (const [width, size] of [[1280, 100], [2560, 200], [390, 100], [390, 200]]) {
     const cwd = await mkdtemp(path.join(os.tmpdir(), 'divlet-chat-'));
     let runtime, context;
     try {
@@ -39,9 +39,10 @@ try {
         const geometry = await page.locator('.ask-foot').evaluate(foot => {
           const send = foot.querySelector('.ask-send'), box = foot.getBoundingClientRect(), button = send.getBoundingClientRect();
           const overlaps = [...foot.querySelectorAll('.agent-chip, .ask-hint')].filter(n => n.getClientRects().length).some(n => { const r = n.getBoundingClientRect(); return Math.min(r.right, button.right) - Math.max(r.left, button.left) > 1 && Math.min(r.bottom, button.bottom) - Math.max(r.top, button.top) > 1; });
-          return { right: Math.abs(box.right - button.right) <= 1, bottom: Math.abs(box.bottom - button.bottom) <= 1, overlaps, count: foot.querySelectorAll('.ask-send').length };
+          const valuesWhole = [...foot.querySelectorAll('.agent-chip')].every(n => n.scrollWidth <= n.clientWidth);
+          return { right: Math.abs(box.right - button.right) <= 1, bottom: Math.abs(box.bottom - button.bottom) <= 1, overlaps, valuesWhole, count: foot.querySelectorAll('.ask-send').length };
         });
-        assert.deepEqual(geometry, { right: true, bottom: true, overlaps: false, count: 1 }, `${label}: Send stays at the footer's bottom-right at ${width}px/${size}%`);
+        assert.deepEqual(geometry, { right: true, bottom: true, overlaps: false, valuesWhole: true, count: 1 }, `${label}: Send stays at the footer's bottom-right without clipping values at ${width}px/${size}%`);
       };
       const footerModes = async () => {
         for (const controls of [null, { model: { value: 'example', options: [{ id: 'example', label: 'Example longer model' }] }, thinking: { value: 'high', options: ['low', 'high'] } }]) {
@@ -104,6 +105,7 @@ try {
         // The default is already the minimum: widen first so the following drag really narrows the conversation.
         const grip = page.locator('.resize-handle[data-panel="sidebar"]');
         await grip.focus(); await grip.press('Shift+ArrowRight'); await grip.press('Shift+ArrowRight'); await bottom();
+        await footerModes(); await bottom();
         const edge = await grip.boundingBox();
         const previousWidth = await list.evaluate(n => n.clientWidth);
         await page.mouse.move(edge.x + 4, edge.y + edge.height / 2); await page.mouse.down();
@@ -131,7 +133,8 @@ try {
       }
       const focusedTop = await list.evaluate(n => n.scrollTop);
       runtime.say({ text: 'An explicitly focused old message must remain in view.' }); await messages(31);
-      assert.ok(Math.abs(await list.evaluate(n => n.scrollTop) - focusedTop) <= 1, 'explicit message focus overrides following');
+      const afterFocusReply = await list.evaluate(n => n.scrollTop);
+      assert.ok(Math.abs(afterFocusReply - focusedTop) <= 1, `explicit message focus overrides following at ${width}px/${size}% (${focusedTop} → ${afterFocusReply})`);
       await scroll(middle);
       await page.evaluate(async () => (await import('./lib/sidebar.js')).close());
       runtime.say({ text: 'A hidden-pane reply must not discard an older reading position.' }); await messages(32);
