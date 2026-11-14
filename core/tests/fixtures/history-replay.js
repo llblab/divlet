@@ -113,10 +113,86 @@ export const historyReplayCases = [
     const item = { ...step.item, forward: { ...step.item.forward, id: 'other' }, inverse: { ...step.item.inverse, id: 'a' } };
     return replay(api, before, [item], 'redo');
   } },
-  { name: 'transaction proof still refuses opaque null changes within retained nodes', error: 'UNSUPPORTED_SOURCE_REPLAY', run: api => {
+  { name: 'transaction proof retains opaque null changes within retained nodes', expected: { literal: null }, run: api => {
     const before = context(api), frame = before.frames.get('a');
     const changed = api.validateDocument({ ...frame, nodes: { ...frame.nodes, label: { ...frame.nodes.label, metadata: { literal: null } } } }), next = new Map([['a', changed]]);
-    return api.assertProjectHistoryRoundTrip(before.frames, before.settings, next, before.settings, api.projectHistoryItems(before.frames, before.settings, next, before.settings));
+    const items = api.projectHistoryItems(before.frames, before.settings, next, before.settings);
+    api.assertProjectHistoryRoundTrip(before.frames, before.settings, next, before.settings, items);
+    return replay(api, before, items, 'redo').frames.get('a').nodes.label.metadata;
+  } },
+  ...[
+    ['absence', {}, { slot: null }],
+    ['prototype-named own member', {}, { toString: null }],
+    ['deletion', { slot: null }, {}],
+    ['scalar', { slot: null }, { slot: false }],
+    ['record', { slot: null }, { slot: { literal: null, nested: { value: null } } }],
+    ['array', { slot: null }, { slot: [null, { value: null }] }],
+    ['new subtree', {}, { slot: { literal: null } }],
+    ['removed subtree', { slot: { literal: null } }, {}],
+    ['scalar to record', { slot: 'text' }, { slot: { length: null } }],
+    ['record to array', { slot: { length: null } }, { slot: [null] }],
+  ].map(([name, from, to]) => ({ name: `nullable data slots replay ${name} without interpreting null as deletion`, expected: { undo: from, redo: to }, run: api => {
+    const before = context(api), frame = before.frames.get('a');
+    const original = api.validateDocument({ ...frame, metadata: from }), after = api.validateDocument({ ...frame, metadata: to });
+    const item = { type: 'patch', documentId: 'a', ...api.documentHistoryPatch(original, after) };
+    const redo = replay(api, { ...before, frames: new Map([['a', original]]) }, [item], 'redo');
+    const undo = replay(api, redo, [item], 'undo');
+    return { undo: undo.frames.get('a').metadata, redo: redo.frames.get('a').metadata };
+  } })),
+  ...[
+    ['creation', {}, { definition: { attrs: { title: null }, metadata: { literal: null }, style: { padding: null } } }],
+    ['removal', { definition: { attrs: { title: null }, metadata: { literal: null }, style: { padding: null } } }, {}],
+    ['container omission', { definition: { attrs: { title: null } } }, { definition: {} }],
+    ['value replacement', { definition: { attrs: { title: null }, metadata: { literal: null } } }, { definition: { attrs: { title: 'Changed' }, metadata: { literal: 'Changed' } } }],
+  ].map(([name, from, to]) => ({ name: `nullable override ${name} composes attribute/metadata and style history`, expected: { undo: from, redo: to }, run: api => {
+    const before = overrideContext(api, from), frame = before.frames.get('a');
+    const after = api.validateDocument({ ...frame, nodes: { ...frame.nodes, instance: { ...frame.nodes.instance, descendants: to } } });
+    const item = { type: 'patch', documentId: 'a', ...api.documentHistoryPatch(frame, after) };
+    const redo = replay(api, before, [item], 'redo'), undo = replay(api, redo, [item], 'undo');
+    return { undo: undo.frames.get('a').nodes.instance.descendants, redo: redo.frames.get('a').nodes.instance.descendants };
+  } })),
+  { name: 'node lifecycle treats prototype-named IDs as own data slots', expected: { id: 'toString', metadata: { literal: null } }, run: api => {
+    const before = context(api), frame = before.frames.get('a');
+    const original = api.validateDocument({ ...frame, nodes: { ...frame.nodes, root: { ...frame.nodes.root, children: ['label', 'toString'] }, toString: { id: 'toString', type: 'text', content: 'Literal', metadata: { literal: null } } } });
+    const after = frame;
+    const item = { type: 'patch', documentId: 'a', ...api.documentHistoryPatch(original, after) };
+    const redo = replay(api, { ...before, frames: new Map([['a', original]]) }, [item], 'redo'), undo = replay(api, redo, [item], 'undo');
+    const node = undo.frames.get('a').nodes.toString;
+    return { id: node.id, metadata: node.metadata };
+  } },
+  { name: 'nullable data slots preserve disjoint later metadata leaves', expected: { slot: null, sibling: 'later' }, run: api => {
+    const before = context(api), frame = before.frames.get('a');
+    const original = api.validateDocument({ ...frame, metadata: { slot: null } });
+    const step = styleStep(api, original, { metadata: { slot: 'Changed' } });
+    const later = api.applyDocumentPatch(step.after, { metadata: { sibling: 'later' } });
+    return replay(api, { ...before, frames: new Map([['a', later]]) }, [step.item], 'undo').frames.get('a').metadata;
+  } },
+  { name: 'nullable replacement refuses later changes inside its captured record', error: 'CANNOT_UNDO', run: api => {
+    const before = context(api), frame = before.frames.get('a');
+    const original = api.validateDocument({ ...frame, metadata: { slot: null } });
+    const step = styleStep(api, original, { metadata: { slot: { value: 'Changed' } } });
+    const later = api.applyDocumentPatch(step.after, { metadata: { slot: { sibling: 'later' } } });
+    return replay(api, { ...before, frames: new Map([['a', later]]) }, [step.item], 'undo');
+  } },
+  { name: 'null slot guards distinguish a missing key from actual null data', error: 'CANNOT_UNDO', run: api => {
+    const before = context(api), frame = before.frames.get('a');
+    const original = api.validateDocument({ ...frame, metadata: { slot: null } }), after = api.validateDocument({ ...frame, metadata: {} });
+    const item = { type: 'patch', documentId: 'a', ...api.documentHistoryPatch(original, after) };
+    return replay(api, { ...before, frames: new Map([['a', original]]) }, [item], 'undo');
+  } },
+  { name: 'restored nullable slots still require final model admission', error: 'INVALID_DOCUMENT', run: api => {
+    const before = context(api), frame = before.frames.get('a');
+    const original = api.validateDocument({ ...frame, metadata: { slot: null } });
+    const step = styleStep(api, original, { metadata: { slot: 'Changed' } });
+    const item = structuredClone(step.item); item.nullBlocks[0].before = Infinity;
+    return replay(api, { ...before, frames: new Map([['a', step.after]]) }, [item], 'undo');
+  } },
+  { name: 'nullable slots do not bypass ordinary patch admission', error: 'INVALID_DOCUMENT', run: api => {
+    const before = context(api), frame = before.frames.get('a');
+    const original = api.validateDocument({ ...frame, metadata: { slot: null } });
+    const step = styleStep(api, original, { metadata: { slot: 'Changed' } });
+    const item = { ...step.item, forward: { ...step.item.forward, id: 'other' }, inverse: { ...step.item.inverse, id: 'a' } };
+    return replay(api, { ...before, frames: new Map([['a', original]]) }, [item], 'redo');
   } },
   { name: 'transaction proof retains untouched metadata null through a style change', expected: { literal: null }, run: api => {
     const before = context(api), frame = before.frames.get('a');

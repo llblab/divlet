@@ -83,6 +83,19 @@ try {
     await runtime.undo(); assert.deepEqual(read().nodes.nullable, capturedNode);
     await runtime.redo(); assert.equal(Object.hasOwn(read().nodes, 'nullable'), false);
   }
+  const nullable = JSON.parse(await readFile(file, 'utf8')), priorMetadata = structuredClone(read().nodes.root.metadata);
+  nullable.frames[0].metadata = { literal: null };
+  nullable.frames[0].nodes.root.metadata = { literal: null, nested: { value: null } };
+  await writeFile(file, JSON.stringify(nullable)); await runtime.scan();
+  assert.deepEqual(runtime.info().diagnostics, []);
+  const nullableMetadata = structuredClone(read().nodes.root.metadata);
+  await runtime.undo(); assert.deepEqual(read().nodes.root.metadata, priorMetadata);
+  await runtime.redo(); assert.deepEqual(read().nodes.root.metadata, nullableMetadata);
+  await runtime.patch({ documentId: 'plain', expectedVersion: read().version, patch: { metadata: { literal: 'Changed' }, nodes: { root: { metadata: { literal: 'Changed', nested: { value: null } } } } } });
+  for (let iteration = 0; iteration < 2; iteration++) {
+    await runtime.undo(); assert.deepEqual(read().metadata, { literal: null }); assert.deepEqual(read().nodes.root.metadata, nullableMetadata);
+    await runtime.redo(); assert.deepEqual(read().metadata, { literal: 'Changed' }); assert.deepEqual(read().nodes.root.metadata, { literal: 'Changed', nested: {} });
+  }
   const importer = { id: 'host-input', label: 'Host input', extensions: ['.host'], async claims() { return false; }, convert(bytes) {
     assert.equal(new TextDecoder().decode(bytes), 'host input'); return { text: source };
   } };
@@ -99,5 +112,5 @@ try {
   api.registerStyleEngine(engine);
   await runtime.patch({ documentId: 'plain', expectedVersion: read().version, patch: { nodes: { root: { styles: { padding: '2px' } } } } });
   assert.equal(lowered, 1); assert.match(read().nodes.root.className, /host-custom/);
-  console.log(JSON.stringify({ status: 'passed', mode: 'installed-native', modules: loaded.size, registeredHostProviders: true, sourceHistoryRoundTrip: true, nodeLifecycleRoundTrip: true }));
+  console.log(JSON.stringify({ status: 'passed', mode: 'installed-native', modules: loaded.size, registeredHostProviders: true, sourceHistoryRoundTrip: true, nodeLifecycleRoundTrip: true, retainedNullRoundTrip: true }));
 } finally { await runtime?.close(); }

@@ -62,13 +62,31 @@ export function replayHistory(previous: ReadonlyMap<string, DocumentModel>, prev
         const current = frames.get(item.documentId);
         if (!current || !matchesDocumentHistoryPatch(current, item, undoing)) refuse('Later changes touched the same content.');
         let candidate: DocumentModel;
-        if (item.styleBlocks?.length || item.nodeBlocks?.length) {
+        if (item.styleBlocks?.length || item.nodeBlocks?.length || item.nullBlocks?.length) {
           // Keep ordinary patch admission, then validate exact snapshot restoration before acceptance.
           const raw: Record<string, any> = applyDocumentPatch(current, change);
           for (const block of item.nodeBlocks ?? []) {
             const value = block[undoing ? 'before' : 'after'];
             if (value === undefined) delete raw.nodes[block.nodeId];
             else raw.nodes[block.nodeId] = structuredClone(value);
+          }
+          for (const block of item.nullBlocks ?? []) {
+            const value = block[undoing ? 'before' : 'after'];
+            let parent: Record<string, any> | undefined = raw;
+            for (const key of block.path.slice(0, -1)) {
+              const child: unknown = parent && Object.hasOwn(parent, key) ? parent[key] : undefined;
+              if (!child || typeof child !== 'object' || Array.isArray(child)) {
+                if (value !== undefined) refuse('History nullable value container is missing.');
+                parent = undefined;
+                break;
+              }
+              parent = child as Record<string, any>;
+            }
+            if (parent) {
+              const key = block.path.at(-1)!;
+              if (value === undefined) delete parent[key];
+              else parent[key] = structuredClone(value);
+            }
           }
           for (const block of item.styleBlocks ?? []) {
             const node = raw.nodes?.[block.nodeId], value = block[undoing ? 'before' : 'after'];

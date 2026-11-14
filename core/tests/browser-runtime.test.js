@@ -217,6 +217,39 @@ test('node lifecycle Undo refuses later node edits without moving either writer'
   } finally { await writers.close(); }
 });
 
+test('retained-node nullable history restores data without blocking disjoint later edits', async () => {
+  const source = JSON.parse(editable), frame = source.frames[0], nodes = frame.nodes;
+  frame.metadata = { literal: null, nested: { 'dot/slash.key': null }, array: [null, { value: null }] };
+  nodes.label.metadata = { literal: null };
+  nodes.content.reusable = true; nodes.root.children = ['content', 'instance'];
+  nodes.instance = { id: 'instance', type: 'ref', ref: 'index/content', descendants: { content: { attrs: { title: null }, metadata: { literal: null } } } };
+  const writers = await pair(JSON.stringify(source));
+  try {
+    for (const runtime of [writers.node, writers.browser]) {
+      const original = structuredClone(runtime.documents.get('index').document);
+      await runtime.patch({ documentId: 'index', expectedVersion: 1, patch: { metadata: { literal: null, nested: { 'dot/slash.key': 'Changed' } }, nodes: { label: { metadata: { literal: 'Changed' } }, instance: { descendants: { content: { attrs: { title: 'Changed' }, metadata: { literal: 'Changed' } } } } } } });
+      const changed = structuredClone(runtime.documents.get('index').document);
+      await runtime.patch({ documentId: 'index', expectedVersion: 2, undoable: false, patch: { metadata: { later: 'retained' }, nodes: { label: { metadata: { later: 'retained' } } } } });
+      for (let iteration = 0; iteration < 2; iteration++) {
+        await runtime.undo();
+        const restored = runtime.documents.get('index').document;
+        assert.deepEqual(restored.metadata, { ...original.metadata, later: 'retained' });
+        assert.deepEqual(restored.nodes.label.metadata, { ...original.nodes.label.metadata, later: 'retained' });
+        assert.deepEqual(restored.nodes.instance, original.nodes.instance);
+        await runtime.redo();
+        const redone = runtime.documents.get('index').document;
+        assert.deepEqual(redone.metadata, { ...changed.metadata, later: 'retained' });
+        assert.deepEqual(redone.nodes.label.metadata, { ...changed.nodes.label.metadata, later: 'retained' });
+        assert.deepEqual(redone.nodes.instance, changed.nodes.instance);
+      }
+      await runtime.undo();
+      const serialized = runtime === writers.node ? await fs.readFile(runtime.projectPath, 'utf8') : runtime.source();
+      assert.deepEqual(JSON.parse(serialized).frames[0].nodes.instance, original.nodes.instance);
+    }
+    sameState(writers, 'retained-node nullable history');
+  } finally { await writers.close(); }
+});
+
 test('opt-in native text refusal does not silently replace draft readers or touch accepted writers', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-draft-json-'));
   const file = path.join(directory, 'draft.divlet');

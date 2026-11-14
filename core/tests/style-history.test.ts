@@ -69,7 +69,27 @@ test('node lifecycle snapshots own independent data and guard the complete nulla
   assert.equal(matchesDocumentHistoryPatch(before, item, false), false, 'null is data rather than the absence of a patch member');
 });
 
+test('nullable slot capture is independent and skips unchanged nulls and atomic arrays', () => {
+  const before = validateDocument({ ...styled(), metadata: { slot: null, untouched: null, array: [null] } });
+  const after = validateDocument({ ...before, metadata: { slot: { nested: { value: null } }, untouched: null, array: [null, 1] } });
+  const item = documentHistoryPatch(before, after);
+  assert.deepEqual(item.nullBlocks, [{ path: ['metadata', 'slot'], before: null, after: { nested: { value: null } } }]);
+  const slot = after.metadata.slot;
+  if (!slot || typeof slot !== 'object' || Array.isArray(slot)) throw new Error('fixture');
+  slot.nested = 'later';
+  assert.deepEqual(item.nullBlocks?.[0]?.after, { nested: { value: null } });
+  const renamed = documentHistoryPatch(before, applyDocumentPatch(before, { name: 'Renamed' }));
+  assert.equal(renamed.nullBlocks, undefined, 'unchanged nullable data must not turn disjoint edits into conflicts');
+});
+
 function readonlyHistoryContract(item: DocumentHistoryPatch) {
+  const nullable = item.nullBlocks?.[0];
+  if (nullable) {
+    // @ts-expect-error Captured paths cannot be redirected.
+    nullable.path.push('other');
+    // @ts-expect-error Captured endpoints cannot be replaced.
+    nullable.before = null;
+  }
   const node = item.nodeBlocks?.[0];
   if (node) {
     // @ts-expect-error A lifecycle snapshot target cannot be redirected.

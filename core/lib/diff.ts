@@ -71,16 +71,41 @@ export interface HistoryNodeBlock {
   readonly before: Node | undefined;
   readonly after: Node | undefined;
 }
-export interface DocumentHistoryPatch { inverse: ValuePatch; forward: ValuePatch; styleBlocks?: readonly HistoryStyleBlock[]; nodeBlocks?: readonly HistoryNodeBlock[] }
+/** A changed nullable data slot, distinct from sparse deletion; arrays remain ordinary atomic patch values. */
+export interface HistoryNullBlock {
+  readonly path: readonly string[];
+  readonly before: unknown;
+  readonly after: unknown;
+}
+export interface DocumentHistoryPatch { inverse: ValuePatch; forward: ValuePatch; styleBlocks?: readonly HistoryStyleBlock[]; nodeBlocks?: readonly HistoryNodeBlock[]; nullBlocks?: readonly HistoryNullBlock[] }
+
+function readHistoryValue(value: unknown, path: readonly string[]): unknown {
+  for (const key of path) { if (!plain(value) || !Object.hasOwn(value, key)) return undefined; value = value[key]; }
+  return value;
+}
+
+/** Only changed slots involving stored null need supplementing; unchanged branches and array contents remain sparse/atomic. */
+function captureNullBlocks(roots: Array<readonly [unknown, unknown, string[]]>): HistoryNullBlock[] {
+  const blocks: HistoryNullBlock[] = [];
+  while (roots.length) {
+    const [before, after, path] = roots.pop()!;
+    if (isDeepStrictEqual(before, after)) continue;
+    if (before === null || after === null) { blocks.push({ path, before: structuredClone(before), after: structuredClone(after) }); continue; }
+    const from = plain(before) ? before : {}, to = plain(after) ? after : {};
+    for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) roots.push([Object.hasOwn(from, key) ? from[key] : undefined, Object.hasOwn(to, key) ? to[key] : undefined, [...path, key]]);
+  }
+  return blocks;
+}
 
 /** Check exact lifecycle/style snapshots first; their sparse encoding cannot guard stored nulls or declaration order. */
 export function matchesDocumentHistoryPatch(current: DocumentModel, item: DocumentHistoryPatch, undoing: boolean): boolean {
   const expected = undoing ? item.forward : item.inverse, change = undoing ? item.inverse : item.forward;
-  const styleBlocks = item.styleBlocks ?? [], nodeBlocks = item.nodeBlocks ?? [];
-  if (nodeBlocks.some(block => !sameNode(current.nodes[block.nodeId], block[undoing ? 'after' : 'before']))) return false;
+  const styleBlocks = item.styleBlocks ?? [], nodeBlocks = item.nodeBlocks ?? [], nullBlocks = item.nullBlocks ?? [];
+  if (nullBlocks.some(block => !isDeepStrictEqual(readHistoryValue(current, block.path), block[undoing ? 'after' : 'before']))) return false;
+  if (nodeBlocks.some(block => !sameNode(Object.hasOwn(current.nodes, block.nodeId) ? current.nodes[block.nodeId] : undefined, block[undoing ? 'after' : 'before']))) return false;
   if (styleBlocks.some(block => !isDeepStrictEqual(readStyleBlock(current, block.nodeId, block.address), block[undoing ? 'after' : 'before']))) return false;
-  if (!styleBlocks.length && !nodeBlocks.length) return matchesPatch(current, expected, change);
-  const paths = new Set([...nodeBlocks.map(block => JSON.stringify(['nodes', block.nodeId])), ...styleBlocks.map(block => JSON.stringify(['nodes', block.nodeId, ...(block.address === null ? ['style'] : ['descendants', block.address, 'style'])]))]);
+  if (!styleBlocks.length && !nodeBlocks.length && !nullBlocks.length) return matchesPatch(current, expected, change);
+  const paths = new Set([...nullBlocks.map(block => JSON.stringify(block.path)), ...nodeBlocks.map(block => JSON.stringify(['nodes', block.nodeId])), ...styleBlocks.map(block => JSON.stringify(['nodes', block.nodeId, ...(block.address === null ? ['style'] : ['descendants', block.address, 'style'])]))]);
   function matches(value: unknown, prior: unknown, patch: unknown, path: string[]): boolean {
     if (paths.has(JSON.stringify(path))) return true;
     if (plain(patch) && plain(prior)) return Object.keys(patch).every(key => matches((value as any)?.[key], prior[key], patch[key], [...path, key]));
@@ -95,12 +120,12 @@ export function readStyleBlock(document: DocumentModel, nodeId: string, address:
   return style === undefined ? undefined : Object.entries(style);
 }
 
-/** Node lifecycle and native style blocks carry exact data; edits within retained nodes keep sparse per-field guards. */
+/** Lifecycle/style blocks and changed nullable data slots supplement sparse per-field history without changing patch syntax. */
 export function documentHistoryPatch(from: DocumentModel, to: DocumentModel): DocumentHistoryPatch {
   const forward = diffDocuments(from, to), inverse = diffDocuments(to, from);
   const nodeBlocks: HistoryNodeBlock[] = [];
   for (const nodeId of new Set([...Object.keys(from.nodes), ...Object.keys(to.nodes)])) {
-    if (Object.hasOwn(from.nodes, nodeId) !== Object.hasOwn(to.nodes, nodeId)) nodeBlocks.push({ nodeId, before: structuredClone(from.nodes[nodeId]), after: structuredClone(to.nodes[nodeId]) });
+    if (Object.hasOwn(from.nodes, nodeId) !== Object.hasOwn(to.nodes, nodeId)) nodeBlocks.push({ nodeId, before: Object.hasOwn(from.nodes, nodeId) ? structuredClone(from.nodes[nodeId]) : undefined, after: Object.hasOwn(to.nodes, nodeId) ? structuredClone(to.nodes[nodeId]) : undefined });
   }
   const lifecycle = new Set(nodeBlocks.map(block => block.nodeId));
   const locations = new Map([...documentStyleSequence(from), ...documentStyleSequence(to)].filter(([id]) => !lifecycle.has(id)).map(([id, address]) => [JSON.stringify([id, address]), [id, address] as const]));
@@ -109,7 +134,18 @@ export function documentHistoryPatch(from: DocumentModel, to: DocumentModel): Do
     const before = readStyleBlock(from, nodeId, address), after = readStyleBlock(to, nodeId, address);
     if (!isDeepStrictEqual(before, after)) styleBlocks.push({ nodeId, address, before, after });
   }
-  return { forward, inverse, ...(styleBlocks.length ? { styleBlocks } : {}), ...(nodeBlocks.length ? { nodeBlocks } : {}) };
+  const nullable: Array<readonly [unknown, unknown, string[]]> = [[from.metadata, to.metadata, ['metadata']]];
+  for (const [id, before] of Object.entries(from.nodes)) {
+    if (!Object.hasOwn(to.nodes, id)) continue; // Whole-node lifecycle records already own all data of added/deleted nodes.
+    const after = to.nodes[id]!;
+    nullable.push([before.metadata, after.metadata, ['nodes', id, 'metadata']]);
+    const a = before.type === 'ref' ? before.descendants : {}, b = after.type === 'ref' ? after.descendants : {};
+    for (const address of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      for (const key of ['attrs', 'metadata'] as const) nullable.push([a[address]?.[key], b[address]?.[key], ['nodes', id, 'descendants', address, key]]);
+    }
+  }
+  const nullBlocks = captureNullBlocks(nullable);
+  return { forward, inverse, ...(styleBlocks.length ? { styleBlocks } : {}), ...(nodeBlocks.length ? { nodeBlocks } : {}), ...(nullBlocks.length ? { nullBlocks } : {}) };
 }
 
 function sameNodeField(before: any, after: any, key: string): boolean {

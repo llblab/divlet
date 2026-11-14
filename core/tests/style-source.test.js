@@ -68,6 +68,12 @@ transitions.push(
     source.frames[1].nodes.root.children.push('second');
   } },
   { kind: 'override', name: 'stored-null address creation', setup: source => { delete source.frames[1].nodes.instance.descendants.button; }, edit: source => { source.frames[1].nodes.instance.descendants.button = { style: storedNull }; } },
+  { kind: 'override', name: 'opaque null insertion within a retained node', edit: source => { source.frames[1].nodes.instance.metadata.later = null; } },
+  { kind: 'override', name: 'opaque null restoration within a retained node', edit: source => { source.frames[1].nodes.instance.metadata = { literal: 'Changed' }; } },
+  { kind: 'override', name: 'stored-null attribute operation within a retained node', edit: source => { source.frames[1].nodes.instance.descendants.button.attrs = { title: null }; } },
+  { kind: 'literal', name: 'frame metadata null insertion', edit: source => { source.frames[0].metadata = { literal: null, nested: { value: null }, toString: null }; } },
+  { kind: 'override', name: 'nullable override address creation', setup: source => { delete source.frames[1].nodes.instance.descendants.button; }, edit: source => { source.frames[1].nodes.instance.descendants.button = { attrs: { title: null }, metadata: { literal: null }, style: storedNull }; } },
+  { kind: 'override', name: 'nullable override address removal', setup: source => { source.frames[1].nodes.instance.descendants.button = { attrs: { title: null }, metadata: { literal: null }, style: storedNull }; }, edit: source => { delete source.frames[1].nodes.instance.descendants.button; } },
 );
 const digest = text => createHash('sha256').update(text).digest('hex');
 const stylesOf = frames => frames.flatMap(frame => Object.keys(frame.nodes).sort().flatMap(id => {
@@ -79,39 +85,39 @@ const stylesOf = frames => frames.flatMap(frame => Object.keys(frame.nodes).sort
   });
 }));
 const acceptedStyles = runtime => stylesOf([...runtime.documents.values()].map(entry => entry.document));
-const acceptedNodes = runtime => [...runtime.documents.values()].map(entry => [entry.document.id, structuredClone(entry.document.nodes)]);
+const acceptedContent = runtime => [...runtime.documents.values()].map(entry => structuredClone({ ...entry.document, version: 0 }));
 
 for (const { kind, name, edit, initialStyle, setup } of transitions) test(`live ${kind} source accepts and replays ${name} exactly`, async t => {
   const { runtime, file } = await fixture(t, kind, initialStyle, setup);
   runtime.setSelection({ documentId: 'consumer', ids: [runtime.getEntry('consumer').document.rootId] });
-  const before = await state(runtime), original = acceptedStyles(runtime), originalNodes = acceptedNodes(runtime), originalName = runtime.settings.name;
+  const before = await state(runtime), original = acceptedStyles(runtime), originalContent = acceptedContent(runtime), originalName = runtime.settings.name;
   const source = JSON.parse(await fs.readFile(file, 'utf8'));
   edit(source); source.name = 'Accepted external style edit';
-  const expected = stylesOf(source.frames), expectedNodes = readProject(source).frames.map(frame => [frame.id, frame.nodes]);
+  const expected = stylesOf(source.frames), expectedContent = readProject(source).frames.map(frame => ({ ...frame, version: 0 }));
   await fs.writeFile(file, JSON.stringify(source, null, '\t') + '\r\n');
   await runtime.scan();
   assert.equal(runtime.diagnostics.has(file), false);
   assert.deepEqual(acceptedStyles(runtime), expected);
-  assert.deepEqual(acceptedNodes(runtime), expectedNodes);
+  assert.deepEqual(acceptedContent(runtime), expectedContent);
   assert.deepEqual(stylesOf(JSON.parse(await fs.readFile(file, 'utf8')).frames), expected);
   assert.equal(runtime.knownHashes.get(file), digest(await fs.readFile(file, 'utf8')));
   assert.deepEqual(runtime.selection, before.selection, 'captured selection is not refreshed by content/history');
   assert.equal(runtime.settings.name, source.name);
   assert.equal(runtime.revision, before.revision + 1);
   assert.equal(runtime.redoStack.length, 0, 'source acceptance discards the prior future');
-  assert.ok(runtime.undoStack.at(-1).items.some(item => item.styleBlocks?.length || item.nodeBlocks?.length));
+  assert.ok(runtime.undoStack.at(-1).items.some(item => item.styleBlocks?.length || item.nodeBlocks?.length || item.nullBlocks?.length));
   const point = runtime.historyHead().pointId, accepted = await state(runtime);
   await runtime.scan(); assert.deepEqual(await state(runtime), accepted, 'own canonical write produces no echo');
   for (let iteration = 0; iteration < 2; iteration++) {
     await runtime.undo();
     assert.deepEqual(acceptedStyles(runtime), original);
-    assert.deepEqual(acceptedNodes(runtime), originalNodes);
+    assert.deepEqual(acceptedContent(runtime), originalContent);
     assert.deepEqual(stylesOf(JSON.parse(await fs.readFile(file, 'utf8')).frames), original);
     assert.equal(runtime.settings.name, originalName);
     assert.equal(runtime.historyHead().pointId, before.point);
     await runtime.redo();
     assert.deepEqual(acceptedStyles(runtime), expected);
-    assert.deepEqual(acceptedNodes(runtime), expectedNodes);
+    assert.deepEqual(acceptedContent(runtime), expectedContent);
     assert.deepEqual(stylesOf(JSON.parse(await fs.readFile(file, 'utf8')).frames), expected);
     assert.equal(runtime.historyHead().pointId, point);
     assert.deepEqual(runtime.selection, before.selection);
@@ -145,11 +151,8 @@ async function refusedSource(t, { kind = 'literal', initialStyle, edit, code }) 
 }
 
 for (const row of [
-  { name: 'opaque metadata null insertion within a retained node', kind: 'override', edit: source => { source.frames[1].nodes.instance.metadata.later = null; } },
-  { name: 'opaque metadata null restoration within a retained node', kind: 'override', edit: source => { source.frames[1].nodes.instance.metadata = { literal: 'changed' }; } },
-  { name: 'stored-null attribute operation within a retained node', kind: 'override', edit: source => { source.frames[1].nodes.instance.descendants.button.attrs = { title: null }; } },
   { name: 'collateral project metadata null', edit: source => { source.frames[0].nodes.button.style = reordered; source.metadata = { literal: null }; } },
-  { name: 'metadata-only null insertion', edit: source => { source.frames[0].metadata = { literal: null }; } },
+  { name: 'project-only null insertion', edit: source => { source.metadata = { literal: null }; } },
 ]) test(`unreplayable source refuses ${row.name} before accepting its hash`, t => refusedSource(t, { ...row, code: 'UNSUPPORTED_SOURCE_REPLAY' }));
 
 for (const row of [
