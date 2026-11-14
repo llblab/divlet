@@ -222,10 +222,22 @@ try {
   await page.evaluate(async () => (await import('./lib/inspector.js')).render({ force: true }));
   assert.equal(await page.getByRole('menu', { name: 'Font family', exact: true }).isVisible(), true, 'an unchanged-context forced measurement refresh does not retire an active menu');
   await page.keyboard.press('End'); await page.keyboard.press('Escape');
-  assert.equal(await family.evaluate(node => node === document.activeElement), true, 'keyboard Escape restores focus to the font field');
+  const familyFocused = () => page.evaluate(() => {
+    const node = document.querySelector('#inspector [data-key="font-family"]');
+    return !!node?.isConnected && node === document.activeElement;
+  });
+  assert.equal(await familyFocused(), true, 'keyboard Escape restores focus to the font field');
   await page.keyboard.press('Space'); await page.keyboard.press('Home'); await page.keyboard.press('Enter');
   await waitUntil(() => inlineFamily() === undefined, 'keyboard Default clears only the inline value');
   assert.equal(await actualFamily(), 'serif');
+  // Separate from the uninterrupted Escape/Default gesture: repaint may retain or replace identity, but not lose focus.
+  await family.focus();
+  const previousFamily = await family.elementHandle();
+  await page.evaluate(async () => (await import('./lib/inspector.js')).render({ force: true }));
+  const previousIdentity = await previousFamily.evaluate(node => ({ connected: node.isConnected, focused: node === document.activeElement }));
+  assert.equal(previousIdentity.connected, previousIdentity.focused, 'a retained field stays focused; a retired handle is not active');
+  assert.equal(await familyFocused(), true, 'inspector repaint preserves focus on the live font field');
+  await previousFamily.dispose();
   await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { nodes: { cta: { className: classesBeforeFamily } } } });
   const semanticChecks = await page.evaluate(async () => {
     const { familyPatch } = await import('./lib/typography.js');
