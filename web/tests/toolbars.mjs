@@ -552,14 +552,21 @@ try {
   // Without Pi the Agent tab offers the exact command that connects this project.
   await page.evaluate(async () => (await import('./lib/sidebar.js')).show('agent'));
   await page.locator('#agent .ask-copy').waitFor();
+  const connectionCommand = page.getByRole('textbox', { name: 'Agent connection command', exact: true });
+  assert.equal(await connectionCommand.inputValue(), `/divlet ${runtime.info().project.file}`, 'show the exact project command before copying');
+  assert.equal(await page.locator('#agent .chat-list .quiet').count(), 0, 'no empty-conversation invitation without an agent');
   await page.locator('#agent .ask-copy').click();
   await waitUntil(async () => /\/divlet /.test(await page.locator('#toast').innerText()), 'copying the command says what to run in Pi');
-  checks.push('the not-connected Agent tab offers a copy of the /divlet command for this project');
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), await connectionCommand.inputValue(), 'copy exactly the visible Pi command');
+  checks.push('the not-connected Agent tab shows a read-only /divlet command for this project and copies exactly that value');
 
   // With Pi connected the Agent tab says what a request is about and offers starting points that only fill the box.
   runtime.setAgent({ connected: true });
   await page.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards([]); (await import('./lib/sidebar.js')).show('agent'); });
   await waitUntil(async () => /whole board/.test(await page.locator('#agent .ask-scope').innerText()), 'with nothing selected the scope says the whole board');
+  await page.waitForFunction(() => !document.querySelector('#agent .ask-input').disabled);
+  assert.match(await page.locator('#agent .chat-list').innerText(), /No conversation yet/, 'a connected conversational host gets the empty-conversation invitation');
+  assert.equal(await page.locator('#agent .agent-connect').count(), 0, 'connection instructions are replaced, not duplicated');
   await page.evaluate(async () => (await import('./lib/store.js')).selectArtboards(['welcome']));
   await waitUntil(async () => /A space for ideas/.test(await page.locator('#agent .ask-scope').innerText()), 'the scope names the selected artboard');
   await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', ['nav']));

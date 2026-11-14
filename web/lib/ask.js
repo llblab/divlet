@@ -19,8 +19,6 @@ let returnFocus = null;
 
 /** A board request needs a host that relays conversation; agents of a browser host work through its MCP tools only. */
 export const available = () => !!store.state?.agent?.connected && store.state.agent.conversation !== false;
-/** The command an MCP host runs to connect an agent to this page (browser hosts only). */
-const connectCommand = () => `npx -y @divlet/mcp --connect ${new URL('./', location.href).href}`;
 export const isOpen = () => sidebar.isOpen('agent');
 const agent = () => store.state?.agent || {};
 
@@ -90,7 +88,7 @@ function paintSession() {
   sessionChips.replaceChildren(...chips);
   // The selectors replace the key hints rather than stacking under them; Send keeps the trailing bottom corner if they wrap.
   sessionChips.hidden = chips.length === 0;
-  hint.hidden = chips.length > 0;
+  hint.hidden = chips.length > 0 || !available();
 }
 // One slot, two occupants: a host that can change the session shows the two selectors where the key hints would be; a host that
 // cannot (MCP) shows the hints. Pi users are assumed to know the shortcuts; the selectors carry their own tips.
@@ -160,6 +158,7 @@ function paintStatus() {
   paintSuggest();
   paintSession();
   const state = agent();
+  composer.hidden = state.conversation === false;
   send.querySelector('span').textContent = state.busy ? 'Queue' : 'Send';
   send.dataset.tip = state.busy ? `The agent is working — this runs right after · ${keys('Enter')}` : `Send to the agent · ${keys('Enter')}`;
   send.disabled = sending || !available() || !input.value.trim();
@@ -171,23 +170,8 @@ function paintStatus() {
     : tight ? 'Ask the agent…' : 'Ask the agent to change the layout…';
   const keysHint = tight ? [`${keys('Enter')} send`] : [`${keys('Enter')} send`, `${keys('Shift+Enter')} new line`, '↑ previous'];
   // Each key with its meaning is one unit: a narrow composer wraps between units, never inside one.
-  if (!native) {
-    // A browser host: no conversation relay; offer the command that connects an MCP host to this very page.
-    const copy = button('copy', 'Copy the MCP command that connects an agent to this page', async () => {
-      try { await navigator.clipboard.writeText(connectCommand()); toast('Copied · register it as an MCP server in your agent'); }
-      catch { toast(connectCommand()); }
-    }, 'mini ask-copy');
-    hint.replaceChildren(el('span', '', store.state?.agent?.connected ? 'An agent is working through this page' : 'Connect an agent to this page'), copy);
-  } else if (!available()) {
-    // Not connected: say so, and offer the exact command that connects this project in Pi.
-    const file = store.state?.project?.file;
-    const copy = button('copy', 'Copy the command that opens this project in Pi', async () => {
-      const command = `/divlet ${file || ''}`.trim();
-      try { await navigator.clipboard.writeText(command); toast(`Copied ${command} · paste it in the Pi terminal`); }
-      catch { toast(`Run ${command} in the Pi terminal`); }
-    }, 'mini ask-copy');
-    hint.replaceChildren(el('span', '', 'No agent is connected to this board'), copy);
-  } else hint.replaceChildren(...keysHint.map(text => el('span', 'hint-unit', text)));
+  // Connection instructions live with the conversation, not as a second copy action in the composer footer.
+  hint.replaceChildren(...(available() ? keysHint.map(text => el('span', 'hint-unit', text)) : []));
   // The plaque above the box already says what the agent is doing; the hint keeps the keys so nothing moves or repeats it.
   hint.classList.toggle('busy', false);
 }
@@ -205,7 +189,7 @@ function focusInput() {
 
 export function toggle(open = !isOpen(), { text, fromFrame = false } = {}) {
   if (open && !available()) {
-    toast(native ? 'No agent is connected to this board. Open it from Pi with /divlet, or connect an MCP client (divlet-mcp).' : `Agents connect to this page over MCP: ${connectCommand()}`);
+    toast(native ? 'No agent is connected to this board. Open it from Pi with /divlet, or connect an MCP client (divlet-mcp).' : `Agents connect to this page over MCP: ${chat.connectCommand()}`);
     return false;
   }
   if (open === isOpen()) { if (open) { if (text !== undefined) { input.value = text; grow(); } input.focus(); } return open; }

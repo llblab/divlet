@@ -84,6 +84,25 @@ test('the static board opens the landing project with no backend', async () => {
   await page.click('#open-agent');
   await page.waitForSelector('#agent .ask-copy');
   assert.match(await page.locator('#agent').innerText(), /Connect an agent to this page/);
+  assert.equal(await page.locator('#agent .chat-list .quiet').count(), 0, 'disconnected visitors are not told to start an unavailable conversation');
+  const command = page.getByRole('textbox', { name: 'Agent connection command', exact: true });
+  assert.equal(await command.count(), 1, 'the command is visible before it is copied');
+  assert.equal(await command.inputValue(), `npx -y @divlet/mcp --connect ${base}`);
+  assert.equal(await command.evaluate(node => node.readOnly && !node.disabled), true, 'read-only but selectable, not disabled');
+  await command.focus();
+  await page.keyboard.type('not editable');
+  assert.equal(await command.inputValue(), `npx -y @divlet/mcp --connect ${base}`);
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.locator('#agent .ask-copy').click();
+  assert.equal(await page.evaluate(() => navigator.clipboard.readText()), await command.inputValue(), 'Copy uses exactly the displayed command');
+  await page.evaluate(() => { navigator.clipboard.writeText = async () => { throw new Error('Clipboard denied'); }; });
+  await page.locator('#agent .ask-copy').click();
+  await page.waitForFunction(() => { const node = document.querySelector('.agent-connect-value'); return node === document.activeElement && node.selectionStart === 0 && node.selectionEnd === node.value.length; });
+  assert.match(await page.locator('#toast').innerText(), /clipboard is unavailable/);
+  await page.evaluate(() => { delete navigator.clipboard.writeText; });
+  await command.press('Tab');
+  assert.equal(await page.locator('#agent .ask-copy').evaluate(node => node === document.activeElement), true, 'Tab reaches the corner Copy button without editing the command');
+  assert.equal(await page.locator('.agent-composer').isVisible(), false, 'the static host does not offer a conversation relay it lacks');
   const exported = await page.evaluate(async () => (await (await import('./lib/host.js')).exports.page('index')).html);
   assert.match(exported, /^<!DOCTYPE html>/i);
   assert.doesNotMatch(exported, /data-divlet-id/, 'a clean export, not the editing page');
@@ -113,6 +132,22 @@ test('a first visit on a phone reads the landing as a phone page', async () => {
   await phone.getByRole('button', { name: 'Collapse to the board', exact: true }).focus();
   await phone.keyboard.press('Enter');
   await phone.waitForSelector('#expanded-preview', { state: 'hidden' });
+  await phone.click('#open-agent');
+  const command = phone.getByRole('textbox', { name: 'Agent connection command', exact: true });
+  assert.equal(await command.count(), 1);
+  for (const size of [100, 200]) {
+    await phone.evaluate(async size => (await import('./lib/help.js')).setUiSize(size), size);
+    const geometry = await phone.locator('.agent-connect-command').evaluate(box => {
+      const field = box.querySelector('textarea'), copy = box.querySelector('button');
+      const outer = box.getBoundingClientRect(), control = copy.getBoundingClientRect(), input = field.getBoundingClientRect();
+      const glyph = copy.querySelector('svg').getBoundingClientRect(), label = copy.querySelector('span').getBoundingClientRect();
+      return { readonly: field.readOnly, visible: input.width > 60 && input.height > 0, copyInside: control.left >= outer.left && control.right <= outer.right && control.top >= outer.top && control.bottom <= outer.bottom, copyInline: glyph.right <= label.left + 1 && Math.abs((glyph.top + glyph.bottom) - (label.top + label.bottom)) <= 2, clipped: box.scrollWidth > box.clientWidth + 1 };
+    });
+    assert.deepEqual(geometry, { readonly: true, visible: true, copyInside: true, copyInline: true, clipped: false }, `the command and corner Copy button fit at phone/${size}%`);
+    assert.equal(await phone.locator('.chat-list .quiet').count(), 0);
+    await phone.screenshot({ path: `artifacts/pages-agent-connect-${size}.png` });
+    if (size === 100) await phone.locator('.agent-connect').screenshot({ path: 'artifacts/pages-agent-connect-card.png' });
+  }
   await phone.close();
 });
 
@@ -127,6 +162,9 @@ test('an agent connects by URL, edits the project and the visitor sees it; the c
     await page.waitForSelector('.artboard[data-artboard-id="index"] iframe');
     const project = parse(await connection.callTool('read_divlet', {}));
     assert.deepEqual(project.frames.map(frame => frame.id), ['index']);
+    assert.equal(await page.locator('.agent-connect').count(), 0, 'an MCP agent reported by the host replaces connection instructions');
+    assert.match(await page.locator('.chat-list').textContent(), /Continue the conversation in your agent/);
+    assert.doesNotMatch(await page.locator('.chat-list').textContent(), /Ask the agent to change the layout below/, 'tool access does not invent a conversation relay');
     const frame = parse(await connection.callTool('divlet_read', { view: 'frame', frameId: 'index', full: true }));
     const heading = Object.values(frame.nodes).find(node => node.type === 'element' && node.tag === 'h1');
     const text = Object.values(frame.nodes).find(node => node.type === 'text' && heading.children.includes(node.id));

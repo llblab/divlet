@@ -55,7 +55,18 @@ try {
         }
         runtime.setAgent({ connected: false, controls: null }); await input.waitFor({ state: 'visible' });
         await page.waitForFunction(() => document.querySelector('.ask-input').disabled); await sendCorner('disconnected');
+        assert.equal(await list.locator('.quiet').count(), 0, 'disconnection removes the empty-conversation invitation');
+        const command = page.getByRole('textbox', { name: 'Agent connection command', exact: true });
+        assert.equal(await command.count(), 1, 'connection instructions remain available even when earlier messages exist');
+        assert.equal(await command.inputValue(), `/divlet ${runtime.info().project.file}`);
+        assert.equal(await command.evaluate(node => node.readOnly && !node.disabled), true);
+        await command.focus();
+        await command.evaluate(node => node.setSelectionRange(0, 7));
+        runtime.setAgent({ activity: 'waiting for a connection' });
+        await page.waitForFunction(async () => (await import('./lib/store.js')).store.state.agent.activity === 'waiting for a connection' && document.querySelector('.agent-connect-value') === document.activeElement && document.activeElement.selectionEnd === 7);
         runtime.setAgent({ connected: true }); await page.waitForFunction(() => !document.querySelector('.ask-input').disabled);
+        assert.equal(await page.locator('.agent-connect').count(), 0, 'the connection card leaves when the host reports an agent');
+        if (!await list.locator('.bubble').count()) assert.match(await list.innerText(), /No conversation yet/);
       };
       await footerModes();
       await input.fill('First message.'); await input.press('Enter');

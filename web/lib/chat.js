@@ -1,7 +1,8 @@
 // The conversation with Pi: your requests and its answers, oldest first, in the Agent pane. Changes made to the
 // project (by anyone) are the History pane's business, not this one's.
 import { $, el, icon, ago, button } from './util.js';
-import { store, toast, descriptor, selectArtboards, selectNodes, loadModel, cachedModel } from './store.js';
+import { store, on, toast, descriptor, selectArtboards, selectNodes, loadModel, cachedModel } from './store.js';
+import { native } from './host.js';
 import { reveal } from './canvas.js';
 import * as sidebar from './sidebar.js';
 
@@ -11,6 +12,35 @@ export const isChat = change => CHAT.has(change.kind);
 export const list = el('div', 'chat-list');
 list.setAttribute('role', 'log');
 list.setAttribute('aria-label', 'Conversation with Pi');
+
+/** The exact connection command shown to the user and offered by the Agent shortcut. */
+export const connectCommand = () => native ? `/divlet ${store.state?.project?.file || ''}`.trim() : `npx -y @divlet/mcp --connect ${new URL('./', location.href).href}`;
+const connection = el('section', 'agent-connect');
+connection.setAttribute('aria-label', 'Connect an agent');
+connection.append(el('h3', '', 'Connect an agent to this page'), el('p', '', native
+  ? 'Open this project in Pi with the command below, or connect an MCP client that supports sampling.'
+  : 'Register this command as an MCP server in your agent, then use the browser window it opens.'));
+const commandBox = el('div', 'agent-connect-command');
+const command = el('textarea', 'field mono agent-connect-value');
+command.rows = 4;
+command.readOnly = true;
+command.spellcheck = false;
+command.setAttribute('aria-label', 'Agent connection command');
+const copyCommand = button('copy', 'Copy the connection command', async () => {
+  const value = command.value;
+  try {
+    await navigator.clipboard.writeText(value);
+    toast(native ? `Copied ${value} · paste it in the Pi terminal` : 'Copied · register it as an MCP server in your agent');
+  } catch {
+    command.focus(); command.select();
+    toast('The clipboard is unavailable. Copy the selected command.');
+  }
+}, 'mini ask-copy');
+copyCommand.append(el('span', '', 'Copy'));
+commandBox.append(command, copyCommand);
+connection.append(commandBox);
+const connectionKey = () => `${!!store.state?.agent?.connected}:${store.state?.agent?.conversation !== false}:${connectCommand()}`;
+let renderedConnection = null;
 const expanded = new Set();
 const unreadBadge = $('#agent-count');
 let unread = 0;
@@ -139,7 +169,18 @@ export function note(change) {
 export function render() {
   const top = list.scrollTop;
   const messages = store.recent.filter(isChat);
-  list.replaceChildren(...(messages.length ? messages.map(bubble) : [el('div', 'quiet', 'No conversation yet. Ask the agent to change the layout below; its answers appear here, and every edit it makes is in History.')]));
+  const content = messages.map(bubble);
+  const focused = connection.contains(document.activeElement) ? document.activeElement : null;
+  if (!store.state?.agent?.connected) {
+    const value = connectCommand();
+    if (command.value !== value) command.value = value;
+    content.push(connection);
+  } else if (!messages.length) content.push(el('div', 'quiet', store.state.agent.conversation === false
+    ? 'An agent is connected. Continue the conversation in your agent; its edits appear in History.'
+    : 'No conversation yet. Ask the agent to change the layout below; its answers appear here, and every edit it makes is in History.'));
+  list.replaceChildren(...content);
+  renderedConnection = connectionKey();
+  if (focused?.isConnected) focused.focus({ preventScroll: true });
   if (sidebar.isOpen('agent')) { unread = 0; paintUnread(); }
   if (focusSeq !== null) {
     const target = [...list.querySelectorAll('[data-seq]')].find(node => node.dataset.seq === String(focusSeq));
@@ -149,6 +190,9 @@ export function render() {
   if (followLatest) scrollToLatest();
   else if (list.clientHeight) list.scrollTop = top;
 }
+
+// Repaint connection transitions, not every activity update: keep command selection and older-message focus intact.
+on('state', () => { if (renderedConnection !== connectionKey()) render(); });
 
 /** Scroll to one message once the pane shows it. */
 export function focus(seq) { focusSeq = seq; render(); }

@@ -746,7 +746,6 @@ html.w440 .shortcut-group dd { text-align: left; padding-bottom: 5px; white-spac
 .ask-idea { flex: 0 1 auto; max-width: 100%; min-height: 28px; padding: 4px 10px; border: 0; border-radius: 14px; background: var(--field); color: var(--muted); font: 11.5px/1.35 var(--font); white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .ask-idea:hover { background: var(--field-hover); color: var(--ink); }
 .node-name { font-size: 12px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; padding: 0 2px; }
-.ask-hint .ask-copy { vertical-align: middle; margin-left: 4px; }
 .ask-stop { color: var(--bad); }
 .ask-stop .icon { width: 12px; height: 12px; }
 .ask-send { flex: none; align-self: flex-end; margin-left: auto; height: 30px; padding: 0 10px 0 12px; gap: 6px; }
@@ -770,6 +769,12 @@ html.w440 .shortcut-group dd { text-align: left; padding-bottom: 5px; white-spac
 .chat-list > * { flex-shrink: 0; }
 /* Auto margin absorbs spare space, but disappears on overflow so the oldest message stays reachable. */
 .chat-list > :first-child { margin-top: auto; }
+.agent-connect { display: grid; gap: 8px; min-width: 0; padding: 12px; border-radius: var(--radius-inner); background: var(--field); }
+.agent-connect h3 { margin: 0; font-size: 13px; line-height: 1.4; font-weight: 600; }
+.agent-connect p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.agent-connect-command { position: relative; min-width: 0; }
+.agent-connect-value { padding: 40px 9px 9px; background: var(--solid); overflow-wrap: anywhere; }
+.agent-connect-command .ask-copy { position: absolute; top: 4px; right: 4px; display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; background: var(--field); white-space: nowrap; }
 .agent-composer { display: grid; gap: 8px; margin: 0 8px 8px; padding: 8px; border-radius: var(--radius-inner); background: var(--field); }
 /* A dragged-narrow sidebar (sidebar.js sets data-sidebar): the same content, less air, so nothing is pushed off the edge. */
 html[data-sidebar="narrow"] .agent-composer, html[data-sidebar="tiny"] .agent-composer { margin: 0 6px 6px; padding: 6px; gap: 6px; }
