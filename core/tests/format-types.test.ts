@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { AssetTree, AssetFile, Attrs, Override, CssDeclaration, CssDeclarationOperation } from '../lib/model.ts';
 import type { StyleEngine, StyleEngineRequirement, ResolvedStyleEngine } from '../lib/engine.ts';
-import { validDeclarations } from '../lib/model.ts';
+import { validDeclarations, parseNativeJson } from '../lib/model.ts';
+import type { JsonTextLimits } from '../lib/model.ts';
 import type { ProjectRequirements } from '../lib/project.ts';
 import { validateRequirements } from '../lib/project.ts';
 
@@ -35,6 +36,12 @@ const invalidTuple: CssDeclaration = ['color', 'red', 'blue'];
 
 const requiredEngine: StyleEngineRequirement = { id: 'example', version: 'renderer-1' };
 const legacyEngine: StyleEngine = { id: 'legacy' };
+const jsonTextLimits: JsonTextLimits = { bytes: 1024, nesting: 16 };
+const decodedText: unknown = parseNativeJson('{"schemaVersion":1}', jsonTextLimits);
+// @ts-expect-error Text decoding cannot attest a document's schema or fields.
+const uncheckedDocument: DocumentModel = decodedText;
+// @ts-expect-error JSON container nesting is not the source/DOM depth capacity.
+const wrongJsonLimits: JsonTextLimits = { bytes: 1024, depth: 16 };
 const nativeRequirements: ProjectRequirements = {};
 const declaredRequirements: ProjectRequirements = { styleEngine: requiredEngine };
 const decodedRequirements: ProjectRequirements = validateRequirements(declaredRequirements);
@@ -53,6 +60,7 @@ const numericRendererVersion: StyleEngineRequirement = { id: 'example', version:
 test('renderer types distinguish legacy capabilities from exact compiling requirements', () => {
   assert.equal(requiredEngine.version, 'renderer-1');
   assert.equal(legacyEngine.version, undefined);
+  assert.deepEqual(decodedText, { schemaVersion: 1 });
   assert.deepEqual(nativeRequirements, {});
   assert.deepEqual(decodedEngine, requiredEngine);
 });

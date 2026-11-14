@@ -10,6 +10,7 @@ import { openRuntime } from '../lib/runtime.js';
 import { BrowserRuntime } from '../lib/browser-runtime.ts';
 import { runOnRuntime } from '../lib/tools.ts';
 import { compileClasses, unknownClasses } from '../lib/engine.ts';
+import { parseNativeJson } from '../lib/model.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const landing = await fs.readFile(path.join(root, 'examples/landing/landing.divlet'), 'utf8');
@@ -52,6 +53,31 @@ function sameState(writers, label) {
   const log = runtime => runtime.history.map(change => [change.kind, change.documentId, change.summary.replace(' (its files are in divlet/.trash)', '')]);
   assert.deepEqual(log(writers.browser), log(writers.node), `${label}: action log`);
 }
+
+test('opt-in native text refusal does not silently replace draft readers or touch accepted writers', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-draft-json-'));
+  const file = path.join(directory, 'draft.divlet');
+  const source = '{"schemaVersion":1,"metadata":{"choice":"old","choice":"draft","zero":-0},"frames":[]}';
+  let node, browser;
+  const persisted = [];
+  try {
+    await fs.writeFile(file, source);
+    node = await openRuntime({ file, watch: false, createDemo: false });
+    browser = await BrowserRuntime.open({ source, file: 'draft.divlet', projectId: 'draft', persist: text => persisted.push(text) });
+    const acceptedDisk = await fs.readFile(file, 'utf8');
+    assert.throws(() => parseNativeJson(source, { bytes: 1024, nesting: 8 }), { code: 'INVALID_JSON' });
+    for (const runtime of [node, browser]) {
+      assert.deepEqual(runtime.settings.metadata, { choice: 'draft', zero: -0 }, 'draft text readers remain unchanged until coherent cutover');
+      assert.equal(runtime.revision, 1);
+      assert.equal(runtime.history.length, 0);
+    }
+    assert.equal(await fs.readFile(file, 'utf8'), acceptedDisk, 'decoder refusal causes no additional disk publication');
+    assert.deepEqual(persisted, [], 'refusal never publishes a browser candidate');
+  } finally {
+    await node?.close(); await browser?.close();
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
 
 test('the browser writer opens a project exactly as the Node runtime renders it', async () => {
   const writers = await pair();

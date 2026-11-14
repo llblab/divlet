@@ -80,3 +80,65 @@ export function json(value: unknown, label = 'value', depth = 0, preserveKeys = 
     json(entry, label, depth + 1, preserveKeys, maxDepth);
   }
 }
+
+/** Host-selected text capacities; JSON container nesting is not DOM/document depth. */
+export interface JsonTextLimits { readonly bytes: number; readonly nesting: number }
+
+/** Opt-in native value profile only: callers still validate the decoded schema, fields and metadata. */
+export function parseNativeJson(input: unknown, limits: JsonTextLimits): unknown {
+  function invalid(message: string, offset?: number): never {
+    throw new DivletError('INVALID_JSON', message, offset === undefined ? undefined : { offset });
+  }
+  const bytes = limits?.bytes, nesting = limits?.nesting;
+  if (!Number.isSafeInteger(bytes) || bytes < 0 || !Number.isSafeInteger(nesting) || nesting < 0) invalid('Native JSON capacities must be nonnegative safe integers.');
+  if (typeof input !== 'string') invalid('Native JSON source must be text.');
+  if (!withinUtf8Budget(input, bytes)) invalid('Native JSON exceeds its UTF-8 byte budget.');
+  try {
+    // Track only names and containers; the platform parser remains the JSON grammar authority.
+    const scopes: Array<{ members: Set<string> | null; key: boolean }> = [];
+    for (let index = 0; index < input.length; index++) {
+      const char = input[index];
+      if (char === '"') {
+        const start = index;
+        while (++index < input.length) {
+          if (input[index] === '\\') index++;
+          else if (input[index] === '"') break;
+        }
+        if (index >= input.length) invalid('Native source is not valid JSON.', start);
+        const scope = scopes.at(-1);
+        if (scope?.members && scope.key) {
+          const name = JSON.parse(input.slice(start, index + 1)) as string;
+          if (scope.members.has(name)) invalid('Native JSON contains a duplicate object member.', start);
+          scope.members.add(name);
+          scope.key = false;
+        }
+      } else if (char === '{' || char === '[') {
+        if (scopes.length >= nesting) invalid('Native JSON exceeds its container nesting budget.', index);
+        scopes.push({ members: char === '{' ? new Set() : null, key: char === '{' });
+      } else if (char === '}' || char === ']') scopes.pop();
+      else if (char === ',') {
+        const scope = scopes.at(-1);
+        if (scope?.members) scope.key = true;
+      }
+    }
+    const root = { value: JSON.parse(input) as unknown };
+    // A recursive reviver would add a host-dependent call-stack limit to the declared nesting budget.
+    const pending: Record<string, unknown>[] = [root];
+    while (pending.length) {
+      const value = pending.pop()!;
+      for (const key in value) {
+        if (!Object.hasOwn(value, key)) continue;
+        const member = value[key];
+        if (typeof member === 'number') {
+          if (!Number.isFinite(member)) invalid('Native JSON contains a non-finite binary64 number.');
+          if (member === 0) value[key] = 0;
+        } else if (member !== null && typeof member === 'object') pending.push(member as Record<string, unknown>);
+      }
+    }
+    return root.value;
+  } catch (error) {
+    // SyntaxError messages may quote private input; never pass platform diagnostics through.
+    if (error instanceof SyntaxError) invalid('Native source is not valid JSON.');
+    throw error;
+  }
+}
