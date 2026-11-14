@@ -2,7 +2,7 @@
  * Declarative styles → Tailwind classes. People and agents who do not know Tailwind state styles as CSS declarations
  * (`{ 'padding-top': '16px', color: '#fff' }`); this module turns each declaration into the matching utility (an
  * arbitrary-property class when no utility exists) and replaces whatever class already set the same property.
- * The same transpiler converts imported PEN styles (`convert.js`).
+ * This optional representation does not own native inline declarations or foreign conversion.
  */
 const KEYWORD = {
   display: { flex: 'flex', none: 'hidden', block: 'block', grid: 'grid', 'inline-flex': 'inline-flex', 'inline-block': 'inline-block', inline: 'inline' },
