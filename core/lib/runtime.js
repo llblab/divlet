@@ -574,12 +574,13 @@ export class DivletRuntime extends EventEmitter {
   /**
    * Write the project file for the `next` frames, then the generated HTML of `write` and every
    * meta.json that changed. Generated files that were edited by hand are moved to divlet/.trash first.
+   * Existing-source adoption may publish only the derived cache; both source conflict checks still apply.
    */
-  async persist(next, { settings = this.settings, write = [], removed = [], sourceHash = this.knownHashes.get(this.projectPath) ?? null, generation } = {}) {
+  async persist(next, { settings = this.settings, write = [], removed = [], sourceHash = this.knownHashes.get(this.projectPath) ?? null, generation, writeSource = true } = {}) {
     const disk = await this.fileContents(this.projectPath, MAX_PROJECT_BYTES);
     const text = writeProject(settings, [...next.values()].map(entry => entry.document));
     if (Buffer.byteLength(text) > MAX_PROJECT_BYTES) fail('FILE_TOO_LARGE', 'The serialized project exceeds the source read limit.');
-    if (hashOf(disk) !== sourceHash) fail('FILE_CONFLICT', `${path.basename(this.projectPath)} changed on disk and is being read now. Read the new state and retry.`);
+    if (hashOf(disk) !== sourceHash || (!writeSource && disk === null)) fail('FILE_CONFLICT', `${path.basename(this.projectPath)} changed on disk and is being read now. Read the new state and retry.`);
     const output = new OutputStore(this.projectPath, settings.outputDir);
     const moved = output.directory !== this.outputDir;
     if (moved) write = [...next.keys()];
@@ -589,10 +590,10 @@ export class DivletRuntime extends EventEmitter {
       await output.preflight(generation.files, removedNames, { mediaTypes: generation.mediaTypes ?? new Map() });
       const latest = await this.fileContents(this.projectPath, MAX_PROJECT_BYTES);
       if (hashOf(latest) !== sourceHash) fail('FILE_CONFLICT', 'The project source changed during output preparation. Read it again and retry.');
-      if (latest !== text) {
+      if (writeSource && latest !== text) {
         await this.atomicWrite(this.projectPath, text);
       }
-      this.knownHashes.set(this.projectPath, digest(text));
+      this.knownHashes.set(this.projectPath, writeSource ? digest(text) : sourceHash);
       for (const entry of next.values()) entry.savedVersion = entry.document.version;
       const previousOutput = this.output;
       this.output = output;
@@ -703,7 +704,7 @@ export class DivletRuntime extends EventEmitter {
         return;
       }
       this.knownHashes.set(this.projectPath, digest(text));
-      await this.adopt(project.settings, project.frames, {});
+      await this.adopt(project.settings, project.frames, { writeSource: false });
       return;
     }
     if (requireSource || this.adopted || path.extname(this.projectPath).toLowerCase() === '.pen') fail('NOT_FOUND', 'The selected project source disappeared before opening. Restore it or select an existing source.');
@@ -721,8 +722,8 @@ export class DivletRuntime extends EventEmitter {
   }
 
 
-  /** Take a whole validated project as the current state and write whatever is missing or stale. */
-  async adopt(settings, frames, { prepared } = {}) {
+  /** Take a whole validated project as current state; existing-source loads rebuild only missing/stale output. */
+  async adopt(settings, frames, { prepared, writeSource = true } = {}) {
     const lookup = new Map(frames.map(frame => [frame.id, frame]));
     prepared ??= await this.prepareAll(frames.map(frame => frame.id), lookup, settings);
     const output = new OutputStore(this.projectPath, settings.outputDir);
@@ -747,7 +748,7 @@ export class DivletRuntime extends EventEmitter {
         this.diagnostics.set(entry.htmlPath, this.editedDiagnostic(entry));
       }
     }
-    await this.persist(next, { settings, write: stale, generation });
+    await this.persist(next, { settings, write: stale, generation, writeSource });
     this.settings = settings;
     this.documents = next;
     this.#historyLine.reset({ seq: null, label: this.adopted ? 'Project replaced' : 'Opened project', boundary: this.adopted ? 'untracked' : 'opened' });

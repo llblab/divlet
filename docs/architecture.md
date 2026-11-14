@@ -99,6 +99,8 @@ the owner is alive, and attaches instead of opening a second writer. Attached ca
 the owner's process disappears the entry is stale and the next client opens the project itself. The registry lives outside the
 project, is owner-only on disk, and grants nothing beyond the board's own local API.
 
+Opening an existing native project validates its model and publishes missing/stale owned cache without rewriting the authored source. `load()` opts into cache-only `adopt()`/`persist()` publication; candidate serialization/capacity validation and both source-hash checks remain active. The retained hash describes the disk text, not an unwritten canonical serialization, so the first scan is not an echo edit. Formatting, omitted defaults and raw duplicate-name evidence remain available for explicit conversion. This does not activate stricter JSON admission. Real content edits, accepted semantic external changes and history replay still use the normal canonical writer; creating a missing project/imported source still writes it.
+
 ## History replay
 
 The readable action log and the runtime's inverse/forward undo stacks are separate, bounded session state. Moving a frame patches its authored artboard coordinates and is undoable like content or project settings; a grouped gesture can contain several frame patches. Browser reloads attach to the same runtime history, but restarting the runtime does not restore a persistent timeline.

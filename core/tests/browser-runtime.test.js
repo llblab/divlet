@@ -65,6 +65,7 @@ test('opt-in native text refusal does not silently replace draft readers or touc
     node = await openRuntime({ file, watch: false, createDemo: false });
     browser = await BrowserRuntime.open({ source, file: 'draft.divlet', projectId: 'draft', persist: text => persisted.push(text) });
     const acceptedDisk = await fs.readFile(file, 'utf8');
+    assert.equal(acceptedDisk, source, 'opening retains duplicate-key evidence until explicit profile conversion');
     assert.throws(() => parseNativeJson(source, { bytes: 1024, nesting: 8 }), { code: 'INVALID_JSON' });
     for (const runtime of [node, browser]) {
       assert.deepEqual(runtime.settings.metadata, { choice: 'draft', zero: -0 }, 'draft text readers remain unchanged until coherent cutover');
