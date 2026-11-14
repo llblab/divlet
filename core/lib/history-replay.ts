@@ -7,7 +7,7 @@ import type { DocumentModel } from './model.ts';
 import { patchSettings } from './project.ts';
 import type { ProjectSettings } from './project.ts';
 import { matchesPatch, matchesDocumentHistoryPatch, documentHistoryPatch } from './diff.ts';
-import type { ValuePatch, HistoryStyleBlock } from './diff.ts';
+import type { ValuePatch, DocumentHistoryPatch } from './diff.ts';
 import { sameDocument, sameSettings, settingsPatch } from './acceptance.ts';
 import { sameJson } from './validation.ts';
 import type { HistoryDirection } from './history.ts';
@@ -15,7 +15,7 @@ export { documentHistoryPatch } from './diff.ts';
 
 /** Session-owned records, not a wire format or an admission boundary for foreign history. */
 export type HistoryReplayItem = Readonly<
-  | { type: 'patch'; documentId: string; inverse: ValuePatch; forward: ValuePatch; styleBlocks?: readonly HistoryStyleBlock[] }
+  | ({ type: 'patch'; documentId: string } & DocumentHistoryPatch)
   | { type: 'project'; inverse: ValuePatch; forward: ValuePatch }
   | { type: 'order'; inverse: readonly string[]; forward: readonly string[] }
   | { type: 'create' | 'delete'; documentId: string; index?: number; document: DocumentModel }>;
@@ -62,10 +62,15 @@ export function replayHistory(previous: ReadonlyMap<string, DocumentModel>, prev
         const current = frames.get(item.documentId);
         if (!current || !matchesDocumentHistoryPatch(current, item, undoing)) refuse('Later changes touched the same content.');
         let candidate: DocumentModel;
-        if (item.styleBlocks?.length) {
+        if (item.styleBlocks?.length || item.nodeBlocks?.length) {
           // Keep ordinary patch admission, then validate exact snapshot restoration before acceptance.
           const raw: Record<string, any> = applyDocumentPatch(current, change);
-          for (const block of item.styleBlocks) {
+          for (const block of item.nodeBlocks ?? []) {
+            const value = block[undoing ? 'before' : 'after'];
+            if (value === undefined) delete raw.nodes[block.nodeId];
+            else raw.nodes[block.nodeId] = structuredClone(value);
+          }
+          for (const block of item.styleBlocks ?? []) {
             const node = raw.nodes?.[block.nodeId], value = block[undoing ? 'before' : 'after'];
             if (block.address === null) {
               if (value === undefined) { if (node?.type === 'element') refuse('History style block no longer matches its element.'); }

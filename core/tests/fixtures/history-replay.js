@@ -58,11 +58,65 @@ export const historyReplayCases = [
     const before = context(api), nextSettings = { ...before.settings, metadata: { literal: null } };
     return api.assertProjectHistoryRoundTrip(before.frames, before.settings, before.frames, nextSettings, api.projectHistoryItems(before.frames, before.settings, before.frames, nextSettings));
   } },
-  { name: 'transaction proof refuses node metadata loss even when its style is replayable', error: 'UNSUPPORTED_SOURCE_REPLAY', run: api => {
-    const before = overrideContext(api, { definition: { style: { padding: null } } }), frame = before.frames.get('a');
+  { name: 'transaction proof retains node lifecycle metadata and override nulls', expected: { metadata: { literal: null }, attrs: { title: null }, style: [['padding', null]] }, run: api => {
+    const before = overrideContext(api, { definition: { style: { padding: null }, attrs: { title: null } } }), frame = before.frames.get('a');
     const original = api.validateDocument({ ...frame, nodes: { ...frame.nodes, instance: { ...frame.nodes.instance, metadata: { literal: null } } } });
     const previous = new Map([['a', original]]), removed = api.applyDocumentPatch(original, { nodes: { root: { children: ['definition'] }, instance: null } }), next = new Map([['a', removed]]);
-    return api.assertProjectHistoryRoundTrip(previous, before.settings, next, before.settings, api.projectHistoryItems(previous, before.settings, next, before.settings));
+    const items = api.projectHistoryItems(previous, before.settings, next, before.settings);
+    api.assertProjectHistoryRoundTrip(previous, before.settings, next, before.settings, items);
+    const restored = replay(api, { ...before, frames: next }, items, 'undo').frames.get('a').nodes.instance;
+    return { metadata: restored.metadata, attrs: restored.descendants.definition.attrs, style: Object.entries(restored.descendants.definition.style) };
+  } },
+  ...['element', 'text'].map(type => ({ name: `${type} lifecycle restores nested null data without snapshot aliasing`, expected: { literal: null, nested: { value: null }, array: [null, { value: null }] }, run: api => {
+    const before = context(api), frame = before.frames.get('a'), id = type === 'element' ? 'root' : 'label';
+    const original = api.validateDocument({ ...frame, nodes: { ...frame.nodes, [id]: { ...frame.nodes[id], metadata: { literal: null, nested: { value: null }, array: [null, { value: null }] } } } });
+    const removed = api.validateDocument({ ...frame, rootId: 'replacement', nodes: { replacement: { id: 'replacement', type: 'element', tag: 'aside', children: [] } } });
+    const item = { type: 'patch', documentId: 'a', ...api.documentHistoryPatch(original, removed) };
+    // Captured lifecycle records are independent data; later source mutation cannot alter them.
+    original.nodes[id].metadata.nested.value = 'later';
+    const restored = replay(api, { ...before, frames: new Map([['a', removed]]) }, [item], 'undo');
+    const node = restored.frames.get('a').nodes[id];
+    node.metadata.nested.value = 'mutated candidate';
+    const again = replay(api, { ...before, frames: new Map([['a', removed]]) }, [item], 'undo');
+    return again.frames.get('a').nodes[id].metadata;
+  } })),
+  { name: 'lifecycle guard refuses later stored-null changes to the captured node', error: 'CANNOT_UNDO', run: api => {
+    const before = context(api), original = before.frames.get('a');
+    const step = styleStep(api, original, { nodes: { root: { children: [] }, label: null } });
+    const restored = replay(api, { ...before, frames: new Map([['a', step.after]]) }, [step.item], 'undo');
+    const frame = restored.frames.get('a');
+    const later = api.validateDocument({ ...frame, nodes: { ...frame.nodes, label: { ...frame.nodes.label, metadata: { literal: null } } } });
+    return replay(api, { ...before, frames: new Map([['a', later]]) }, [step.item], 'redo');
+  } },
+  { name: 'lifecycle guard refuses value-equal reordered style blocks', error: 'CANNOT_UNDO', run: api => {
+    const before = context(api), original = before.frames.get('a');
+    const replacement = api.validateDocument({ ...original, rootId: 'replacement', nodes: { replacement: { id: 'replacement', type: 'element', tag: 'aside', children: [] } } });
+    const item = { type: 'patch', documentId: 'a', ...api.documentHistoryPatch(replacement, original) };
+    const later = api.validateDocument({ ...original, nodes: { ...original.nodes, root: { ...original.nodes.root, style: { padding: '10px', 'padding-left': '20px' } } } });
+    return replay(api, { ...before, frames: new Map([['a', later]]) }, [item], 'undo');
+  } },
+  { name: 'lifecycle replay retains unrelated later fields on surviving nodes', expected: { literal: null, later: 'retained' }, run: api => {
+    const before = context(api), frame = before.frames.get('a');
+    const original = api.validateDocument({ ...frame, nodes: { ...frame.nodes, label: { ...frame.nodes.label, metadata: { literal: null } } } });
+    const step = styleStep(api, original, { nodes: { root: { children: [] }, label: null } });
+    const later = api.applyDocumentPatch(step.after, { nodes: { root: { attrs: { title: 'retained' } } } });
+    const restored = replay(api, { ...before, frames: new Map([['a', later]]) }, [step.item], 'undo').frames.get('a');
+    return { ...restored.nodes.label.metadata, later: restored.nodes.root.attrs.title };
+  } },
+  { name: 'restored lifecycle snapshots still require final model admission', error: 'INVALID_DOCUMENT', run: api => {
+    const before = context(api), step = styleStep(api, before.frames.get('a'), { nodes: { root: { children: [] }, label: null } });
+    const item = structuredClone(step.item); item.nodeBlocks[0].before.id = 'wrong';
+    return replay(api, { ...before, frames: new Map([['a', step.after]]) }, [item], 'undo');
+  } },
+  { name: 'lifecycle snapshots do not bypass ordinary patch admission', error: 'INVALID_DOCUMENT', run: api => {
+    const before = context(api), step = styleStep(api, before.frames.get('a'), { nodes: { root: { children: [] }, label: null } });
+    const item = { ...step.item, forward: { ...step.item.forward, id: 'other' }, inverse: { ...step.item.inverse, id: 'a' } };
+    return replay(api, before, [item], 'redo');
+  } },
+  { name: 'transaction proof still refuses opaque null changes within retained nodes', error: 'UNSUPPORTED_SOURCE_REPLAY', run: api => {
+    const before = context(api), frame = before.frames.get('a');
+    const changed = api.validateDocument({ ...frame, nodes: { ...frame.nodes, label: { ...frame.nodes.label, metadata: { literal: null } } } }), next = new Map([['a', changed]]);
+    return api.assertProjectHistoryRoundTrip(before.frames, before.settings, next, before.settings, api.projectHistoryItems(before.frames, before.settings, next, before.settings));
   } },
   { name: 'transaction proof retains untouched metadata null through a style change', expected: { literal: null }, run: api => {
     const before = context(api), frame = before.frames.get('a');

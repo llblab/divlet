@@ -65,15 +65,22 @@ export interface HistoryStyleBlock {
   readonly before: readonly CssDeclarationOperation[] | undefined;
   readonly after: readonly CssDeclarationOperation[] | undefined;
 }
-export interface DocumentHistoryPatch { inverse: ValuePatch; forward: ValuePatch; styleBlocks?: readonly HistoryStyleBlock[] }
+/** Whole-node lifecycle data must not interpret nullable metadata or override fields as sparse deletions. */
+export interface HistoryNodeBlock {
+  readonly nodeId: string;
+  readonly before: Node | undefined;
+  readonly after: Node | undefined;
+}
+export interface DocumentHistoryPatch { inverse: ValuePatch; forward: ValuePatch; styleBlocks?: readonly HistoryStyleBlock[]; nodeBlocks?: readonly HistoryNodeBlock[] }
 
-/** Check atomic style snapshots first; their per-key sparse-patch encoding is not a stored-null guard. */
+/** Check exact lifecycle/style snapshots first; their sparse encoding cannot guard stored nulls or declaration order. */
 export function matchesDocumentHistoryPatch(current: DocumentModel, item: DocumentHistoryPatch, undoing: boolean): boolean {
   const expected = undoing ? item.forward : item.inverse, change = undoing ? item.inverse : item.forward;
-  const styleBlocks = item.styleBlocks ?? [];
+  const styleBlocks = item.styleBlocks ?? [], nodeBlocks = item.nodeBlocks ?? [];
+  if (nodeBlocks.some(block => !sameNode(current.nodes[block.nodeId], block[undoing ? 'after' : 'before']))) return false;
   if (styleBlocks.some(block => !isDeepStrictEqual(readStyleBlock(current, block.nodeId, block.address), block[undoing ? 'after' : 'before']))) return false;
-  if (!styleBlocks.length) return matchesPatch(current, expected, change);
-  const paths = new Set(styleBlocks.map(block => JSON.stringify(['nodes', block.nodeId, ...(block.address === null ? ['style'] : ['descendants', block.address, 'style'])])));
+  if (!styleBlocks.length && !nodeBlocks.length) return matchesPatch(current, expected, change);
+  const paths = new Set([...nodeBlocks.map(block => JSON.stringify(['nodes', block.nodeId])), ...styleBlocks.map(block => JSON.stringify(['nodes', block.nodeId, ...(block.address === null ? ['style'] : ['descendants', block.address, 'style'])]))]);
   function matches(value: unknown, prior: unknown, patch: unknown, path: string[]): boolean {
     if (paths.has(JSON.stringify(path))) return true;
     if (plain(patch) && plain(prior)) return Object.keys(patch).every(key => matches((value as any)?.[key], prior[key], patch[key], [...path, key]));
@@ -88,16 +95,21 @@ export function readStyleBlock(document: DocumentModel, nodeId: string, address:
   return style === undefined ? undefined : Object.entries(style);
 }
 
-/** Native style blocks are atomic history fields; other fields retain ordinary merge-patch guards. */
+/** Node lifecycle and native style blocks carry exact data; edits within retained nodes keep sparse per-field guards. */
 export function documentHistoryPatch(from: DocumentModel, to: DocumentModel): DocumentHistoryPatch {
   const forward = diffDocuments(from, to), inverse = diffDocuments(to, from);
-  const locations = new Map([...documentStyleSequence(from), ...documentStyleSequence(to)].map(([id, address]) => [JSON.stringify([id, address]), [id, address] as const]));
+  const nodeBlocks: HistoryNodeBlock[] = [];
+  for (const nodeId of new Set([...Object.keys(from.nodes), ...Object.keys(to.nodes)])) {
+    if (Object.hasOwn(from.nodes, nodeId) !== Object.hasOwn(to.nodes, nodeId)) nodeBlocks.push({ nodeId, before: structuredClone(from.nodes[nodeId]), after: structuredClone(to.nodes[nodeId]) });
+  }
+  const lifecycle = new Set(nodeBlocks.map(block => block.nodeId));
+  const locations = new Map([...documentStyleSequence(from), ...documentStyleSequence(to)].filter(([id]) => !lifecycle.has(id)).map(([id, address]) => [JSON.stringify([id, address]), [id, address] as const]));
   const styleBlocks: HistoryStyleBlock[] = [];
   for (const [nodeId, address] of locations.values()) {
     const before = readStyleBlock(from, nodeId, address), after = readStyleBlock(to, nodeId, address);
     if (!isDeepStrictEqual(before, after)) styleBlocks.push({ nodeId, address, before, after });
   }
-  return { forward, inverse, ...(styleBlocks.length ? { styleBlocks } : {}) };
+  return { forward, inverse, ...(styleBlocks.length ? { styleBlocks } : {}), ...(nodeBlocks.length ? { nodeBlocks } : {}) };
 }
 
 function sameNodeField(before: any, after: any, key: string): boolean {
@@ -106,7 +118,7 @@ function sameNodeField(before: any, after: any, key: string): boolean {
   if (key === 'descendants' && before.type === 'ref' && after.type === 'ref') return isDeepStrictEqual(nodeStyleSequence(before), nodeStyleSequence(after));
   return true;
 }
-const sameNode = (before: Node, after: Node): boolean => isDeepStrictEqual(before, after) && isDeepStrictEqual(nodeStyleSequence(before), nodeStyleSequence(after));
+const sameNode = (before: Node | undefined, after: Node | undefined): boolean => isDeepStrictEqual(before, after) && isDeepStrictEqual(nodeStyleSequence(before), nodeStyleSequence(after));
 
 const describe = (node: Node): string => (node.type === 'text' ? 'text' : node.type === 'ref' ? 'instance' : node.tag);
 

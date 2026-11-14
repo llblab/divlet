@@ -69,6 +69,20 @@ try {
   assert.ok(runtime.info().diagnostics.some(item => item.code === 'UNSUPPORTED_SOURCE_REPLAY'));
   assert.deepEqual(read(), acceptedModel); assert.equal(await readFile(file, 'utf8'), unacceptedBytes);
   await writeFile(file, acceptedBytes); await runtime.scan(); assert.deepEqual(runtime.info().diagnostics, []);
+  const lifecycle = JSON.parse(await readFile(file, 'utf8'));
+  lifecycle.frames[0].nodes.nullable = { id: 'nullable', type: 'element', tag: 'section', style: { 'padding-left': '20px', padding: '10px' }, metadata: { literal: null, nested: { value: null } }, children: [] };
+  lifecycle.frames[0].nodes.root.children.push('nullable');
+  await writeFile(file, JSON.stringify(lifecycle)); await runtime.scan();
+  assert.deepEqual(runtime.info().diagnostics, []);
+  const capturedNode = structuredClone(read().nodes.nullable);
+  assert.deepEqual(capturedNode.metadata, { literal: null, nested: { value: null } });
+  await runtime.undo(); assert.equal(Object.hasOwn(read().nodes, 'nullable'), false);
+  await runtime.redo(); assert.deepEqual(read().nodes.nullable, capturedNode);
+  await runtime.patch({ documentId: 'plain', expectedVersion: read().version, patch: { nodes: { root: { children: read().nodes.root.children.filter(id => id !== 'nullable') }, nullable: null } } });
+  for (let iteration = 0; iteration < 2; iteration++) {
+    await runtime.undo(); assert.deepEqual(read().nodes.nullable, capturedNode);
+    await runtime.redo(); assert.equal(Object.hasOwn(read().nodes, 'nullable'), false);
+  }
   const importer = { id: 'host-input', label: 'Host input', extensions: ['.host'], async claims() { return false; }, convert(bytes) {
     assert.equal(new TextDecoder().decode(bytes), 'host input'); return { text: source };
   } };
@@ -85,5 +99,5 @@ try {
   api.registerStyleEngine(engine);
   await runtime.patch({ documentId: 'plain', expectedVersion: read().version, patch: { nodes: { root: { styles: { padding: '2px' } } } } });
   assert.equal(lowered, 1); assert.match(read().nodes.root.className, /host-custom/);
-  console.log(JSON.stringify({ status: 'passed', mode: 'installed-native', modules: loaded.size, registeredHostProviders: true, sourceHistoryRoundTrip: true }));
+  console.log(JSON.stringify({ status: 'passed', mode: 'installed-native', modules: loaded.size, registeredHostProviders: true, sourceHistoryRoundTrip: true, nodeLifecycleRoundTrip: true }));
 } finally { await runtime?.close(); }

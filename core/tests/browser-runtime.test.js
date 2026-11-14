@@ -174,6 +174,49 @@ test('stored-null override style operations survive real writer Undo and Redo', 
   } finally { await writers.close(); }
 });
 
+test('node removal history restores opaque null data exactly in both writers', async () => {
+  const source = JSON.parse(editable), nodes = source.frames[0].nodes;
+  nodes.content.reusable = true; nodes.root.children = ['content', 'instance'];
+  nodes.instance = { id: 'instance', type: 'ref', ref: 'index/content', metadata: { literal: null, nested: { value: null }, array: [null, { value: null }] }, descendants: { content: { style: { padding: null, color: 'red' }, attrs: { title: null } } } };
+  const writers = await pair(JSON.stringify(source));
+  try {
+    for (const runtime of [writers.node, writers.browser]) {
+      const original = structuredClone(runtime.documents.get('index').document.nodes.instance);
+      const point = runtime.historyHead().pointId;
+      await runtime.patch({ documentId: 'index', expectedVersion: 1, patch: { nodes: { root: { children: ['content'] }, instance: null } } });
+      const removedPoint = runtime.historyHead().pointId;
+      for (let iteration = 0; iteration < 2; iteration++) {
+        await runtime.undo();
+        assert.deepEqual(runtime.documents.get('index').document.nodes.instance, original, 'node creation during replay must retain null data, not treat it as a patch deletion');
+        assert.equal(runtime.historyHead().pointId, point);
+        await runtime.redo();
+        assert.equal(Object.hasOwn(runtime.documents.get('index').document.nodes, 'instance'), false);
+        assert.equal(runtime.historyHead().pointId, removedPoint);
+      }
+      await runtime.undo();
+      const serialized = runtime === writers.node ? await fs.readFile(runtime.projectPath, 'utf8') : runtime.source();
+      assert.deepEqual(JSON.parse(serialized).frames[0].nodes.instance, original);
+    }
+    sameState(writers, 'exact node lifecycle history');
+  } finally { await writers.close(); }
+});
+
+test('node lifecycle Undo refuses later node edits without moving either writer', async () => {
+  const writers = await pair(editable);
+  try {
+    for (const runtime of [writers.node, writers.browser]) {
+      await runtime.patch({ documentId: 'index', expectedVersion: 1, patch: { nodes: { root: { children: ['content', 'added'] }, added: { id: 'added', type: 'text', content: 'Created' } } } });
+      await runtime.patch({ documentId: 'index', expectedVersion: 2, undoable: false, patch: { nodes: { added: { content: 'Later' } } } });
+      const before = historyState(runtime), text = runtime === writers.node ? await fs.readFile(runtime.projectPath, 'utf8') : runtime.source(), writes = writers.stored.length;
+      await assert.rejects(runtime.undo(), { code: 'CANNOT_UNDO' });
+      assert.deepEqual(historyState(runtime), before);
+      assert.equal(runtime === writers.node ? await fs.readFile(runtime.projectPath, 'utf8') : runtime.source(), text);
+      assert.equal(writers.stored.length, writes);
+    }
+    sameState(writers, 'node lifecycle conflict');
+  } finally { await writers.close(); }
+});
+
 test('opt-in native text refusal does not silently replace draft readers or touch accepted writers', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-draft-json-'));
   const file = path.join(directory, 'draft.divlet');

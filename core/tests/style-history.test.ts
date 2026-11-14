@@ -52,7 +52,31 @@ test('non-style edits keep their existing sparse per-field guard', () => {
   assert.equal(matchesDocumentHistoryPatch(applyDocumentPatch(after, { name: 'Later' }), item, true), false);
 });
 
+test('node lifecycle snapshots own independent data and guard the complete nullable node', () => {
+  const before = styled();
+  if (before.nodes.root?.type !== 'element') throw new Error('fixture');
+  before.nodes.root.metadata = { literal: null, nested: { value: null } };
+  const after = validateDocument({ ...before, rootId: 'replacement', nodes: { replacement: { id: 'replacement', type: 'element', tag: 'aside', children: [] } } });
+  const item = documentHistoryPatch(before, after);
+  assert.equal(item.styleBlocks, undefined, 'whole-node data already owns its ordered styles');
+  assert.equal(item.nodeBlocks?.length, Object.keys(before.nodes).length + 1);
+  assert.equal(matchesDocumentHistoryPatch(before, item, false), true);
+  assert.equal(matchesDocumentHistoryPatch(after, item, true), true);
+  const block = item.nodeBlocks?.find(block => block.nodeId === 'root');
+  assert.deepEqual(block?.before?.metadata, { literal: null, nested: { value: null } });
+  before.nodes.root.metadata.literal = 'later';
+  assert.deepEqual(block?.before?.metadata, { literal: null, nested: { value: null } });
+  assert.equal(matchesDocumentHistoryPatch(before, item, false), false, 'null is data rather than the absence of a patch member');
+});
+
 function readonlyHistoryContract(item: DocumentHistoryPatch) {
+  const node = item.nodeBlocks?.[0];
+  if (node) {
+    // @ts-expect-error A lifecycle snapshot target cannot be redirected.
+    node.nodeId = 'other';
+    // @ts-expect-error A captured endpoint cannot be replaced.
+    node.before = undefined;
+  }
   const block = item.styleBlocks?.[0];
   if (!block?.before) return;
   // @ts-expect-error Session snapshot arrays are readonly.
