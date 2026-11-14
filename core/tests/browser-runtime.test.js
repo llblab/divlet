@@ -70,6 +70,17 @@ const historyState = runtime => structuredClone({
   undo: runtime.undoStack, redo: runtime.redoStack, timeline: runtime.readTimeline(),
 });
 
+async function holdQueue(runtime) {
+  let release, entered;
+  const gate = new Promise(resolve => { release = resolve; });
+  const started = new Promise(resolve => { entered = resolve; });
+  const done = runtime.enqueue(() => { entered(); return gate; });
+  await started;
+  return { release, done };
+}
+const snapshotText = state => state.documents.find(([id]) => id === 'index')[1].nodes.label.content;
+const outcome = promise => promise.then(value => ({ ok: true, value }), error => ({ ok: false, code: error.code }));
+
 test('opt-in native text refusal does not silently replace draft readers or touch accepted writers', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-draft-json-'));
   const file = path.join(directory, 'draft.divlet');
@@ -234,6 +245,93 @@ test('shared navigation validates before reading and resolves current points onl
       } finally { runtime._replay = replay; }
     }
     sameState(writers, 'queued navigation/refusal parity');
+    assert.equal(writers.browser.source(), await fs.readFile(writers.node.projectPath, 'utf8'));
+  } finally { await writers.close(); }
+});
+
+test('direct Undo and Redo queued before an edit commits observe the accepted history in execution order', async () => {
+  const writers = await pair(editable);
+  try {
+    for (const runtime of [writers.node, writers.browser]) {
+      const base = runtime.historyHead().pointId, gate = await holdQueue(runtime);
+      try {
+        const edit = runtime.patch({ documentId: 'index', expectedVersion: 1, patch: { nodes: { label: { content: 'Queued edit' } } } });
+        const edited = runtime.enqueue(() => historyState(runtime));
+        const undo = runtime.undo();
+        const undone = runtime.enqueue(() => historyState(runtime));
+        const redo = runtime.redo();
+        const redone = runtime.enqueue(() => historyState(runtime));
+        gate.release();
+        await Promise.all([gate.done, edit, undo, redo]);
+        const [afterEdit, afterUndo, afterRedo] = await Promise.all([edited, undone, redone]);
+        assert.equal(snapshotText(afterEdit), 'Queued edit');
+        assert.equal(afterEdit.undo.length, 1); assert.equal(afterEdit.redo.length, 0);
+        assert.equal(snapshotText(afterUndo), 'Editable text');
+        assert.equal(afterUndo.timeline.current, base); assert.equal(afterUndo.undo.length, 0);
+        assert.deepEqual(afterUndo.redo, afterEdit.undo, 'the whole accepted group moves to the active Redo stack');
+        assert.equal(snapshotText(afterRedo), 'Queued edit');
+        assert.equal(afterRedo.timeline.current, afterEdit.timeline.current);
+        assert.deepEqual(afterRedo.undo, afterEdit.undo); assert.equal(afterRedo.redo.length, 0);
+      } finally { gate.release(); await gate.done; }
+    }
+    sameState(writers, 'queued edit/Undo/Redo');
+    assert.equal(writers.browser.source(), await fs.readFile(writers.node.projectPath, 'utf8'));
+  } finally { await writers.close(); }
+});
+
+test('direct Redo queued behind a branch edit cannot consume the discarded future', async () => {
+  const writers = await pair(editable);
+  try {
+    for (const runtime of [writers.node, writers.browser]) {
+      await runtime.patch({ documentId: 'index', expectedVersion: 1, patch: { nodes: { label: { content: 'Discarded future' } } } });
+      const future = runtime.historyHead().pointId;
+      await runtime.undo();
+      assert.equal(runtime.redoStack.length, 1);
+      const gate = await holdQueue(runtime);
+      try {
+        const edit = runtime.patch({ documentId: 'index', expectedVersion: runtime.getEntry('index').document.version, patch: { nodes: { label: { content: 'New branch' } } } });
+        const edited = runtime.enqueue(() => historyState(runtime));
+        const redo = outcome(runtime.redo());
+        const refused = runtime.enqueue(() => historyState(runtime));
+        gate.release();
+        await Promise.all([gate.done, edit]);
+        const accepted = await edited;
+        assert.deepEqual(await redo, { ok: false, code: 'NOTHING_TO_UNDO' });
+        assert.deepEqual(await refused, accepted, 'refusal leaves the new branch model, source revision, full stacks and point authority intact');
+        assert.equal(snapshotText(accepted), 'New branch'); assert.equal(accepted.redo.length, 0);
+        assert.equal(accepted.timeline.points.some(point => point.id === future), false);
+      } finally { gate.release(); await gate.done; }
+    }
+    sameState(writers, 'queued branch/Redo refusal');
+    assert.equal(writers.browser.source(), await fs.readFile(writers.node.projectPath, 'utf8'));
+  } finally { await writers.close(); }
+});
+
+test('direct history queued behind a refused edit uses the last accepted group without a failed prefix', async () => {
+  const writers = await pair(editable);
+  try {
+    for (const runtime of [writers.node, writers.browser]) {
+      await runtime.patch({ documentId: 'index', expectedVersion: 1, patch: { nodes: { label: { content: 'Accepted group' } } } });
+      const before = historyState(runtime), gate = await holdQueue(runtime);
+      try {
+        const edit = outcome(runtime.patch({ documentId: 'index', expectedVersion: 2, patch: { nodes: { root: { children: ['missing'] } } } }));
+        const failed = runtime.enqueue(() => historyState(runtime));
+        const undo = runtime.undo({ documentId: 'index' });
+        const undone = runtime.enqueue(() => historyState(runtime));
+        const redo = runtime.redo({ documentId: 'index' });
+        const redone = runtime.enqueue(() => historyState(runtime));
+        gate.release();
+        await Promise.all([gate.done, undo, redo]);
+        assert.deepEqual(await edit, { ok: false, code: 'INVALID_DOCUMENT' });
+        assert.deepEqual(await failed, before, 'the refused edit neither records nor consumes a group');
+        assert.equal(snapshotText(await undone), 'Editable text');
+        const after = await redone;
+        assert.equal(snapshotText(after), 'Accepted group');
+        assert.equal(after.timeline.current, before.timeline.current);
+        assert.deepEqual(after.undo, before.undo); assert.equal(after.redo.length, 0);
+      } finally { gate.release(); await gate.done; }
+    }
+    sameState(writers, 'queued invalid edit/history');
     assert.equal(writers.browser.source(), await fs.readFile(writers.node.projectPath, 'utf8'));
   } finally { await writers.close(); }
 });
