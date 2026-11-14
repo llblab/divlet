@@ -21,6 +21,7 @@ const publicSnapshot = await landingDemoSnapshot();
 const files = new Map([
   [prefix, ['text/html', '<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><title>Portable validation</title>']],
   [`${prefix}validation.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/validation.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}declarations.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/declarations.ts', import.meta.url), 'utf8'))]],
   [`${prefix}asset-reference.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/asset-reference.ts', import.meta.url), 'utf8'))]],
   [`${prefix}asset-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/asset-references.js', import.meta.url), 'utf8')]],
   [`${prefix}cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/validation.js', import.meta.url), 'utf8')]],
@@ -109,7 +110,18 @@ try {
     const selection = await selectionCases(local, localHost, shared, sharedHost);
     const { serviceCases } = await import(new URL('services-cases.js', location.href).href);
     const services = await serviceCases();
+    const { serializeDeclarations } = await import(new URL('declarations.ts', location.href).href);
+    const declarations = frameApi.validDeclarations([['padding-left', '20px'], ['padding', '10px']], 'root');
+    const orderedCssPadding = [declarations, [...declarations].reverse()].map(value => {
+      const element = document.createElement('div');
+      element.style.cssText = serializeDeclarations(value);
+      document.body.append(element);
+      const padding = getComputedStyle(element).paddingLeft;
+      element.remove();
+      return padding;
+    });
     return {
+      orderedCssPadding,
       selection,
       references,
       services,
@@ -158,6 +170,7 @@ try {
   for (const row of svgProfileResults) assert.deepEqual(row, { name: row.name, errors: 0, textMatches: true }, row.name);
   assert.deepEqual(assetProof, { color: 'rgb(17, 34, 51)', imageWidth: 20, xmlErrors: 0, title: '\u00a0', label: '<brand>', line: 'one\ntwo' }, 'actual browser XML/image and case-insensitive CSS import rendering under a prefix');
   assert.deepEqual(result.nodeGlobals, [], 'no Node globals/polyfills supply the kernel');
+  assert.deepEqual(result.orderedCssPadding, ['10px', '20px'], 'validated declaration order survives the shared serializer and actual browser cascade');
   assert.ok(result.cases.length > 25, 'the shared acceptance/refusal regions are exercised');
   for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.references, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
   assert.deepEqual(result.frames, expectedFrames, 'the same full-frame validation, patch and inspection semantics run in Node and browser');

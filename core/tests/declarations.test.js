@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyDeclarationOperations, serializeDeclarations } from '../lib/declarations.ts';
-import { merge } from '../lib/model.ts';
+import { merge, validStyle, validDeclarations, validateDocument, DivletError } from '../lib/model.ts';
 
 test('inline serialization retains declaration order, repeated fallbacks and values', () => {
   const declarations = [['display', '-webkit-box'], ['display', 'flex'], ['padding-left', '20px'], ['padding', '10px'], ['color', 'var(--Accent) !important']];
@@ -64,4 +64,43 @@ test('long edit sequences retain slots without accumulating replaced declaration
   assert.equal(result.length, source.length);
   assert.deepEqual(result[0], ['property-0', 'new-0']);
   assert.deepEqual(result.at(-1), ['property-9999', 'new-9999']);
+});
+
+test('ordered CSS admission preserves fallbacks, declaration order and source isolation', () => {
+  const input = Object.freeze([['display', '-webkit-box'], ['display', 'flex'], ['padding-left', '20px'], ['padding', '10px'], ['--Accent', 'one\r\ntwo'], ['color', 'red !important']].map(Object.freeze));
+  const result = validDeclarations(input, 'root');
+  assert.deepEqual(result, [['display', '-webkit-box'], ['display', 'flex'], ['padding-left', '20px'], ['padding', '10px'], ['--Accent', 'one\ntwo'], ['color', 'red !important']]);
+  result[0][1] = 'grid';
+  assert.equal(input[0][1], '-webkit-box');
+  assert.deepEqual(validDeclarations(undefined, 'root'), []);
+  assert.deepEqual(validDeclarations(null, 'root'), []);
+  assert.deepEqual(validDeclarations([], 'root'), []);
+});
+
+test('ordered CSS admission distinguishes literal values from nullable override operations', () => {
+  const operations = [['padding-left', null], ['padding-left', '16px'], ['color', 'red !important']];
+  assert.deepEqual(validDeclarations(operations, 'instance', true), operations);
+  assert.throws(() => validDeclarations(operations, 'root'), { code: 'INVALID_DOCUMENT' });
+  for (const input of [{}, 'color:red', 0, [null], [['color']], [['color', 'red', 'extra']], [[1, 'red']], [['color', undefined]], [['color', 1]], Array(1), [Object.assign(['color', 'red'], { extra: true })], Object.assign([['color', 'red']], { extra: true })]) {
+    assert.throws(() => validDeclarations(input, 'root'), error => error instanceof DivletError && error.code === 'INVALID_DOCUMENT');
+  }
+});
+
+test('ordered CSS admission shares legacy declaration safety, normalization and value bounds', () => {
+  for (const style of [{}, { padding: ' 4px ', color: 'red !important' }, { '--Accent': 'one\r\ntwo' }]) {
+    assert.deepEqual(validDeclarations(Object.entries(style), 'root'), Object.entries(validStyle(style, 'root')));
+  }
+  assert.deepEqual(validDeclarations([['color', null]], 'root', true), Object.entries(validStyle({ color: null }, 'root', true)));
+  for (const [property, value] of [['bad property', 'red'], ['color', 'red;background:blue'], ['color', 'red;}body{display:none}x{color:blue'], ['color', '</style>'], ['color', 'expression(evil())'], ['background', 'url(javascript:evil())'], ['color', '\0'], ['color', '\ud800'], ['--x', 'a'.repeat(16385)]]) {
+    assert.throws(() => validDeclarations([[property, value]], 'root'), error => error instanceof DivletError);
+    assert.throws(() => validStyle({ [property]: value }, 'root'), error => error instanceof DivletError);
+  }
+  assert.equal(validDeclarations([['--x', 'a'.repeat(16384)]], 'root')[0][1].length, 16384);
+});
+
+test('ordered CSS helpers do not silently activate a new draft wire profile', () => {
+  const frame = { schemaVersion: 1, id: 'ordered', name: 'Ordered', version: 1, artboard: { x: 0, y: 0, width: 100, height: 100 }, rootId: 'root', nodes: { root: { id: 'root', type: 'element', tag: 'main', children: [], style: { color: 'red' } } } };
+  assert.equal(validateDocument(frame).nodes.root.style.color, 'red');
+  const ordered = validDeclarations(Object.entries(frame.nodes.root.style), 'root');
+  assert.throws(() => validateDocument({ ...frame, nodes: { root: { ...frame.nodes.root, style: ordered } } }), { code: 'INVALID_DOCUMENT' });
 });

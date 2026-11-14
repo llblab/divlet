@@ -31,6 +31,12 @@ function byteBoundaryFrame(api, extra) {
 export const frameCases = [
   { name: 'defaults, attribute folding and newline normalization', run: api => { const frame = sampleFrame(); frame.nodes.root.attrs = { TITLE: 'One\r\nTwo' }; frame.nodes.label.content = 'One\rTwo'; return api.validateDocument(frame); } },
   { name: 'native CSS, tokens, inline declaration normalization', run: api => { const frame = sampleFrame(); frame.css = '@media(min-width:1px){main{color:red}}'; frame.tokens = { '--color-brand': 'red !important' }; frame.nodes.root.style = { padding: '12px !important' }; return api.validateDocument(frame); } },
+  { name: 'ordered CSS opt-in preserves declaration order and repeated fallbacks', run: api => api.validDeclarations([['display', '-webkit-box'], ['display', 'flex'], ['padding-left', '20px'], ['padding', '10px']], 'root') },
+  { name: 'ordered CSS override operations retain removals and normalized values', run: api => api.validDeclarations([['color', null], ['--Accent', 'one\r\ntwo'], ['color', 'red !important']], 'instance', true) },
+  { name: 'ordered CSS literal null refusal', error: 'INVALID_DOCUMENT', run: api => api.validDeclarations([['color', null]], 'root') },
+  { name: 'ordered CSS escaped declaration refusal', error: 'INVALID_DOCUMENT', run: api => api.validDeclarations([['color', 'red;background:blue']], 'root') },
+  { name: 'ordered CSS sparse tuple refusal', error: 'INVALID_DOCUMENT', run: api => api.validDeclarations([['color', ,]], 'root') },
+  { name: 'ordered CSS wire profile remains gated', error: 'INVALID_DOCUMENT', run: api => { const frame = sampleFrame(); frame.nodes.root.style = api.validDeclarations([['color', 'red']], 'root'); return api.validateDocument(frame); } },
   { name: 'signed fractional geometry and inert metadata', run: api => { const frame = sampleFrame(); frame.artboard.x = -0.5; frame.artboard.width = 390.25; frame.metadata = { schemaVersion: 3, note: 'One\rTwo', score: Number.MAX_VALUE }; return api.validateDocument(frame); } },
   { name: 'atomic patch and source isolation', run: api => {
     const source = api.validateDocument(sampleFrame()), before = JSON.stringify(source);

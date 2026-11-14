@@ -8,6 +8,7 @@
  */
 import { applyStyles } from './model-styles.ts';
 import { readAssetReference } from './asset-reference.ts';
+import type { CssDeclaration, CssDeclarationOperation } from './declarations.ts';
 import postcssParse from 'postcss/lib/parse';
 import type postcss from 'postcss';
 import { DivletError, fail, object, string, keys, json, withinUtf8Budget } from './validation.ts';
@@ -21,7 +22,7 @@ export type Metadata = { [key: string]: Json };
 export type Style = Record<string, string>;
 /** Override declarations may delete a property with null. */
 export type StyleOverrides = Record<string, string | null>;
-/** Ordered CSS contracts; the admitted Style fields remain maps until the versioned cutover. */
+/** Ordered CSS contracts; stored Style fields remain maps until the coherent draft cutover. */
 export type { CssDeclaration, CssDeclarationOperation } from './declarations.ts';
 /** Project-owned resource directories; leaves are canonical base64 Data URLs, not filesystem paths. */
 export interface AssetTree { [name: string]: string | AssetTree }
@@ -170,23 +171,36 @@ export function safeAttribute(name: string, value: string, nodeId: string, resou
   }
 }
 
+function validDeclarationValue(property: string, value: unknown, label: string, nullable: boolean): string | null {
+  if (!TOKEN.test(property) && !/^[a-z][a-z0-9-]*$/.test(property)) fail(`Invalid CSS property: ${property}`);
+  if (value === null && nullable) return null;
+  string(value, label, 16384);
+  validateCss(`a{${property}:${value}}`);
+  const stylesheet = parseCss(`a{${property}:${value}}`);
+  const parsed = stylesheet.first as postcss.Rule;
+  const declaration = parsed.nodes[0] as postcss.Declaration | undefined;
+  if (stylesheet.nodes.length !== 1 || parsed.nodes.length !== 1 || declaration?.type !== 'decl' || declaration.prop !== property) fail(`CSS value escapes its declaration: ${property}`);
+  return `${declaration.value}${declaration.important ? ' !important' : ''}`.replace(/\r\n?/g, '\n');
+}
+
+/** Opt-in ordered CSS admission; wire readers still use maps. Frame validation owns aggregate budgets. */
+export function validDeclarations(input: unknown, id: string, nullable?: false): CssDeclaration[];
+export function validDeclarations(input: unknown, id: string, nullable: true): CssDeclarationOperation[];
+export function validDeclarations(input: unknown, id: string, nullable = false): CssDeclaration[] | CssDeclarationOperation[] {
+  if (input === null || input === undefined) return [];
+  if (!Array.isArray(input) || Object.keys(input).length !== input.length) fail(`${id}.style must be an ordered declaration list`);
+  return Array.from(input, (pair, index): CssDeclarationOperation => {
+    if (!Array.isArray(pair) || pair.length !== 2 || Object.keys(pair).length !== 2 || typeof pair[0] !== 'string') fail(`${id}.style[${index}] must be a property/value pair`);
+    return [pair[0], validDeclarationValue(pair[0], pair[1], `${id}.style[${index}]`, nullable)];
+  });
+}
+
 /** Normalized inline style; `nullable` keeps null values (deletions inside overrides). */
 export function validStyle(input: unknown, id: string, nullable?: false): Style;
 export function validStyle(input: unknown, id: string, nullable: true): StyleOverrides;
 export function validStyle(input: unknown, id: string, nullable = false): Style | StyleOverrides {
   const style = structuredClone(object(input, `${id}.style`)) as Record<string, unknown>;
-  for (const [property, value] of Object.entries(style)) {
-    if (!TOKEN.test(property) && !/^[a-z][a-z0-9-]*$/.test(property)) fail(`Invalid CSS property: ${property}`);
-    if (value === null && nullable) continue;
-    string(value, `${id}.style.${property}`, 16384);
-    validateCss(`a{${property}:${value}}`);
-    const stylesheet = parseCss(`a{${property}:${value}}`);
-    const parsed = stylesheet.first as postcss.Rule;
-    const declaration = parsed.nodes[0] as postcss.Declaration | undefined;
-    if (stylesheet.nodes.length !== 1 || parsed.nodes.length !== 1 || declaration?.type !== 'decl' || declaration.prop !== property) fail(`CSS value escapes its declaration: ${property}`);
-    const value2 = declaration.value;
-    style[property] = `${value2}${declaration.important ? ' !important' : ''}`.replace(/\r\n?/g, '\n');
-  }
+  for (const [property, value] of Object.entries(style)) style[property] = validDeclarationValue(property, value, `${id}.style.${property}`, nullable);
   return style as Style;
 }
 

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { AssetTree, AssetFile, Attrs, Override, CssDeclaration, CssDeclarationOperation } from '../lib/model.ts';
 import type { StyleEngine, StyleEngineRequirement, ResolvedStyleEngine } from '../lib/engine.ts';
+import { validDeclarations } from '../lib/model.ts';
 
 const assets: AssetTree = { brand: { logo: 'data:image/svg+xml;base64,AA==' } };
 const decodedAsset: AssetFile = { mediaType: 'image/png', bytes: new Uint8Array([1]) };
@@ -21,6 +22,10 @@ const invalidElementAttrs: Attrs = { title: null };
 
 const declaration: CssDeclaration = ['display', 'flex'];
 const operation: CssDeclarationOperation = ['display', null];
+const admittedDeclarations: CssDeclaration[] = validDeclarations([['display', 'flex']], 'root');
+const admittedOperations: CssDeclarationOperation[] = validDeclarations([['display', null]], 'instance', true);
+// @ts-expect-error Nullable override operations cannot be consumed as literal declarations.
+const nullableLiterals: CssDeclaration[] = validDeclarations([['display', null]], 'instance', true);
 // @ts-expect-error Literal declaration values are strings, not deletion operations.
 const invalidDeclaration: CssDeclaration = ['display', null];
 // @ts-expect-error A declaration is exactly one property/value pair.
@@ -43,6 +48,8 @@ test('renderer types distinguish legacy capabilities from exact compiling requir
 test('ordered CSS types distinguish literal declarations from property operations', () => {
   assert.deepEqual(declaration, ['display', 'flex']);
   assert.deepEqual(operation, ['display', null]);
+  assert.deepEqual(admittedDeclarations, [declaration]);
+  assert.deepEqual(admittedOperations, [operation]);
 });
 
 test('attribute types distinguish nullable override edits from literal element values', () => {
