@@ -121,14 +121,24 @@ try {
       await page.locator('.agent-status:not([hidden])').waitFor(); await bottom();
       runtime.setAgent({ busy: false }); await page.locator('.agent-status').waitFor({ state: 'hidden' }); await bottom();
 
-      await page.evaluate(async () => (await import('./lib/sidebar.js')).close());
+      const foldedDensity = await page.evaluate(async () => {
+        const sidebar = await import('./lib/sidebar.js'); sidebar.close(); return sidebar.widthSize();
+      });
+      await page.waitForFunction(expected => document.documentElement.dataset.sidebar === expected, foldedDensity);
       runtime.say({ text: 'A reply delivered while the conversation was folded.' }); await messages(30);
-      await page.evaluate(async () => (await import('./lib/sidebar.js')).show('agent')); await bottom();
-      await page.evaluate(async () => { const chat = await import('./lib/chat.js'); chat.focus(Number(document.querySelector('.chat-list .bubble').dataset.seq)); });
+      // Focus before the opening pane's ResizeObserver updates density/padding; preserve visibility through that reflow.
+      const expectedDensity = await page.evaluate(async () => {
+        const sidebar = await import('./lib/sidebar.js'), chat = await import('./lib/chat.js');
+        sidebar.show('agent'); chat.focus(Number(document.querySelector('.chat-list .bubble').dataset.seq));
+        return sidebar.widthSize();
+      });
       try {
-        await page.waitForFunction(() => { const list = document.querySelector('.chat-list'), box = list.getBoundingClientRect(), first = list.firstElementChild.getBoundingClientRect(); return first.top >= box.top - 1 && first.bottom <= box.bottom + 1; });
+        await page.waitForFunction(expected => {
+          const list = document.querySelector('.chat-list'), box = list.getBoundingClientRect(), first = list.firstElementChild.getBoundingClientRect();
+          return list.clientHeight > 0 && document.documentElement.dataset.sidebar === expected && first.top >= box.top - 1 && first.bottom <= box.bottom + 1;
+        }, expectedDensity);
       } catch (error) {
-        console.error(JSON.stringify({ width, size, focus: await list.evaluate(node => ({ scroll: node.scrollTop, total: node.scrollHeight, client: node.clientHeight, list: node.getBoundingClientRect().toJSON(), first: node.firstElementChild.getBoundingClientRect().toJSON(), active: document.activeElement?.outerHTML.slice(0, 180), panelScroll: document.querySelector('#sidebar').scrollTop })) }));
+        console.error(JSON.stringify({ width, size, focus: await list.evaluate(node => ({ scroll: node.scrollTop, total: node.scrollHeight, client: node.clientHeight, density: document.documentElement.dataset.sidebar, padding: getComputedStyle(node).paddingTop, list: node.getBoundingClientRect().toJSON(), first: node.firstElementChild.getBoundingClientRect().toJSON(), active: document.activeElement?.outerHTML.slice(0, 180), panelScroll: document.querySelector('#sidebar').scrollTop })) }));
         throw error;
       }
       const focusedTop = await list.evaluate(n => n.scrollTop);
