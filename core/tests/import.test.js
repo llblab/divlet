@@ -9,6 +9,7 @@ import { launch } from '../lib/launch.ts';
 import { listProjects, resolveProject } from '../lib/projects.ts';
 import { openRuntime } from '@divlet/core/runtime';
 import { LIMITS } from '../lib/model.ts';
+import { styleOrderSource } from '../../plugins/pen/tests/fixtures/style-order.js';
 
 const simple = () => ({ version: '2.21', fileToken: 'private-token', variables: { 'ink/primary': { type: 'color', value: '#123456' } }, children: [
   { id: 'page', type: 'frame', name: 'Landing Page', x: 0, y: 0, width: 320, height: 200, layout: 'vertical', padding: 16, gap: 8, fill: '#e8d5a8', children: [
@@ -101,6 +102,21 @@ test('ambiguous projection CSS refuses sibling publication while retaining forei
   const opened = [];
   await launch(pen, { openBoard: async location => { opened.push(location.file); return { info: () => ({ url: 'x' }) }; } });
   assert.deepEqual(opened, [pen]);
+});
+
+for (const file of ['direct.pen', 'nested.pen', 'legacy.divlet']) test(`unrepresentable inline order retains ${file} after refusal without native publication`, async t => {
+  const dir = await workspace(t), source = path.join(dir, file);
+  const bytes = JSON.stringify(styleOrderSource({ nested: file === 'nested.pen' }), null, 1);
+  await fs.writeFile(source, bytes);
+  // importSource treats an occupied .divlet as authoritative; launch owns legacy detach/restore.
+  if (file.endsWith('.pen')) await assert.rejects(importPen(source), { code: 'UNSUPPORTED_PEN_RENDER' });
+  assert.equal(await fs.readFile(source, 'utf8'), bytes);
+  assert.deepEqual(await fs.readdir(dir), [file], 'no native sibling/cache or final legacy-backup residue');
+  const opened = [];
+  const result = await launch(source, { openBoard: async location => { opened.push(location.file); return { info: () => ({ url: 'x' }) }; } });
+  assert.deepEqual(opened, [source]); assert.equal(result.imported, undefined);
+  assert.equal(await fs.readFile(source, 'utf8'), bytes);
+  assert.deepEqual(await fs.readdir(dir), [file]);
 });
 
 test('native CSS capacity refusal retains source and creates no partial project', async t => {

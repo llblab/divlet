@@ -7,7 +7,7 @@
 import postcss from 'postcss';
 import { readProject } from './source.js';
 import { sourceFrame } from './projection.js';
-import { validateSettings, writeProject } from '../../../core/lib/project.ts';
+import { validateSettings, writeProject, expandFrame } from '../../../core/lib/project.ts';
 import { validateDocument } from '../../../core/lib/model.ts';
 import { decodeCss } from '../../../core/lib/css-literals.ts';
 
@@ -196,6 +196,18 @@ function linkComponents(frames, reusable) {
   return total;
 }
 
+/** Inline order is rendering data even in the draft map profile; linking must reproduce the projected inline sequence exactly. */
+function inlineStyleSequence(frame) {
+  const sequence = [], pending = [frame.rootId];
+  while (pending.length) {
+    const node = frame.nodes[pending.pop()];
+    if (node.type !== 'element') continue;
+    sequence.push([node.tag, Object.entries(node.style)]);
+    pending.push(...[...node.children].reverse());
+  }
+  return sequence;
+}
+
 function reusableIds(children, out = new Set()) {
   for (const node of children || []) { if (node.reusable === true) out.add(node.id); reusableIds(node.children, out); }
   return out;
@@ -249,8 +261,14 @@ export function convertPen(input, { name, provenance } = {}) {
     stats.declarations += frame.declarations;
     converted.push(frame);
   }
+  const projectedStyles = converted.map(frame => JSON.stringify(inlineStyleSequence(frame)));
   stats.instances = linkComponents(converted, reusableIds(project.source.children));
   const frames = converted.map(frame => validateDocument({ schemaVersion: 1, id: frame.id, name: frame.name, version: 1, rootId: frame.rootId, artboard: frame.artboard, tokens: {}, css: '', metadata: {}, nodes: frame.nodes }));
+  const lookup = new Map(frames.map(frame => [frame.id, frame]));
+  for (const [index, frame] of frames.entries()) {
+    const expanded = expandFrame(frame, id => lookup.get(id), null).document;
+    if (JSON.stringify(inlineStyleSequence(expanded)) !== projectedStyles[index]) unsupported('Component linking cannot preserve projected inline CSS declaration order and values in the current native profile.');
+  }
   stats.frames = frames.length;
   stats.nodes = frames.reduce((total, frame) => total + Object.keys(frame.nodes).length, 0);
   const settings = validateSettings({ name, tokens, css: [...shared, project.settings.css].filter(Boolean).join('\n'), metadata: provenance ? { import: provenance } : {} });

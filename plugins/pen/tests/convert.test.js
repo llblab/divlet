@@ -4,6 +4,8 @@ import { convertPen } from '../lib/convert.js';
 import postcss from 'postcss';
 import { styleEngine, setStyleEngines } from '../../../core/lib/engine.ts';
 import { cssAnnotationCases } from '../../../core/tests/fixtures/css-annotations.js';
+import { readProject as readNativeProject, expandFrame } from '../../../core/lib/project.ts';
+import { styleOrderSource } from './fixtures/style-order.js';
 
 const original = styleEngine();
 test.before(() => setStyleEngines([]));
@@ -53,6 +55,25 @@ test('instances that differ from their component only by overrides stay instance
   const label = Object.values(card.nodes).find(node => node.type === 'text');
   assert.deepEqual(refs.map(ref => ref.descendants).sort((a, b) => Object.keys(a).length - Object.keys(b).length), [{}, { [label.id]: { content: 'Second' } }]);
 });
+
+for (const nested of [false, true]) {
+  for (const sameValues of [false, true]) test(`component linking refuses lost inline CSS order (${nested ? 'nested' : 'direct'}, ${sameValues ? 'order only' : 'changed values'})`, () => {
+    const source = styleOrderSource({ nested, sameValues }), before = JSON.stringify(source);
+    assert.throws(() => convertPen(source), { code: 'UNSUPPORTED_PEN_RENDER' });
+    assert.equal(JSON.stringify(source), before, 'source member order and values remain untouched');
+  });
+  test(`representable inline changes preserve component links and declaration order (${nested ? 'nested' : 'direct'})`, () => {
+    const source = styleOrderSource({ nested, reordered: false }), before = JSON.stringify(source);
+    const converted = convertPen(source), project = readNativeProject(JSON.parse(converted.text));
+    const frames = new Map(project.frames.map(frame => [frame.id, frame]));
+    const page = project.frames.find(frame => frame.name === 'Page');
+    const expanded = expandFrame(page, id => frames.get(id), project.settings).document;
+    const inline = Object.values(expanded.nodes).filter(node => node.type === 'element' && Object.hasOwn(node.style, 'padding'));
+    assert.deepEqual(inline.map(node => Object.entries(node.style)), [[['padding-left', '24px'], ['padding', '12px']]]);
+    assert.ok(converted.stats.instances >= (nested ? 3 : 1), 'representable instances remain linked');
+    assert.equal(JSON.stringify(source), before);
+  });
+}
 
 test('variables stay live: colour, length, number and font variables become tokens referenced with var()', () => {
   const source = { version: '2.21',
