@@ -7,6 +7,7 @@ import os from 'node:os';
 import { openRuntime } from '@divlet/core/runtime';
 import { readProject } from '../lib/project.ts';
 import { domReferenceProject } from './fixtures/dom-ids.js';
+import { componentScopeProject } from './fixtures/component-scope.js';
 
 async function fixture(t) {
   const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-components-'));
@@ -225,6 +226,33 @@ test('DOM ID conflicts in dependent instances retain accepted source, selection 
   assert.match(runtime.render('consumer').html, /for="field-2"/);
   await runtime.redo({});
   assert.match(runtime.render('consumer').html, /for="field-3"/);
+});
+
+test('source-only styles stay out of consumer output through edits and Undo', async t => {
+  const { runtime } = await fixture(t), input = componentScopeProject();
+  await runtime.patchProject({ expectedVersion: 1, patch: { tokens: input.tokens, css: input.css } });
+  for (const document of input.frames) await runtime.create({ document });
+  runtime.setSelection({ ids: ['consumer'], nodes: { documentId: 'consumer', nodeIds: ['instance'] } });
+  const before = runtime.read({ view: 'document', documentId: 'consumer' });
+  const html = await fs.readFile(runtime.getEntry('consumer').htmlPath), selected = structuredClone(runtime.info().selection.selectedNodes);
+  await runtime.patch({ documentId: 'library', expectedVersion: 1, patch: { tokens: { '--accent': '#ff00ff', '--source-only': '99px' }, css: '.scope{background:black!important}' } });
+  assert.deepEqual(runtime.read({ view: 'document', documentId: 'consumer' }), before);
+  assert.deepEqual(await fs.readFile(runtime.getEntry('consumer').htmlPath), html, 'unused source-frame context does not enter rendered consumer bytes');
+  assert.deepEqual(runtime.info().selection.selectedNodes, selected);
+  await runtime.undo({});
+  assert.deepEqual(await fs.readFile(runtime.getEntry('consumer').htmlPath), html);
+  assert.deepEqual(runtime.read({ view: 'document', documentId: 'consumer' }), before);
+  assert.deepEqual(runtime.info().selection.selectedNodes, selected);
+  await runtime.redo({});
+  assert.deepEqual(await fs.readFile(runtime.getEntry('consumer').htmlPath), html);
+  assert.deepEqual(runtime.read({ view: 'document', documentId: 'consumer' }), before);
+  assert.deepEqual(runtime.info().selection.selectedNodes, selected);
+  await runtime.patch({ documentId: 'consumer', expectedVersion: before.version, patch: { tokens: { '--accent': '#dd00ee' } } });
+  assert.match(await fs.readFile(runtime.getEntry('consumer').htmlPath, 'utf8'), /--accent:#dd00ee/);
+  const library = runtime.read({ view: 'document', documentId: 'library' });
+  assert.equal(library.nodes.component.style.color, 'var(--accent)', 'variable expressions are not replaced by measured values');
+  assert.equal(runtime.read({ view: 'document', documentId: 'consumer' }).nodes.instance.ref, 'library/component');
+  assert.deepEqual(runtime.info().selection.selectedNodes.nodeIds, ['instance']);
 });
 
 test('instances cannot break HTML nesting rules once expanded', async t => {
