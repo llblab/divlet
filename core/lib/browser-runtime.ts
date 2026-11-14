@@ -20,7 +20,7 @@ import { exportHtml } from './codec.ts';
 import type { ProjectSettings } from './project.ts';
 import { prepareFrameWith } from './prepare.ts';
 import type { FrameCompiler, PreparedFrame } from './prepare.ts';
-import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertExpectedVersion, assertExpectedRender } from './acceptance.ts';
+import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertPatchVersion, assertExpectedVersion, assertExpectedRender } from './acceptance.ts';
 import { sameJson } from './validation.ts';
 import { runOnRuntime, toolByName, toolList } from './tools.ts';
 
@@ -349,7 +349,7 @@ export class BrowserRuntime {
 
   async _patch({ documentId, expectedVersion, expectedRender, patch, actor = 'agent', group, label, undoable = true, kind = 'patch' }: any) {
     const previous = this.getEntry(documentId);
-    if (!Number.isInteger(expectedVersion) || expectedVersion !== previous.document.version) fail('REVISION_CONFLICT', `Expected frame version ${previous.document.version}; received ${expectedVersion}. Read the frame again and rebuild the change.`, { actualVersion: previous.document.version });
+    assertPatchVersion(expectedVersion, previous.document);
     assertExpectedRender(expectedRender, previous);
     const candidate = applyDocumentPatch(previous.document, patch, { colourNames: colourNames(this.settings.tokens, previous.document.tokens) });
     candidate.version = previous.document.version + 1;
@@ -383,7 +383,7 @@ export class BrowserRuntime {
   }
 
   async _patchProject({ expectedVersion, patch, actor = 'agent', group, label, undoable = true, kind = 'patch' }: any) {
-    if (!Number.isInteger(expectedVersion) || expectedVersion !== this.settings.version) fail('REVISION_CONFLICT', `Expected project version ${this.settings.version}; received ${expectedVersion}. Read the project again.`, { actualVersion: this.settings.version });
+    assertPatchVersion(expectedVersion, this.settings, 'project');
     if (patch && typeof patch === 'object' && Object.hasOwn(patch, 'assets') && patch.assets !== null) fail('ASSETS_UNAVAILABLE', 'Embedded assets need the local divlet host: this browser build does not decode project asset bytes.');
     const previous = this.settings;
     const settings = { ...patchSettings(previous, patch), version: previous.version + 1 };

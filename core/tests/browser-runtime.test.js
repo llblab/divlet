@@ -336,6 +336,62 @@ test('direct history queued behind a refused edit uses the last accepted group w
   } finally { await writers.close(); }
 });
 
+for (const scope of ['frame', 'project']) test(`required ${scope} patch admission agrees through direct/tool paths, no-ops and queued stale reads`, async () => {
+  const writers = await pair(editable);
+  try {
+    for (const runtime of [writers.node, writers.browser]) {
+      const target = () => scope === 'frame' ? runtime.getEntry('index').document : runtime.settings;
+      const call = (expectedVersion, patch, tool = false, extra = {}) => tool
+        ? runOnRuntime('divlet_patch', { ...(scope === 'frame' ? { frameId: 'index' } : {}), expectedVersion, patch, ...extra }, runtime)
+        : scope === 'frame' ? runtime.patch({ documentId: 'index', expectedVersion, patch, ...extra }) : runtime.patchProject({ expectedVersion, patch });
+      const source = () => runtime === writers.node ? fs.readFile(runtime.projectPath, 'utf8') : Promise.resolve(runtime.source());
+      const persist = runtime.persist.bind(runtime);
+      let writes = 0;
+      runtime.persist = (...args) => { writes++; return persist(...args); };
+      try {
+        const before = historyState(runtime), bytes = await source();
+        const noop = { name: target().name }, invalid = scope === 'frame' ? { nodes: { root: { children: ['missing'] } } } : { name: 1 };
+        for (const tool of [false, true]) for (const version of [undefined, null, false, 0, '1', 1.5, 2]) for (const patch of [noop, invalid]) {
+          await assert.rejects(call(version, patch, tool), error => error.code === 'REVISION_CONFLICT' && error.details.actualVersion === 1);
+          assert.deepEqual(historyState(runtime), before);
+          assert.equal(await source(), bytes, 'each refusal retains serialized source at its boundary');
+        }
+        assert.equal(writes, 0);
+        if (scope === 'frame') {
+          for (const tool of [false, true]) {
+            const result = await call(1, noop, tool);
+            assert.equal(result.saved, false); assert.equal(result.seq, null); assert.equal(result.version, 1);
+          }
+          const staleRender = runtime.getEntry('index').render + 1;
+          await assert.rejects(call(0, invalid, false, { expectedRender: staleRender }), { code: 'REVISION_CONFLICT' });
+          await assert.rejects(call(1, invalid, false, { expectedRender: staleRender }), { code: 'RENDER_CONFLICT' });
+          assert.deepEqual(historyState(runtime), before); assert.equal(await source(), bytes); assert.equal(writes, 0);
+        }
+        const acceptedPatch = scope === 'frame' ? { nodes: { label: { content: 'Accepted patch' } } } : { metadata: { proof: 'Accepted patch' } };
+        await call(1, acceptedPatch);
+        const accepted = historyState(runtime), acceptedBytes = await source();
+        await assert.rejects(call(1, acceptedPatch, true), { code: 'REVISION_CONFLICT' });
+        assert.deepEqual(historyState(runtime), accepted); assert.equal(await source(), acceptedBytes); assert.equal(writes, 1);
+        const gate = await holdQueue(runtime);
+        try {
+          const version = target().version;
+          const queuedPatch = scope === 'frame' ? { nodes: { label: { content: 'Queued patch' } } } : { metadata: { proof: 'Queued patch' } };
+          const first = call(version, queuedPatch);
+          const committed = runtime.enqueue(async () => ({ state: historyState(runtime), source: await source() }));
+          const stale = outcome(call(version, queuedPatch, true));
+          const refused = runtime.enqueue(async () => ({ state: historyState(runtime), source: await source() }));
+          gate.release(); await first;
+          assert.deepEqual(await stale, { ok: false, code: 'REVISION_CONFLICT' });
+          assert.deepEqual(await refused, await committed, 'the queued stale no-op cannot consume revision, source or history authority');
+          assert.equal(writes, 2);
+        } finally { gate.release(); await gate.done; }
+      } finally { runtime.persist = persist; }
+    }
+    sameState(writers, `${scope} required-version admission`);
+    assert.equal(writers.browser.source(), await fs.readFile(writers.node.projectPath, 'utf8'));
+  } finally { await writers.close(); }
+});
+
 test('the browser writer refuses what only the Node host can do, without changing state', async () => {
   const writers = await pair();
   try {

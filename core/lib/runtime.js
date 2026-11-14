@@ -15,7 +15,7 @@ import { diffDocuments, diffValue, summarizeChange, touchedNodeIds } from './dif
 import { replayHistory } from './history-replay.ts';
 import { operationPatch } from './ops.ts';
 import { HistoryLine, planHistoryTraversal, validateHistoryNavigation, planHistoryNavigation } from './history.ts';
-import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertExpectedVersion, assertExpectedRender, assertReplayableStyleTransition } from './acceptance.ts';
+import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertPatchVersion, assertExpectedVersion, assertExpectedRender, assertReplayableStyleTransition } from './acceptance.ts';
 import { expandPath, inspectPath, initProject, resolveProject, isProjectFile } from './projects.ts';
 import { OutputStore, safeDirectory } from './output.ts';
 import { buildStatic, inlineDeclaredAssets, readResourceBytes, normalizeExternalFiles } from './static.js';
@@ -1045,7 +1045,7 @@ await this.importProject(project.settings, project.frames, hash);
 
   async _patch({ documentId, expectedVersion, expectedRender, patch, actor = 'agent', group, label, undoable = true, kind = 'patch' }) {
     const previous = this.getEntry(documentId);
-    if (!Number.isInteger(expectedVersion) || expectedVersion !== previous.document.version) fail('REVISION_CONFLICT', `Expected frame version ${previous.document.version}; received ${expectedVersion}. Read the frame again and rebuild the change.`, { actualVersion: previous.document.version });
+    assertPatchVersion(expectedVersion, previous.document);
     assertExpectedRender(expectedRender, previous);
     this.assertWritable();
     const candidate = applyDocumentPatch(previous.document, patch, { colourNames: colourNames(this.settings.tokens, previous.document.tokens) });
@@ -1084,7 +1084,7 @@ await this.importProject(project.settings, project.frames, hash);
   }
 
   async _patchProject({ expectedVersion, patch, actor = 'agent', group, label, undoable = true, kind = 'patch' }) {
-    if (!Number.isInteger(expectedVersion) || expectedVersion !== this.settings.version) fail('REVISION_CONFLICT', `Expected project version ${this.settings.version}; received ${expectedVersion}. Read the project again.`, { actualVersion: this.settings.version });
+    assertPatchVersion(expectedVersion, this.settings, 'project');
     this.assertWritable();
     const previous = this.settings;
     const settings = { ...patchSettings(previous, patch), version: previous.version + 1 };

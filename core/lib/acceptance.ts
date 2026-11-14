@@ -37,9 +37,17 @@ export function assertReplayableStyleTransition(from: DocumentModel, to: Documen
   if (!sameJson(forward, after) || !sameJson(inverse, before)) throw new DivletError('UNSUPPORTED_STYLE_REPLAY', 'This live source edit cannot preserve inline declarations or override operations through current merge-patch Undo/Redo. Restore the accepted source or explicitly reopen it; the board keeps its last working state.');
 }
 
+/** Patches require the read version, including no-ops; lifecycle callers retain the separate optional guard below. */
+export function assertPatchVersion(expected: unknown, target: { readonly version: number }, what: 'frame' | 'project' = 'frame'): void {
+  if (!Number.isInteger(expected) || expected !== target.version) {
+    const recovery = what === 'frame' ? 'Read the frame again and rebuild the change.' : 'Read the project again.';
+    throw new DivletError('REVISION_CONFLICT', `Expected ${what} version ${target.version}; received ${expected}. ${recovery}`, { actualVersion: target.version });
+  }
+}
+
 /**
- * A caller that names the state it read gets a refusal instead of silently overwriting a change it
- * never saw (AGENTS.md, "Validated commits"). Omitted means the caller accepted whatever is current.
+ * Optional lifecycle guard: a named read point must match; omission accepts whatever is current.
+ * Patch admission uses assertPatchVersion instead and never permits an omitted version.
  */
 export function assertExpectedVersion(expected: unknown, target: { version: number }, what = 'frame'): void {
   if (expected === undefined) return;

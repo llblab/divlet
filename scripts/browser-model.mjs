@@ -6,6 +6,7 @@ export const bundleBrowserCodec = (resolveDir, options) => bundleEntry('@divlet/
 export const bundleBrowserProject = (resolveDir, options) => bundleEntry('@divlet/core/project', resolveDir, options);
 // Checkout-only private kernel profile; not an installed/public browser API.
 export const bundleBrowserReplay = resolveDir => bundleEntry('./core/lib/history-replay.ts', resolveDir, { source: true });
+export const bundleBrowserAcceptance = resolveDir => bundleEntry('./core/lib/acceptance.ts', resolveDir, { source: true });
 
 async function bundleEntry(entry, resolveDir, { source = false } = {}) {
   const result = await build({
