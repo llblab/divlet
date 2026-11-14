@@ -143,20 +143,24 @@ test('literal alias conflicts retain accepted state and equal tag/class peers re
   assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.feature.descendants['card-action/button'].className, 'rounded');
 });
 
-test('attribute alias conflicts preserve writer state and equal peers remain undoable', async t => {
+test('canonical HTML attribute peers preserve selected writer state and remain undoable', async t => {
   const { runtime, cwd } = await fixture(t);
+  const initial = runtime.read({ view: 'document', documentId: 'landing' });
   await runtime.patch({ documentId: 'landing', expectedVersion: 1, patch: { nodes: { feature: { descendants: {
-    'card-action': { attrs: { title: 'Agreed', 'data-retain': 'keep' } }, 'card-action/button': { attrs: { title: 'Agreed' } },
+    'card-action': { attrs: { TITLE: 'Agreed', 'data-retain': 'keep' } }, 'card-action/button': { attrs: { title: 'Agreed' } },
   } } } } });
+  runtime.setSelection({ ids: ['landing'], nodes: { documentId: 'landing', nodeIds: ['feature'] } });
   const before = runtime.read({ view: 'document', documentId: 'landing' });
   const source = await fs.readFile(path.join(cwd, 'project.divlet')), html = await fs.readFile(runtime.getEntry('landing').htmlPath);
   const history = structuredClone(runtime.historyHead()), selection = structuredClone(runtime.info().selection), render = runtime.getEntry('landing').render;
+  assert.equal(before.nodes.feature.descendants['card-action'].attrs.TITLE, 'Agreed', 'stored overrides keep their authored name spelling');
+  assert.equal((html.toString().match(/ title="Agreed"/g) ?? []).length, 1, 'one canonical physical HTML attribute');
   const candidate = page(); candidate.id = 'refused-attributes';
-  candidate.nodes.feature.descendants['card-action'] = { attrs: { title: null } };
+  candidate.nodes.feature.descendants['card-action'] = { attrs: { TITLE: null } };
   candidate.nodes.feature.descendants['card-action/button'] = { attrs: { title: 'Agreed' } };
   // Whole-frame admission preserves a stored null operation; sparse tool-patch null would remove the override key instead.
   for (const refuse of [
-    () => runtime.patch({ documentId: 'landing', expectedVersion: before.version, patch: { nodes: { feature: { descendants: { 'card-action': { attrs: { title: 'Different' } } } } } } }),
+    () => runtime.patch({ documentId: 'landing', expectedVersion: before.version, patch: { nodes: { feature: { descendants: { 'card-action': { attrs: { TITLE: 'Different' } } } } } } }),
     () => runtime.create({ document: candidate }),
   ]) {
     await assert.rejects(refuse(), { code: 'INVALID_OVERRIDE' });
@@ -168,9 +172,16 @@ test('attribute alias conflicts preserve writer state and equal peers remain und
     assert.equal(runtime.documents.has('refused-attributes'), false);
   }
   await runtime.undo({});
-  assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.feature.descendants['card-action'], undefined);
+  const undone = runtime.read({ view: 'document', documentId: 'landing' });
+  assert.deepEqual(undone, { ...initial, version: undone.version });
+  assert.doesNotMatch(runtime.render('landing').html, / title="Agreed"/);
+  // Selection records its explicit read point; history does not synthesize a new selection event.
+  assert.deepEqual(runtime.info().selection.selectedNodes, selection.selectedNodes);
   await runtime.redo({});
-  assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.feature.descendants['card-action/button'].attrs.title, 'Agreed');
+  const redone = runtime.read({ view: 'document', documentId: 'landing' });
+  assert.deepEqual(redone, { ...before, version: redone.version });
+  assert.equal((runtime.render('landing').html.match(/ title="Agreed"/g) ?? []).length, 1);
+  assert.deepEqual(runtime.info().selection.selectedNodes, selection.selectedNodes);
 });
 
 test('metadata alias conflicts retain selected instances and writer history', async t => {

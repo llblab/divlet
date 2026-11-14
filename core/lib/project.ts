@@ -11,7 +11,7 @@ import { readAssets, validateAssetPatch } from './assets.ts';
 import type { AssetTree } from './model.ts';
 import {
   DivletError, validateDocument, SOURCE_LIMITS, LIMITS, PROJECTION_LIMITS, documentLimits, validateTokens, validateCss,
-  validateMetadata, string, merge, REF,
+  validateMetadata, string, merge, REF, canonicalAttributeName,
 } from './model.ts';
 import { sameJson, withinUtf8Budget } from './validation.ts';
 import type { Attrs, DocumentModel, Json, Limits, Metadata, Node, NodeId, Override, Style } from './model.ts';
@@ -49,7 +49,8 @@ export interface ExpandedFrame { document: DocumentModel; parts: Map<NodeId, Exp
 export type FrameLookup = (id: NodeId) => DocumentModel | undefined;
 /** The expansion tree: a frame's nodes with addresses (`key`) instead of stable IDs, before validation makes it a document. */
 interface PartText { key: string; type: 'text'; content: string; metadata: Metadata }
-interface PartElement { key: string; type: 'element'; tag: string; attrs: Attrs; className: string; style: Style; metadata: Metadata; children: string[] }
+interface AttributeWrite { name: string; value: string | null; label: string }
+interface PartElement { key: string; type: 'element'; tag: string; attrs: Attrs; attributeLayers?: AttributeWrite[][]; className: string; style: Style; metadata: Metadata; children: string[] }
 type Part = PartText | PartElement;
 type LiteralOverrideField = 'tag' | 'className' | 'text' | 'content';
 
@@ -188,8 +189,25 @@ function metadataPatch(writes: Map<string, MetadataWrite>): Metadata {
   return Object.fromEntries([...writes].map(([key, write]) => [key, 'children' in write ? metadataPatch(write.children) : write.value]));
 }
 
+/** Resolve name aliases only after all enclosing tag overrides and the consuming tree's namespace are known. */
+function resolveAttributes(node: PartElement, inSvg: boolean): Attrs {
+  let attrs = node.attrs;
+  for (const layer of node.attributeLayers ?? []) {
+    const writes = new Map<string, AttributeWrite>();
+    for (const write of layer) {
+      const name = canonicalAttributeName(write.name, inSvg), previous = writes.get(name);
+      if (previous && previous.value !== write.value) fail('INVALID_OVERRIDE', `Conflicting attribute ${name} overrides: ${[previous.label, write.label].sort().join(' and ')}.`);
+      if (!previous) writes.set(name, write);
+    }
+    const entries = Object.entries(attrs).filter(([name]) => !writes.has(canonicalAttributeName(name, inSvg)));
+    for (const [name, write] of writes) if (write.value !== null) entries.push([name, write.value]);
+    attrs = Object.fromEntries(entries);
+  }
+  return attrs;
+}
+
 /**
- * Apply non-metadata fields to a cloned part; literal and metadata peers are planned per instance layer.
+ * Apply unplanned fields to a cloned part; literal, attribute and metadata peers are planned per instance layer.
  * A field the target cannot hold fails with its address rather than silently doing nothing.
  */
 function applyOverride(node: Part, override: Override, where: string, writeLiteral: (node: Part, field: LiteralOverrideField, value: string, label: string) => void): void {
@@ -201,7 +219,7 @@ function applyOverride(node: Part, override: Override, where: string, writeLiter
   if (override.content !== undefined) fail('INVALID_OVERRIDE', `${where} is an element; use text to replace its text, or address its text node.`);
   if (override.tag !== undefined) writeLiteral(node, 'tag', override.tag, where);
   if (override.className !== undefined) writeLiteral(node, 'className', override.className, where);
-  for (const key of ['style', 'attrs'] as const) if (override[key] !== undefined) node[key] = merge(node[key], override[key]);
+  if (override.style !== undefined) node.style = merge(node.style, override.style);
   if (override.text !== undefined) writeLiteral(node, 'text', override.text, where);
 }
 
@@ -237,7 +255,7 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
     const nodes = new Map<string, Part>();
     // Literal peers share one per-occurrence field plan; text shortcuts resolve to their existing child when present.
     const literalWrites = new Map<Part, Map<LiteralOverrideField, { value: string; label: string }>>();
-    const attributeWrites = new Map<PartElement, Map<string, { value: string | null; label: string }>>();
+    const attributeWrites = new Map<PartElement, AttributeWrite[]>();
     const metadataWrites = new Map<Part, Map<string, MetadataWrite>>();
     const writeLiteral = (node: Part, field: LiteralOverrideField, value: string, label: string): void => {
       let target = node;
@@ -283,27 +301,19 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
       const target = nodes.get(address);
       if (!target) fail('INVALID_OVERRIDE', `${where} overrides ${address}, which is not a node of ${refNode.ref}. Read the component (divlet_read view:components) for its node IDs.`);
       const label = `${where} → ${address}`;
-      let applied = override;
       if (target.type === 'element' && override.attrs !== undefined) {
         let writes = attributeWrites.get(target);
-        if (!writes) { writes = new Map(); attributeWrites.set(target, writes); }
-        const attrs: Array<[string, string | null]> = [];
-        // Compare exact authored names here; final validation still owns HTML/SVG name normalization and URL context.
-        for (const [name, raw] of Object.entries(override.attrs)) {
-          const value = raw === null ? null : string(raw, `attribute ${name}`);
-          const previous = writes.get(name);
-          if (previous && previous.value !== value) fail('INVALID_OVERRIDE', `Conflicting attribute ${name} overrides: ${[previous.label, label].sort().join(' and ')}.`);
-          if (!previous) { writes.set(name, { value, label }); attrs.push([name, value]); }
-        }
-        applied = { ...override, attrs: Object.fromEntries(attrs) };
+        if (!writes) { writes = []; attributeWrites.set(target, writes); }
+        for (const [name, raw] of Object.entries(override.attrs)) writes.push({ name, value: raw === null ? null : string(raw, `attribute ${name}`), label });
       }
       if (override.metadata !== undefined) {
         let writes = metadataWrites.get(target);
         if (!writes) { writes = new Map(); metadataWrites.set(target, writes); }
         planMetadata(writes, override.metadata, label);
       }
-      applyOverride(target, applied, label, writeLiteral);
+      applyOverride(target, override, label, writeLiteral);
     }
+    for (const [target, writes] of attributeWrites) (target.attributeLayers ??= []).push(writes);
     for (const [target, writes] of metadataWrites) target.metadata = merge(target.metadata, metadataPatch(writes));
     for (const [target, writes] of literalWrites) {
       if (target.type === 'text') {
@@ -323,19 +333,19 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
     return { rootKey: nodeId, nodes };
   }
 
-  function emit(id: NodeId, stack: string[]): string {
+  function emit(id: NodeId, stack: string[], inSvg = false): string {
     const node = frame.nodes[id] as Node;
     bump();
     if (node.type === 'text') { out[id] = structuredClone(node); return id; }
     if (node.type === 'element') {
       const { reusable, ...element } = structuredClone(node);
       out[id] = element;
-      element.children = node.children.map(child => emit(child, stack));
+      element.children = node.children.map(child => emit(child, stack, inSvg || node.tag === 'svg'));
       return id;
     }
     const instance = instantiate(node, frame.id, stack, `${frame.id}/${id}`);
     const idOf = new Map<Part, string>();
-    const visit = (key: string): string => {
+    const visit = (key: string, parentSvg: boolean): string => {
       const part = instance.nodes.get(key) as Part;
       const known = idOf.get(part);
       if (known) return known;
@@ -350,12 +360,13 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
       idOf.set(part, partId);
       if (part.type === 'text') out[partId] = { id: partId, type: 'text', content: part.content, metadata: part.metadata };
       else {
-        out[partId] = { id: partId, type: 'element', tag: part.tag, attrs: part.attrs, className: part.className, style: part.style, metadata: key === instance.rootKey ? { ...part.metadata, ...node.metadata } : part.metadata, children: [] };
-        out[partId].children = part.children.map(visit);
+        const inSvg = parentSvg || part.tag === 'svg';
+        out[partId] = { id: partId, type: 'element', tag: part.tag, attrs: resolveAttributes(part, inSvg), className: part.className, style: part.style, metadata: key === instance.rootKey ? { ...part.metadata, ...node.metadata } : part.metadata, children: [] };
+        out[partId].children = part.children.map(child => visit(child, inSvg));
       }
       return partId;
     };
-    return visit(instance.rootKey);
+    return visit(instance.rootKey, inSvg);
   }
 
   const rootId = emit(frame.rootId, []);

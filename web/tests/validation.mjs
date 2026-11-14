@@ -158,7 +158,7 @@ try {
     for (let index = 0; index < 10000; index++) deepValue = [deepValue];
     const deepCopy = api.normalizeNativeJson(deepValue, { nodes: 10001, nesting: 10000 });
     const deepNativeEqual = api.sameNativeJson(deepValue, deepCopy);
-    const [project, { componentTextCases }, { componentValueCases }, { componentAttributeCases }, { componentMetadataCases }] = await Promise.all(['project.js', 'component-text.js', 'component-values.js', 'component-attrs.js', 'component-metadata.js'].map(file => import(new URL(file, location.href).href)));
+    const [project, { componentTextCases }, { componentValueCases }, { componentAttributeCases, attributeReferenceProject }, { componentMetadataCases }] = await Promise.all(['project.js', 'component-text.js', 'component-values.js', 'component-attrs.js', 'component-metadata.js'].map(file => import(new URL(file, location.href).href)));
     const componentCases = cases => cases.map(({ name, run, expected, error }) => {
       let actual;
       try { actual = { value: run(project) }; } catch (cause) { actual = { error: cause.code || cause.message }; }
@@ -194,6 +194,23 @@ try {
         other.srcdoc = codec.renderFile(expanded.document); document.body.append(other); await otherLoaded;
         domReferences.push({ kind, controls: ['first', 'second'].map(name => child.querySelector(`[data-divlet-id="${name}:referrer"]`).control.id), independent: child.getElementById('field') !== other.contentDocument.getElementById('field') && other.contentDocument.getElementById('field').ownerDocument === other.contentDocument });
         other.remove();
+      }
+      iframe.remove();
+    }
+    const attributeReferences = [];
+    for (const svg of [false, true]) {
+      const admitted = project.readProject(attributeReferenceProject(svg)), lookup = new Map(admitted.frames.map(frame => [frame.id, frame]));
+      const expanded = project.expandFrame(lookup.get('consumer'), id => lookup.get(id), admitted.settings);
+      const iframe = document.createElement('iframe');
+      const loaded = new Promise(resolve => { iframe.onload = resolve; });
+      iframe.srcdoc = codec.renderFile(expanded.document); document.body.append(iframe); await loaded;
+      const child = iframe.contentDocument;
+      if (svg) {
+        const root = child.querySelector('svg'), rect = root.querySelector('rect');
+        attributeReferences.push({ svg, namespace: rect.namespaceURI, viewBox: [root.viewBox.baseVal.width, root.viewBox.baseVal.height], box: [rect.getBBox().width, rect.getBBox().height] });
+      } else {
+        const label = child.querySelector('label');
+        attributeReferences.push({ svg, namespace: label.namespaceURI, control: label.control.id, title: label.title, names: label.getAttributeNames().filter(name => /^(for|title)$/i.test(name)).sort() });
       }
       iframe.remove();
     }
@@ -245,6 +262,7 @@ try {
       componentMetadata,
       domIds,
       domReferences,
+      attributeReferences,
       componentScopes,
       scopeRendering,
       inlineCss,
@@ -318,6 +336,10 @@ try {
     { kind: 'aria', values: [{ labelledBy: ['field', 'help'], describedBy: ['help'] }, { labelledBy: ['field-2', 'help-2'], describedBy: ['help-2'] }] },
     { kind: 'svg', values: [{ href: '#shape', width: 4, fill: true, clip: true }, { href: '#shape-2', width: 4, fill: true, clip: true }] },
   ]);
+  assert.deepEqual(result.attributeReferences, [
+    { svg: false, namespace: 'http://www.w3.org/1999/xhtml', control: 'attribute-field', title: 'Canonical', names: ['for', 'title'] },
+    { svg: true, namespace: 'http://www.w3.org/2000/svg', viewBox: [24, 32], box: [3, 4] },
+  ], 'coalesced HTML references and final-retag SVG context reach actual browser DOM semantics');
   assert.deepEqual(result.parsedCssRendering, ['10px', '20px', 'grid', 'rgb(255, 0, 0)'], 'ordered parsing/admission/serialization preserves browser cascade, fallback and priority');
   assert.equal(result.draftDuplicateRefusal, 'INVALID_HTML', 'draft HTML still refuses repeated properties until cutover');
   assert.equal(result.deepNativeEqual, true, 'caller-selected deep native value normalization/equality is iterative in Chromium');
@@ -337,7 +359,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

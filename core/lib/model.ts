@@ -152,6 +152,9 @@ export function metadata(value: unknown, label: string): Metadata {
   return structuredClone(record) as Metadata;
 }
 
+/** Attribute-name identity in a known native namespace; tree placement and attribute safety are validated separately. */
+export const canonicalAttributeName = (name: string, inSvg: boolean): string => inSvg ? name : name.toLowerCase();
+
 /** Resource URL syntax is distinct from project declaration/byte resolution. Boolean callers retain the Data-URL contract. */
 export interface ResourceAttributeContext { readonly data?: boolean; readonly asset?: boolean }
 export function safeAttribute(name: string, value: string, nodeId: string, resource: boolean | ResourceAttributeContext = false): void {
@@ -317,7 +320,7 @@ export function validateDocument(input: unknown, { limits = LIMITS }: { limits?:
       if (!inSvg && node.tag !== 'svg') {
         const normalized: Attrs = {};
         for (const [name, value] of Object.entries(node.attrs)) {
-          const key = name.toLowerCase();
+          const key = canonicalAttributeName(name, false);
           if (Object.hasOwn(normalized, key)) fail(`Duplicate normalized attribute: ${key}`);
           normalized[key] = value as string;
         }
