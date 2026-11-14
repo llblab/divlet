@@ -39,8 +39,8 @@ export interface ProjectSettings {
 }
 /** A project file as read from disk: its settings and its frames. */
 export interface ProjectFile { settings: ProjectSettings; frames: DocumentModel[] }
-/** A component definition found in a frame, with the text parts an instance may override. */
-export interface ComponentInfo { ref: string; frameId: NodeId; nodeId: NodeId; name: string; tag: string; texts: Array<{ id: NodeId; content: string }> }
+/** A component definition and editable text slots; parentId identifies the sole-text-child element shortcut, not a DOM ID. */
+export interface ComponentInfo { ref: string; frameId: NodeId; nodeId: NodeId; name: string; tag: string; texts: Array<{ id: NodeId; content: string; parentId?: NodeId }> }
 /** An instance in a frame: its node ID and the component it renders. */
 export interface InstanceInfo { id: NodeId; ref: string; frame: NodeId; node: NodeId }
 /** Where a generated part came from: the instance that produced it and the component address inside it. */
@@ -148,12 +148,12 @@ export function listComponents(frames: DocumentModel[]): ComponentInfo[] {
   for (const frame of frames) {
     for (const node of Object.values(frame.nodes)) {
       if (node.type !== 'element' || !node.reusable) continue;
-      const texts: Array<{ id: string; content: string }> = [];
-      const walk = (id: NodeId): void => {
+      const texts: ComponentInfo['texts'] = [];
+      const walk = (id: NodeId, parentId?: NodeId): void => {
         const item = frame.nodes[id];
         if (!item) return;
-        if (item.type === 'text') texts.push({ id, content: item.content.slice(0, 80) });
-        else if (item.type === 'element') item.children.forEach(walk);
+        if (item.type === 'text') texts.push({ id, content: item.content.slice(0, 80), ...(parentId ? { parentId } : {}) });
+        else if (item.type === 'element') item.children.forEach(child => walk(child, item.children.length === 1 ? item.id : undefined));
       };
       walk(node.id);
       const named = typeof node.metadata?.name === 'string' && node.metadata.name.trim() ? node.metadata.name.trim() : node.id;
@@ -169,13 +169,13 @@ export function instancesOf(frame: DocumentModel): InstanceInfo[] {
 }
 
 /**
- * Apply one instance override to a cloned part. `makeText` gives an element its text when the override sets `text`; an override
+ * Apply one instance override to a cloned part. `writeText` plans text/content at its effective destination; an override
  * that names a field the target cannot hold fails with the address, because a silent no-op would look like a bug in the board.
  */
-function applyOverride(node: Part, override: Override, where: string, makeText: (node: PartElement, content: string, label: string) => void): void {
+function applyOverride(node: Part, override: Override, where: string, writeText: (node: Part, content: string, label: string) => void): void {
   if (node.type === 'text') {
     for (const key of Object.keys(override)) if (key !== 'content' && key !== 'metadata') fail('INVALID_OVERRIDE', `${where} is text; override its content (not ${key}).`);
-    if (override.content !== undefined) node.content = override.content;
+    if (override.content !== undefined) writeText(node, override.content, where);
     if (override.metadata !== undefined) node.metadata = merge(node.metadata, override.metadata);
     return;
   }
@@ -183,7 +183,7 @@ function applyOverride(node: Part, override: Override, where: string, makeText: 
   if (override.tag !== undefined) node.tag = override.tag;
   if (override.className !== undefined) node.className = override.className;
   for (const key of ['style', 'attrs', 'metadata'] as const) if (override[key] !== undefined) node[key] = merge(node[key], override[key]);
-  if (override.text !== undefined) makeText(node, override.text, where);
+  if (override.text !== undefined) writeText(node, override.text, where);
 }
 
 /**
@@ -216,14 +216,18 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
     if (stack.length >= MAX_INSTANCE_DEPTH) fail('TOO_DEEP', `Instances are nested more than ${MAX_INSTANCE_DEPTH} levels deep at ${where}.`);
     uses.add(key);
     const nodes = new Map<string, Part>();
-    let textSeed = 0;
-    const makeText = (node: PartElement, content: string, label: string): void => {
-      const texts = node.children.filter(child => nodes.get(child)?.type === 'text');
-      if (node.children.length === 1 && texts.length === 1) { (nodes.get(texts[0] as string) as PartText).content = content; return; }
-      if (node.children.length) fail('INVALID_OVERRIDE', `${label} mixes text and elements; address one of its text nodes with content instead.`);
-      const id = `${node.key}#t${++textSeed}`;
-      nodes.set(id, { key: id, type: 'text', content, metadata: {} });
-      node.children = [id];
+    // Resolve peers before creating text parts: aliases and element-text/child-content may name one destination.
+    const textWrites = new Map<Part, { content: string; label: string }>();
+    const writeText = (node: Part, content: string, label: string): void => {
+      let target = node;
+      if (node.type === 'element') {
+        const child = node.children.length === 1 ? nodes.get(node.children[0] as string) : undefined;
+        if (child?.type === 'text') target = child;
+        else if (node.children.length) fail('INVALID_OVERRIDE', `${label} mixes text and elements; address one of its text nodes with content instead.`);
+      }
+      const previous = textWrites.get(target);
+      if (previous && previous.content !== content) fail('INVALID_OVERRIDE', `Conflicting text overrides: ${[previous.label, label].sort().join(' and ')}.`);
+      if (!previous) textWrites.set(target, { content, label });
     };
     // Clone the definition; nested instances become address-prefixed subtrees.
     const clone = (id: NodeId, prefix: string): string => {
@@ -231,11 +235,16 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
       const address = prefix + id;
       if (item.type === 'ref') {
         const nested = instantiate(item, source.id, [...stack, key], `${where} → ${address}`);
+        const full = (key: string): string => key === nested.rootKey ? address : `${address}/${key}`;
+        const remapped = new Set<Part>();
         for (const [nestedAddress, node] of nested.nodes) {
-          const full = nestedAddress === nested.rootKey ? address : `${address}/${nestedAddress}`;
-          node.key = full;
-          if (node.type === 'element') node.children = node.children.map(child => (child === nested.rootKey ? address : `${address}/${child}`));
-          nodes.set(full, node);
+          // Multiple alias keys share one part; prefix its canonical identity and children exactly once.
+          if (!remapped.has(node)) {
+            node.key = full(node.key);
+            if (node.type === 'element') node.children = node.children.map(full);
+            remapped.add(node);
+          }
+          nodes.set(full(nestedAddress), node);
         }
         nodes.set(`${address}/${nested.rootKey}`, nodes.get(address) as Part);
         return address;
@@ -250,7 +259,15 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
     for (const [address, override] of Object.entries(refNode.descendants ?? {})) {
       const target = nodes.get(address);
       if (!target) fail('INVALID_OVERRIDE', `${where} overrides ${address}, which is not a node of ${refNode.ref}. Read the component (divlet_read view:components) for its node IDs.`);
-      applyOverride(target, override, `${where} → ${address}`, makeText);
+      applyOverride(target, override, `${where} → ${address}`, writeText);
+    }
+    for (const [target, { content }] of textWrites) {
+      if (target.type === 'text') target.content = content;
+      else {
+        const id = `${target.key}#t1`;
+        nodes.set(id, { key: id, type: 'text', content, metadata: {} });
+        target.children = [id];
+      }
     }
     return { rootKey: nodeId, nodes };
   }

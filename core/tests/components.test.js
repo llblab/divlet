@@ -67,7 +67,7 @@ test('instances render their component with overrides, nested instances included
   assert.deepEqual(componentsMeta.usedBy, ['landing']);
   const listed = runtime.read({ view: 'components' }).components;
   assert.deepEqual(listed.map(item => [item.ref, item.name, item.instances]), [['components/button', 'Button/Primary', ['components/card-action', 'landing/cta']], ['components/card', 'card', ['landing/feature']]]);
-  assert.deepEqual(listed[0].texts, [{ id: 'button-label', content: 'Continue' }]);
+  assert.deepEqual(listed[0].texts, [{ id: 'button-label', content: 'Continue', parentId: 'button' }]);
 });
 
 test('editing a component re-renders the frames that use it without changing their versions', async t => {
@@ -98,6 +98,25 @@ test('a component that is still used cannot disappear, and broken references are
   await assert.rejects(runtime.patch({ documentId: 'landing', expectedVersion: 1, patch: { nodes: { cta: { descendants: { 'button-label': { className: 'x' } } } } } }), /is text; override its content/);
   await assert.rejects(runtime.patch({ documentId: 'components', expectedVersion: 1, patch: { nodes: { 'button-label': null, button: { children: ['loop'] }, loop: { id: 'loop', type: 'ref', ref: 'card' } } } }), /Component cycle: components\/card → components\/button → components\/card|Component cycle/);
   assert.equal(runtime.read({ view: 'document', documentId: 'components' }).version, 1);
+});
+
+test('text peer conflicts preserve accepted source/output/history and identical peers remain undoable', async t => {
+  const { runtime, cwd } = await fixture(t);
+  await runtime.patch({ documentId: 'landing', expectedVersion: 1, patch: { nodes: { cta: { descendants: { button: { text: 'Agreed' }, 'button-label': { content: 'Agreed' } } } } } });
+  const before = runtime.read({ view: 'document', documentId: 'landing' });
+  const source = await fs.readFile(path.join(cwd, 'project.divlet')), html = await fs.readFile(runtime.getEntry('landing').htmlPath);
+  const history = runtime.historyHead(), selection = runtime.info().selection, render = runtime.getEntry('landing').render;
+  await assert.rejects(runtime.patch({ documentId: 'landing', expectedVersion: before.version, patch: { nodes: { cta: { descendants: { button: { text: 'Different' } } } } } }), { code: 'INVALID_OVERRIDE' });
+  assert.deepEqual(runtime.read({ view: 'document', documentId: 'landing' }), before);
+  assert.deepEqual(await fs.readFile(path.join(cwd, 'project.divlet')), source);
+  assert.deepEqual(await fs.readFile(runtime.getEntry('landing').htmlPath), html);
+  assert.deepEqual(runtime.historyHead(), history); assert.deepEqual(runtime.info().selection, selection);
+  assert.equal(runtime.getEntry('landing').render, render);
+  await runtime.undo({});
+  assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.cta.descendants.button.text, undefined);
+  await runtime.redo({});
+  assert.match(runtime.render('landing').html, /Agreed/);
+  assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.cta.descendants['button-label'].content, 'Agreed');
 });
 
 test('instances cannot break HTML nesting rules once expanded', async t => {

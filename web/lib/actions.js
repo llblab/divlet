@@ -4,6 +4,7 @@ import * as canvas from './canvas.js';
 import { openMenu } from './menu.js';
 import * as clip from './clip.js';
 import { newArtboard, duplicateArtboards, deleteArtboards } from './artboards.js';
+import { textOverridePatch } from './component-text.js';
 import { components as componentSource, exports as exportSource, native } from './host.js';
 export { newArtboard, duplicateArtboards, deleteArtboards };
 
@@ -231,7 +232,7 @@ export async function overrideText(documentId, instance, address, content) {
     const target = component?.nodes[segments.at(-1)];
     const only = target?.type === 'element' && target.children.length === 1 && component.nodes[target.children[0]]?.type === 'text' ? target.children[0] : null;
     const prefix = segments.slice(0, -1).map(segment => `${segment}/`).join('');
-    const descendants = only ? { [`${prefix}${only}`]: { content }, ...(ref.descendants[address]?.text !== undefined ? { [address]: { text: null } } : {}) } : { [address]: { text: content } };
+    const descendants = only ? textOverridePatch(ref, { id: `${prefix}${only}`, parentId: address }, content) : { [address]: { text: content } };
     await commit(documentId, { nodes: { [instance]: { descendants } } }, { label: `override text of ${instance}` });
   } catch { /* reported by commit */ }
 }

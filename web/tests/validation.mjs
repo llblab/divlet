@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import * as nodeModel from '../../core/lib/model.ts';
 import { captureFrame, frameCases, resourceFrame } from '../../core/tests/fixtures/frame-portability.js';
 import { prepareFrame } from '../../core/lib/render.ts';
-import { bundleBrowserModel, bundleBrowserCodec } from '../../scripts/browser-model.mjs';
+import { bundleBrowserModel, bundleBrowserCodec, bundleBrowserProject } from '../../scripts/browser-model.mjs';
 import { cssAnnotationCases } from '../../core/tests/fixtures/css-annotations.js';
 import { landingDemoSnapshot } from '../../scripts/landing-demo.mjs';
 import { buildStatic } from '../../core/lib/static.js';
@@ -18,6 +18,7 @@ import { svgResourceCases } from '../../core/tests/fixtures/svg-resources.js';
 const prefix = '/divlet-kernel/';
 const bundle = await bundleBrowserModel(fileURLToPath(new URL('../../', import.meta.url)), { source: true });
 const codecBundle = await bundleBrowserCodec(fileURLToPath(new URL('../../', import.meta.url)), { source: true });
+const projectBundle = await bundleBrowserProject(fileURLToPath(new URL('../../', import.meta.url)), { source: true });
 const expectedFrames = frameCases.map(({ name, run }) => ({ name, result: captureFrame(nodeModel, run) }));
 const publicSnapshot = await landingDemoSnapshot();
 const files = new Map([
@@ -33,6 +34,8 @@ const files = new Map([
   [`${prefix}value-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/native-values.js', import.meta.url), 'utf8')]],
   [`${prefix}model.js`, ['text/javascript', bundle.code]],
   [`${prefix}codec.js`, ['text/javascript', codecBundle.code]],
+  [`${prefix}project.js`, ['text/javascript', projectBundle.code]],
+  [`${prefix}component-text.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/component-text.js', import.meta.url), 'utf8')]],
   [`${prefix}css-annotations.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/css-annotations.js', import.meta.url), 'utf8')]],
   [`${prefix}inline-css-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/inline-css.js', import.meta.url), 'utf8')]],
   [`${prefix}frames.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/frame-portability.js', import.meta.url), 'utf8')]],
@@ -141,6 +144,12 @@ try {
     for (let index = 0; index < 10000; index++) deepValue = [deepValue];
     const deepCopy = api.normalizeNativeJson(deepValue, { nodes: 10001, nesting: 10000 });
     const deepNativeEqual = api.sameNativeJson(deepValue, deepCopy);
+    const [project, { componentTextCases }] = await Promise.all(['project.js', 'component-text.js'].map(file => import(new URL(file, location.href).href)));
+    const componentTexts = componentTextCases.map(({ name, run, expected, error }) => {
+      let actual;
+      try { actual = { value: run(project) }; } catch (cause) { actual = { error: cause.code || cause.message }; }
+      return { name, actual, expected: error ? { error } : { value: expected } };
+    });
     const [codec, { cssAnnotationCases }] = await Promise.all(['codec.js', 'css-annotations.js'].map(file => import(new URL(file, location.href).href)));
     const { inlineCssCases, captureInlineCss } = await import(new URL('inline-css-cases.js', location.href).href);
     const inlineCss = inlineCssCases.map(({ name, input, expected }) => ({ name, actual: captureInlineCss(codec, input), expected }));
@@ -169,6 +178,7 @@ try {
       return { name, inline: inline.nodes[inline.rootId].style.content, pasted: pasted[0].style.content, frame, reopened, refusals, computed };
     });
     return {
+      componentTexts,
       inlineCss,
       parsedCssRendering,
       draftDuplicateRefusal,
@@ -229,7 +239,7 @@ try {
   assert.deepEqual(result.nodeGlobals, [], 'no Node globals/polyfills supply the kernel');
   assert.deepEqual(result.orderedCssPadding, ['10px', '20px'], 'validated declaration order survives the shared serializer and actual browser cascade');
   assert.ok(result.cases.length > 25, 'the shared acceptance/refusal regions are exercised');
-  for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.references, ...result.requirements, ...result.nativeJson, ...result.nativeValues, ...result.nativeEquality, ...result.inlineCss, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
+  for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.references, ...result.requirements, ...result.nativeJson, ...result.nativeValues, ...result.nativeEquality, ...result.inlineCss, ...result.componentTexts, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
   assert.deepEqual(result.parsedCssRendering, ['10px', '20px', 'grid', 'rgb(255, 0, 0)'], 'ordered parsing/admission/serialization preserves browser cascade, fallback and priority');
   assert.equal(result.draftDuplicateRefusal, 'INVALID_HTML', 'draft HTML still refuses repeated properties until cutover');
   assert.equal(result.deepNativeEqual, true, 'caller-selected deep native value normalization/equality is iterative in Chromium');
@@ -249,7 +259,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.componentTexts.length} component-text + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

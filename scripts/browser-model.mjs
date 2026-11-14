@@ -3,6 +3,7 @@ import { build } from 'esbuild';
 
 export const bundleBrowserModel = (resolveDir, options) => bundleEntry('@divlet/core/model', resolveDir, options);
 export const bundleBrowserCodec = (resolveDir, options) => bundleEntry('@divlet/core/codec', resolveDir, options);
+export const bundleBrowserProject = (resolveDir, options) => bundleEntry('@divlet/core/project', resolveDir, options);
 
 async function bundleEntry(entry, resolveDir, { source = false } = {}) {
   const result = await build({

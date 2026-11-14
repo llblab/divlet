@@ -7,6 +7,7 @@ import { overflowBar } from './toolbar.js';
 import { panelSections } from './panels.js';
 import { components as componentSource } from './host.js';
 import { fontFamilyControl } from './typography.js';
+import { textOverride, textOverridePatch } from './component-text.js';
 import { attributesEditor } from './attrs.js';
 import { formatCss, highlightCss } from './css.js';
 import { attachSuggest, filterLocal } from './suggest.js';
@@ -518,16 +519,16 @@ function instanceEditor(doc, node) {
   box.append(head);
   const overrides = node.descendants || {};
   for (const text of component?.texts ?? []) {
-    const current = overrides[text.id]?.content;
+    const current = textOverride(node, text);
     const line = el('div', 'kv override');
     const name = el('span', 'k', text.id);
     if (text.id.length > 10) name.dataset.tip = text.id;
     const field = textField(`override:${text.id}`, current ?? text.content, value => {
-      const next = value === text.content || value === '' ? { [text.id]: null } : { [text.id]: { content: value } };
+      const next = textOverridePatch(node, text, value === text.content || value === '' ? null : value);
       refreshed(commit(doc.id, { nodes: { [node.id]: { descendants: next } } }, { label: `override text of ${node.id}` }));
     }, { label: `${text.id} text`, placeholder: text.content });
     line.append(el('span', `swatch ${current !== undefined ? 'set' : 'none'}`), name, field);
-    if (current !== undefined) line.append(button('undo', 'Back to the component text', () => refreshed(commit(doc.id, { nodes: { [node.id]: { descendants: { [text.id]: null } } } }, { label: `reset ${text.id} on ${node.id}` })), 'mini'));
+    if (current !== undefined) line.append(button('undo', 'Back to the component text', () => refreshed(commit(doc.id, { nodes: { [node.id]: { descendants: textOverridePatch(node, text, null) } } }, { label: `reset ${text.id} on ${node.id}` })), 'mini'));
     else line.append(el('span'));
     box.append(line);
   }
