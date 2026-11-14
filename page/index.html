@@ -1,0 +1,304 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>divlet — a layout board for agents</title>
+<meta name="description" content="divlet is a local browser layout board for coding agents: live frames of real HTML and CSS, reusable components, and the same validated tools through Pi, MCP or the board running in your browser."><link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgY29sb3I9IiM1YjViZjAiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj48cGF0aCBkPSJNOCA0LjUgMi41IDEwIDggMTUuNSIgZmlsbD0ibm9uZSIvPjxwYXRoIGQ9Ik0xMC41IDQuNUgxMkwxNy41IDEwIDEyIDE1LjVoLTEuNVoiIGZpbGw9ImN1cnJlbnRDb2xvciIgc3Ryb2tlPSJub25lIi8+PC9zdmc+Cg=="><style>@layer theme, base, components, utilities;
+@layer components {
+/* Authored in examples/landing/landing.divlet; this stylesheet travels with its frame. */
+:root {
+  color-scheme: light dark;
+  --paper: #f7f5f1;
+  --ink: #17161a;
+  --muted: #5f5b57;
+  --faint: #8d8781;
+  --hair: #e2ddd5;
+  --panel: #fffefc;
+  --accent: #5b5bf0;
+  --accent-ink: #4646d8;
+  --accent-soft: #ebebfd;
+  --code: #2a2740;
+  --code-ink: #ece9ff;
+  --green: #123524;
+  --gold: #d7b474;
+  --shadow: 0 12px 28px -18px rgba(23, 22, 26, .45);
+  --radius: 18px;
+  --radius-inner: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #14131a;
+    --ink: #f1eef7;
+    --muted: #a9a4b3;
+    --faint: #7d7887;
+    --hair: #2b2833;
+    --panel: #1b1a22;
+    --accent: #8e8eff;
+    --accent-ink: #a5a5ff;
+    --accent-soft: #262544;
+    --code: #100f16;
+    --code-ink: #dcd8ff;
+    --shadow: 0 18px 34px -22px rgba(0, 0, 0, .8);
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+main { width: min(940px, 100% - 40px); margin: 0 auto; padding: 28px 0 56px; overflow-wrap: anywhere; }
+h1, h2, h3 { letter-spacing: -.02em; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(30px, 5.4vw, 50px); font-weight: 660; }
+h2 { font-size: clamp(20px, 3vw, 26px); font-weight: 640; }
+h3 { font-size: 16px; font-weight: 640; }
+p { margin: 0; }
+code { font: .92em ui-monospace, SFMono-Regular, Menlo, monospace; }
+a { color: inherit; }
+
+/* ---- top bar ------------------------------------------------------------------------------------ */
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 56px; }
+.mark { display: inline-flex; align-items: center; gap: 8px; font-weight: 640; letter-spacing: -.01em; text-decoration: none; }
+.mark svg { width: 24px; height: 24px; fill: none; color: var(--accent); stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.top nav { display: flex; flex-wrap: wrap; gap: 4px; }
+.top nav a { padding: 6px 10px; border-radius: 9px; color: var(--muted); font-size: 13.5px; text-decoration: none; }
+.top nav a:hover { background: var(--panel); color: var(--ink); box-shadow: var(--shadow); }
+
+/* ---- hero --------------------------------------------------------------------------------------- */
+.hero { display: grid; gap: 16px; max-width: 42em; }
+.eyebrow { color: var(--accent); font-size: 12.5px; font-weight: 640; letter-spacing: .1em; text-transform: uppercase; }
+.lede { color: var(--muted); font-size: clamp(15px, 1.9vw, 17.5px); }
+.cta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 8px; }
+.button { display: inline-flex; align-items: center; height: 42px; padding: 0 20px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 14.5px; font-weight: 620; text-decoration: none; }
+.button:hover { background: var(--accent-ink); }
+.quiet-link { color: var(--muted); font-size: 14px; text-decoration: none; border-bottom: 1px solid var(--hair); }
+.quiet-link:hover { color: var(--ink); border-color: var(--accent); }
+
+/* ---- what it is: one edit as the agent and the board see it, beside what that means ----------- */
+.note { color: var(--faint); font-size: 13px; }
+.board { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px; align-items: start; margin: 64px 0; }
+.exchange { display: grid; gap: 8px; margin: 0; padding: 18px; border-radius: var(--radius); background: var(--code); color: var(--code-ink); box-shadow: var(--shadow); font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.exchange figcaption { margin-bottom: 4px; color: #a9a4c9; font: 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif; }
+.row { display: grid; grid-template-columns: 6ch 13ch minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.who { color: #8d88b0; }
+.call { color: #fff; font-weight: 600; }
+.arg { color: #cfcaf2; }
+.row.ok .call { color: #8fe0b0; }
+.row.no .call { color: #ffb4a8; }
+.facts { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }
+.facts li { display: grid; gap: 2px; }
+.facts b { font-size: 14.5px; font-weight: 640; }
+.facts span { color: var(--muted); font-size: 13.5px; }
+
+/* ---- steps -------------------------------------------------------------------------------------- */
+.how { margin: 64px 0; }
+.steps { display: grid; gap: 14px; margin: 22px 0 0; padding: 0; list-style: none; }
+.steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; align-items: start; }
+.step { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12.5px; font-weight: 660; }
+.steps b { font-size: 14.5px; }
+.steps p { color: var(--muted); font-size: 13.5px; }
+
+/* ---- formats, tools and boundaries -------------------------------------------------------------- */
+.formats, .agents, .try, .limits { margin: 64px 0; }
+.prose { color: var(--muted); font-size: 14.5px; max-width: 44em; margin-top: 12px; }
+.prose.small { font-size: 13px; margin-top: 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.chips span { padding: 6px 12px; border: 1px solid var(--hair); border-radius: 999px; background: var(--panel); color: var(--muted); font-size: 12.5px; }
+.chips code { color: var(--ink); }
+
+/* ---- trying and installing ---------------------------------------------------------------------- */
+.start { margin: 64px 0; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 16px; margin-top: 20px; }
+.card { display: grid; gap: 8px; padding: 18px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); }
+.card p { color: var(--muted); font-size: 13.5px; }
+.card pre { margin: 4px 0 0; padding: 12px; border-radius: var(--radius-inner); background: var(--code); color: var(--code-ink); font-size: 12.5px; white-space: pre-wrap; overflow-wrap: normal; word-break: normal; overflow-x: auto; }
+/* Commands wrap between words, never inside a flag; a token wider than the card scrolls inside it. */
+
+.tools { display: grid; list-style: none; padding: 0; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 10px 24px; margin: 20px 0 0; }
+.tools li { display: grid; gap: 2px; padding-top: 10px; border-top: 1px solid var(--hair); }
+.tools code { color: var(--accent-ink); font-size: 13px; font-weight: 600; }
+.tools span { color: var(--muted); font-size: 13.5px; }
+.limits ul { display: grid; gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; max-width: 44em; }
+.limits li { color: var(--muted); font-size: 14px; }
+.limits b { color: var(--ink); font-weight: 620; }
+
+footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--hair); color: var(--faint); font-size: 12.5px; }
+
+@media (max-width: 720px) {
+  .board { grid-template-columns: 1fr; }
+  .row { grid-template-columns: 6ch minmax(0, 1fr); }
+  .row .arg { grid-column: 2; }
+  .top { margin-bottom: 36px; }
+}
+
+}</style>
+<style>/*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */
+@layer theme, base, components, utilities;
+@layer theme {
+  :root, :host {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+      "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+      "Segoe UI Symbol", "Noto Color Emoji";
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+      "Courier New", monospace;
+    --default-font-family: var(--font-sans);
+    --default-mono-font-family: var(--font-mono);
+  }
+}
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0 solid;
+  }
+  html, :host {
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    tab-size: 4;
+    font-family: var(--default-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji");
+    font-feature-settings: var(--default-font-feature-settings, normal);
+    font-variation-settings: var(--default-font-variation-settings, normal);
+    -webkit-tap-highlight-color: transparent;
+  }
+  hr {
+    height: 0;
+    color: inherit;
+    border-top-width: 1px;
+  }
+  abbr:where([title]) {
+    -webkit-text-decoration: underline dotted;
+    text-decoration: underline dotted;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+  a {
+    color: inherit;
+    -webkit-text-decoration: inherit;
+    text-decoration: inherit;
+  }
+  b, strong {
+    font-weight: bolder;
+  }
+  code, kbd, samp, pre {
+    font-family: var(--default-mono-font-family, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+    font-feature-settings: var(--default-mono-font-feature-settings, normal);
+    font-variation-settings: var(--default-mono-font-variation-settings, normal);
+    font-size: 1em;
+  }
+  small {
+    font-size: 80%;
+  }
+  sub, sup {
+    font-size: 75%;
+    line-height: 0;
+    position: relative;
+    vertical-align: baseline;
+  }
+  sub {
+    bottom: -0.25em;
+  }
+  sup {
+    top: -0.5em;
+  }
+  table {
+    text-indent: 0;
+    border-color: inherit;
+    border-collapse: collapse;
+  }
+  :-moz-focusring:where(:not(iframe)) {
+    outline: auto;
+  }
+  progress {
+    vertical-align: baseline;
+  }
+  summary {
+    display: list-item;
+  }
+  ol, ul, menu {
+    list-style: none;
+  }
+  img, svg, video, canvas, audio, iframe, embed, object {
+    display: block;
+    vertical-align: middle;
+  }
+  img, video {
+    max-width: 100%;
+    height: auto;
+  }
+  button, input, select, optgroup, textarea, ::file-selector-button {
+    font: inherit;
+    font-feature-settings: inherit;
+    font-variation-settings: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    border-radius: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+  :where(select:is([multiple], [size])) optgroup {
+    font-weight: bolder;
+  }
+  :where(select:is([multiple], [size])) optgroup option {
+    padding-inline-start: 20px;
+  }
+  ::file-selector-button {
+    margin-inline-end: 4px;
+  }
+  ::placeholder {
+    opacity: 1;
+  }
+  @supports (not (-webkit-appearance: -apple-pay-button))  or (contain-intrinsic-size: 1px) {
+    ::placeholder {
+      color: currentcolor;
+      @supports (color: color-mix(in lab, red, red)) {
+        color: color-mix(in oklab, currentcolor 50%, transparent);
+      }
+    }
+  }
+  textarea {
+    resize: vertical;
+  }
+  ::-webkit-search-decoration {
+    -webkit-appearance: none;
+  }
+  ::-webkit-date-and-time-value {
+    min-height: 1lh;
+    text-align: inherit;
+  }
+  ::-webkit-datetime-edit {
+    display: inline-flex;
+  }
+  ::-webkit-datetime-edit-fields-wrapper {
+    padding: 0;
+  }
+  ::-webkit-datetime-edit, ::-webkit-datetime-edit-year-field, ::-webkit-datetime-edit-month-field, ::-webkit-datetime-edit-day-field, ::-webkit-datetime-edit-hour-field, ::-webkit-datetime-edit-minute-field, ::-webkit-datetime-edit-second-field, ::-webkit-datetime-edit-millisecond-field, ::-webkit-datetime-edit-meridiem-field {
+    padding-block: 0;
+  }
+  ::-webkit-calendar-picker-indicator {
+    line-height: 1;
+  }
+  :-moz-ui-invalid {
+    box-shadow: none;
+  }
+  button, input:where([type="button"], [type="reset"], [type="submit"]), ::file-selector-button {
+    appearance: button;
+  }
+  ::-webkit-inner-spin-button, ::-webkit-outer-spin-button {
+    height: auto;
+  }
+  [hidden]:where(:not([hidden="until-found"])) {
+    display: none !important;
+  }
+}
+@layer utilities;
+</style>
+</head>
+<body><main data-divlet-id="top" id="top"><header data-divlet-id="node-1" class="top"><a data-divlet-id="node-2" href="#top" aria-label="divlet" class="mark"><svg data-divlet-id="node-3" viewBox="0 0 20 20" aria-hidden="true"><path data-divlet-id="node-4" d="M8 4.5 2.5 10 8 15.5" fill="none"></path><path data-divlet-id="node-5" d="M10.5 4.5H12L17.5 10 12 15.5h-1.5Z" fill="currentColor" stroke="none"></path></svg><span data-divlet-id="node-6">divlet</span></a><nav data-divlet-id="node-8" aria-label="Sections"><a data-divlet-id="node-9" href="#how">How it works</a><a data-divlet-id="node-11" href="#try">Try it</a><a data-divlet-id="node-13" href="#start">Install</a><a data-divlet-id="node-15" href="#agents">For agents</a></nav></header><section data-divlet-id="node-17" class="hero"><p data-divlet-id="node-18" class="eyebrow">A layout board for coding agents</p><h1 data-divlet-id="node-20">Design in the browser.<br data-divlet-id="node-22">Change it in conversation.</h1><p data-divlet-id="node-24" class="lede">divlet gives your agent a board of real web pages. Point at what should change; the agent edits through validated tools, and you watch every accepted change land — versioned, logged and one Undo away.</p><div data-divlet-id="node-26" class="cta"><a data-divlet-id="node-27" href="#start" class="button">Get started</a><a data-divlet-id="node-29" href="#try" class="quiet-link">Try it without installing</a></div><p data-divlet-id="node-31" class="note">This page is a divlet project too: one frame of plain HTML and CSS.</p></section><section data-divlet-id="what" id="what" class="board"><figure data-divlet-id="node-33" aria-label="What one edit looks like" class="exchange"><figcaption data-divlet-id="node-34">One edit, as the agent and the board see it</figcaption><p data-divlet-id="node-36" class="row"><span data-divlet-id="node-37" class="who">agent</span><span data-divlet-id="node-39" class="call">divlet_read</span><span data-divlet-id="node-41" class="arg">frame index · v4</span></p><p data-divlet-id="node-43" class="row"><span data-divlet-id="node-44" class="who">agent</span><span data-divlet-id="node-46" class="call">divlet_patch</span><span data-divlet-id="node-48" class="arg">index@v4 · h1 → “Ship the calm version”</span></p><p data-divlet-id="node-50" class="row ok"><span data-divlet-id="node-51" class="who">board</span><span data-divlet-id="node-53" class="call">accepted</span><span data-divlet-id="node-55" class="arg">v5 · rendered · saved · undoable</span></p><p data-divlet-id="node-57" class="row no"><span data-divlet-id="node-58" class="who">board</span><span data-divlet-id="node-60" class="call">refused</span><span data-divlet-id="node-62" class="arg">REVISION_CONFLICT · read v5 first</span></p></figure><ul data-divlet-id="node-64" class="facts"><li data-divlet-id="node-65"><b data-divlet-id="node-66">Real pages</b><span data-divlet-id="node-68">Every artboard is a live page of HTML, SVG and CSS. Resize it to check the phone layout; what you see is what ships.</span></li><li data-divlet-id="node-70"><b data-divlet-id="node-71">Point, then ask</b><span data-divlet-id="node-73">Select an element and ask. The agent reads the same selection, frame and measured layout you are looking at.</span></li><li data-divlet-id="node-75"><b data-divlet-id="node-76">Validated edits</b><span data-divlet-id="node-78">Each change names the version it was made against. Stale or invalid edits are refused, never half-applied, and History records who changed what.</span></li><li data-divlet-id="node-80"><b data-divlet-id="node-81">One file you own</b><span data-divlet-id="node-83"><code data-divlet-id="node-84">project.divlet</code> holds frames, components, tokens and CSS. Generated pages are plain HTML you can host anywhere.</span></li></ul></section><section data-divlet-id="how" id="how" class="how"><h2 data-divlet-id="node-87">How a change lands</h2><ol data-divlet-id="node-89" class="steps"><li data-divlet-id="node-90"><span data-divlet-id="node-91" class="step">1</span><div data-divlet-id="node-93"><b data-divlet-id="node-94">You point</b><p data-divlet-id="node-96">Select a frame or an element and say what you want: “tighter hero, warmer card”.</p></div></li><li data-divlet-id="node-98"><span data-divlet-id="node-99" class="step">2</span><div data-divlet-id="node-101"><b data-divlet-id="node-102">The agent reads, then edits</b><p data-divlet-id="node-104">It reads the frame and its version, then changes structure, text, styles or components by stable IDs.</p></div></li><li data-divlet-id="node-106"><span data-divlet-id="node-107" class="step">3</span><div data-divlet-id="node-109"><b data-divlet-id="node-110">The board checks and shows it</b><p data-divlet-id="node-112">The change is validated, rendered and saved as one step, or refused with a reason the agent can act on.</p></div></li><li data-divlet-id="node-114"><span data-divlet-id="node-115" class="step">4</span><div data-divlet-id="node-117"><b data-divlet-id="node-118">You keep it or undo it</b><p data-divlet-id="node-120">Undo reverts the whole accepted edit, whether the agent made it or you dragged something a minute ago.</p></div></li></ol></section><section data-divlet-id="try" id="try" class="try"><h2 data-divlet-id="node-122">Try it without installing</h2><p data-divlet-id="node-124" class="prose">On the divlet site this page opens inside the board itself, running entirely in your browser. Nothing is uploaded: your copy lives in this browser, and you can download it as a <code data-divlet-id="node-126">.divlet</code> file at any time.</p><div data-divlet-id="node-129" class="cards"><div data-divlet-id="node-130" class="card"><h3 data-divlet-id="node-131">Edit it on the board</h3><p data-divlet-id="node-133">Choose <b data-divlet-id="node-135">Edit on the board</b> at the top of the page, select anything and change it in the inspector, or add an artboard for a phone layout.</p><pre data-divlet-id="node-138"><code data-divlet-id="node-139">llblab.github.io/divlet</code></pre></div><div data-divlet-id="node-141" class="card"><h3 data-divlet-id="node-142">Let your agent edit it</h3><p data-divlet-id="node-144">The site is its own MCP provider. Register it by URL in Claude Code, an editor or any MCP host: the tools run in a browser page that <code data-divlet-id="node-146">divlet-mcp</code> opens, not on your machine.</p><pre data-divlet-id="node-149"><code data-divlet-id="node-150">npx -y @divlet/mcp --connect https://llblab.github.io/divlet/</code></pre></div></div></section><section data-divlet-id="start" id="start" class="start"><h2 data-divlet-id="node-152">Use it on your own projects</h2><p data-divlet-id="node-154" class="prose">Requires Node.js 22.19 or later. The board binds to loopback and your project stays a file in your folder; nothing is uploaded.</p><div data-divlet-id="node-156" class="cards"><div data-divlet-id="node-157" class="card"><h3 data-divlet-id="node-158">A board on your machine</h3><p data-divlet-id="node-160">Open a folder; an empty one gets a starter project, an existing one opens as it is.</p><pre data-divlet-id="node-162"><code data-divlet-id="node-163">npx -y @divlet/cli ./my-project</code></pre></div><div data-divlet-id="node-165" class="card"><h3 data-divlet-id="node-166">Your MCP agent</h3><p data-divlet-id="node-168">Install the workflow skill once, then register the server. The agent opens the board when it needs one.</p><pre data-divlet-id="node-170"><code data-divlet-id="node-171">npx skills add llblab/divlet --skill divlet --global
+npx -y @divlet/mcp --cwd ./my-project</code></pre></div><div data-divlet-id="node-173" class="card"><h3 data-divlet-id="node-174">Pi</h3><p data-divlet-id="node-176">The extension brings the tools, the skill and the Agent conversation to the board.</p><pre data-divlet-id="node-178"><code data-divlet-id="node-179">pi install npm:@divlet/pi</code></pre><p data-divlet-id="node-181">Then run <code data-divlet-id="node-183">/divlet</code> in your workspace.</p></div></div><p data-divlet-id="node-186" class="prose small">Version 0.0.5. The native project format remains a pre-freeze draft, so keep backups of projects you care about.</p></section><section data-divlet-id="agents" id="agents" class="agents"><h2 data-divlet-id="node-188">Seven tools, one contract</h2><p data-divlet-id="node-190" class="prose">Pi, MCP and the browser board run the same tool definitions, validation and refusal codes. The skill teaches the loop: read, edit with the version you read, verify what rendered.</p><ul data-divlet-id="node-192" class="tools"><li data-divlet-id="node-193"><code data-divlet-id="node-194">divlet_open</code><span data-divlet-id="node-196">Open a project and its local board.</span></li><li data-divlet-id="node-198"><code data-divlet-id="node-199">divlet_read</code><span data-divlet-id="node-201">Frames, nodes, components, the user's selection, measured layout and history.</span></li><li data-divlet-id="node-203"><code data-divlet-id="node-204">divlet_patch</code><span data-divlet-id="node-206">Change a frame or the project by stable IDs, at a known version.</span></li><li data-divlet-id="node-208"><code data-divlet-id="node-209">divlet_edit</code><span data-divlet-id="node-211">Insert, move, wrap, duplicate, rename or remove elements.</span></li><li data-divlet-id="node-213"><code data-divlet-id="node-214">divlet_frame_manage</code><span data-divlet-id="node-216">Create, duplicate or delete frames.</span></li><li data-divlet-id="node-218"><code data-divlet-id="node-219">divlet_undo</code><span data-divlet-id="node-221">Undo or redo the latest change.</span></li><li data-divlet-id="node-223"><code data-divlet-id="node-224">divlet_mark</code><span data-divlet-id="node-226">Show the user where the agent is about to work.</span></li></ul></section><section data-divlet-id="formats" id="formats" class="formats"><h2 data-divlet-id="node-228">Bring pages in, take plain HTML out</h2><p data-divlet-id="node-230" class="prose">Static HTML pages open through the native importer, Pencil files convert through a plugin, and Markdown folders become routed sites. A source is never rewritten: divlet creates a sibling <code data-divlet-id="node-232">.divlet</code> once. What comes out is ordinary HTML and CSS.</p><div data-divlet-id="node-235" class="chips"><span data-divlet-id="node-236"><code data-divlet-id="node-237">.html</code> static pages</span><span data-divlet-id="node-240"><code data-divlet-id="node-241">.pen</code> Pencil</span><span data-divlet-id="node-244">Markdown sites</span><span data-divlet-id="node-246"><code data-divlet-id="node-247">.divlet</code> native</span></div></section><section data-divlet-id="limits" id="limits" class="limits"><h2 data-divlet-id="node-250">Honest boundaries</h2><ul data-divlet-id="node-252"><li data-divlet-id="node-253"><b data-divlet-id="node-254">Layouts, not applications.</b> HTML, SVG and CSS; no scripts or event handlers.</li><li data-divlet-id="node-257"><b data-divlet-id="node-258">Generated pages are output.</b> Hand edits there are reported and preserved, not imported back.</li><li data-divlet-id="node-261"><b data-divlet-id="node-262">The browser board is a copy.</b> It edits this site's project; images, fonts and utility classes need the local board.</li></ul></section><footer data-divlet-id="node-265"><span data-divlet-id="node-266">divlet · MIT · github.com/llblab/divlet</span><span data-divlet-id="node-268">A browser board, not a service.</span></footer></main>
+</body></html>

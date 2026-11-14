@@ -1,0 +1,2836 @@
+{
+  "schemaVersion": 1,
+  "name": "divlet landing",
+  "version": 1,
+  "tokens": {},
+  "css": "",
+  "metadata": {},
+  "frames": [
+    {
+      "id": "index",
+      "name": "divlet — a layout board for agents",
+      "head": {
+        "description": "divlet is a local browser layout board for coding agents: live frames of real HTML and CSS, reusable components, and the same validated tools through Pi, MCP or the board running in your browser.",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgY29sb3I9IiM1YjViZjAiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj48cGF0aCBkPSJNOCA0LjUgMi41IDEwIDggMTUuNSIgZmlsbD0ibm9uZSIvPjxwYXRoIGQ9Ik0xMC41IDQuNUgxMkwxNy41IDEwIDEyIDE1LjVoLTEuNVoiIGZpbGw9ImN1cnJlbnRDb2xvciIgc3Ryb2tlPSJub25lIi8+PC9zdmc+Cg=="
+      },
+      "version": 5,
+      "artboard": {
+        "x": 80,
+        "y": 80,
+        "width": 1280,
+        "height": 3120
+      },
+      "rootId": "top",
+      "tokens": {},
+      "css": "/* Authored in examples/landing/landing.divlet; this stylesheet travels with its frame. */\n:root {\n  color-scheme: light dark;\n  --paper: #f7f5f1;\n  --ink: #17161a;\n  --muted: #5f5b57;\n  --faint: #8d8781;\n  --hair: #e2ddd5;\n  --panel: #fffefc;\n  --accent: #5b5bf0;\n  --accent-ink: #4646d8;\n  --accent-soft: #ebebfd;\n  --code: #2a2740;\n  --code-ink: #ece9ff;\n  --green: #123524;\n  --gold: #d7b474;\n  --shadow: 0 12px 28px -18px rgba(23, 22, 26, .45);\n  --radius: 18px;\n  --radius-inner: 12px;\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    --paper: #14131a;\n    --ink: #f1eef7;\n    --muted: #a9a4b3;\n    --faint: #7d7887;\n    --hair: #2b2833;\n    --panel: #1b1a22;\n    --accent: #8e8eff;\n    --accent-ink: #a5a5ff;\n    --accent-soft: #262544;\n    --code: #100f16;\n    --code-ink: #dcd8ff;\n    --shadow: 0 18px 34px -22px rgba(0, 0, 0, .8);\n  }\n}\n\n* { box-sizing: border-box; }\nhtml { -webkit-text-size-adjust: 100%; }\nbody {\n  margin: 0;\n  background: var(--paper);\n  color: var(--ink);\n  font: 16px/1.6 -apple-system, BlinkMacSystemFont, \"Segoe UI\", Inter, system-ui, sans-serif;\n  -webkit-font-smoothing: antialiased;\n}\nmain { width: min(940px, 100% - 40px); margin: 0 auto; padding: 28px 0 56px; overflow-wrap: anywhere; }\nh1, h2, h3 { letter-spacing: -.02em; line-height: 1.15; margin: 0; }\nh1 { font-size: clamp(30px, 5.4vw, 50px); font-weight: 660; }\nh2 { font-size: clamp(20px, 3vw, 26px); font-weight: 640; }\nh3 { font-size: 16px; font-weight: 640; }\np { margin: 0; }\ncode { font: .92em ui-monospace, SFMono-Regular, Menlo, monospace; }\na { color: inherit; }\n\n/* ---- top bar ------------------------------------------------------------------------------------ */\n.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 56px; }\n.mark { display: inline-flex; align-items: center; gap: 8px; font-weight: 640; letter-spacing: -.01em; text-decoration: none; }\n.mark svg { width: 24px; height: 24px; fill: none; color: var(--accent); stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }\n.top nav { display: flex; flex-wrap: wrap; gap: 4px; }\n.top nav a { padding: 6px 10px; border-radius: 9px; color: var(--muted); font-size: 13.5px; text-decoration: none; }\n.top nav a:hover { background: var(--panel); color: var(--ink); box-shadow: var(--shadow); }\n\n/* ---- hero --------------------------------------------------------------------------------------- */\n.hero { display: grid; gap: 16px; max-width: 42em; }\n.eyebrow { color: var(--accent); font-size: 12.5px; font-weight: 640; letter-spacing: .1em; text-transform: uppercase; }\n.lede { color: var(--muted); font-size: clamp(15px, 1.9vw, 17.5px); }\n.cta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 8px; }\n.button { display: inline-flex; align-items: center; height: 42px; padding: 0 20px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 14.5px; font-weight: 620; text-decoration: none; }\n.button:hover { background: var(--accent-ink); }\n.quiet-link { color: var(--muted); font-size: 14px; text-decoration: none; border-bottom: 1px solid var(--hair); }\n.quiet-link:hover { color: var(--ink); border-color: var(--accent); }\n\n/* ---- what it is: one edit as the agent and the board see it, beside what that means ----------- */\n.note { color: var(--faint); font-size: 13px; }\n.board { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 28px; align-items: start; margin: 64px 0; }\n.exchange { display: grid; gap: 8px; margin: 0; padding: 18px; border-radius: var(--radius); background: var(--code); color: var(--code-ink); box-shadow: var(--shadow); font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }\n.exchange figcaption { margin-bottom: 4px; color: #a9a4c9; font: 12px/1.4 -apple-system, BlinkMacSystemFont, \"Segoe UI\", Inter, system-ui, sans-serif; }\n.row { display: grid; grid-template-columns: 6ch 13ch minmax(0, 1fr); gap: 10px; align-items: baseline; }\n.who { color: #8d88b0; }\n.call { color: #fff; font-weight: 600; }\n.arg { color: #cfcaf2; }\n.row.ok .call { color: #8fe0b0; }\n.row.no .call { color: #ffb4a8; }\n.facts { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; }\n.facts li { display: grid; gap: 2px; }\n.facts b { font-size: 14.5px; font-weight: 640; }\n.facts span { color: var(--muted); font-size: 13.5px; }\n\n/* ---- steps -------------------------------------------------------------------------------------- */\n.how { margin: 64px 0; }\n.steps { display: grid; gap: 14px; margin: 22px 0 0; padding: 0; list-style: none; }\n.steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; align-items: start; }\n.step { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12.5px; font-weight: 660; }\n.steps b { font-size: 14.5px; }\n.steps p { color: var(--muted); font-size: 13.5px; }\n\n/* ---- formats, tools and boundaries -------------------------------------------------------------- */\n.formats, .agents, .try, .limits { margin: 64px 0; }\n.prose { color: var(--muted); font-size: 14.5px; max-width: 44em; margin-top: 12px; }\n.prose.small { font-size: 13px; margin-top: 16px; }\n.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }\n.chips span { padding: 6px 12px; border: 1px solid var(--hair); border-radius: 999px; background: var(--panel); color: var(--muted); font-size: 12.5px; }\n.chips code { color: var(--ink); }\n\n/* ---- trying and installing ---------------------------------------------------------------------- */\n.start { margin: 64px 0; }\n.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 16px; margin-top: 20px; }\n.card { display: grid; gap: 8px; padding: 18px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--panel); box-shadow: var(--shadow); }\n.card p { color: var(--muted); font-size: 13.5px; }\n.card pre { margin: 4px 0 0; padding: 12px; border-radius: var(--radius-inner); background: var(--code); color: var(--code-ink); font-size: 12.5px; white-space: pre-wrap; overflow-wrap: normal; word-break: normal; overflow-x: auto; }\n/* Commands wrap between words, never inside a flag; a token wider than the card scrolls inside it. */\n\n.tools { display: grid; list-style: none; padding: 0; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 10px 24px; margin: 20px 0 0; }\n.tools li { display: grid; gap: 2px; padding-top: 10px; border-top: 1px solid var(--hair); }\n.tools code { color: var(--accent-ink); font-size: 13px; font-weight: 600; }\n.tools span { color: var(--muted); font-size: 13.5px; }\n.limits ul { display: grid; gap: 8px; margin: 16px 0 0; padding: 0; list-style: none; max-width: 44em; }\n.limits li { color: var(--muted); font-size: 14px; }\n.limits b { color: var(--ink); font-weight: 620; }\n\nfooter { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--hair); color: var(--faint); font-size: 12.5px; }\n\n@media (max-width: 720px) {\n  .board { grid-template-columns: 1fr; }\n  .row { grid-template-columns: 6ch minmax(0, 1fr); }\n  .row .arg { grid-column: 2; }\n  .top { margin-bottom: 36px; }\n}\n",
+      "metadata": {},
+      "nodes": {
+        "top": {
+          "id": "top",
+          "type": "element",
+          "tag": "main",
+          "attrs": {
+            "id": "top"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-1",
+            "node-17",
+            "what",
+            "how",
+            "try",
+            "start",
+            "agents",
+            "formats",
+            "limits",
+            "node-265"
+          ]
+        },
+        "node-2": {
+          "id": "node-2",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#top",
+            "aria-label": "divlet"
+          },
+          "className": "mark",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-3",
+            "node-6"
+          ]
+        },
+        "node-4": {
+          "id": "node-4",
+          "type": "element",
+          "tag": "path",
+          "attrs": {
+            "d": "M8 4.5 2.5 10 8 15.5",
+            "fill": "none"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "node-6": {
+          "id": "node-6",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-7"
+          ]
+        },
+        "node-8": {
+          "id": "node-8",
+          "type": "element",
+          "tag": "nav",
+          "attrs": {
+            "aria-label": "Sections"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-9",
+            "node-11",
+            "node-13",
+            "node-15"
+          ]
+        },
+        "text-12": {
+          "id": "text-12",
+          "type": "text",
+          "content": "Try it",
+          "metadata": {}
+        },
+        "text-21": {
+          "id": "text-21",
+          "type": "text",
+          "content": "Design in the browser.",
+          "metadata": {}
+        },
+        "node-22": {
+          "id": "node-22",
+          "type": "element",
+          "tag": "br",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "text-23": {
+          "id": "text-23",
+          "type": "text",
+          "content": "Change it in conversation.",
+          "metadata": {}
+        },
+        "text-28": {
+          "id": "text-28",
+          "type": "text",
+          "content": "Get started",
+          "metadata": {}
+        },
+        "node-37": {
+          "id": "node-37",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "who",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-38"
+          ]
+        },
+        "text-38": {
+          "id": "text-38",
+          "type": "text",
+          "content": "agent",
+          "metadata": {}
+        },
+        "text-42": {
+          "id": "text-42",
+          "type": "text",
+          "content": "frame index · v4",
+          "metadata": {}
+        },
+        "node-43": {
+          "id": "node-43",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "row",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-44",
+            "node-46",
+            "node-48"
+          ]
+        },
+        "text-47": {
+          "id": "text-47",
+          "type": "text",
+          "content": "divlet_patch",
+          "metadata": {}
+        },
+        "node-48": {
+          "id": "node-48",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "arg",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-49"
+          ]
+        },
+        "text-49": {
+          "id": "text-49",
+          "type": "text",
+          "content": "index@v4 · h1 → “Ship the calm version”",
+          "metadata": {}
+        },
+        "text-52": {
+          "id": "text-52",
+          "type": "text",
+          "content": "board",
+          "metadata": {}
+        },
+        "what": {
+          "id": "what",
+          "type": "element",
+          "tag": "section",
+          "attrs": {
+            "id": "what"
+          },
+          "className": "board",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-33",
+            "node-64"
+          ]
+        },
+        "node-57": {
+          "id": "node-57",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "row no",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-58",
+            "node-60",
+            "node-62"
+          ]
+        },
+        "text-61": {
+          "id": "text-61",
+          "type": "text",
+          "content": "refused",
+          "metadata": {}
+        },
+        "node-62": {
+          "id": "node-62",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "arg",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-63"
+          ]
+        },
+        "text-63": {
+          "id": "text-63",
+          "type": "text",
+          "content": "REVISION_CONFLICT · read v5 first",
+          "metadata": {}
+        },
+        "node-64": {
+          "id": "node-64",
+          "type": "element",
+          "tag": "ul",
+          "attrs": {},
+          "className": "facts",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-65",
+            "node-70",
+            "node-75",
+            "node-80"
+          ]
+        },
+        "node-66": {
+          "id": "node-66",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-67"
+          ]
+        },
+        "text-67": {
+          "id": "text-67",
+          "type": "text",
+          "content": "Real pages",
+          "metadata": {}
+        },
+        "text-74": {
+          "id": "text-74",
+          "type": "text",
+          "content": "Select an element and ask. The agent reads the same selection, frame and measured layout you are looking at.",
+          "metadata": {}
+        },
+        "node-80": {
+          "id": "node-80",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-81",
+            "node-83"
+          ]
+        },
+        "node-83": {
+          "id": "node-83",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-84",
+            "text-86"
+          ]
+        },
+        "text-85": {
+          "id": "text-85",
+          "type": "text",
+          "content": "project.divlet",
+          "metadata": {}
+        },
+        "text-86": {
+          "id": "text-86",
+          "type": "text",
+          "content": " holds frames, components, tokens and CSS. Generated pages are plain HTML you can host anywhere.",
+          "metadata": {}
+        },
+        "node-87": {
+          "id": "node-87",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-88"
+          ]
+        },
+        "node-90": {
+          "id": "node-90",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-91",
+            "node-93"
+          ]
+        },
+        "text-92": {
+          "id": "text-92",
+          "type": "text",
+          "content": "1",
+          "metadata": {}
+        },
+        "node-93": {
+          "id": "node-93",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-94",
+            "node-96"
+          ]
+        },
+        "node-94": {
+          "id": "node-94",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-95"
+          ]
+        },
+        "text-95": {
+          "id": "text-95",
+          "type": "text",
+          "content": "You point",
+          "metadata": {}
+        },
+        "node-96": {
+          "id": "node-96",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-97"
+          ]
+        },
+        "text-97": {
+          "id": "text-97",
+          "type": "text",
+          "content": "Select a frame or an element and say what you want: “tighter hero, warmer card”.",
+          "metadata": {}
+        },
+        "node-99": {
+          "id": "node-99",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "step",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-100"
+          ]
+        },
+        "node-102": {
+          "id": "node-102",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-103"
+          ]
+        },
+        "text-103": {
+          "id": "text-103",
+          "type": "text",
+          "content": "The agent reads, then edits",
+          "metadata": {}
+        },
+        "text-105": {
+          "id": "text-105",
+          "type": "text",
+          "content": "It reads the frame and its version, then changes structure, text, styles or components by stable IDs.",
+          "metadata": {}
+        },
+        "how": {
+          "id": "how",
+          "type": "element",
+          "tag": "section",
+          "attrs": {
+            "id": "how"
+          },
+          "className": "how",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-87",
+            "node-89"
+          ]
+        },
+        "node-114": {
+          "id": "node-114",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-115",
+            "node-117"
+          ]
+        },
+        "node-117": {
+          "id": "node-117",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-118",
+            "node-120"
+          ]
+        },
+        "text-121": {
+          "id": "text-121",
+          "type": "text",
+          "content": "Undo reverts the whole accepted edit, whether the agent made it or you dragged something a minute ago.",
+          "metadata": {}
+        },
+        "node-122": {
+          "id": "node-122",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-123"
+          ]
+        },
+        "node-126": {
+          "id": "node-126",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-127"
+          ]
+        },
+        "text-127": {
+          "id": "text-127",
+          "type": "text",
+          "content": ".divlet",
+          "metadata": {}
+        },
+        "node-131": {
+          "id": "node-131",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-132"
+          ]
+        },
+        "node-135": {
+          "id": "node-135",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-136"
+          ]
+        },
+        "text-136": {
+          "id": "text-136",
+          "type": "text",
+          "content": "Edit on the board",
+          "metadata": {}
+        },
+        "node-141": {
+          "id": "node-141",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "card",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-142",
+            "node-144",
+            "node-149"
+          ]
+        },
+        "node-144": {
+          "id": "node-144",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-145",
+            "node-146",
+            "text-148"
+          ]
+        },
+        "text-145": {
+          "id": "text-145",
+          "type": "text",
+          "content": "The site is its own MCP provider. Register it by URL in Claude Code, an editor or any MCP host: the tools run in a browser page that ",
+          "metadata": {}
+        },
+        "node-146": {
+          "id": "node-146",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-147"
+          ]
+        },
+        "text-147": {
+          "id": "text-147",
+          "type": "text",
+          "content": "divlet-mcp",
+          "metadata": {}
+        },
+        "text-148": {
+          "id": "text-148",
+          "type": "text",
+          "content": " opens, not on your machine.",
+          "metadata": {}
+        },
+        "formats": {
+          "id": "formats",
+          "type": "element",
+          "tag": "section",
+          "attrs": {
+            "id": "formats"
+          },
+          "className": "formats",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-228",
+            "node-230",
+            "node-235"
+          ]
+        },
+        "text-151": {
+          "id": "text-151",
+          "type": "text",
+          "content": "npx -y @divlet/mcp --connect https://llblab.github.io/divlet/",
+          "metadata": {}
+        },
+        "node-152": {
+          "id": "node-152",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-153"
+          ]
+        },
+        "text-153": {
+          "id": "text-153",
+          "type": "text",
+          "content": "Use it on your own projects",
+          "metadata": {}
+        },
+        "node-158": {
+          "id": "node-158",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-159"
+          ]
+        },
+        "text-159": {
+          "id": "text-159",
+          "type": "text",
+          "content": "A board on your machine",
+          "metadata": {}
+        },
+        "node-160": {
+          "id": "node-160",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-161"
+          ]
+        },
+        "text-164": {
+          "id": "text-164",
+          "type": "text",
+          "content": "npx -y @divlet/cli ./my-project",
+          "metadata": {}
+        },
+        "node-165": {
+          "id": "node-165",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "card",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-166",
+            "node-168",
+            "node-170"
+          ]
+        },
+        "node-166": {
+          "id": "node-166",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-167"
+          ]
+        },
+        "text-167": {
+          "id": "text-167",
+          "type": "text",
+          "content": "Your MCP agent",
+          "metadata": {}
+        },
+        "text-169": {
+          "id": "text-169",
+          "type": "text",
+          "content": "Install the workflow skill once, then register the server. The agent opens the board when it needs one.",
+          "metadata": {}
+        },
+        "node-170": {
+          "id": "node-170",
+          "type": "element",
+          "tag": "pre",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-171"
+          ]
+        },
+        "node-171": {
+          "id": "node-171",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-172"
+          ]
+        },
+        "text-172": {
+          "id": "text-172",
+          "type": "text",
+          "content": "npx skills add llblab/divlet --skill divlet --global\nnpx -y @divlet/mcp --cwd ./my-project",
+          "metadata": {}
+        },
+        "text-177": {
+          "id": "text-177",
+          "type": "text",
+          "content": "The extension brings the tools, the skill and the Agent conversation to the board.",
+          "metadata": {}
+        },
+        "start": {
+          "id": "start",
+          "type": "element",
+          "tag": "section",
+          "attrs": {
+            "id": "start"
+          },
+          "className": "start",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-152",
+            "node-154",
+            "node-156",
+            "node-186"
+          ]
+        },
+        "text-180": {
+          "id": "text-180",
+          "type": "text",
+          "content": "pi install npm:@divlet/pi",
+          "metadata": {}
+        },
+        "node-181": {
+          "id": "node-181",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-182",
+            "node-183",
+            "text-185"
+          ]
+        },
+        "text-182": {
+          "id": "text-182",
+          "type": "text",
+          "content": "Then run ",
+          "metadata": {}
+        },
+        "text-185": {
+          "id": "text-185",
+          "type": "text",
+          "content": " in your workspace.",
+          "metadata": {}
+        },
+        "node-186": {
+          "id": "node-186",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "prose small",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-187"
+          ]
+        },
+        "text-187": {
+          "id": "text-187",
+          "type": "text",
+          "content": "Version 0.0.5. The native project format remains a pre-freeze draft, so keep backups of projects you care about.",
+          "metadata": {}
+        },
+        "text-189": {
+          "id": "text-189",
+          "type": "text",
+          "content": "Seven tools, one contract",
+          "metadata": {}
+        },
+        "node-190": {
+          "id": "node-190",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "prose",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-191"
+          ]
+        },
+        "text-191": {
+          "id": "text-191",
+          "type": "text",
+          "content": "Pi, MCP and the browser board run the same tool definitions, validation and refusal codes. The skill teaches the loop: read, edit with the version you read, verify what rendered.",
+          "metadata": {}
+        },
+        "node-192": {
+          "id": "node-192",
+          "type": "element",
+          "tag": "ul",
+          "attrs": {},
+          "className": "tools",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-193",
+            "node-198",
+            "node-203",
+            "node-208",
+            "node-213",
+            "node-218",
+            "node-223"
+          ]
+        },
+        "node-194": {
+          "id": "node-194",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-195"
+          ]
+        },
+        "text-195": {
+          "id": "text-195",
+          "type": "text",
+          "content": "divlet_open",
+          "metadata": {}
+        },
+        "node-199": {
+          "id": "node-199",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-200"
+          ]
+        },
+        "text-200": {
+          "id": "text-200",
+          "type": "text",
+          "content": "divlet_read",
+          "metadata": {}
+        },
+        "text-202": {
+          "id": "text-202",
+          "type": "text",
+          "content": "Frames, nodes, components, the user's selection, measured layout and history.",
+          "metadata": {}
+        },
+        "node-203": {
+          "id": "node-203",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-204",
+            "node-206"
+          ]
+        },
+        "node-204": {
+          "id": "node-204",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-205"
+          ]
+        },
+        "text-205": {
+          "id": "text-205",
+          "type": "text",
+          "content": "divlet_patch",
+          "metadata": {}
+        },
+        "text-207": {
+          "id": "text-207",
+          "type": "text",
+          "content": "Change a frame or the project by stable IDs, at a known version.",
+          "metadata": {}
+        },
+        "node-208": {
+          "id": "node-208",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-209",
+            "node-211"
+          ]
+        },
+        "text-212": {
+          "id": "text-212",
+          "type": "text",
+          "content": "Insert, move, wrap, duplicate, rename or remove elements.",
+          "metadata": {}
+        },
+        "node-213": {
+          "id": "node-213",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-214",
+            "node-216"
+          ]
+        },
+        "text-217": {
+          "id": "text-217",
+          "type": "text",
+          "content": "Create, duplicate or delete frames.",
+          "metadata": {}
+        },
+        "node-218": {
+          "id": "node-218",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-219",
+            "node-221"
+          ]
+        },
+        "text-220": {
+          "id": "text-220",
+          "type": "text",
+          "content": "divlet_undo",
+          "metadata": {}
+        },
+        "node-223": {
+          "id": "node-223",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-224",
+            "node-226"
+          ]
+        },
+        "text-225": {
+          "id": "text-225",
+          "type": "text",
+          "content": "divlet_mark",
+          "metadata": {}
+        },
+        "node-226": {
+          "id": "node-226",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-227"
+          ]
+        },
+        "text-227": {
+          "id": "text-227",
+          "type": "text",
+          "content": "Show the user where the agent is about to work.",
+          "metadata": {}
+        },
+        "node-228": {
+          "id": "node-228",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-229"
+          ]
+        },
+        "text-229": {
+          "id": "text-229",
+          "type": "text",
+          "content": "Bring pages in, take plain HTML out",
+          "metadata": {}
+        },
+        "text-231": {
+          "id": "text-231",
+          "type": "text",
+          "content": "Static HTML pages open through the native importer, Pencil files convert through a plugin, and Markdown folders become routed sites. A source is never rewritten: divlet creates a sibling ",
+          "metadata": {}
+        },
+        "text-234": {
+          "id": "text-234",
+          "type": "text",
+          "content": " once. What comes out is ordinary HTML and CSS.",
+          "metadata": {}
+        },
+        "node-235": {
+          "id": "node-235",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "chips",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-236",
+            "node-240",
+            "node-244",
+            "node-246"
+          ]
+        },
+        "text-239": {
+          "id": "text-239",
+          "type": "text",
+          "content": " static pages",
+          "metadata": {}
+        },
+        "node-240": {
+          "id": "node-240",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-241",
+            "text-243"
+          ]
+        },
+        "text-242": {
+          "id": "text-242",
+          "type": "text",
+          "content": ".pen",
+          "metadata": {}
+        },
+        "text-245": {
+          "id": "text-245",
+          "type": "text",
+          "content": "Markdown sites",
+          "metadata": {}
+        },
+        "node-247": {
+          "id": "node-247",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-248"
+          ]
+        },
+        "text-249": {
+          "id": "text-249",
+          "type": "text",
+          "content": " native",
+          "metadata": {}
+        },
+        "text-251": {
+          "id": "text-251",
+          "type": "text",
+          "content": "Honest boundaries",
+          "metadata": {}
+        },
+        "node-253": {
+          "id": "node-253",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-254",
+            "text-256"
+          ]
+        },
+        "text-256": {
+          "id": "text-256",
+          "type": "text",
+          "content": " HTML, SVG and CSS; no scripts or event handlers.",
+          "metadata": {}
+        },
+        "node-258": {
+          "id": "node-258",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-259"
+          ]
+        },
+        "text-259": {
+          "id": "text-259",
+          "type": "text",
+          "content": "Generated pages are output.",
+          "metadata": {}
+        },
+        "text-260": {
+          "id": "text-260",
+          "type": "text",
+          "content": " Hand edits there are reported and preserved, not imported back.",
+          "metadata": {}
+        },
+        "text-264": {
+          "id": "text-264",
+          "type": "text",
+          "content": " It edits this site's project; images, fonts and utility classes need the local board.",
+          "metadata": {}
+        },
+        "node-265": {
+          "id": "node-265",
+          "type": "element",
+          "tag": "footer",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-266",
+            "node-268"
+          ]
+        },
+        "text-267": {
+          "id": "text-267",
+          "type": "text",
+          "content": "divlet · MIT · github.com/llblab/divlet",
+          "metadata": {}
+        },
+        "node-268": {
+          "id": "node-268",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-269"
+          ]
+        },
+        "text-269": {
+          "id": "text-269",
+          "type": "text",
+          "content": "A browser board, not a service.",
+          "metadata": {}
+        },
+        "node-1": {
+          "id": "node-1",
+          "type": "element",
+          "tag": "header",
+          "attrs": {},
+          "className": "top",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-2",
+            "node-8"
+          ]
+        },
+        "node-3": {
+          "id": "node-3",
+          "type": "element",
+          "tag": "svg",
+          "attrs": {
+            "viewBox": "0 0 20 20",
+            "aria-hidden": "true"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-4",
+            "node-5"
+          ]
+        },
+        "node-5": {
+          "id": "node-5",
+          "type": "element",
+          "tag": "path",
+          "attrs": {
+            "d": "M10.5 4.5H12L17.5 10 12 15.5h-1.5Z",
+            "fill": "currentColor",
+            "stroke": "none"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "text-7": {
+          "id": "text-7",
+          "type": "text",
+          "content": "divlet",
+          "metadata": {}
+        },
+        "node-9": {
+          "id": "node-9",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#how"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-10"
+          ]
+        },
+        "text-10": {
+          "id": "text-10",
+          "type": "text",
+          "content": "How it works",
+          "metadata": {}
+        },
+        "node-11": {
+          "id": "node-11",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#try"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-12"
+          ]
+        },
+        "node-13": {
+          "id": "node-13",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#start"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-14"
+          ]
+        },
+        "text-14": {
+          "id": "text-14",
+          "type": "text",
+          "content": "Install",
+          "metadata": {}
+        },
+        "node-15": {
+          "id": "node-15",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#agents"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-16"
+          ]
+        },
+        "text-16": {
+          "id": "text-16",
+          "type": "text",
+          "content": "For agents",
+          "metadata": {}
+        },
+        "node-17": {
+          "id": "node-17",
+          "type": "element",
+          "tag": "section",
+          "attrs": {},
+          "className": "hero",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-18",
+            "node-20",
+            "node-24",
+            "node-26",
+            "node-31"
+          ]
+        },
+        "node-18": {
+          "id": "node-18",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "eyebrow",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-19"
+          ]
+        },
+        "text-19": {
+          "id": "text-19",
+          "type": "text",
+          "content": "A layout board for coding agents",
+          "metadata": {}
+        },
+        "node-20": {
+          "id": "node-20",
+          "type": "element",
+          "tag": "h1",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-21",
+            "node-22",
+            "text-23"
+          ]
+        },
+        "node-24": {
+          "id": "node-24",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "lede",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-25"
+          ]
+        },
+        "text-25": {
+          "id": "text-25",
+          "type": "text",
+          "content": "divlet gives your agent a board of real web pages. Point at what should change; the agent edits through validated tools, and you watch every accepted change land — versioned, logged and one Undo away.",
+          "metadata": {}
+        },
+        "node-26": {
+          "id": "node-26",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "cta",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-27",
+            "node-29"
+          ]
+        },
+        "node-27": {
+          "id": "node-27",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#start"
+          },
+          "className": "button",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-28"
+          ]
+        },
+        "node-29": {
+          "id": "node-29",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#try"
+          },
+          "className": "quiet-link",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-30"
+          ]
+        },
+        "text-30": {
+          "id": "text-30",
+          "type": "text",
+          "content": "Try it without installing",
+          "metadata": {}
+        },
+        "node-31": {
+          "id": "node-31",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "note",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-32"
+          ]
+        },
+        "text-32": {
+          "id": "text-32",
+          "type": "text",
+          "content": "This page is a divlet project too: one frame of plain HTML and CSS.",
+          "metadata": {}
+        },
+        "node-33": {
+          "id": "node-33",
+          "type": "element",
+          "tag": "figure",
+          "attrs": {
+            "aria-label": "What one edit looks like"
+          },
+          "className": "exchange",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-34",
+            "node-36",
+            "node-43",
+            "node-50",
+            "node-57"
+          ]
+        },
+        "node-34": {
+          "id": "node-34",
+          "type": "element",
+          "tag": "figcaption",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-35"
+          ]
+        },
+        "text-35": {
+          "id": "text-35",
+          "type": "text",
+          "content": "One edit, as the agent and the board see it",
+          "metadata": {}
+        },
+        "node-36": {
+          "id": "node-36",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "row",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-37",
+            "node-39",
+            "node-41"
+          ]
+        },
+        "node-39": {
+          "id": "node-39",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "call",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-40"
+          ]
+        },
+        "text-40": {
+          "id": "text-40",
+          "type": "text",
+          "content": "divlet_read",
+          "metadata": {}
+        },
+        "node-41": {
+          "id": "node-41",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "arg",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-42"
+          ]
+        },
+        "node-44": {
+          "id": "node-44",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "who",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-45"
+          ]
+        },
+        "text-45": {
+          "id": "text-45",
+          "type": "text",
+          "content": "agent",
+          "metadata": {}
+        },
+        "node-46": {
+          "id": "node-46",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "call",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-47"
+          ]
+        },
+        "node-50": {
+          "id": "node-50",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "row ok",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-51",
+            "node-53",
+            "node-55"
+          ]
+        },
+        "node-51": {
+          "id": "node-51",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "who",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-52"
+          ]
+        },
+        "node-53": {
+          "id": "node-53",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "call",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-54"
+          ]
+        },
+        "text-54": {
+          "id": "text-54",
+          "type": "text",
+          "content": "accepted",
+          "metadata": {}
+        },
+        "node-55": {
+          "id": "node-55",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "arg",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-56"
+          ]
+        },
+        "text-56": {
+          "id": "text-56",
+          "type": "text",
+          "content": "v5 · rendered · saved · undoable",
+          "metadata": {}
+        },
+        "node-58": {
+          "id": "node-58",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "who",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-59"
+          ]
+        },
+        "text-59": {
+          "id": "text-59",
+          "type": "text",
+          "content": "board",
+          "metadata": {}
+        },
+        "node-60": {
+          "id": "node-60",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "call",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-61"
+          ]
+        },
+        "node-65": {
+          "id": "node-65",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-66",
+            "node-68"
+          ]
+        },
+        "node-68": {
+          "id": "node-68",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-69"
+          ]
+        },
+        "text-69": {
+          "id": "text-69",
+          "type": "text",
+          "content": "Every artboard is a live page of HTML, SVG and CSS. Resize it to check the phone layout; what you see is what ships.",
+          "metadata": {}
+        },
+        "node-70": {
+          "id": "node-70",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-71",
+            "node-73"
+          ]
+        },
+        "node-71": {
+          "id": "node-71",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-72"
+          ]
+        },
+        "text-72": {
+          "id": "text-72",
+          "type": "text",
+          "content": "Point, then ask",
+          "metadata": {}
+        },
+        "node-73": {
+          "id": "node-73",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-74"
+          ]
+        },
+        "node-75": {
+          "id": "node-75",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-76",
+            "node-78"
+          ]
+        },
+        "node-76": {
+          "id": "node-76",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-77"
+          ]
+        },
+        "text-77": {
+          "id": "text-77",
+          "type": "text",
+          "content": "Validated edits",
+          "metadata": {}
+        },
+        "node-78": {
+          "id": "node-78",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-79"
+          ]
+        },
+        "text-79": {
+          "id": "text-79",
+          "type": "text",
+          "content": "Each change names the version it was made against. Stale or invalid edits are refused, never half-applied, and History records who changed what.",
+          "metadata": {}
+        },
+        "node-81": {
+          "id": "node-81",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-82"
+          ]
+        },
+        "text-82": {
+          "id": "text-82",
+          "type": "text",
+          "content": "One file you own",
+          "metadata": {}
+        },
+        "node-84": {
+          "id": "node-84",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-85"
+          ]
+        },
+        "text-88": {
+          "id": "text-88",
+          "type": "text",
+          "content": "How a change lands",
+          "metadata": {}
+        },
+        "node-89": {
+          "id": "node-89",
+          "type": "element",
+          "tag": "ol",
+          "attrs": {},
+          "className": "steps",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-90",
+            "node-98",
+            "node-106",
+            "node-114"
+          ]
+        },
+        "node-91": {
+          "id": "node-91",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "step",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-92"
+          ]
+        },
+        "node-98": {
+          "id": "node-98",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-99",
+            "node-101"
+          ]
+        },
+        "text-100": {
+          "id": "text-100",
+          "type": "text",
+          "content": "2",
+          "metadata": {}
+        },
+        "node-101": {
+          "id": "node-101",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-102",
+            "node-104"
+          ]
+        },
+        "node-104": {
+          "id": "node-104",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-105"
+          ]
+        },
+        "node-106": {
+          "id": "node-106",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-107",
+            "node-109"
+          ]
+        },
+        "node-107": {
+          "id": "node-107",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "step",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-108"
+          ]
+        },
+        "text-108": {
+          "id": "text-108",
+          "type": "text",
+          "content": "3",
+          "metadata": {}
+        },
+        "node-109": {
+          "id": "node-109",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-110",
+            "node-112"
+          ]
+        },
+        "node-110": {
+          "id": "node-110",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-111"
+          ]
+        },
+        "text-111": {
+          "id": "text-111",
+          "type": "text",
+          "content": "The board checks and shows it",
+          "metadata": {}
+        },
+        "node-112": {
+          "id": "node-112",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-113"
+          ]
+        },
+        "text-113": {
+          "id": "text-113",
+          "type": "text",
+          "content": "The change is validated, rendered and saved as one step, or refused with a reason the agent can act on.",
+          "metadata": {}
+        },
+        "node-115": {
+          "id": "node-115",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "step",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-116"
+          ]
+        },
+        "text-116": {
+          "id": "text-116",
+          "type": "text",
+          "content": "4",
+          "metadata": {}
+        },
+        "node-118": {
+          "id": "node-118",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-119"
+          ]
+        },
+        "text-119": {
+          "id": "text-119",
+          "type": "text",
+          "content": "You keep it or undo it",
+          "metadata": {}
+        },
+        "node-120": {
+          "id": "node-120",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-121"
+          ]
+        },
+        "try": {
+          "id": "try",
+          "type": "element",
+          "tag": "section",
+          "attrs": {
+            "id": "try"
+          },
+          "className": "try",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-122",
+            "node-124",
+            "node-129"
+          ]
+        },
+        "text-123": {
+          "id": "text-123",
+          "type": "text",
+          "content": "Try it without installing",
+          "metadata": {}
+        },
+        "node-124": {
+          "id": "node-124",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "prose",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-125",
+            "node-126",
+            "text-128"
+          ]
+        },
+        "text-125": {
+          "id": "text-125",
+          "type": "text",
+          "content": "On the divlet site this page opens inside the board itself, running entirely in your browser. Nothing is uploaded: your copy lives in this browser, and you can download it as a ",
+          "metadata": {}
+        },
+        "text-128": {
+          "id": "text-128",
+          "type": "text",
+          "content": " file at any time.",
+          "metadata": {}
+        },
+        "node-129": {
+          "id": "node-129",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "cards",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-130",
+            "node-141"
+          ]
+        },
+        "node-130": {
+          "id": "node-130",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "card",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-131",
+            "node-133",
+            "node-138"
+          ]
+        },
+        "text-132": {
+          "id": "text-132",
+          "type": "text",
+          "content": "Edit it on the board",
+          "metadata": {}
+        },
+        "node-133": {
+          "id": "node-133",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-134",
+            "node-135",
+            "text-137"
+          ]
+        },
+        "text-134": {
+          "id": "text-134",
+          "type": "text",
+          "content": "Choose ",
+          "metadata": {}
+        },
+        "text-137": {
+          "id": "text-137",
+          "type": "text",
+          "content": " at the top of the page, select anything and change it in the inspector, or add an artboard for a phone layout.",
+          "metadata": {}
+        },
+        "node-138": {
+          "id": "node-138",
+          "type": "element",
+          "tag": "pre",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-139"
+          ]
+        },
+        "node-139": {
+          "id": "node-139",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-140"
+          ]
+        },
+        "text-140": {
+          "id": "text-140",
+          "type": "text",
+          "content": "llblab.github.io/divlet",
+          "metadata": {}
+        },
+        "node-142": {
+          "id": "node-142",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-143"
+          ]
+        },
+        "text-143": {
+          "id": "text-143",
+          "type": "text",
+          "content": "Let your agent edit it",
+          "metadata": {}
+        },
+        "node-149": {
+          "id": "node-149",
+          "type": "element",
+          "tag": "pre",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-150"
+          ]
+        },
+        "node-150": {
+          "id": "node-150",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-151"
+          ]
+        },
+        "node-154": {
+          "id": "node-154",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "prose",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-155"
+          ]
+        },
+        "text-155": {
+          "id": "text-155",
+          "type": "text",
+          "content": "Requires Node.js 22.19 or later. The board binds to loopback and your project stays a file in your folder; nothing is uploaded.",
+          "metadata": {}
+        },
+        "node-156": {
+          "id": "node-156",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "cards",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-157",
+            "node-165",
+            "node-173"
+          ]
+        },
+        "node-157": {
+          "id": "node-157",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "card",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-158",
+            "node-160",
+            "node-162"
+          ]
+        },
+        "text-161": {
+          "id": "text-161",
+          "type": "text",
+          "content": "Open a folder; an empty one gets a starter project, an existing one opens as it is.",
+          "metadata": {}
+        },
+        "node-162": {
+          "id": "node-162",
+          "type": "element",
+          "tag": "pre",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-163"
+          ]
+        },
+        "node-163": {
+          "id": "node-163",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-164"
+          ]
+        },
+        "node-168": {
+          "id": "node-168",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-169"
+          ]
+        },
+        "node-173": {
+          "id": "node-173",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "card",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-174",
+            "node-176",
+            "node-178",
+            "node-181"
+          ]
+        },
+        "node-174": {
+          "id": "node-174",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-175"
+          ]
+        },
+        "text-175": {
+          "id": "text-175",
+          "type": "text",
+          "content": "Pi",
+          "metadata": {}
+        },
+        "node-176": {
+          "id": "node-176",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-177"
+          ]
+        },
+        "node-178": {
+          "id": "node-178",
+          "type": "element",
+          "tag": "pre",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-179"
+          ]
+        },
+        "node-179": {
+          "id": "node-179",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-180"
+          ]
+        },
+        "node-183": {
+          "id": "node-183",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-184"
+          ]
+        },
+        "text-184": {
+          "id": "text-184",
+          "type": "text",
+          "content": "/divlet",
+          "metadata": {}
+        },
+        "agents": {
+          "id": "agents",
+          "type": "element",
+          "tag": "section",
+          "attrs": {
+            "id": "agents"
+          },
+          "className": "agents",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-188",
+            "node-190",
+            "node-192"
+          ]
+        },
+        "node-188": {
+          "id": "node-188",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-189"
+          ]
+        },
+        "node-193": {
+          "id": "node-193",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-194",
+            "node-196"
+          ]
+        },
+        "node-196": {
+          "id": "node-196",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-197"
+          ]
+        },
+        "text-197": {
+          "id": "text-197",
+          "type": "text",
+          "content": "Open a project and its local board.",
+          "metadata": {}
+        },
+        "node-198": {
+          "id": "node-198",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-199",
+            "node-201"
+          ]
+        },
+        "node-201": {
+          "id": "node-201",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-202"
+          ]
+        },
+        "node-206": {
+          "id": "node-206",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-207"
+          ]
+        },
+        "node-209": {
+          "id": "node-209",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-210"
+          ]
+        },
+        "text-210": {
+          "id": "text-210",
+          "type": "text",
+          "content": "divlet_edit",
+          "metadata": {}
+        },
+        "node-211": {
+          "id": "node-211",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-212"
+          ]
+        },
+        "node-214": {
+          "id": "node-214",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-215"
+          ]
+        },
+        "text-215": {
+          "id": "text-215",
+          "type": "text",
+          "content": "divlet_frame_manage",
+          "metadata": {}
+        },
+        "node-216": {
+          "id": "node-216",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-217"
+          ]
+        },
+        "node-219": {
+          "id": "node-219",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-220"
+          ]
+        },
+        "node-221": {
+          "id": "node-221",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-222"
+          ]
+        },
+        "text-222": {
+          "id": "text-222",
+          "type": "text",
+          "content": "Undo or redo the latest change.",
+          "metadata": {}
+        },
+        "node-224": {
+          "id": "node-224",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-225"
+          ]
+        },
+        "node-230": {
+          "id": "node-230",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "prose",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-231",
+            "node-232",
+            "text-234"
+          ]
+        },
+        "node-232": {
+          "id": "node-232",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-233"
+          ]
+        },
+        "text-233": {
+          "id": "text-233",
+          "type": "text",
+          "content": ".divlet",
+          "metadata": {}
+        },
+        "node-236": {
+          "id": "node-236",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-237",
+            "text-239"
+          ]
+        },
+        "node-237": {
+          "id": "node-237",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-238"
+          ]
+        },
+        "text-238": {
+          "id": "text-238",
+          "type": "text",
+          "content": ".html",
+          "metadata": {}
+        },
+        "node-241": {
+          "id": "node-241",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-242"
+          ]
+        },
+        "text-243": {
+          "id": "text-243",
+          "type": "text",
+          "content": " Pencil",
+          "metadata": {}
+        },
+        "node-244": {
+          "id": "node-244",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-245"
+          ]
+        },
+        "node-246": {
+          "id": "node-246",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-247",
+            "text-249"
+          ]
+        },
+        "text-248": {
+          "id": "text-248",
+          "type": "text",
+          "content": ".divlet",
+          "metadata": {}
+        },
+        "limits": {
+          "id": "limits",
+          "type": "element",
+          "tag": "section",
+          "attrs": {
+            "id": "limits"
+          },
+          "className": "limits",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-250",
+            "node-252"
+          ]
+        },
+        "node-250": {
+          "id": "node-250",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-251"
+          ]
+        },
+        "node-252": {
+          "id": "node-252",
+          "type": "element",
+          "tag": "ul",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-253",
+            "node-257",
+            "node-261"
+          ]
+        },
+        "node-254": {
+          "id": "node-254",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-255"
+          ]
+        },
+        "text-255": {
+          "id": "text-255",
+          "type": "text",
+          "content": "Layouts, not applications.",
+          "metadata": {}
+        },
+        "node-257": {
+          "id": "node-257",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-258",
+            "text-260"
+          ]
+        },
+        "node-261": {
+          "id": "node-261",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-262",
+            "text-264"
+          ]
+        },
+        "node-262": {
+          "id": "node-262",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-263"
+          ]
+        },
+        "text-263": {
+          "id": "text-263",
+          "type": "text",
+          "content": "The browser board is a copy.",
+          "metadata": {}
+        },
+        "node-266": {
+          "id": "node-266",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-267"
+          ]
+        }
+      }
+    }
+  ]
+}
