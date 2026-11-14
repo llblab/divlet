@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { AssetTree, AssetFile, Attrs, Override, CssDeclaration, CssDeclarationOperation, DocumentModel, Style } from '../lib/model.ts';
+import type { AssetTree, AssetFile, Attrs, Override, CssDeclaration, CssDeclarationOperation, DocumentModel, Style, StyleInput } from '../lib/model.ts';
 import { parseInlineDeclarations } from '../lib/codec.ts';
-import type { StyleEngine, StyleEngineRequirement, ResolvedStyleEngine } from '../lib/engine.ts';
+import type { StyleEngine, StyleEngineRequirement, ResolvedStyleEngine, StyleInput as EngineStyleInput, applyStyles } from '../lib/engine.ts';
+import type { applyStyles as browserApplyStyles } from '../lib/browser-styles.ts';
 import { validDeclarations, parseNativeJson, normalizeNativeJson, sameNativeJson } from '../lib/model.ts';
 import type { JsonTextLimits, JsonValueLimits } from '../lib/model.ts';
 import type { ProjectRequirements } from '../lib/project.ts';
@@ -37,6 +38,18 @@ const nullableLiterals: CssDeclaration[] = validDeclarations([['display', null]]
 const invalidDeclaration: CssDeclaration = ['display', null];
 // @ts-expect-error A declaration is exactly one property/value pair.
 const invalidTuple: CssDeclaration = ['color', 'red', 'blue'];
+
+const propertyEdits: StyleInput = { display: 'grid', opacity: 0.5, width: null };
+const engineEdits: EngineStyleInput = propertyEdits;
+const capabilityEdits: Parameters<NonNullable<StyleEngine['applyStyles']>>[1] = propertyEdits;
+const facadeEdits: Parameters<typeof applyStyles>[1] = propertyEdits;
+const browserEdits: Parameters<typeof browserApplyStyles>[1] = propertyEdits;
+// @ts-expect-error Transient property maps are not ordered literal declaration lists.
+const orderedEdits: StyleInput = parsedDeclarations;
+// @ts-expect-error Transient string/number/null values do not admit booleans.
+const booleanEdits: StyleInput = { opacity: true };
+// @ts-expect-error Stored draft inline declarations still require strings, not numeric edits or null removals.
+const persistedEdits: Style = propertyEdits;
 
 const requiredEngine: StyleEngineRequirement = { id: 'example', version: 'renderer-1' };
 const legacyEngine: StyleEngine = { id: 'legacy' };
@@ -79,6 +92,10 @@ test('renderer types distinguish legacy capabilities from exact compiling requir
 test('native value types distinguish bounded JSON data from admitted documents', () => {
   assert.deepEqual(decodedValue, { value: 0 });
   assert.equal(equalNativeValues, true);
+});
+
+test('transient property input types stay separate from persisted CSS in both host bindings', () => {
+  for (const input of [engineEdits, capabilityEdits, facadeEdits, browserEdits]) assert.equal(input, propertyEdits);
 });
 
 test('ordered CSS types distinguish literal declarations from property operations', () => {

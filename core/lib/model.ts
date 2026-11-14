@@ -23,6 +23,8 @@ export type Metadata = { [key: string]: Json };
 export type Style = Record<string, string>;
 /** Override declarations may delete a property with null. */
 export type StyleOverrides = Record<string, string | null>;
+/** Transient property-map edits, not stored inline data. The legacy helper accepts numbers and null removals. */
+export type StyleInput = Record<string, string | number | null>;
 /** Ordered CSS contracts; stored Style fields remain maps until the coherent draft cutover. */
 export type { CssDeclaration, CssDeclarationOperation } from './declarations.ts';
 /** Exact renderer identity: an opaque case-sensitive version, never a semver range to resolve. */

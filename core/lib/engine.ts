@@ -8,8 +8,8 @@
  * here so callers stay typed no matter which engine is registered.
  */
 import tailwind from '../../plugins/tailwind/index.js';
-import type { Style, StyleOptions, StyleEngineRequirement } from './model.ts';
-export type { StyleEngineRequirement } from './model.ts';
+import type { StyleInput, StyleOptions, StyleEngineRequirement } from './model.ts';
+export type { StyleInput, StyleEngineRequirement } from './model.ts';
 
 /** What one explanation says about a class: a utility with its CSS, a rule of the project's own CSS, a marker, or nothing. */
 export interface ClassExplanation { kind: 'utility' | 'custom' | 'marker' | 'unknown'; lines: string[]; color?: string; custom?: string }
@@ -45,8 +45,8 @@ export interface StyleEngine {
   explainClasses?: (context: ClassContext & { names: string[] }) => Promise<Record<string, ClassExplanation>>;
   suggestClasses?: (context: ClassContext & { query: string; used?: string[]; limit?: number }) => Promise<ClassSuggestion[]>;
   warmSuggestions?: (tokens: Record<string, string>, base?: string) => void;
-  /** Declarations (`{ property: value }`) → class string, replacing the classes that set the same property. */
-  applyStyles?: (className: string, styles: Style, options?: StyleOptions & { colorOf?: (value: string) => string | null }) => string;
+  /** Transient property edits → class string; this input is independent of persisted inline/override data. */
+  applyStyles?: (className: string, styles: StyleInput, options?: StyleOptions & { colorOf?: (value: string) => string | null }) => string;
   /** One declaration → class(es). */
   declarationClass?: (property: string, value: string, colorOf?: (value: string) => string | null, options?: { scale?: boolean }) => string;
   propertyOfClass?: (name: string, colourNames?: ReadonlySet<string>) => string | null;

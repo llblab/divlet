@@ -17,6 +17,30 @@ test('a declaration replaces the class that set the same property and keeps ever
   eq(set('[font-family:serif] flex', { 'font-family': 'monospace' }), 'flex [font-family:monospace]', 'arbitrary-property classes are replaced too');
 });
 
+test('transient property maps retain string, numeric and removal semantics without changing stored inline data', async () => {
+  const { applyDocumentPatch, createDemoDocument } = await import('../../../core/lib/model.ts');
+  const input = Object.freeze({ display: 'grid', opacity: 0.5, 'flex-grow': 1, width: null });
+  const original = 'block opacity-[1] grow-0 w-4 hover:w-8 marker';
+  const expected = 'grid opacity-[0.5] grow hover:w-8 marker';
+  eq(norm(applyStyles(original, input)), expected);
+  const doc = createDemoDocument(), id = doc.rootId;
+  doc.nodes[id].className = original;
+  doc.nodes[id].style = { color: 'red' };
+  const next = applyDocumentPatch(doc, { nodes: { [id]: { styles: input } } });
+  eq(norm(next.nodes[id].className), expected);
+  assert.deepEqual(next.nodes[id].style, { color: 'red' });
+  assert.ok(!Object.hasOwn(next.nodes[id], 'styles'));
+  assert.equal(doc.nodes[id].className, original);
+  assert.deepEqual(input, { display: 'grid', opacity: 0.5, 'flex-grow': 1, width: null });
+  for (const invalid of [[], { opacity: false }, { opacity: {} }, { width: '1px; color:red' }]) {
+    assert.throws(() => applyStyles(original, invalid), { code: 'INVALID_PATCH' });
+    assert.throws(() => applyDocumentPatch(doc, { nodes: { [id]: { styles: invalid } } }), { code: 'INVALID_PATCH' });
+    assert.equal(doc.nodes[id].className, original);
+  }
+  assert.throws(() => applyDocumentPatch(doc, { nodes: { [id]: { style: input } } }), { code: 'INVALID_DOCUMENT' });
+  assert.throws(() => applyDocumentPatch(doc, { nodes: { [id]: { style: [['color', 'blue']] } } }), { code: 'INVALID_DOCUMENT' });
+});
+
 test('padding and margin merge their sides instead of overwriting blindly', () => {
   eq(set('flex', { padding: '16px' }), 'flex p-4');
   eq(set('p-4', { 'padding-top': '8px' }), 'pb-4 pl-4 pr-4 pt-2');
