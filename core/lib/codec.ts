@@ -9,6 +9,8 @@
 import { parse, parseFragment } from 'parse5';
 import postcss from 'postcss';
 import { serializeDeclarations } from './declarations.ts';
+import { parseInlineDeclarations } from './inline-css.ts';
+export { parseInlineDeclarations };
 import { validateDocument, validateHead, safeAttribute, DivletError, VOID_TAGS, LIMITS, documentLimits, supportsTag } from './model.ts';
 import { readAssetReference } from './asset-reference.ts';
 import { withinUtf8Budget } from './validation.ts';
@@ -292,17 +294,15 @@ function attr(node: P5Node, name: string): string | undefined {
 }
 
 function parseInlineStyle(value: string): Record<string, string> {
-  let root: postcss.Root;
-  try { root = postcss.parse(`div{${value}}`, { map: false }); } catch (cause) { const reason = cause as { reason?: string; message: string }; error(`Invalid inline style: ${reason.reason || reason.message}`); }
-  const rule = root.first as postcss.Rule | undefined;
-  if (root.nodes.length !== 1 || rule?.type !== 'rule' || rule.selector !== 'div') error('Inline style escapes its declaration block');
-  const style: Record<string, string> = {};
-  for (const node of (rule as postcss.Rule).nodes as postcss.Declaration[]) {
-    if (node.type !== 'decl') error('Inline style supports declarations only');
-    if (Object.hasOwn(style, node.prop)) error(`Duplicate inline style property: ${node.prop}`);
-    style[node.prop] = node.value + (node.important ? ' !important' : '');
+  let declarations: ReturnType<typeof parseInlineDeclarations>;
+  try { declarations = parseInlineDeclarations(value); }
+  catch (cause) { if (cause instanceof DivletError) error(cause.message); throw cause; }
+  const seen = new Set<string>();
+  for (const [property] of declarations) {
+    if (seen.has(property)) error(`Duplicate inline style property: ${property}`);
+    seen.add(property);
   }
-  return style;
+  return Object.fromEntries(declarations);
 }
 
 export function decodeHtml(source: unknown, { fallbackId = 'imported', previous, limits = LIMITS }: DecodeOptions = {}): DocumentModel {

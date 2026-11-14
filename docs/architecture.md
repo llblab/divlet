@@ -160,7 +160,9 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `core/lib/media-type.ts`, `browser-media-type.ts` | Canonical bounded MIME syntax and shared HTTP/projection extension defaults; the browser mapping refuses (`ASSETS_UNAVAILABLE`) rather than approximating. |
 | `core/lib/svg-resource.ts` | Strict XML SVG resource projection, not HTML parsing or publication. |
 | `core/lib/project.ts` | Project settings/read/write and component expansion/listing. |
-| `core/lib/codec.ts` | Strict native model ↔ HTML codec and `renderFile`. |
+| `core/lib/codec.ts` | Strict native model ↔ HTML codec, draft inline-map adapter and `renderFile`; public ordered inline-syntax export. |
+| `core/lib/inline-css.ts` | Parser-backed, source-map-inert inline declaration syntax decoding; not value safety or source capacities. |
+| `core/lib/declarations.ts` | Dependency-free ordered CSS data, property operations and serialization; separately native-browser importable. |
 | `core/lib/html-import.ts` | Loss-aware external HTML admission, separate from the strict codec. |
 | `core/lib/prepare.ts` | Host-independent frame preparation with an injected style compiler. |
 | `core/lib/render.ts` | Node composition of preparation with the style engine, and public frame metadata. |

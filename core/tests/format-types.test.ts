@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { AssetTree, AssetFile, Attrs, Override, CssDeclaration, CssDeclarationOperation, DocumentModel } from '../lib/model.ts';
+import type { AssetTree, AssetFile, Attrs, Override, CssDeclaration, CssDeclarationOperation, DocumentModel, Style } from '../lib/model.ts';
+import { parseInlineDeclarations } from '../lib/codec.ts';
 import type { StyleEngine, StyleEngineRequirement, ResolvedStyleEngine } from '../lib/engine.ts';
 import { validDeclarations, parseNativeJson, normalizeNativeJson, sameNativeJson } from '../lib/model.ts';
 import type { JsonTextLimits, JsonValueLimits } from '../lib/model.ts';
@@ -26,6 +27,9 @@ const invalidElementAttrs: Attrs = { title: null };
 const declaration: CssDeclaration = ['display', 'flex'];
 const operation: CssDeclarationOperation = ['display', null];
 const admittedDeclarations: CssDeclaration[] = validDeclarations([['display', 'flex']], 'root');
+const parsedDeclarations: CssDeclaration[] = parseInlineDeclarations('display:-webkit-box;display:flex');
+// @ts-expect-error Syntax-decoded ordered pairs are not a stored draft style map.
+const parsedDraftStyle: Style = parsedDeclarations;
 const admittedOperations: CssDeclarationOperation[] = validDeclarations([['display', null]], 'instance', true);
 // @ts-expect-error Nullable override operations cannot be consumed as literal declarations.
 const nullableLiterals: CssDeclaration[] = validDeclarations([['display', null]], 'instance', true);
@@ -82,6 +86,7 @@ test('ordered CSS types distinguish literal declarations from property operation
   assert.deepEqual(operation, ['display', null]);
   assert.deepEqual(admittedDeclarations, [declaration]);
   assert.deepEqual(admittedOperations, [operation]);
+  assert.deepEqual(parsedDeclarations, [['display', '-webkit-box'], ['display', 'flex']]);
 });
 
 test('attribute types distinguish nullable override edits from literal element values', () => {
