@@ -32,6 +32,10 @@
       "divlet-source": "./core/runtime.ts",
       "default": "./dist/core/runtime.js"
     },
+    "./native": {
+      "divlet-source": "./core/native.ts",
+      "default": "./dist/core/native.js"
+    },
     "./codec": {
       "divlet-source": "./core/lib/codec.ts",
       "default": "./dist/core/lib/codec.js"
@@ -128,6 +132,7 @@
     "test:static": "node scripts/source.mjs web/tests/static.mjs",
     "test:source": "node scripts/source.mjs web/tests/native-collections.mjs && node scripts/source.mjs web/tests/native-default.mjs",
     "test:release": "node core/tests/release/install-smoke.mjs",
+    "test:native-package": "node core/tests/release/native-smoke.mjs",
     "test:release:pi": "node core/tests/release/install-smoke.mjs --pi",
     "test:pen-fidelity": "node scripts/source.mjs plugins/pen/tests/fidelity.mjs",
     "test:pi": "node scripts/source.mjs pi/tests/e2e/pi.mjs",
@@ -147,16 +152,18 @@
   },
   "dependencies": {
     "@divlet/web": "0.0.5",
-    "@tailwindcss/node": "^4.1.0",
     "@xmldom/xmldom": "0.9.12",
-    "lucide-static": "1.67.0",
     "marked": "^18.1.2",
     "parse5": "^8.0.0",
     "postcss": "^8.5.6",
     "postcss-value-parser": "^4.2.0",
-    "svg-pathdata": "8.0.0",
-    "tailwindcss": "^4.1.0",
     "yaml": "^2.9.1"
+  },
+  "optionalDependencies": {
+    "@tailwindcss/node": "^4.1.0",
+    "lucide-static": "1.67.0",
+    "svg-pathdata": "8.0.0",
+    "tailwindcss": "^4.1.0"
   },
   "peerDependencies": {
     "playwright-core": ">=1.50.0"

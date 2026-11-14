@@ -122,6 +122,8 @@ npm install -g @divlet/cli @divlet/mcp
 
 For Pi, run `pi install npm:@divlet/pi@0.0.5`. Shared setups should pin `@divlet/cli@0.0.5`, `@divlet/mcp@0.0.5` and `npm:@divlet/pi@0.0.5`. The root package has no commands or Pi manifest; there is no wrapper layer.
 
+Unreleased source/local builds also provide a [provider-free Node host entry](docs/agents.md#provider-free-node-host); this is not part of the published 0.0.5 or an adapter/browser-mode switch.
+
 See [npm publication](docs/publishing.md) for version pinning, package identity and release gates.
 
 </details>

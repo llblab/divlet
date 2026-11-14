@@ -26,6 +26,22 @@ test('@divlet/core is the shared product library, not a host or command package'
   assert.ok(pkg.workspaces.includes('.'), 'source adapters can resolve the product workspace without a registry release');
 });
 
+test('native host packaging separates optional provider dependencies from mandatory native parsers', async () => {
+  assert.deepEqual(pkg.exports['./native'], { 'divlet-source': './core/native.ts', default: './dist/core/native.js' });
+  const providers = ['@tailwindcss/node', 'tailwindcss', 'lucide-static', 'svg-pathdata'];
+  assert.deepEqual(Object.keys(pkg.optionalDependencies).sort(), providers.sort());
+  const lock = JSON.parse(await readFile(path.join(root, 'package-lock.json'), 'utf8'));
+  assert.deepEqual(lock.packages[''].optionalDependencies, pkg.optionalDependencies);
+  for (const plugin of ['tailwind', 'pen']) {
+    const descriptor = JSON.parse(await readFile(path.join(root, 'plugins', plugin, 'package.json'), 'utf8'));
+    for (const name of Object.keys(descriptor.dependencies).filter(name => providers.includes(name))) {
+      assert.equal(pkg.dependencies[name], undefined);
+      assert.equal(pkg.optionalDependencies[name], descriptor.dependencies[name], 'bundled payload retains its plugin-owned dependency range');
+    }
+  }
+  for (const name of ['@divlet/web', 'postcss', 'postcss-value-parser', 'parse5', '@xmldom/xmldom', 'marked', 'yaml']) assert.ok(pkg.dependencies[name], `${name} remains native-owned`);
+});
+
 test('the public model selects native semantics for browser exports and explicit composition for Node', async () => {
   assert.deepEqual(pkg.exports['./model'], {
     browser: { 'divlet-source': './core/lib/model.ts', default: './dist/core/lib/model.js' },
@@ -123,6 +139,47 @@ function coldStandalone(script) {
     ${script}
   `], { cwd: root, stdio: 'pipe', timeout: 10000 });
 }
+
+test('the public native host loads no provider and makes untouched absence authoritative', () => coldStandalone(`
+  const providers = registerHooks({ resolve(specifier, context, next) {
+    const result = next(specifier, context);
+    assert.doesNotMatch(result.url, /\\/plugins\\/(?:tailwind|pen)\\//, 'native composition never loads bundled providers');
+    return result;
+  } });
+  const api = await import('@divlet/core/native');
+  assert.deepEqual(Object.keys(api).sort(), ['launch', 'makeHost', 'openRuntime', 'registerExporter', 'registerImporter', 'registerStyleEngine', 'resolveOpenFile', 'setStyleEngines', 'startServer'].sort());
+  const engines = await import('./core/lib/style-engines.ts');
+  const importers = await import('./core/lib/plugin-registry.ts');
+  assert.equal(engines.styleEngine(), undefined);
+  assert.deepEqual(importers.importerList(), []);
+  providers.deregister();
+  await import('@divlet/core/runtime');
+  await import('@divlet/core/contract');
+  assert.equal(engines.styleEngine(), undefined, 'late public composition preserves the explicit native choice');
+  assert.deepEqual(importers.importerList(), []);
+`));
+
+test('public native registration and preselected host providers survive either composition order', () => coldStandalone(`
+  const engines = await import('./core/lib/style-engines.ts');
+  const importers = await import('./core/lib/plugin-registry.ts');
+  const engine = { id: 'host-owned', applyStyles() { return 'host'; } };
+  const importer = { id: 'host-owned', extensions: ['.host'] };
+  engines.setStyleEngines([engine]);
+  importers.registerImporter(importer);
+  const api = await import('@divlet/core/native');
+  assert.equal(engines.styleEngine(), engine, 'native entry never clears an existing host choice');
+  assert.deepEqual(importers.importerList(), [importer]);
+  api.setStyleEngines([]);
+  api.registerStyleEngine(engine);
+  api.registerImporter(importer);
+  const exporter = { id: 'host-output', label: 'Host', extension: '.txt', mime: 'text/plain', export() { return { name: 'host', bytes: 'host' }; } };
+  api.registerExporter(exporter);
+  await import('@divlet/core/runtime');
+  await import('@divlet/core/contract');
+  assert.equal(engines.styleEngine(), engine);
+  assert.deepEqual(importers.importerList(), [importer]);
+  assert.equal(importers.exporterList()[0].id, exporter.id);
+`));
 
 test('cold public runtime composes both bundled defaults without the library root', () => coldStandalone(`
   const api = await import('@divlet/core/runtime');

@@ -149,4 +149,25 @@ import { encodeHtml, exportHtml } from "@divlet/core/codec";
 import { validateDocument } from "@divlet/core/model";
 ```
 
-`readProject` validates the whole project, including component references. `expandFrame` expands instances into ordinary nodes. `exportHtml` produces clean HTML for a page or node. The runtime compiles Tailwind automatically.
+`readProject` validates the whole project, including component references. `expandFrame` expands instances into ordinary nodes. `exportHtml` produces clean HTML for a page or node. The default runtime compiles Tailwind automatically.
+
+### Provider-free Node host
+
+**Unreleased source/local builds; not available in the published 0.0.5.** `@divlet/core/native` is an explicit Node host composition without bundled providers:
+
+```js
+import { openRuntime } from '@divlet/core/native';
+const runtime = await openRuntime({
+  file: '/absolute/path/to/project.divlet', watch: false, createDemo: false,
+});
+try {
+  console.log(runtime.info().url);
+  // Use literal native style patches and authored project CSS/tokens.
+} finally { await runtime.close(); }
+```
+
+It also exports the root's `launch`, `makeHost`, `resolveOpenFile` and `startServer` host functions. `registerStyleEngine`, `setStyleEngines`, `registerImporter` and `registerExporter` let trusted hosts supply their own providers using the existing `StyleEngine`/`Importer`/`Exporter` contracts. Import initializes untouched registries as explicitly empty; it never clears an existing selection, and later default-facade imports do not replace it. Selection remains process-wide, not per runtime. Preserve the [one-writer attachment rule](architecture.md) when composing clients.
+
+For local packed consumers, `npm install --omit=optional <web-archive> <core-archive>` omits the provider-only dependencies. The core archive still contains compatible bundled provider code; it is not a separate lean package. Default root/runtime/contract/model/engine/plugins entries still select bundled composition and require its dependencies, so use the native entry consistently when those dependencies are absent. npm can also succeed after an optional dependency fails to install; in that case a bundled entry can fail during module loading. Successful installation alone no longer guarantees bundled-provider availability. No adapter installation or browser entry changes are implied.
+
+Only use this composition for native authored HTML/CSS; it does not infer rendering dependencies from classes or convert a provider-dependent project. Draft exact renderer requirements are not yet enforced, and semantic `styles` lowering still requires a registered provider. Ordered-style cutover, lossless plugin disabling, base inspector ownership and a browser compiler remain open. See [composition and installed evidence](architecture.md#core-and-plugins).
