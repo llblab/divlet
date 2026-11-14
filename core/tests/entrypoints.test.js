@@ -97,6 +97,111 @@ test('public adapter imports start no process service or stdio listeners', () =>
   `], { cwd: root, stdio: 'pipe', timeout: 10000 });
 });
 
+// Every probe is a fresh module graph; a warm root import must not mask missing standalone initialization.
+function coldStandalone(script) {
+  execFileSync(process.execPath, ['--conditions=divlet-source', '--input-type=module', '-e', `
+    import assert from 'node:assert/strict';
+    import { createRequire, registerHooks } from 'node:module';
+    const require = createRequire(import.meta.url);
+    const rootURL = import.meta.resolve('@divlet/core');
+    const rootGuard = registerHooks({ resolve(specifier, context, next) {
+      const result = next(specifier, context);
+      assert.notEqual(result.url, rootURL, 'standalone entries must not initialize through the library root');
+      return result;
+    } });
+    ${script}
+  `], { cwd: root, stdio: 'pipe', timeout: 10000 });
+}
+
+for (const mode of ['import', 'require']) {
+  const load = entry => mode === 'import' ? `await import('@divlet/core/${entry}')` : `require('@divlet/core/${entry}')`;
+  test(`cold public model keeps default lowering through ${mode} without the library root`, () => coldStandalone(`
+    const api = ${load('model')};
+    const base = api.createDemoDocument();
+    const next = api.applyDocumentPatch(base, { nodes: { [base.rootId]: { styles: { 'padding-top': '12px' } } } });
+    assert.match(next.nodes[base.rootId].className, /(?:^|\\s)pt-3(?:$|\\s)/);
+    assert.equal(base.nodes[base.rootId].className.includes('pt-3'), false);
+  `));
+  test(`cold public engine keeps bundled defaults through ${mode} without the library root`, () => coldStandalone(`
+    const api = ${load('engine')};
+    assert.equal(api.styleEngine().id, 'tailwind');
+    assert.equal(api.applyStyles('', { 'padding-top': '12px' }), 'pt-3');
+    assert.equal(api.clientPlugins().filter(plugin => plugin.id === 'tailwind').length, 1);
+    assert.match(await api.compileClasses({}, ['pt-3'], process.cwd()), /padding-top/);
+  `));
+}
+
+test('cold public plugins keep the bundled importer without the library root', () => coldStandalone(`
+  const api = await import('@divlet/core/plugins');
+  const pen = api.importerList().find(importer => importer.id === 'pen');
+  assert.ok(pen);
+  assert.equal(api.importerList().filter(importer => importer.id === 'pen').length, 1);
+  assert.ok(api.importExtensions().has('.pen'));
+  assert.equal(await api.importerFor('scene.PEN', () => assert.fail('extension dispatch must not read source')), pen);
+`));
+
+test('explicit engine absence survives late model, importer and root imports', () => coldStandalone(`
+  const engine = await import('@divlet/core/engine');
+  engine.setStyleEngines([]);
+  const model = await import('@divlet/core/model');
+  await import('@divlet/core/plugins');
+  rootGuard.deregister();
+  await import('@divlet/core');
+  assert.equal(engine.styleEngine(), undefined);
+  assert.deepEqual(engine.clientPlugins(), []);
+  assert.equal(await engine.compileClasses({}, ['pt-3']), '');
+  const base = model.createDemoDocument();
+  const patch = input => model.applyDocumentPatch(base, { nodes: { [base.rootId]: input } });
+  assert.throws(() => patch({ styles: { color: 'red' } }), { code: 'NO_STYLE_ENGINE' });
+  assert.equal(patch({ style: { color: 'red' } }).nodes[base.rootId].style.color, 'red');
+`));
+
+test('host engine selection, ID deduplication and exact identity survive late composition', () => coldStandalone(`
+  const engine = await import('@divlet/core/engine');
+  const host = { id: 'host', version: 'host-renderer', applyStyles() {
+    assert.equal(this, host);
+    return 'host-authored';
+  }, async compileClasses() { assert.equal(this, host); return 'host CSS'; } };
+  engine.setStyleEngines([host]);
+  engine.registerStyleEngine({ id: 'host', version: 'wrong', applyStyles() { assert.fail('duplicate ID'); } });
+  engine.registerStyleEngine({ id: 'other', version: 'other-renderer' });
+  const model = await import('@divlet/core/model');
+  await import('@divlet/core/plugins');
+  rootGuard.deregister();
+  await import('@divlet/core');
+  assert.equal(engine.styleEngine(), host);
+  const requirement = Object.freeze({ id: 'host', version: 'host-renderer' });
+  assert.equal(engine.resolveStyleEngine(requirement), host);
+  assert.equal(await engine.compileClasses({}, ['anything'], undefined, requirement), 'host CSS');
+  assert.throws(() => engine.resolveStyleEngine({ ...requirement, version: 'wrong' }), { code: 'STYLE_ENGINE_VERSION_MISMATCH' });
+  const base = model.createDemoDocument();
+  const next = model.applyDocumentPatch(base, { nodes: { [base.rootId]: { styles: { color: 'red' } } } });
+  assert.equal(next.nodes[base.rootId].className, 'host-authored');
+`));
+
+test('importer registration preserves first claim, ID deduplication and order across late composition', () => coldStandalone(`
+  const api = await import('@divlet/core/plugins');
+  const original = api.importerList();
+  const read = () => assert.fail('dispatch must not read this probe');
+  const first = { id: 'first', label: 'First', extensions: [], async claims(file, actualRead) {
+    assert.equal(this, first); assert.equal(actualRead, read); return file.endsWith('.probe');
+  }, convert() { assert.fail('dispatch must not convert'); } };
+  const second = { id: 'second', label: 'Second', extensions: ['.probe'], async claims() { return false; }, convert() { assert.fail('dispatch must not convert'); } };
+  api.registerImporter(first);
+  api.registerImporter({ ...first, label: 'Duplicate', async claims() { assert.fail('duplicate ID'); } });
+  api.registerImporter(second);
+  const expected = [...original, first, second];
+  assert.deepEqual(api.importerList(), expected);
+  await import('@divlet/core/model');
+  await import('@divlet/core/engine');
+  rootGuard.deregister();
+  await import('@divlet/core');
+  assert.deepEqual(api.importerList(), expected);
+  assert.equal(await api.importerFor('scene.probe', read), first);
+  const copy = api.importerList(); copy.length = 0;
+  assert.deepEqual(api.importerList(), expected, 'listing does not expose registry storage');
+`));
+
 test('published library targets are compiled; development targets name real source files', async () => {
   for (const [name, target] of Object.entries(pkg.exports)) {
     if (name === './skill') { assert.equal(await exists(path.join(root, target)), true); continue; }
