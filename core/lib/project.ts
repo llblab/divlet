@@ -13,8 +13,8 @@ import {
   DivletError, validateDocument, SOURCE_LIMITS, LIMITS, PROJECTION_LIMITS, documentLimits, validateTokens, validateCss,
   validateMetadata, string, merge, REF,
 } from './model.ts';
-import { withinUtf8Budget } from './validation.ts';
-import type { Attrs, DocumentModel, Limits, Metadata, Node, NodeId, Override, Style } from './model.ts';
+import { sameJson, withinUtf8Budget } from './validation.ts';
+import type { Attrs, DocumentModel, Json, Limits, Metadata, Node, NodeId, Override, Style } from './model.ts';
 export type { ProjectRequirements } from './model.ts';
 export { validateRequirements } from './requirements.ts';
 
@@ -169,21 +169,39 @@ export function instancesOf(frame: DocumentModel): InstanceInfo[] {
   return Object.values(frame.nodes).filter(node => node.type === 'ref').map(node => ({ id: node.id, ref: node.ref, ...parseRef(node.ref, frame.id) }));
 }
 
+type MetadataWrite = { label: string; children: Map<string, MetadataWrite> } | { label: string; value: Json };
+
+/** Record merges ensure an object even when empty; scalar/array replacements and deletions cannot share that path. */
+function planMetadata(writes: Map<string, MetadataWrite>, patch: Metadata, label: string): void {
+  for (const [key, value] of Object.entries(patch)) {
+    const branch = value !== null && typeof value === 'object' && !Array.isArray(value);
+    let previous = writes.get(key);
+    if (previous && (branch !== ('children' in previous) || !branch && 'value' in previous && !sameJson(previous.value, value))) {
+      fail('INVALID_OVERRIDE', `Conflicting metadata overrides: ${[previous.label, label].sort().join(' and ')}.`);
+    }
+    if (!previous) { previous = branch ? { label, children: new Map() } : { label, value }; writes.set(key, previous); }
+    if (branch && 'children' in previous) planMetadata(previous.children, value as Metadata, label);
+  }
+}
+
+function metadataPatch(writes: Map<string, MetadataWrite>): Metadata {
+  return Object.fromEntries([...writes].map(([key, write]) => [key, 'children' in write ? metadataPatch(write.children) : write.value]));
+}
+
 /**
- * Apply one instance override to a cloned part. `writeLiteral` plans literal fields at their effective destination; an override
- * that names a field the target cannot hold fails with the address, because a silent no-op would look like a bug in the board.
+ * Apply non-metadata fields to a cloned part; literal and metadata peers are planned per instance layer.
+ * A field the target cannot hold fails with its address rather than silently doing nothing.
  */
 function applyOverride(node: Part, override: Override, where: string, writeLiteral: (node: Part, field: LiteralOverrideField, value: string, label: string) => void): void {
   if (node.type === 'text') {
     for (const key of Object.keys(override)) if (key !== 'content' && key !== 'metadata') fail('INVALID_OVERRIDE', `${where} is text; override its content (not ${key}).`);
     if (override.content !== undefined) writeLiteral(node, 'content', override.content, where);
-    if (override.metadata !== undefined) node.metadata = merge(node.metadata, override.metadata);
     return;
   }
   if (override.content !== undefined) fail('INVALID_OVERRIDE', `${where} is an element; use text to replace its text, or address its text node.`);
   if (override.tag !== undefined) writeLiteral(node, 'tag', override.tag, where);
   if (override.className !== undefined) writeLiteral(node, 'className', override.className, where);
-  for (const key of ['style', 'attrs', 'metadata'] as const) if (override[key] !== undefined) node[key] = merge(node[key], override[key]);
+  for (const key of ['style', 'attrs'] as const) if (override[key] !== undefined) node[key] = merge(node[key], override[key]);
   if (override.text !== undefined) writeLiteral(node, 'text', override.text, where);
 }
 
@@ -220,6 +238,7 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
     // Literal peers share one per-occurrence field plan; text shortcuts resolve to their existing child when present.
     const literalWrites = new Map<Part, Map<LiteralOverrideField, { value: string; label: string }>>();
     const attributeWrites = new Map<PartElement, Map<string, { value: string | null; label: string }>>();
+    const metadataWrites = new Map<Part, Map<string, MetadataWrite>>();
     const writeLiteral = (node: Part, field: LiteralOverrideField, value: string, label: string): void => {
       let target = node;
       if (field === 'text' && node.type === 'element') {
@@ -278,8 +297,14 @@ export function expandFrame(frame: DocumentModel, lookup: FrameLookup | null, se
         }
         applied = { ...override, attrs: Object.fromEntries(attrs) };
       }
+      if (override.metadata !== undefined) {
+        let writes = metadataWrites.get(target);
+        if (!writes) { writes = new Map(); metadataWrites.set(target, writes); }
+        planMetadata(writes, override.metadata, label);
+      }
       applyOverride(target, applied, label, writeLiteral);
     }
+    for (const [target, writes] of metadataWrites) target.metadata = merge(target.metadata, metadataPatch(writes));
     for (const [target, writes] of literalWrites) {
       if (target.type === 'text') {
         const content = writes.get('content');

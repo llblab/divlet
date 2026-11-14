@@ -314,8 +314,16 @@ try {
   await page.locator('#inspector [data-key="pick:Weight"]').click();
   await page.locator('.menu .menu-item', { hasText: 'Extra bold 800' }).click();
   await waitUntil(() => classesOf('cta').includes('font-extrabold'), 'a long weight option can still be selected');
-  await page.waitForFunction(() => document.querySelector('#inspector [data-key="pick:Weight"] .pick-v')?.textContent === 'Extra bold 800');
-  assert.equal(await page.locator('#inspector [data-key="pick:Weight"] .pick-v').evaluate(node => node.scrollWidth <= node.clientWidth + 1 && node.clientHeight <= parseFloat(getComputedStyle(node).lineHeight) + 1), true, 'long selector values stay whole on one line');
+  // Resolve and measure the live control in one browser task; an ElementHandle can detach during inspector repaint.
+  const weightGeometry = await page.waitForFunction(() => {
+    const node = document.querySelector('#inspector [data-key="pick:Weight"] .pick-v');
+    if (!node?.isConnected || node.textContent !== 'Extra bold 800') return null;
+    const lineHeight = parseFloat(getComputedStyle(node).lineHeight);
+    if (!node.getClientRects().length || !Number.isFinite(lineHeight)) return null;
+    return { scrollWidth: node.scrollWidth, clientWidth: node.clientWidth, clientHeight: node.clientHeight, lineHeight };
+  });
+  const weightSize = await weightGeometry.jsonValue(); await weightGeometry.dispose();
+  assert.equal(weightSize.scrollWidth <= weightSize.clientWidth + 1 && weightSize.clientHeight <= weightSize.lineHeight + 1, true, 'long selector values stay whole on one line');
   await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', []));
   await page.locator('#inspector [data-key="width"]').waitFor();
   const dimensions = await page.locator('#inspector .geometry-grid').evaluate(node => {

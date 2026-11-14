@@ -171,6 +171,36 @@ test('attribute alias conflicts preserve writer state and equal peers remain und
   assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.feature.descendants['card-action/button'].attrs.title, 'Agreed');
 });
 
+test('metadata alias conflicts retain selected instances and writer history', async t => {
+  const { runtime, cwd } = await fixture(t);
+  await runtime.patch({ documentId: 'landing', expectedVersion: 1, patch: { nodes: { feature: { descendants: {
+    'card-action': { metadata: { shared: { a: 1 } } }, 'card-action/button': { metadata: { shared: { b: 2 } } },
+  } } } } });
+  runtime.setSelection({ ids: ['landing'], nodes: { documentId: 'landing', nodeIds: ['feature'] } });
+  const before = runtime.read({ view: 'document', documentId: 'landing' });
+  const source = await fs.readFile(path.join(cwd, 'project.divlet')), html = await fs.readFile(runtime.getEntry('landing').htmlPath);
+  const history = structuredClone(runtime.historyHead()), selection = structuredClone(runtime.info().selection), render = runtime.getEntry('landing').render;
+  const candidate = page(); candidate.id = 'refused-metadata';
+  candidate.nodes.feature.descendants['card-action'] = { metadata: { shared: null } };
+  candidate.nodes.feature.descendants['card-action/button'] = { metadata: { shared: { b: 2 } } };
+  for (const refuse of [
+    () => runtime.patch({ documentId: 'landing', expectedVersion: before.version, patch: { nodes: { feature: { descendants: { 'card-action': { metadata: { shared: 'replacement' } } } } } } }),
+    () => runtime.create({ document: candidate }), // Whole-frame admission retains stored null deletions.
+  ]) {
+    await assert.rejects(refuse(), { code: 'INVALID_OVERRIDE' });
+    assert.deepEqual(runtime.read({ view: 'document', documentId: 'landing' }), before);
+    assert.deepEqual(await fs.readFile(path.join(cwd, 'project.divlet')), source);
+    assert.deepEqual(await fs.readFile(runtime.getEntry('landing').htmlPath), html);
+    assert.deepEqual(runtime.historyHead(), history); assert.deepEqual(runtime.info().selection, selection);
+    assert.equal(runtime.getEntry('landing').render, render);
+    assert.equal(runtime.documents.has('refused-metadata'), false);
+  }
+  await runtime.undo({});
+  assert.equal(runtime.read({ view: 'document', documentId: 'landing' }).nodes.feature.descendants['card-action'], undefined);
+  await runtime.redo({});
+  assert.deepEqual(runtime.read({ view: 'document', documentId: 'landing' }).nodes.feature.descendants['card-action/button'].metadata.shared, { b: 2 });
+});
+
 test('instances cannot break HTML nesting rules once expanded', async t => {
   const { runtime } = await fixture(t);
   await assert.rejects(runtime.patch({ documentId: 'components', expectedVersion: 1, patch: { nodes: { card: { tag: 'button' } } } }), /Buttons cannot be nested/);
