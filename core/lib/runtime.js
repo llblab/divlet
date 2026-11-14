@@ -14,7 +14,7 @@ import { buildSite } from './site.ts';
 import { diffDocuments, diffValue, summarizeChange, touchedNodeIds } from './diff.ts';
 import { replayHistory } from './history-replay.ts';
 import { operationPatch } from './ops.ts';
-import { HistoryLine, planHistoryTraversal } from './history.ts';
+import { HistoryLine, planHistoryTraversal, validateHistoryNavigation, planHistoryNavigation } from './history.ts';
 import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertExpectedVersion, assertExpectedRender, assertReplayableStyleTransition } from './acceptance.ts';
 import { expandPath, inspectPath, initProject, resolveProject, isProjectFile } from './projects.ts';
 import { OutputStore, safeDirectory } from './output.ts';
@@ -1259,16 +1259,12 @@ await this.importProject(project.settings, project.frames, hash);
   navigateHistory(options) {
     return this.enqueue(async () => {
       const { pointId, expectedPoint, actor = 'user' } = options ?? {};
-      if (typeof pointId !== 'string' || !pointId || typeof expectedPoint !== 'string' || !expectedPoint) fail('INVALID_QUERY', 'pointId and expectedPoint must be nonempty state point IDs.');
-      const timeline = this.readTimeline();
-      if (expectedPoint !== timeline.current) fail('HISTORY_CONFLICT', 'History changed since it was read. Read the current timeline before navigating.');
-      const index = timeline.points.findIndex(point => point.id === pointId);
-      if (index < 0) fail('HISTORY_POINT_UNAVAILABLE', 'That state point is no longer on the retained current history segment.');
-      const delta = index - timeline.index;
-      if (!delta) return { ...this.historyHead(), changed: false };
-      const direction = delta < 0 ? 'undo' : 'redo';
-      const from = delta < 0 ? this.undoStack : this.redoStack, to = delta < 0 ? this.redoStack : this.undoStack;
-      return { ...await this._replay(from, to, direction, { actor, steps: Math.abs(delta) }), changed: true };
+      const request = validateHistoryNavigation(pointId, expectedPoint);
+      const plan = planHistoryNavigation(this.readTimeline(), request);
+      if (!plan.changed) return { ...this.historyHead(), changed: false };
+      const { direction, steps } = plan;
+      const from = direction === 'undo' ? this.undoStack : this.redoStack, to = direction === 'undo' ? this.redoStack : this.undoStack;
+      return { ...await this._replay(from, to, direction, { actor, steps }), changed: true };
     });
   }
 

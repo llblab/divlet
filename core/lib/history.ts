@@ -1,4 +1,4 @@
-/** Session lineage and read-only traversal planning. Replay candidates and writer acceptance/stack authority stay separate. */
+/** Session lineage and read-only traversal/navigation planning. Replay candidates and writer authority stay separate. */
 import { DivletError } from './validation.ts';
 
 export type HistoryDirection = 'undo' | 'redo';
@@ -23,6 +23,30 @@ export interface HistoryTimeline {
   pastLimited: boolean;
   futureLimited: boolean;
 }
+export type HistoryNavigationRequest = Readonly<Pick<HistoryNavigation, 'pointId' | 'expectedPoint'>>;
+/** Only the trusted writer snapshot's addressable segment is needed for target planning. */
+export interface HistoryNavigationTimeline {
+  readonly current: string;
+  readonly index: number;
+  readonly points: readonly { readonly id: string }[];
+}
+export type HistoryNavigationPlan = Readonly<{ changed: false } | { changed: true; direction: HistoryDirection; steps: number }>;
+
+/** Validate addresses before the writer reads its timeline; actor and queue ownership stay with the host. */
+export function validateHistoryNavigation(pointId: unknown, expectedPoint: unknown): HistoryNavigationRequest {
+  if (typeof pointId !== 'string' || !pointId || typeof expectedPoint !== 'string' || !expectedPoint) throw new DivletError('INVALID_QUERY', 'pointId and expectedPoint must be nonempty state point IDs.');
+  return { pointId, expectedPoint };
+}
+
+/** Resolve validated addresses against the current snapshot inside the writer queue; no stacks or points are moved. */
+export function planHistoryNavigation(timeline: HistoryNavigationTimeline, { pointId, expectedPoint }: HistoryNavigationRequest): HistoryNavigationPlan {
+  if (expectedPoint !== timeline.current) throw new DivletError('HISTORY_CONFLICT', 'History changed since it was read. Read the current timeline before navigating.');
+  const index = timeline.points.findIndex(point => point.id === pointId);
+  if (index < 0) throw new DivletError('HISTORY_POINT_UNAVAILABLE', 'That state point is no longer on the retained current history segment.');
+  const delta = index - timeline.index;
+  return !delta ? { changed: false } : { changed: true, direction: delta < 0 ? 'undo' : 'redo', steps: Math.abs(delta) };
+}
+
 /** Session items need only their frame addresses for selection; their replay payload remains opaque here. */
 export interface HistoryAddressedItem {
   readonly type: string;

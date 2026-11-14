@@ -64,6 +64,12 @@ function sameState(writers, label) {
   assert.deepEqual(log(writers.browser), log(writers.node), `${label}: action log`);
 }
 
+const historyState = runtime => structuredClone({
+  settings: runtime.settings, documents: [...runtime.documents].map(([id, item]) => [id, item.document, item.render, item.html]),
+  selection: runtime.selection, revision: runtime.revision, history: runtime.history,
+  undo: runtime.undoStack, redo: runtime.redoStack, timeline: runtime.readTimeline(),
+});
+
 test('opt-in native text refusal does not silently replace draft readers or touch accepted writers', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-draft-json-'));
   const file = path.join(directory, 'draft.divlet');
@@ -171,21 +177,64 @@ test('shared replay keeps multi-step traversal atomic and preserves both writers
     assert.deepEqual(runtimes.map(runtime => runtime.historyHead().pointId), endpoints);
     sameState(writers, 'multi-step Redo');
     for (const runtime of runtimes) await runtime.patch({ documentId: 'index', expectedVersion: runtime.getEntry('index').document.version, patch: { nodes: { 'label': { content: 'Later overlapping content' } } }, undoable: false });
-    const snapshot = runtime => structuredClone({
-      settings: runtime.settings, documents: [...runtime.documents].map(([id, item]) => [id, item.document, item.render, item.html]),
-      selection: runtime.selection, revision: runtime.revision, history: runtime.history,
-      undo: runtime.undoStack, redo: runtime.redoStack, timeline: runtime.readTimeline(),
-    });
-    const before = runtimes.map(snapshot), disk = await fs.readFile(writers.node.projectPath, 'utf8'), browserSource = writers.browser.source();
+    const before = runtimes.map(historyState), disk = await fs.readFile(writers.node.projectPath, 'utf8'), browserSource = writers.browser.source();
     stored = writers.stored.length;
     for (let i = 0; i < runtimes.length; i++) {
       await assert.rejects(runtimes[i].undo({ steps: 2 }), error => error.code === 'CANNOT_UNDO' && /Later changes touched the same content/.test(error.message));
-      assert.deepEqual(snapshot(runtimes[i]), before[i], 'the candidate project-field prefix does not become accepted or move stack/point authority');
+      assert.deepEqual(historyState(runtimes[i]), before[i], 'the candidate project-field prefix does not become accepted or move stack/point authority');
     }
     assert.equal(writers.stored.length, stored);
     assert.equal(writers.browser.source(), browserSource);
     assert.equal(await fs.readFile(writers.node.projectPath, 'utf8'), disk);
     sameState(writers, 'refused multi-step traversal');
+  } finally { await writers.close(); }
+});
+
+test('shared navigation validates before reading and resolves current points only inside each writer queue', async () => {
+  const writers = await pair(editable);
+  try {
+    for (const runtime of [writers.node, writers.browser]) {
+      const base = runtime.historyHead().pointId;
+      const read = runtime.readTimeline.bind(runtime);
+      let reads = 0;
+      runtime.readTimeline = () => { reads++; return read(); };
+      try {
+        for (const options of [undefined, null, {}, { pointId: 1, expectedPoint: base }, { pointId: base, expectedPoint: '' }]) await assert.rejects(runtime.navigateHistory(options), { code: 'INVALID_QUERY' });
+        assert.equal(reads, 0, 'malformed addresses refuse before reading a timeline');
+      } finally { runtime.readTimeline = read; }
+      await runtime.patch({ documentId: 'index', expectedVersion: 1, patch: { nodes: { label: { content: 'First' } } } });
+      await runtime.patch({ documentId: 'index', expectedVersion: 2, patch: { nodes: { label: { content: 'Second' } } } });
+      const target = runtime.historyHead().pointId;
+      const replay = runtime._replay.bind(runtime);
+      let replays = 0;
+      runtime._replay = (...args) => { replays++; return replay(...args); };
+      try {
+        const back = await runtime.navigateHistory({ pointId: base, expectedPoint: target, actor: 'navigator' });
+        assert.equal(back.changed, true); assert.equal(back.pointId, base); assert.equal(replays, 1);
+        assert.equal(runtime.getEntry('index').document.nodes.label.content, 'Editable text');
+        assert.equal(runtime.history.at(-1).actor, 'navigator', 'actor remains a writer concern');
+        const beforeNoOp = historyState(runtime);
+        assert.equal((await runtime.navigateHistory({ pointId: base, expectedPoint: base })).changed, false);
+        assert.equal(replays, 1); assert.deepEqual(historyState(runtime), beforeNoOp);
+        const forward = await runtime.navigateHistory({ pointId: target, expectedPoint: base });
+        assert.equal(forward.changed, true); assert.equal(forward.pointId, target); assert.equal(replays, 2);
+        assert.equal(runtime.getEntry('index').document.nodes.label.content, 'Second');
+        const beforeRefusal = historyState(runtime);
+        await assert.rejects(runtime.navigateHistory({ pointId: target, expectedPoint: base }), { code: 'HISTORY_CONFLICT' });
+        await assert.rejects(runtime.navigateHistory({ pointId: 'missing', expectedPoint: target }), { code: 'HISTORY_POINT_UNAVAILABLE' });
+        assert.equal(replays, 2); assert.deepEqual(historyState(runtime), beforeRefusal);
+        // Queue a real edit first. A navigation planned before queue admission would consume the stale read point.
+        const pending = runtime.patch({ documentId: 'index', expectedVersion: runtime.getEntry('index').document.version, patch: { name: 'Queued later' } });
+        const accepted = runtime.enqueue(() => historyState(runtime));
+        const stale = runtime.navigateHistory({ pointId: base, expectedPoint: target });
+        const beforeNavigation = await accepted;
+        await assert.rejects(stale, { code: 'HISTORY_CONFLICT' }); await pending;
+        assert.equal(replays, 2); assert.deepEqual(historyState(runtime), beforeNavigation);
+        assert.equal(runtime.getEntry('index').document.name, 'Queued later');
+      } finally { runtime._replay = replay; }
+    }
+    sameState(writers, 'queued navigation/refusal parity');
+    assert.equal(writers.browser.source(), await fs.readFile(writers.node.projectPath, 'utf8'));
   } finally { await writers.close(); }
 });
 

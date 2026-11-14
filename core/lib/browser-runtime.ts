@@ -14,7 +14,7 @@ import type { DocumentModel } from './model.ts';
 import { diffDocuments, summarizeChange, touchedNodeIds } from './diff.ts';
 import { replayHistory } from './history-replay.ts';
 import { operationPatch } from './ops.ts';
-import { HistoryLine, planHistoryTraversal } from './history.ts';
+import { HistoryLine, planHistoryTraversal, validateHistoryNavigation, planHistoryNavigation } from './history.ts';
 import { readProject, writeProject, patchSettings, listComponents, instancesOf, expandFrame } from './project.ts';
 import { exportHtml } from './codec.ts';
 import type { ProjectSettings } from './project.ts';
@@ -515,16 +515,12 @@ export class BrowserRuntime {
   navigateHistory(options: any) {
     return this.enqueue(async () => {
       const { pointId, expectedPoint, actor = 'user' } = options ?? {};
-      if (typeof pointId !== 'string' || !pointId || typeof expectedPoint !== 'string' || !expectedPoint) fail('INVALID_QUERY', 'pointId and expectedPoint must be nonempty state point IDs.');
-      const timeline = this.readTimeline();
-      if (expectedPoint !== timeline.current) fail('HISTORY_CONFLICT', 'History changed since it was read. Read the current timeline before navigating.');
-      const index = timeline.points.findIndex(point => point.id === pointId);
-      if (index < 0) fail('HISTORY_POINT_UNAVAILABLE', 'That state point is no longer on the retained current history segment.');
-      const delta = index - timeline.index;
-      if (!delta) return { ...this.historyHead(), changed: false };
-      const direction = delta < 0 ? 'undo' : 'redo';
-      const from = delta < 0 ? this.undoStack : this.redoStack, to = delta < 0 ? this.redoStack : this.undoStack;
-      return { ...await this._replay(from, to, direction, { actor, steps: Math.abs(delta) }), changed: true };
+      const request = validateHistoryNavigation(pointId, expectedPoint);
+      const plan = planHistoryNavigation(this.readTimeline(), request);
+      if (!plan.changed) return { ...this.historyHead(), changed: false };
+      const { direction, steps } = plan;
+      const from = direction === 'undo' ? this.undoStack : this.redoStack, to = direction === 'undo' ? this.redoStack : this.undoStack;
+      return { ...await this._replay(from, to, direction, { actor, steps }), changed: true };
     });
   }
 
