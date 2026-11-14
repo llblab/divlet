@@ -62,6 +62,10 @@ test('the npm package includes public entrypoints and a complete documentation l
   const repeated = spawnSync('npm', ['run', 'build'], { cwd: root, encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 });
   assert.ifError(repeated.error); assert.equal(repeated.status, 0, repeated.stderr);
   assert.deepEqual(await snapshot(), first, 'successive builds preserve every adapter and web file name and byte');
+  const publicBytes = spawnSync(process.execPath, ['plugins/pen/tests/byte-contract.mjs', '--compiled'], { cwd: root, env: { ...process.env, NODE_OPTIONS: '', NODE_PATH: '' }, encoding: 'utf8', timeout: 15000 });
+  assert.ifError(publicBytes.error);
+  assert.equal(publicBytes.status, 0, publicBytes.stderr);
+  assert.equal(JSON.parse(publicBytes.stdout).mode, 'compiled', 'public importer bytes work without source export conditions');
   const result = spawnSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], { cwd: root, encoding: 'utf8', timeout: 60000, maxBuffer: 4 * 1024 * 1024 });
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr);
