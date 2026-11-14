@@ -56,6 +56,16 @@ HTML input belongs to the core, not to an optional importer plugin. The core adm
 
 Keep three contracts distinct: external-page admission, guarded reverse editing of a managed projection, and clean static export. Their parsing/validation primitives may be shared, but lossy external sanitization must not erase native identity or provenance during cache reconciliation. A source page is not a second canonical project file; explicit opening creates or reuses a sibling `.divlet` without overwriting the original or an existing destination.
 
+## Native CSS and the base inspector
+
+CSS authoring is a mandatory core capability, not a fallback supplied by a style plugin. The core owns native declarations, shared stylesheets, CSS custom properties and semantic style edits through the same validated acceptance path in Node and browser hosts. A plain HTML/CSS project must remain creatable, editable, saveable and rebuildable when no style plugin is installed or registered. Neither a utility compiler nor a remote compilation service is required for that path; the browser still owns cascade evaluation, layout and painting.
+
+The ordinary inspector controls also belong to the core: Layout, Spacing, Border, typography, colours, sizes and effects remain available without Tailwind. A plugin may contribute controls specific to its representation, but must not be the only owner of these base property editors. Changing plugin availability must not duplicate or remove the base controls, reorder their sections, or turn editor preferences and measured geometry into project content.
+
+For example, setting right padding to `4 px` in the inspector produces an authored `padding-right: 4px` edit, updates the rendered element and survives save/reopen and Undo/Redo without converting a declaration to a utility class. Inline CSS is a sufficient first implementation; shared CSS and variables remain native too. Persisted declaration order and emission follow the [approved format profile](format.md#approved-first-release-profile), not a new inline-only model or a schema-number change. The editing input is distinct from stored fields; this contract does not introduce another wire syntax.
+
+A later inline-to-stylesheet packer may be an explicit, cascade-preserving transformation of the same native model. It is not a prerequisite for core style editing, the base inspector or browser Tailwind support, and must not silently extract or rewrite authored styles on read.
+
 ## Plugin boundaries
 
 ### PEN importer
@@ -66,11 +76,13 @@ A sufficient result uses ordinary HTML/SVG/CSS. Importing PEN must not require T
 
 ### Tailwind style plugin
 
-Tailwind is an optional style representation policy, utility compiler and inspector contribution. It may be enabled by default; it does not define the native document model. Without it, creating, editing, saving and rendering a plain HTML/CSS project must still work, including declarative style edits.
+Tailwind is an optional atomic-class representation policy, utility compiler and representation-specific inspector contribution. It may be enabled by default; it does not define the native document model or own the base property editors. Its UI adds the class editor, utility suggestions and supported variants rather than a second Layout/Spacing/Border/Appearance implementation.
+
+The property controls and class editor are reactively linked through one authored CSS meaning and one accepted project, not independent styling stores. A core property edit can be represented as utilities under an explicitly selected plugin policy; editing a supported utility must update the corresponding property readback and use the same guarded writer/history operation. Repeating synchronization must not commit a second edit, reset selection/focus or overwrite a focused draft. Browser measurements are derived observations, not a flattened replacement for authored CSS.
 
 Its transformations must:
 
-- Preserve cascade, responsive conditions, states and authored values; retain ordinary CSS when equivalence is not established.
+- Preserve cascade, responsive conditions, states and authored values; retain ordinary CSS and opaque classes when equivalence is not established. Never flatten a responsive or stateful rule into an unconditional inline value.
 - Be idempotent: repeating normalization does not accumulate changes.
 - Reconcile superseded inline declarations and utilities instead of leaving competing representations that defeat the requested edit.
 - Run at an explicit boundary such as an import, edit or conversion operation, not silently rewrite a project merely because it was read.
@@ -80,7 +92,13 @@ Disabling a plugin for a dependent project is an explicit, validated conversion:
 
 ### Composition
 
-Core model, validation and generic registries depend on public capability contracts, not concrete plugin implementations. Composition code selects and registers built-in or optional providers. An importer is not required to read an existing native project. A plugin cannot widen the core's executable-content policy or bypass its transaction and filesystem boundaries.
+Core model, validation and generic registries depend on public capability contracts, not concrete plugin implementations. Composition code selects and registers built-in or optional providers. Native style semantics and base inspector controls must stay independent of those concrete providers in both hosts. An importer is not required to read an existing native project. A plugin cannot widen the core's executable-content policy or bypass its transaction and filesystem boundaries.
+
+### Standalone landing composition
+
+The product's static standalone landing board must enable the Tailwind plugin, including its linked class editor and a browser-capable transformation/compiler path. After initial loading, an edit that introduces a supported utility absent from the prepared stylesheet must compile and render in that browser, without a Node backend, host binding or runtime remote compiler. A build-time CSS snapshot may accelerate initial display; it is not evidence of functioning Tailwind editing. Provider code and required inputs belong in the declared static application closure, not an unrequested network fetch or blanket Node polyfill.
+
+This is the landing application's composition, not a mandatory dependency of the kernel or every browser host. A browser composition that omits Tailwind must still expose the same native CSS operations and base property controls. Both compositions use the shared acceptance, history and persistence contracts; reliable offline reopening, embedded assets/fonts and a real WebMCP agent remain separately evidenced capabilities. Existing [browser-runtime evidence](browser-runtime.md#current-evidence) describes what is implemented today; [BROWSER-DEMO](../BACKLOG.md) owns the remaining standalone integration.
 
 ## Browser-host portability investigation
 

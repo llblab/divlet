@@ -2,6 +2,10 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
+## Unreleased
+
+- **Style ownership clarified (documentation only).** The target contract assigns native CSS and ordinary inspector controls to the core in Node and browser hosts; Tailwind adds a linked atomic-class editor/compiler, including the standalone landing composition. Existing WEB/BROWSER tasks now separate native operations, inspector migration, provider admission, linked representation and demo integration with explicit checks. No runtime implementation, format migration or browser Tailwind delivery is claimed.
+
 ## 0.0.5 — Domain-first agent tools
 
 - **Predictable tool names across hosts.** The seven shared operations are now `divlet_open`, `divlet_read`, `divlet_patch`, `divlet_edit`, `divlet_frame_manage`, `divlet_undo` and `divlet_mark`. Skills, prompts, guides and the landing use the same domain-first vocabulary.
