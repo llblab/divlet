@@ -10,17 +10,11 @@ import valueParser from 'postcss-value-parser';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 
-const THEME_TOKEN = /^--(color|font|text|tracking|leading|breakpoint|container|spacing|radius|shadow|inset-shadow|drop-shadow|blur|perspective|aspect|ease|animate|default)(-[\w-]+)?$/;
+import { themeOf } from './theme.ts';
+export { themeOf };
 const MARKER = /^(group|peer)(\/[\w-]+)?$/;
 const CACHE_SIZE = 16;
 const cache = new Map();
-
-/** The `@theme` block for tokens that belong to a Tailwind namespace (others stay plain CSS variables). */
-export function themeOf(tokens = {}) {
-  const lines = Object.entries(tokens).filter(([name, value]) => THEME_TOKEN.test(name) && !/!important\s*$/i.test(value)).map(([name, value]) => `  ${name}: ${value};`);
-  return lines.length ? `@theme {\n${lines.join('\n')}\n}\n` : '';
-}
-
 
 function slot(tokens, base) {
   const theme = themeOf(tokens);
