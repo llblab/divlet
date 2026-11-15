@@ -10,11 +10,13 @@ export const bundleBrowserAcceptance = resolveDir => bundleEntry('./core/lib/acc
 export const bundleBrowserResourceCarriers = resolveDir => bundleEntry('./core/lib/resource-carriers.ts', resolveDir, { source: true });
 export const bundleBrowserSvgResource = resolveDir => bundleEntry('./core/lib/svg-resource.ts', resolveDir, { source: true });
 export const bundleBrowserDeclaredResources = resolveDir => bundleEntry('./core/lib/declared-resources.ts', resolveDir, { source: true });
-export const bundleBrowserStandaloneAssets = resolveDir => bundleEntry('./core/lib/standalone-assets.ts', resolveDir, { source: true });
+// Private verification profile: source by default, or an explicit emitted installed entry without source conditions.
+export const bundleBrowserStandaloneAssets = (resolveDir, { entry = './core/lib/standalone-assets.ts', source = true } = {}) => bundleEntry(entry, resolveDir, { source, workingDir: resolveDir });
 
-async function bundleEntry(entry, resolveDir, { source = false } = {}) {
+async function bundleEntry(entry, resolveDir, { source = false, workingDir } = {}) {
   const result = await build({
-    stdin: { contents: `export * from '${entry}';`, resolveDir, sourcefile: 'divlet-browser-entry.js' },
+    ...(workingDir ? { absWorkingDir: workingDir } : {}),
+    stdin: { contents: `export * from ${JSON.stringify(entry)};`, resolveDir },
     conditions: source ? ['divlet-source'] : [],
     bundle: true, write: false, platform: 'browser', format: 'esm', target: 'es2022', metafile: true,
     define: { 'process.env.NODE_ENV': '"production"' },

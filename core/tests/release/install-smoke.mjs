@@ -178,6 +178,21 @@ try {
     refusalControls.push(code);
   }
   rendererBrowser.refusalControls = refusalControls;
+  const standaloneEntry = path.join(root, 'core/tests/release/standalone-browser.mjs');
+  const standaloneBrowser = JSON.parse(execFileSync(process.execPath, [standaloneEntry, '--installed', target], rendererBrowserOptions));
+  assert.equal(standaloneBrowser.status, 'passed');
+  assert.equal(standaloneBrowser.mode, 'private installed standalone export in Chromium');
+  assert.equal(standaloneBrowser.installedInputsConfined && standaloneBrowser.nodeImportsConfined, true);
+  assert.equal(standaloneBrowser.projectRefusal, 'ASSETS_UNAVAILABLE');
+  const standaloneControls = [];
+  for (const [flag, code] of [['--node-core-only', 'INSTALLED_STANDALONE_DEPENDENCY_ESCAPE'], ['--browser-core-only', 'INSTALLED_STANDALONE_BROWSER_ESCAPE']]) {
+    let refused;
+    try { execFileSync(process.execPath, [standaloneEntry, '--installed', target, flag], rendererBrowserOptions); } catch (error) { refused = error; }
+    assert.equal(refused?.status, 1, `${flag}: the installed standalone guard must refuse vendor inputs`);
+    assert.ok(refused.stderr.includes(code), `${flag}: the standalone confinement guard owns refusal`);
+    standaloneControls.push(code);
+  }
+  standaloneBrowser.refusalControls = standaloneControls;
 
   // The MCP server from the installed package: initialize, list the shared tools, open a project, read it, and stop on EOF.
   await writeFile(path.join(target, 'mcp-smoke.mjs'), `
@@ -259,5 +274,5 @@ try {
     installedPi = JSON.parse(execFileSync(process.execPath, [path.join(root, 'pi/tests/e2e/pi.mjs')], { cwd: target, env: { ...process.env, NODE_OPTIONS: '', PI_DIVLET_INSTALLED_ROOT: target }, encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 }).trim());
     assert.equal(installedPi.status, 'passed'); assert.equal(installedPi.installed, true); assert.equal(installedPi.installedFonts.status, 'passed', 'required installed Pi mode cannot silently skip the real host/browser case');
   }
-  console.log(JSON.stringify({ status: 'passed', registryInstallation: registry, frozenManifest: Boolean(candidate), files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, rendererIdentity, rendererBrowser, pluginTypes: true, browserModelBundle: true, webPackage: webPacked.name, installedFonts, ...(installedPi ? { installedPi } : {}), mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
+  console.log(JSON.stringify({ status: 'passed', registryInstallation: registry, frozenManifest: Boolean(candidate), files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, rendererIdentity, rendererBrowser, standaloneBrowser, pluginTypes: true, browserModelBundle: true, webPackage: webPacked.name, installedFonts, ...(installedPi ? { installedPi } : {}), mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
 } finally { await rm(work, { recursive: true, force: true }); }
