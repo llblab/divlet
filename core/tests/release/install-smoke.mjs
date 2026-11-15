@@ -156,7 +156,7 @@ try {
   const result = JSON.parse(execFileSync(process.execPath, ['smoke.mjs'], { cwd: target, encoding: 'utf8' }).trim().split('\n').pop());
   const { renderer, ...board } = result;
   assert.deepEqual(board, { frames: 1, index: 200, board: 200, lib: 200, panel: 200 }, 'the installed package starts a board and serves it');
-  assert.match(renderer, /^divlet-tailwind-1-[a-f0-9]{64}$/, 'the installed build establishes and executes an exact renderer identity');
+  assert.match(renderer, /^divlet-tailwind-2-[a-f0-9]{64}$/, 'the installed build establishes and executes an exact renderer identity');
   const identityAudit = auditRendererIdentity(path.join(target, 'node_modules/@divlet/core'));
   assert.equal(identityAudit.reports.installed.version, renderer, 'the audit observes the same installed renderer the smoke exercised');
   const rendererIdentity = { phase: 'core-cli-mcp', comparisons: identityAudit.comparisons, inputs: Object.fromEntries(Object.entries(identityAudit.reports).map(([name, report]) => [name, report.inputs])) };

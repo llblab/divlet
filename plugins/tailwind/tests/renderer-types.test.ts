@@ -7,6 +7,6 @@ const renderer: ResolvedStyleEngine = createRenderer();
 
 test('the versioned descriptor satisfies the exact compiling provider contract', () => {
   assert.equal(renderer.id, 'tailwind');
-  assert.match(renderer.version, /^divlet-tailwind-1-/);
+  assert.match(renderer.version, /^divlet-tailwind-2-/);
   assert.equal(typeof renderer.compileClasses, 'function');
 });

@@ -6,7 +6,7 @@ import os from 'node:os';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import draft, { createRenderer } from '../index.js';
-import { rendererVersion } from '../lib/identity.ts';
+import { rendererVersion, rendererSource } from '../lib/identity.ts';
 import { compileClasses, resolveStyleEngine, setStyleEngines, styleEngine } from '../../../core/lib/engine.ts';
 
 async function temporary(t) {
@@ -25,28 +25,30 @@ async function packageAt(root, name, version, dependencies = {}) {
 }
 
 async function installation(root) {
-  const node = await packageAt(root, '@tailwindcss/node', '10.0.0', { transitive: '^1.0.0', tailwindcss: '^10.0.0' });
-  const css = await packageAt(root, 'tailwindcss', '10.0.0');
+  const node = await packageAt(root, '@tailwindcss/node', '10.0.0');
+  const css = await packageAt(root, 'tailwindcss', '10.0.0', { transitive: '^1.0.0' });
+  const parser = await packageAt(root, 'postcss', '10.0.0');
   await packageAt(root, 'transitive', '1.0.0');
-  const selected = await packageAt(node, 'transitive', '1.1.0');
+  const selected = await packageAt(css, 'transitive', '1.1.0');
   for (const name of ['index.css', 'theme.css', 'preflight.css', 'utilities.css']) await fs.writeFile(path.join(css, name), `/* ${name} */`);
   const anchor = path.join(root, 'provider.js');
   await fs.writeFile(anchor, '');
-  return { from: pathToFileURL(anchor), node, css, selected };
+  return { from: pathToFileURL(anchor), node, css, parser, selected };
 }
 
 test('renderer identity is portable and follows installed transitive resolution, not requested ranges', async t => {
   const a = await temporary(t), b = await temporary(t);
   const first = await installation(a), second = await installation(b);
   const version = rendererVersion(first.from);
-  assert.match(version, /^divlet-tailwind-1-[a-f0-9]{64}$/);
+  assert.match(version, /^divlet-tailwind-2-[a-f0-9]{64}$/);
   assert.ok(version.length <= 128);
   assert.equal(rendererVersion(second.from), version);
   // A shadowed hoisted copy and a changed requested range do not change the selected implementation.
   await packageAt(a, 'transitive', '99.0.0');
-  await packageAt(a, '@tailwindcss/node', '10.0.0', { transitive: '>=1.0.0', tailwindcss: '*' });
-  assert.equal(rendererVersion(first.from), version);
-  await packageAt(first.node, 'transitive', '1.2.0');
+  await packageAt(a, 'tailwindcss', '10.0.0', { transitive: '*' });
+  await packageAt(a, '@tailwindcss/node', '99.0.0');
+  assert.equal(rendererVersion(first.from), version, 'the legacy wrapper is not a versioned compiler input');
+  await packageAt(first.css, 'transitive', '1.2.0');
   assert.notEqual(rendererVersion(first.from), version);
 });
 
@@ -54,10 +56,13 @@ test('renderer identity includes the compiler and each owned stylesheet, and ref
   const root = await temporary(t);
   const fixture = await installation(root);
   const original = rendererVersion(fixture.from);
-  await packageAt(root, '@tailwindcss/node', '10.0.1', { transitive: '^1.0.0', tailwindcss: '^10.0.0' });
-  assert.notEqual(rendererVersion(fixture.from), original);
-  await packageAt(root, '@tailwindcss/node', '10.0.0', { transitive: '^1.0.0', tailwindcss: '^10.0.0' });
-  assert.equal(rendererVersion(fixture.from), original);
+  for (const name of ['tailwindcss', 'postcss']) {
+    const dependencies = name === 'tailwindcss' ? { transitive: '^1.0.0' } : {};
+    await packageAt(root, name, '10.0.1', dependencies);
+    assert.notEqual(rendererVersion(fixture.from), original, name);
+    await packageAt(root, name, '10.0.0', dependencies);
+    assert.equal(rendererVersion(fixture.from), original);
+  }
   for (const name of ['index.css', 'theme.css', 'preflight.css', 'utilities.css']) {
     const file = path.join(fixture.css, name);
     const bytes = await fs.readFile(file);
@@ -71,12 +76,27 @@ test('renderer identity includes the compiler and each owned stylesheet, and ref
   assert.throws(() => rendererVersion(fixture.from), { code: 'RENDERER_IDENTITY_UNAVAILABLE' });
 });
 
+test('renderer source captures the exact hashed stylesheet bytes once and does not require the legacy wrapper', async t => {
+  const root = await temporary(t), fixture = await installation(root);
+  const source = rendererSource(fixture.from);
+  assert.equal(source.version, rendererVersion(fixture.from));
+  assert.equal(Object.isFrozen(source) && Object.isFrozen(source.stylesheets), true);
+  for (const [name, content] of Object.entries(source.stylesheets)) assert.equal(content, await fs.readFile(path.join(fixture.css, name), 'utf8'));
+  await fs.rm(fixture.node, { recursive: true });
+  assert.equal(rendererVersion(fixture.from), source.version, 'capture never depends on or executes the legacy Node wrapper');
+  await fs.appendFile(path.join(fixture.css, 'index.css'), '\n/* changed after capture */');
+  const next = rendererSource(fixture.from);
+  assert.notEqual(next.version, source.version);
+  assert.notEqual(next.stylesheets['index.css'], source.stylesheets['index.css']);
+  assert.equal(source.stylesheets['index.css'], '/* index.css */', 'the old selector remains bound to its old CSS snapshot');
+});
+
 test('identity diagnostics capture the real recipe and selected manifests without a second hash algorithm', () => {
   const probe = fileURLToPath(new URL('./fixtures/renderer-probe.mjs', import.meta.url));
   const entry = fileURLToPath(new URL('../lib/renderer.ts', import.meta.url));
   const report = JSON.parse(execFileSync(process.execPath, [probe, entry], { env: { ...process.env, NODE_OPTIONS: '' }, encoding: 'utf8', timeout: 30000 }));
   assert.equal(report.version, createRenderer().version);
-  assert.equal(report.inputs.policy, 'divlet-tailwind-1');
+  assert.equal(report.inputs.policy, 'divlet-tailwind-2');
   assert.equal(report.inputs.stylesheets.length, 4);
   for (const [name, version] of report.inputs.roots) assert.ok(report.manifests.some(manifest => manifest.name === name && manifest.version === version));
   for (const manifest of report.manifests) assert.equal(JSON.stringify(report.inputs).includes(manifest.file), false, 'installation paths are diagnostics, not identity');

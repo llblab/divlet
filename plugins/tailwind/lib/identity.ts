@@ -3,12 +3,13 @@ import { createHash } from 'node:crypto';
 import { readFileSync, realpathSync } from 'node:fs';
 import { findPackageJSON } from 'node:module';
 import path from 'node:path';
+import { STYLESHEETS } from './renderer-source.ts';
+import type { RendererSource, RendererStylesheets } from './renderer-source.ts';
 
 type InstalledPackage = { file: string; name: string; version: string; dependencies: string[] };
-const ROOTS = ['@tailwindcss/node', 'tailwindcss'];
-const STYLESHEETS = ['index.css', 'theme.css', 'preflight.css', 'utilities.css'];
+const ROOTS = ['tailwindcss', 'postcss'];
 // Bump for changes to compiler options, token interpretation or the provider-owned stylesheet-resolution policy.
-const POLICY = 'divlet-tailwind-1';
+const POLICY = 'divlet-tailwind-2';
 const digest = (value: string | Buffer): string => createHash('sha256').update(value).digest('hex');
 
 function installed(name: string, from: string | URL): InstalledPackage {
@@ -25,8 +26,8 @@ function installed(name: string, from: string | URL): InstalledPackage {
   return { file, name: data.name, version: data.version, dependencies: Object.keys(dependencies).sort() };
 }
 
-/** Installed versions, not requested ranges or machine paths. Optional platform binaries share their parent's published semantics. */
-export function rendererVersion(from: string | URL = import.meta.url): string {
+/** Capture the compiler/parser identity and its exact stylesheet inputs together, without executing dependency code. */
+export function rendererSource(from: string | URL = import.meta.url): RendererSource {
   try {
     const roots = ROOTS.map(name => installed(name, from));
     const queue = [...roots];
@@ -40,10 +41,16 @@ export function rendererVersion(from: string | URL = import.meta.url): string {
       queue.push(...dependencies.map(item => item.target));
       records.add(JSON.stringify([current.name, current.version, dependencies.map(({ alias, target }) => [alias, target.name, target.version])]));
     }
-    const stylesheet = roots[1] as InstalledPackage;
-    const css = STYLESHEETS.map(name => [name, digest(readFileSync(path.join(path.dirname(stylesheet.file), name)))]);
-    return `${POLICY}-${digest(JSON.stringify([POLICY, roots.map(item => [item.name, item.version]), [...records].sort(), css]))}`;
+    const stylesheet = roots[0] as InstalledPackage;
+    const css = STYLESHEETS.map(name => ({ name, bytes: readFileSync(path.join(path.dirname(stylesheet.file), name)) }));
+    const stylesheets = Object.fromEntries(css.map(({ name, bytes }) => [name, bytes.toString('utf8')])) as RendererStylesheets;
+    const hashes = css.map(({ name, bytes }) => [name, digest(bytes)]);
+    const version = `${POLICY}-${digest(JSON.stringify([POLICY, roots.map(item => [item.name, item.version]), [...records].sort(), hashes]))}`;
+    return Object.freeze({ version, stylesheets: Object.freeze(stylesheets) });
   } catch (cause) {
     throw Object.assign(new Error('Cannot establish the installed Tailwind renderer identity.', { cause }), { code: 'RENDERER_IDENTITY_UNAVAILABLE' });
   }
 }
+
+/** Opaque selector only; source capture owns the one hash recipe and preserves installation-path independence. */
+export function rendererVersion(from: string | URL = import.meta.url): string { return rendererSource(from).version; }
