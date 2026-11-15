@@ -4,6 +4,8 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { once } from 'node:events';
 import { stripTypeScriptTypes } from 'node:module';
+import { MIMEType } from 'node:util';
+import { mimeCandidates } from '../../core/tests/fixtures/media-types.js';
 import { chromium } from 'playwright';
 import { fileURLToPath } from 'node:url';
 import * as nodeModel from '../../core/lib/model.ts';
@@ -29,6 +31,10 @@ import { prepareFrameWith } from '../../core/lib/prepare.ts';
 import { scopeRenderCases, scopeRenderProject } from '../../core/tests/fixtures/component-scope.js';
 
 const prefix = '/divlet-kernel/';
+const expectedMediaTypes = mimeCandidates().map(input => {
+  if (!input || input.length > 1024 || /[^\x20-\x7e]/.test(input)) return null;
+  try { const mime = new MIMEType(input); return mime.toString() === input ? { essence: mime.essence, params: [...mime.params], text: mime.toString() } : null; } catch { return null; }
+});
 const bundle = await bundleBrowserModel(fileURLToPath(new URL('../../', import.meta.url)), { source: true });
 const codecBundle = await bundleBrowserCodec(fileURLToPath(new URL('../../', import.meta.url)), { source: true });
 const projectBundle = await bundleBrowserProject(fileURLToPath(new URL('../../', import.meta.url)), { source: true });
@@ -52,6 +58,9 @@ for (const row of scopeRenderCases) {
 const files = new Map([
   [prefix, ['text/html', '<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><title>Portable validation</title>']],
   [`${prefix}validation.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/validation.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}canonical-media-type.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/canonical-media-type.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}browser-media-type.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/browser-media-type.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}media-type-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/media-types.js', import.meta.url), 'utf8')]],
   [`${prefix}declarations.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/declarations.ts', import.meta.url), 'utf8'))]],
   [`${prefix}requirements.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/requirements.ts', import.meta.url), 'utf8'))]],
   [`${prefix}requirement-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/requirements.js', import.meta.url), 'utf8')]],
@@ -153,6 +162,12 @@ try {
       import(new URL('asset-reference.ts', location.href).href), import(new URL('asset-cases.js', location.href).href),
     ]);
     const [requirements, { requirementCases, captureRequirements }] = await Promise.all(['requirements.ts', 'requirement-cases.js'].map(file => import(new URL(file, location.href).href)));
+    const [mime, mimeCases, mimeRefusal] = await Promise.all(['canonical-media-type.ts', 'media-type-cases.js', 'browser-media-type.ts'].map(file => import(new URL(file, location.href).href)));
+    const mimeWitnesses = mimeCases.checkMediaTypeWitnesses(mime);
+    const mediaTypes = mimeCases.mimeCandidates().map(input => { const parsed = mime.canonicalMediaType(input); return parsed ? { essence: parsed.essence, params: [...parsed.params], text: parsed.toString() } : null; });
+    let mimeAssetRefusal;
+    try { mimeRefusal.canonicalMediaType('text/plain'); } catch (error) { mimeAssetRefusal = error.code; }
+    const mimeNodeGlobals = ['Buffer', 'process', 'require'].filter(name => name in globalThis);
     const requirementApi = { ...requirements, DivletError: api.DivletError };
     const requirementResults = requirementCases.map(({ name, input, expected, error }) => ({ name, actual: captureRequirements(requirementApi, input), expected: error ? { ok: false, code: error, domainError: true } : { ok: true, value: expected } }));
     const { nativeJsonCases, captureNativeJson } = await import(new URL('json-cases.js', location.href).href);
@@ -321,6 +336,7 @@ try {
       return { name, inline: inline.nodes[inline.rootId].style.content, pasted: pasted[0].style.content, frame, reopened, refusals, computed };
     });
     return {
+      mediaTypes, mimeWitnesses, mimeAssetRefusal, mimeNodeGlobals,
       patchVersions, patchVersionErrorIdentity,
       historyNavigation, navigationDomainError,
       historyCommits,
@@ -396,6 +412,10 @@ try {
   assert.deepEqual(assetProof, { color: 'rgb(17, 34, 51)', imageWidth: 20, xmlErrors: 0, title: '\u00a0', label: '<brand>', line: 'one\ntwo' }, 'actual browser XML/image and case-insensitive CSS import rendering under a prefix');
   assert.deepEqual(result.nodeGlobals, [], 'no Node globals/polyfills supply the kernel');
   assert.deepEqual(result.orderedCssPadding, ['10px', '20px'], 'validated declaration order survives the shared serializer and actual browser cascade');
+  assert.deepEqual(result.mediaTypes, expectedMediaTypes, 'actual native-browser MIME reads match the independent Node canonical oracle');
+  assert.ok(result.mimeWitnesses > 30);
+  assert.equal(result.mimeAssetRefusal, 'ASSETS_UNAVAILABLE');
+  assert.deepEqual(result.mimeNodeGlobals, []);
   assert.ok(result.cases.length > 25, 'the shared acceptance/refusal regions are exercised');
   for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.references, ...result.requirements, ...result.nativeJson, ...result.nativeValues, ...result.nativeEquality, ...result.inlineCss, ...result.componentTexts, ...result.componentValues, ...result.componentAttributes, ...result.componentMetadata, ...result.domIds, ...result.componentScopes, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
   assert.deepEqual(result.styleReplayRendering.map(value => value.html), expectedStyleReplayHtml);
@@ -450,7 +470,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.historyCommits.length} accepted history-commit + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.mediaTypes.length} canonical MIME + ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.historyCommits.length} accepted history-commit + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();
