@@ -6,6 +6,9 @@ import { styleEngine, setStyleEngines } from '../../../core/lib/engine.ts';
 import { cssAnnotationCases } from '../../../core/tests/fixtures/css-annotations.js';
 import { readProject as readNativeProject, expandFrame } from '../../../core/lib/project.ts';
 import { styleOrderSource } from './fixtures/style-order.js';
+import { attributeDifferenceSource } from './fixtures/attribute-difference.js';
+import { readProject as readPen } from '../lib/source.js';
+import { sourceFrame } from '../lib/projection.js';
 
 const original = styleEngine();
 test.before(() => setStyleEngines([]));
@@ -74,6 +77,42 @@ for (const nested of [false, true]) {
     assert.equal(JSON.stringify(source), before);
   });
 }
+
+for (const nested of [false, true]) for (const name of ['data-example', 'toString']) test(`component linking preserves own attribute removal (${nested ? 'nested' : 'direct'}, ${name})`, () => {
+  const source = attributeDifferenceSource({ nested, name }), before = JSON.stringify(source);
+  const projected = sourceFrame(readPen(source), 'page').document;
+  const svg = frame => Object.values(frame.nodes).filter(node => node.type === 'element' && node.tag === 'svg');
+  assert.equal(svg(projected).length, 1);
+  assert.equal(Object.hasOwn(svg(projected)[0].attrs, name), false, 'the admitted source projection really removed the attribute');
+  const converted = convertPen(source), project = readNativeProject(JSON.parse(converted.text));
+  const frames = new Map(project.frames.map(frame => [frame.id, frame]));
+  const page = project.frames.find(frame => frame.name === 'Page'), expanded = expandFrame(page, id => frames.get(id), project.settings).document;
+  assert.equal(svg(expanded).length, 1);
+  assert.equal(Object.hasOwn(svg(expanded)[0].attrs, name), false, 'linking must not resurrect an inherited prototype-named attribute');
+  const child = page.nodes[page.nodes[page.rootId].children[0]];
+  if (nested) {
+    assert.equal(child.type, 'element', 'dropping a lower nested override remains conservatively expanded');
+    assert.equal(svg(expanded)[0].className, 'outer', 'disjoint outer fields survive the conservative fallback');
+  } else {
+    assert.equal(child.type, 'ref', 'an expressible attribute deletion retains the component link');
+    assert.ok(Object.values(child.descendants).some(override => Object.hasOwn(override.attrs ?? {}, name) && override.attrs[name] === null));
+  }
+  assert.equal(JSON.stringify(source), before, 'foreign source objects and own keys are never rewritten');
+});
+
+test('component attribute member order does not create a false fidelity refusal', () => {
+  const source = attributeDifferenceSource({ name: 'data-a' });
+  source.children[0].divlet.attrs = { 'data-a': 'a', 'data-b': 'b' };
+  source.children[1].children[0].divlet.attrs = { 'data-b': 'b', 'data-a': 'a' };
+  const projected = sourceFrame(readPen(source), 'page').document;
+  const attrsOf = frame => Object.values(frame.nodes).find(node => node.type === 'element' && node.tag === 'svg').attrs;
+  assert.deepEqual(Object.keys(attrsOf(projected)).filter(name => name.startsWith('data-') && name !== 'data-pen-style'), ['data-b', 'data-a']);
+  const converted = convertPen(source), project = readNativeProject(JSON.parse(converted.text));
+  const lookup = new Map(project.frames.map(frame => [frame.id, frame])), page = project.frames.find(frame => frame.name === 'Page');
+  const expanded = expandFrame(page, id => lookup.get(id), project.settings).document;
+  assert.equal(page.nodes[page.nodes[page.rootId].children[0]].type, 'ref');
+  assert.equal(attrsOf(expanded)['data-a'], 'a'); assert.equal(attrsOf(expanded)['data-b'], 'b');
+});
 
 test('variables stay live: colour, length, number and font variables become tokens referenced with var()', () => {
   const source = { version: '2.21',

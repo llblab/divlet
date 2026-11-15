@@ -108,7 +108,7 @@ function overrideFor(e, d) {
   for (const key of ['style', 'attrs']) if (!sameObject(e[key], d[key])) {
     const change = {};
     for (const [name, value] of Object.entries(e[key] ?? {})) if (d[key]?.[name] !== value) change[name] = value;
-    for (const name of Object.keys(d[key] ?? {})) if (!(name in (e[key] ?? {}))) change[name] = null;
+    for (const name of Object.keys(d[key] ?? {})) if (!Object.hasOwn(e[key] ?? {}, name)) change[name] = null;
     out[key] = change;
   }
   return out;
@@ -134,7 +134,7 @@ function nestedOverrides(nestedId, ed = {}, dd = {}) {
     if (stable(ed[address]) === stable(dd[address])) continue;
     if (!ed[address]) return null;
     for (const [key, value] of Object.entries(dd[address] ?? {})) {
-      if (key === 'style' || key === 'attrs') { for (const name of Object.keys(value)) if (!(name in (ed[address][key] ?? {}))) return null; }
+      if (key === 'style' || key === 'attrs') { for (const name of Object.keys(value)) if (!Object.hasOwn(ed[address][key] ?? {}, name)) return null; }
       else if (!(key in ed[address])) return null;
     }
     out[`${nestedId}/${address}`] = ed[address];
@@ -196,13 +196,13 @@ function linkComponents(frames, reusable) {
   return total;
 }
 
-/** Inline order is rendering data even in the draft map profile; linking must reproduce the projected inline sequence exactly. */
-function inlineStyleSequence(frame) {
+/** Linking must preserve projected element fields; attribute order is immaterial, inline declaration order is not. */
+function elementPresentation(frame) {
   const sequence = [], pending = [frame.rootId];
   while (pending.length) {
     const node = frame.nodes[pending.pop()];
     if (node.type !== 'element') continue;
-    sequence.push([node.tag, Object.entries(node.style)]);
+    sequence.push([node.tag, node.className, Object.entries(node.attrs).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0), Object.entries(node.style)]);
     pending.push(...[...node.children].reverse());
   }
   return sequence;
@@ -261,13 +261,13 @@ export function convertPen(input, { name, provenance } = {}) {
     stats.declarations += frame.declarations;
     converted.push(frame);
   }
-  const projectedStyles = converted.map(frame => JSON.stringify(inlineStyleSequence(frame)));
+  const projectedPresentation = converted.map(frame => JSON.stringify(elementPresentation(frame)));
   stats.instances = linkComponents(converted, reusableIds(project.source.children));
   const frames = converted.map(frame => validateDocument({ schemaVersion: 1, id: frame.id, name: frame.name, version: 1, rootId: frame.rootId, artboard: frame.artboard, tokens: {}, css: '', metadata: {}, nodes: frame.nodes }));
   const lookup = new Map(frames.map(frame => [frame.id, frame]));
   for (const [index, frame] of frames.entries()) {
     const expanded = expandFrame(frame, id => lookup.get(id), null).document;
-    if (JSON.stringify(inlineStyleSequence(expanded)) !== projectedStyles[index]) unsupported('Component linking cannot preserve projected inline CSS declaration order and values in the current native profile.');
+    if (JSON.stringify(elementPresentation(expanded)) !== projectedPresentation[index]) unsupported('Component linking cannot preserve projected element tags, classes, attributes or inline CSS declarations in the current native profile.');
   }
   stats.frames = frames.length;
   stats.nodes = frames.reduce((total, frame) => total + Object.keys(frame.nodes).length, 0);
