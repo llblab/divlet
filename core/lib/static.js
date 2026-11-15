@@ -13,6 +13,7 @@ import { rewriteSvgResource } from './svg-resource.ts';
 import { decodeCss } from './css-literals.ts';
 import { resourceMediaTypeForExtension } from './media-type.ts';
 import { rewriteCss, rewriteSrcset, rewriteHtml, unsupportedSourceCss } from './resource-carriers.ts';
+import { DeclaredResourceGraph } from './declared-resources.ts';
 
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const fail = (message, details) => { throw Object.assign(new Error(`Static bundle: ${message}`), details ? { details } : {}); };
@@ -249,7 +250,7 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
   frameFiles = frameFiles === undefined ? undefined : new Map(frameFiles);
   const foldedNames = new Set();
   const occupied = new Set();
-  const resources = new Map(), declaredResources = new Map(), assetSources = new Map(), mediaTypes = new Map();
+  const resources = new Map(), assetSources = new Map(), mediaTypes = new Map();
   const pending = [];
   const classRenames = new Map(), sourceSelectors = new Set();
   const numericReferences = new Set(), variableDefinitions = new Set();
@@ -274,6 +275,30 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
   const onClassRename = (from, to) => { for (const selector of sourceSelectors) checkSelector(selector, from, to); classRenames.set(from, to); };
   let allowNewResources = true;
   const budget = { bytes: 0 };
+  const declaredResources = new DeclaredResourceGraph(declared?.files || new Map(), {
+    allocation: {
+      assertOpen() { if (!allowNewResources) fail('preview references a resource absent from the public artifact graph'); },
+      claim(bytes) {
+        if (resources.size + declaredResources.size >= MAX_RESOURCE_FILES) fail('resource count limit exceeded');
+        if ((budget.bytes += bytes) > MAX_TOTAL) fail('resource byte limit exceeded');
+      },
+      reserve,
+    },
+    output: {
+      source(source, output, file) {
+        mediaTypes.set(output, file.mediaType);
+        assetSources.set(source, hash(JSON.stringify([file.mediaType, hash(file.bytes)])));
+        files.set(output, Buffer.from(file.bytes));
+      },
+      text(output, text) { files.set(output, text); },
+    },
+    defer(task) { pending.push(task); },
+    rewrite(url, source, output, kind) {
+      if (nativeAssets && kind === 'svg' && url && !url.startsWith('#') && !/^data:/i.test(url)) throw new DivletError('INVALID_ASSET', 'Native SVG file assets currently require inline or same-document dependencies.');
+      return rewriteUrl(url, source, output);
+    },
+    inspectCss: inspectSelectors,
+  });
   for (const base of [assetBase, siteBase, previewBase]) {
     if (base === undefined) continue;
     let parsed;
@@ -337,33 +362,8 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
     }
     return output;
   }
-  async function declaredResource(key) {
-    if (declaredResources.has(key)) return;
-    if (!allowNewResources) fail('preview references a resource absent from the public artifact graph');
-    const file = declared?.files.get(key);
-    if (!file) throw new DivletError('INVALID_ASSET', `Missing declared asset: ${key}`);
-    if (resources.size + declaredResources.size >= MAX_RESOURCE_FILES) fail('resource count limit exceeded');
-    if ((budget.bytes += file.bytes.byteLength) > MAX_TOTAL) fail('resource byte limit exceeded');
-    const output = `assets/${key}`, content = readAssetText(file);
-    reserve(output);
-    declaredResources.set(key, output);
-    mediaTypes.set(output, file.mediaType);
-    assetSources.set(assetReference(key), hash(JSON.stringify([file.mediaType, hash(file.bytes)])));
-    files.set(output, Buffer.from(file.bytes));
-    if (content) pending.push(async () => {
-      const source = assetReference(key), rewrite = url => {
-        if (nativeAssets && content.kind === 'svg' && url && !url.startsWith('#') && !/^data:/i.test(url)) throw new DivletError('INVALID_ASSET', 'Native SVG file assets currently require inline or same-document dependencies.');
-        return rewriteUrl(url, source, output);
-      };
-      const rewritten = content.kind === 'css'
-        ? await rewriteCss(content.text, rewrite, false, true, inspectSelectors)
-        : await rewriteSvgResource(content.text, { url: rewrite, css: (text, inline) => rewriteCss(text, rewrite, inline, true, inspectSelectors) });
-      if (content.ascii && /[^\x00-\x7f]/.test(rewritten)) throw new DivletError('INVALID_ASSET', 'Rewriting this asset would violate its US-ASCII encoding.');
-      files.set(output, rewritten);
-    });
-  }
   async function declaredUrl(reference, output) {
-    await declaredResource(reference.path);
+    await declaredResources.add(reference.path);
     // Go via the artifact root: comparing raw paths with encoded names can alias literal percent components.
     const up = path.posix.relative(path.posix.dirname(output), '.');
     return `${up ? up + '/' : ''}assets/${assetReference(reference.path).slice(6)}${reference.suffix}`;
@@ -468,7 +468,7 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
   const mapped = mapResources ? await mapResources(async (value, kind = 'url', tokens = {}, numericTokens = {}) => {
     const rewrite = async url => {
       const reference = readAssetReference(url);
-      if (reference) { await declaredResource(reference.path); return url; } // canonical copies retain declared identity, not cache paths
+      if (reference) { await declaredResources.add(reference.path); return url; } // canonical copies retain declared identity, not cache paths
       return rewriteUrl(url, path.join(root, '__divlet_source__.html'), '__divlet_source__.html');
     };
     if (kind === 'url') return rewrite(value);
