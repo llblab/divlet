@@ -22,6 +22,18 @@ The format does not standardize editor selection, hover, panels, viewport naviga
 
 The implementation currently parses JSON numbers as JavaScript binary64 values. A lexical `9007199254740993` is already `9007199254740992` before model validation; `1e-400` becomes zero at the same stage. Metadata `-0` survives admission but `JSON.stringify` writes positive zero. Parse-time rounding must not be misreported as corruption by the project writer. The approved direction is finite binary64 values with equivalent signed zeros, using application-defined strings for precision-sensitive values; exact lexical/decimal preservation would require a different admission representation. This is an implementation target, not a newly frozen numeric promise. The [approved first-release profile](#approved-first-release-profile) below owns the related CSS, identity, dependency and migration choices.
 
+### Envelope boundaries during the cutover
+
+The shared initial marker is not permission to interchange these representations:
+
+- **Canonical project:** `readProject` / `writeProject` own the settings-plus-frames container. A bare standalone frame is not a project-file fallback, even if it has `schemaVersion: 1`; adding `frames` to a frame does not admit a mixed envelope.
+- **Standalone frame:** `validateDocument` and the frame codec consume the schema-1 node tree. Structural validity alone does not establish component-target, declared-resource or renderer closure. Stored frames omit the marker on write; `frameDocument` supplies it only for that adapter, while an explicitly unsupported stored marker still refuses.
+- **HTML frame manifest:** the encoder writes marker 1 and frame identity/metadata, not project settings. Current HTML reconstruction also supplies 1 for an absent/null manifest marker; unsupported numeric markers and unknown manifest fields still refuse. This fallback does not relax standalone JSON admission or open a project. Compiled stylesheet bytes are rendering input: strict decoding excludes them from authored frame CSS, while static file/clean exports may include them for painting.
+
+The approved `requires` object belongs to the **project**, not each stored frame or its HTML manifest. A frame's class names or a `data-divlet-compiled` stylesheet do not authorize provider selection or constitute a dependency declaration. Rendering/resource authority comes from the owning project and trusted composition, not a second frame-owned profile. An independently reopenable frame copy needs a complete project container with the explicitly selected requirements and resource context, rather than an extra frame discriminator. This is a constraint on the coherent transition, not activation of `requires` in today's reader.
+
+Only structural envelope fields carry schema/revision meaning. Identically named `schemaVersion`, `version` or `requires` members inside application metadata remain opaque data; an envelope conversion must not renumber or reinterpret them. `core/tests/envelopes.test.js` records these current boundaries, not a frozen target-reader conformance claim.
+
 ## Project file
 
 This is a complete valid source example, not JSON with placeholder comments:
