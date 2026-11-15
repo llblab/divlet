@@ -81,7 +81,18 @@ Portable data/graph/export primitives are not a browser resource host. The curre
 
 A bounded Chromium transport inquiry used an admitted native image reference `asset:icon.svg?rev=1#mark`, shared frame preparation and the native static graph as a positive control. Under a repository prefix, its projected SVG loaded at 7×9 while retaining query/fragment and unchanged canonical source. The same bytes loaded through a direct Blob URL and its fragment-only form, but appending the query caused image failure and a rejected Blob fetch. Resolving an artifact-relative URL against that opaque Blob base also threw. The single-file exporter correctly refused the query with `UNSUPPORTED_EXPORT` rather than silently removing it. This rules out **direct Blob substitution with unchanged suffixes/relative graph URLs**, not every possible Blob-based strategy. It does not establish a browser materialization host, preview-CSP compatibility, storage, offline behavior or universal browser results.
 
-The next URL-host proof must therefore retain the supported resource semantics or explicitly diagnose an unavailable capability; it cannot strip queries, substitute single-file export for bundle projection, bypass admission or infer a Service Worker design from this counterexample. The remaining implementation and acceptance work belongs in [BACKLOG.md](../BACKLOG.md).
+A separate private Service Worker experiment materialized shared `DeclaredResourceGraph` outputs in Chromium itself, including an independently named alias and a Unicode/percent-bearing name. Its HTTPS URL namespace retained query/fragment: an ordinary controlled iframe loaded both the image and external SVG `use` at 7×9, including with the actual `previewDocument` CSP. The same experiment exposed a distinct containment boundary:
+
+| Frame variant | Observed worker controller | Resource result | Parent document access |
+| --- | --- | --- | --- |
+| Ordinary HTTPS URL, with or without preview CSP | Present | Image and external `use` 7×9 | Allowed; not the editor containment boundary |
+| HTTPS URL with `sandbox="allow-scripts"` | Access raises `SecurityError` | Navigation fell through to the fixture server's empty 404 | Denied |
+| Blob URL with preview CSP, no sandbox | Absent | Image and external-use geometry 0×0 | Allowed; not the editor containment boundary |
+| Current-style Blob URL with preview CSP and `sandbox="allow-scripts"` | Access raises `SecurityError` | No worker-backed image or external-use paint | Denied |
+
+These are bounded Chromium 156 observations, not a claim that every possible Service Worker design is impossible. The fixture also rejected a late generation, returned 410 after explicit release, and left a newer generation readable; that is prototype bookkeeping, not the editor's accepted-state/lifetime protocol. Its publisher was trusted, its bridge inert, and its disposable HTTPS fixture disabled browser certificate checking for a self-signed certificate. No authenticated worker publication, live editor update, hostile-message defense, storage, offline reload or production TLS assurance was established. No worker or resource-host implementation was enabled in the product.
+
+The next URL-host proof must therefore retain preview containment as well as resource semantics, or explicitly diagnose an unavailable capability. An unsandboxed URL control cannot justify adding same-origin access to product previews. Do not strip queries, substitute single-file export for bundle projection, bypass admission or infer a Service Worker design from these experiments. Use actual native-board preview behavior, not static export alone, as an additional baseline before choosing a preview projection/refusal strategy. The remaining implementation and acceptance work belongs in [BACKLOG.md](../BACKLOG.md).
 
 ## Useful modes
 
