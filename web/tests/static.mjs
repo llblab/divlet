@@ -23,6 +23,7 @@ const runtime = await openRuntime({ file: path.join(source, 'manual.divlet'), wa
 let browser;
 let server;
 let native;
+const nativeBundle = new Map(), nativeBundleTypes = new Map();
 try {
   const template = decodeHtml(`<style>main{max-width:100%;box-sizing:border-box}${font ? '@font-face{font-family:Bundled;src:url(assets/font.ttf)}main{font-family:Bundled}' : ''}</style><main id="shell" class="min-h-screen p-4 md:p-8 bg-[#123456] text-white"><header><img id="logo" src="assets/mark.svg" alt="Local mark"><svg id="blur-example" width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><defs><filter id="soft-edge" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2"/></filter></defs><rect x="8" y="8" width="16" height="16" filter="url(#soft-edge)"/></svg><h1 id="title" class="text-2xl md:text-4xl">Title</h1></header><nav id="navigation"></nav><article id="content" class="max-w-prose"></article></main>`, { fallbackId: 'layout' });
   await runtime.create({ document: template });
@@ -44,6 +45,12 @@ try {
       if (!url.pathname.startsWith(prefix)) { res.writeHead(404); return res.end(); }
       const relative = decodeURIComponent(url.pathname.slice(prefix.length));
       if (relative.split('/').includes('..')) { res.writeHead(403); return res.end(); }
+      if (relative.startsWith('native-bundle/')) {
+        const name = relative.slice('native-bundle/'.length);
+        if (!nativeBundle.has(name)) { res.writeHead(404); return res.end(); }
+        res.writeHead(200, { 'Content-Type': nativeBundleTypes.get(name) ?? mime[path.extname(name)] ?? 'application/octet-stream' });
+        return res.end(nativeBundle.get(name));
+      }
       const file = path.join(output, relative.endsWith('/') || !relative ? relative + 'index.html' : relative);
       const bytes = await fs.readFile(file);
       res.writeHead(200, { 'Content-Type': mime[path.extname(file)] ?? 'application/octet-stream' });
@@ -96,7 +103,7 @@ try {
   const nativeFile = path.join(nativeDirectory, 'project.divlet');
   const nativeFrame = decodeHtml('<main><span id="font-proof" style="font-size:100px">AA</span><img id="native-logo" src="asset:icons/mark.svg"></main>', { fallbackId: 'native' });
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect id="mark" width="32" height="32" fill="#123456"/></svg>';
-  const nativeUse = decodeHtml('<main><svg width="32" height="32"><defs><rect id="local-mark" width="32" height="32"/></defs><use href="#local-mark"></use></svg></main>', { fallbackId: 'native-use' });
+  const nativeUse = decodeHtml('<main><img id="query-logo" src="asset:icons/mark.svg?theme=%2f#mark"><svg width="32" height="32"><defs><rect id="local-mark" width="32" height="32"/></defs><use id="native-local-use" href="#local-mark"></use></svg></main>', { fallbackId: 'native-use' });
   const settings = validateSettings({ css: '@font-face{font-family:NativeAsset;src:url(asset:fonts/typed.html)}main{font-family:NativeAsset}', assets: { fonts: { 'typed.html': fontDataUrl() }, icons: { 'mark.svg': 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64') } } });
   await fs.writeFile(nativeFile, writeProject(settings, [nativeFrame, nativeUse]));
   native = await openRuntime({ file: nativeFile, watch: false });
@@ -112,8 +119,35 @@ try {
   await live.locator('#native-logo').evaluate(image => image.decode());
   const usePreview = page.frameLocator('iframe[data-document-id="native-use"]');
   await usePreview.locator('use').waitFor();
-  await page.waitForTimeout(250);
-  assert.equal(await usePreview.locator('use').evaluate(node => node.getBBox().width), 32, 'same-document SVG use remains supported in the real sandboxed preview');
+  const useIframe = await page.locator('iframe[data-document-id="native-use"]').elementHandle();
+  const useDocument = await useIframe.contentFrame();
+  await useDocument.waitForFunction(() => { const box = document.querySelector('use')?.getBBox(); return box?.width === 32 && box.height === 32; });
+  await usePreview.locator('#query-logo').evaluate(image => image.decode());
+  assert.deepEqual(await usePreview.locator('#query-logo').evaluate(image => [image.naturalWidth, image.naturalHeight]), [32, 32]);
+  assert.deepEqual(await usePreview.locator('use').evaluate(node => { const box = node.getBBox(); return [box.width, box.height]; }), [32, 32], 'same-document SVG use remains supported in the real sandboxed preview');
+  assert.deepEqual(await usePreview.locator('#query-logo').evaluate(image => {
+    const url = new URL(image.src), parts = url.search.slice(1).split('&');
+    return { path: url.pathname.slice(url.pathname.lastIndexOf('/assets/')), query: parts.filter(part => !part.startsWith('divlet-resource=')).join('&'), cacheEntries: parts.filter(part => part.startsWith('divlet-resource=')).length, fragment: url.hash };
+  }), { path: '/assets/icons/mark.svg', query: 'theme=%2f', cacheEntries: 1, fragment: '#mark' }, 'native projection retains the raw authored query/fragment alongside its separate cache parameter');
+  assert.equal(await useIframe.getAttribute('sandbox'), 'allow-scripts');
+  assert.equal(await useIframe.getAttribute('referrerpolicy'), 'no-referrer');
+  assert.equal(await useDocument.evaluate(() => { try { return !!parent.document.body; } catch { return false; } }), false);
+  const acceptedFrame = native.read({ view: 'frame', documentId: 'native-use' });
+  const useId = Object.values(acceptedFrame.nodes).find(node => node.type === 'element' && node.attrs.id === 'native-local-use').id;
+  const acceptedState = () => structuredClone({ frame: native.read({ view: 'frame', documentId: 'native-use' }), settings: native.settings, revision: native.revision, render: native.getEntry('native-use').render, html: native.getEntry('native-use').html, history: native.readHistory(), undo: native.undoStack, redo: native.redoStack, publicGraph: [...native.publicFiles].map(([name, bytes]) => [name, typeof bytes === 'string' ? bytes : Buffer.from(bytes).toString('base64'), native.publicMediaTypes.get(name)]) });
+  const beforeRefusal = acceptedState(), beforeSource = await fs.readFile(nativeFile);
+  const refusal = await page.evaluate(async body => {
+    try { await (await import('./lib/host.js')).writer.patch(body); return { accepted: true }; }
+    catch (error) { return { code: error.code, message: error.message }; }
+  }, { documentId: 'native-use', expectedVersion: acceptedFrame.version, patch: { nodes: { [useId]: { attrs: { href: 'asset:icons/mark.svg?theme=%2f#mark' } } } } });
+  assert.deepEqual(refusal, { code: 'INVALID_ASSET', message: 'Declared SVG use references cannot load in the sandboxed native preview. Use inline SVG with same-document references.' });
+  assert.deepEqual(acceptedState(), beforeRefusal, 'refused external SVG use retains model, prepared render, project settings and history stacks');
+  assert.deepEqual(await fs.readFile(nativeFile), beforeSource, 'refusal leaves canonical bytes unchanged');
+  assert.equal(await useIframe.evaluate(node => node.isConnected && node === document.querySelector('iframe[data-document-id="native-use"]')), true, 'refusal retains the actual iframe');
+  assert.deepEqual(await usePreview.locator('use').evaluate(node => { const box = node.getBBox(); return [box.width, box.height]; }), [32, 32]);
+  assert.deepEqual(await usePreview.locator('#query-logo').evaluate(image => [image.naturalWidth, image.naturalHeight]), [32, 32]);
+  for (const [name, bytes] of native.publicFiles) nativeBundle.set(name, typeof bytes === 'string' ? bytes : Buffer.from(bytes));
+  for (const [name, type] of native.publicMediaTypes) nativeBundleTypes.set(name, type);
   await page.locator('iframe[data-document-id="native"]').evaluate(node => { node.dataset.lifetimeProof = 'retained'; });
   const liveDocument = await (await page.locator('iframe[data-document-id="native"]').elementHandle()).contentFrame();
   await native.patchProject({ expectedVersion: native.settings.version, patch: { assets: { fonts: { 'typed.html': fontDataUrl(900) } } } });
@@ -143,6 +177,14 @@ try {
   await fs.writeFile(path.join(output, 'native-export.html'), exported.html);
   await native.close(); await fs.rm(nativeDirectory, { recursive: true });
   const requestStart = requests.length;
+  await page.goto(base + 'native-bundle/native-use.html');
+  await page.locator('#query-logo').evaluate(image => image.decode());
+  assert.deepEqual(await page.locator('#query-logo').evaluate(image => [image.naturalWidth, image.naturalHeight]), [32, 32]);
+  assert.equal(await page.locator('#query-logo').getAttribute('src'), 'assets/icons/mark.svg?theme=%2f#mark', 'clean bundle retains the opaque query/fragment without preview cache parameters');
+  await page.waitForFunction(() => { const box = document.querySelector('use')?.getBBox(); return box?.width === 32 && box.height === 32; });
+  assert.deepEqual(await page.locator('use').evaluate(node => { const box = node.getBBox(); return [box.width, box.height]; }), [32, 32]);
+  assert.equal(await page.locator('script').count(), 0);
+  assert.ok([...nativeBundle.keys()].every(name => !/\.meta\.json$|(?:^|\/)\.divlet/.test(name)), 'the copied control contains the public graph, never editor sidecars');
   await checkNativeFont(base + 'native-export.html', 120, 'UploadedStatic');
   assert.equal(await page.locator('#font-proof').evaluate(node => getComputedStyle(node).fontFamily), 'UploadedStatic');
   assert.ok(requests.slice(requestStart).every(url => !url.startsWith(nativeUrl)), 'standalone fonts/images require neither canonical source, cache nor live board');
@@ -164,9 +206,10 @@ try {
     }, { bytes: bytes.toString('base64'), metadata });
     assert.deepEqual(proof, { width: 120, status: 'loaded', weight: metadata.weight, style: metadata.styles[0], stretch: metadata.stretch });
   }
+  assert.deepEqual(errors, []);
   await fs.mkdir('artifacts', { recursive: true });
   await page.screenshot({ path: 'artifacts/static.png', fullPage: true });
-  console.log(JSON.stringify({ status: 'passed', checks: ['copied build after editor shutdown and source removal', 'subpath hosting', 'real Tailwind CSS', '1280/768/390px responsive rendering', 'local SVG resources and rendered inline Gaussian blur', ...(font ? ['bundled local font'] : []), 'nested Markdown navigation and fragments', 'no editor traffic or scripts', 'native MIME-aware image/font bytes independent of extension', 'real font loading, render invalidation and Undo', 'standalone embedded font/image HTML after deleting native source/cache', 'separately browser-decoded SFNT italic/oblique weight/stretch descriptors'],  screenshot: 'artifacts/static.png' }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', checks: ['copied build after editor shutdown and source removal', 'subpath hosting', 'real Tailwind CSS', '1280/768/390px responsive rendering', 'local SVG resources and rendered inline Gaussian blur', ...(font ? ['bundled local font'] : []), 'nested Markdown navigation and fragments', 'no editor traffic or scripts', 'native MIME-aware image/font bytes independent of extension', 'real font loading, render invalidation and Undo', 'opaque native preview query image/same-document SVG use and non-destructive external-use refusal through the real host writer', 'independent prefixed public bundle preserves query/fragment after native source/cache deletion', 'standalone embedded font/image HTML after deleting native source/cache', 'separately browser-decoded SFNT italic/oblique weight/stretch descriptors'],  screenshot: 'artifacts/static.png' }, null, 2));
 } finally {
   await browser?.close();
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
