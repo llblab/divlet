@@ -66,6 +66,23 @@ This is a flattened **inspection projection**, with presentation ID `index` and 
 
 Public-content curation, HTML/model validity, publication provenance, reference closure and UI capabilities are different checks. This projector is not a secret scanner of visible authored text, attributes or CSS, nor a resource/link-graph validator. It does not make arbitrary input publishable. The first profile deliberately permits only a sibling `.html` browsing filename without paths, queries or fragments; broader routing needs an explicit contract rather than implicit URL guesses.
 
+## Browser resource activation boundary
+
+Portable data/graph/export primitives are not a browser resource host. The current connected chain has these independent boundaries:
+
+| Owner | Current behavior | Integration constraint |
+| --- | --- | --- |
+| `project.ts` and `browser-assets.ts` | Project open/settings validation and source serialization use the bundle-selected asset port; the default browser port refuses byte leaves. | A Node invocation of `BrowserRuntime` is not evidence that the browser reader admits the same source. Preserve the default refusal until the complete browser consumer is proven. |
+| `BrowserRuntime.patchProject` | Independently refuses every non-null `assets` patch before preparing a candidate. | Changing only the reader mapping would leave authoring/history paths inconsistent; capability flags do not select a decoder or remove this guard. |
+| `prepareFrameWith` and `BrowserRuntime.render` | Produce and return model HTML with logical authored resource URLs, without declared graph materialization. | Resource projection must cover both initial iframe creation and later `readRender` updates, without writing projected URLs back into the model. |
+| `browser-board.ts` previews | Allocate/release HTML Blob URLs, not a declared-resource URL namespace. The preview CSP permits Blob images but not Blob fonts or external Blob stylesheets. | Prove resource resolution, CSP and URL lifetime together; a page Blob URL alone cannot serve the declared graph. Do not broadly weaken CSP to hide a missing host. |
+| Browser exports | `BrowserRuntime.exportDocument` is synchronous, does not call `inlineDeclaredAssets`, and the page adapter clones its immediate result. The default composition has no `BoardExports.nodes`. | An asynchronous projector and its awaiting adapter must change together; advertise selected-node export only when the resource-aware implementation exists. Single-file export retains its own query/use/cycle refusals. |
+| Source/storage/project copy | `source()` calls `writeProject`; the browser store retains canonical project text with its publication fingerprint. Project download uses that same source. | Admission, patch/history, storage/reopen and whole-project copying must retain named used and unused bytes. Transient URL handles and derived graph records are not canonical project content. |
+
+A bounded Chromium transport inquiry used an admitted native image reference `asset:icon.svg?rev=1#mark`, shared frame preparation and the native static graph as a positive control. Under a repository prefix, its projected SVG loaded at 7×9 while retaining query/fragment and unchanged canonical source. The same bytes loaded through a direct Blob URL and its fragment-only form, but appending the query caused image failure and a rejected Blob fetch. Resolving an artifact-relative URL against that opaque Blob base also threw. The single-file exporter correctly refused the query with `UNSUPPORTED_EXPORT` rather than silently removing it. This rules out **direct Blob substitution with unchanged suffixes/relative graph URLs**, not every possible Blob-based strategy. It does not establish a browser materialization host, preview-CSP compatibility, storage, offline behavior or universal browser results.
+
+The next URL-host proof must therefore retain the supported resource semantics or explicitly diagnose an unavailable capability; it cannot strip queries, substitute single-file export for bundle projection, bypass admission or infer a Service Worker design from this counterexample. The remaining implementation and acceptance work belongs in [BACKLOG.md](../BACKLOG.md).
+
 ## Useful modes
 
 - **Static publication:** ordinary rendered HTML/CSS/resources. This already exists and needs no editor runtime or service worker.
