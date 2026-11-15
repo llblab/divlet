@@ -6,10 +6,9 @@ import { parse, parseFragment, serialize } from 'parse5';
 import postcss from 'postcss';
 import valueParser from 'postcss-value-parser';
 import { createClassResourceMapper } from './style-engines.ts';
-import { readAssets, readAssetText } from './assets.ts';
+import { readAssets } from './assets.ts';
 import { readAssetReference, resolveAssetDependency } from './asset-reference.ts';
 import { DivletError } from './validation.ts';
-import { rewriteSvgResource } from './svg-resource.ts';
 import { decodeCss } from './css-literals.ts';
 import { resourceMediaTypeForExtension } from './media-type.ts';
 import { rewriteCss, rewriteSrcset, rewriteHtml, unsupportedSourceCss } from './resource-carriers.ts';
@@ -194,40 +193,7 @@ export async function readConfinedResource(projectDir, file, { authorized = new 
 }
 
 
-/** Build a read-only, server-independent static artifact set. */
-/** Standalone clean HTML embeds declared bytes only; legacy URLs and literal Data URLs keep their authored meaning. */
-export async function inlineDeclaredAssets(html, assets, { fragment = false } = {}) {
-  const parsed = readAssets(assets ?? {});
-  if (!parsed.files.size) return html;
-  const completed = new Map();
-  let work = Buffer.byteLength(html);
-  const limit = () => { throw new DivletError('FILE_TOO_LARGE', 'Standalone HTML exceeds its resource byte budget; save a project copy instead.'); };
-  async function fileUrl(key, stack) {
-    if (stack.includes(key)) throw new DivletError('UNSUPPORTED_EXPORT', 'Cyclic declared resources require a project/bundle copy, not one HTML file.');
-    if (completed.has(key)) return completed.get(key);
-    const file = parsed.files.get(key);
-    if (!file) throw new DivletError('INVALID_ASSET', 'Missing declared resource during export.');
-    const text = readAssetText(file), next = [...stack, key];
-    const rewrite = value => url(value, next, key);
-    const bytes = text ? Buffer.from(text.kind === 'css' ? await rewriteCss(text.text, rewrite, false, true) : await rewriteSvgResource(text.text, { url: rewrite, css: (css, inline) => rewriteCss(css, rewrite, inline, true) })) : file.bytes;
-    if (text?.ascii && Buffer.from(bytes).some(byte => byte > 127)) throw new DivletError('INVALID_ASSET', 'Inlining this asset would violate its US-ASCII encoding.');
-    const result = `data:${file.mediaType};base64,${Buffer.from(bytes).toString('base64')}`;
-    completed.set(key, result);
-    return result;
-  }
-  async function url(value, stack = [], base, context) {
-    let reference = readAssetReference(value);
-    if (!reference && base && value && !value.startsWith('#') && !/^(?:data:|https?:|\/\/)/i.test(value)) reference = readAssetReference(resolveAssetDependency(base, value));
-    if (!reference) return value;
-    if (reference.suffix.startsWith('?') || context?.tag === 'use') throw new DivletError('UNSUPPORTED_EXPORT', 'This resource URL requires a project/bundle copy to retain its query or SVG-use semantics.');
-    const result = await fileUrl(reference.path, stack) + reference.suffix;
-    if ((work += result.length + 5 * (result.match(/[<&"\\]/g)?.length || 0)) > MAX_TOTAL) limit();
-    return result;
-  }
-  const result = await rewriteHtml(html, (value, context) => url(value, [], undefined, context), fragment);
-  if (Buffer.byteLength(result) > MAX_TOTAL) limit();
-  return result;
-}
+export { inlineDeclaredAssets } from './standalone-assets.ts';
 
 export async function buildStatic({ projectDir, frames, frameFiles, site = new Map(), assetBase, siteBase, externalFiles = [], previews = new Map(), mapResources, assets, resourceDirectory = assets === undefined ? '_assets' : 'assets', closedCss = false, stylesheetFrames = new Set(), previewBase, nativeAssets = false, sitePreviews = new Map() }) {
   if (mapResources !== undefined && typeof mapResources !== 'function') fail('mapResources must be a function');

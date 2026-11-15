@@ -1,4 +1,4 @@
-// Domain: Asset base64 payloads. Owns: strict canonical admission, a decoded-byte ceiling and fresh portable bytes. Excludes: MIME/Data URLs, trees, host adapters and resource activation.
+// Domain: Asset base64 payloads. Owns: canonical byte encoding, strict decoding and its file-byte ceiling. Excludes: MIME/Data URLs, trees, expanded-output budgets, host adapters and resource activation.
 import { DivletError } from './validation.ts';
 
 export const ASSET_FILE_BYTES = 20 * 1024 * 1024;
@@ -6,6 +6,14 @@ const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
 const values = new Uint8Array(128);
 for (let index = 0; index < alphabet.length; index++) values[alphabet.charCodeAt(index)] = index;
 function fail(message: string): never { throw new DivletError('INVALID_ASSET', message); }
+
+/** Trusted byte transform; callers own expanded-output budgets, distinct from decoded file admission. */
+export function encodeAssetBase64(bytes: Uint8Array): string {
+  const parts: string[] = [];
+  // Three-byte-aligned blocks prevent interior padding and bound fromCharCode's argument count.
+  for (let offset = 0; offset < bytes.length; offset += 12288) parts.push(btoa(String.fromCharCode(...bytes.subarray(offset, offset + 12288))));
+  return parts.join('');
+}
 
 /** Validate fully before allocating the bounded output. Native hosts may wrap these privately owned bytes without copying. */
 export function decodeAssetBase64(input: unknown, maxBytes = ASSET_FILE_BYTES, where = 'Asset'): Uint8Array {

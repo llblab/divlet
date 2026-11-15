@@ -16,6 +16,8 @@ import { DeclaredResourceGraph } from '../../core/lib/declared-resources.ts';
 import * as nodeAssetReferences from '../../core/lib/asset-reference.ts';
 import { declaredResourceCases } from '../../core/tests/fixtures/declared-resources.js';
 import { assetOutputCases, assetOutputRefusals } from '../../core/tests/fixtures/asset-output.js';
+import { inlineDeclaredAssets } from '../../core/lib/standalone-assets.ts';
+import { standaloneAssetCases, captureStandalone } from '../../core/tests/fixtures/standalone-assets.js';
 import { assetDataCases, browserAssetCases, captureAssetData, verifyAssetResult } from '../../core/tests/fixtures/asset-data.js';
 import * as nodeAssetData from '../../core/lib/asset-data.ts';
 import { chromium } from 'playwright';
@@ -25,7 +27,7 @@ import * as nodeCodec from '../../core/lib/codec.ts';
 import { cssCascadeCases, cascadeDocuments } from '../../core/tests/fixtures/css-cascade.js';
 import { captureFrame, frameCases, resourceFrame } from '../../core/tests/fixtures/frame-portability.js';
 import { prepareFrame } from '../../core/lib/render.ts';
-import { bundleBrowserModel, bundleBrowserCodec, bundleBrowserProject, bundleBrowserReplay, bundleBrowserAcceptance, bundleBrowserResourceCarriers, bundleBrowserSvgResource, bundleBrowserDeclaredResources } from '../../scripts/browser-model.mjs';
+import { bundleBrowserModel, bundleBrowserCodec, bundleBrowserProject, bundleBrowserReplay, bundleBrowserAcceptance, bundleBrowserResourceCarriers, bundleBrowserSvgResource, bundleBrowserDeclaredResources, bundleBrowserStandaloneAssets } from '../../scripts/browser-model.mjs';
 import { replayHistory, documentHistoryPatch, projectHistoryItems, assertProjectHistoryRoundTrip } from '../../core/lib/history-replay.ts';
 import { historyReplayCases, captureHistoryReplay, literalStyleReplay } from '../../core/tests/fixtures/history-replay.js';
 import { HistoryLine, planHistoryTraversal, validateHistoryNavigation, planHistoryNavigation } from '../../core/lib/history.ts';
@@ -43,6 +45,7 @@ import { prepareFrameWith } from '../../core/lib/prepare.ts';
 import { scopeRenderCases, scopeRenderProject } from '../../core/tests/fixtures/component-scope.js';
 
 const prefix = '/divlet-kernel/';
+const expectedStandaloneAssets = await Promise.all(standaloneAssetCases.map(({ run }) => captureStandalone({ inlineDeclaredAssets }, run)));
 const expectedDeclaredResources = await Promise.all(declaredResourceCases.map(({ run }) => run({ DeclaredResourceGraph, ...nodeAssetReferences })));
 const svgApi = { ...nodeCarriers, rewriteSvgResource };
 const svgInputs = [...svgResourceCases, ...svgProjectionCases.filter(row => row.refused).map(row => ({ name: row.name, text: row.text, accepted: false }))];
@@ -64,6 +67,8 @@ const acceptanceBundle = await bundleBrowserAcceptance(fileURLToPath(new URL('..
 const carrierBundle = await bundleBrowserResourceCarriers(fileURLToPath(new URL('../../', import.meta.url)));
 const svgBundle = await bundleBrowserSvgResource(fileURLToPath(new URL('../../', import.meta.url)));
 const declaredBundle = await bundleBrowserDeclaredResources(fileURLToPath(new URL('../../', import.meta.url)));
+const standaloneBundle = await bundleBrowserStandaloneAssets(fileURLToPath(new URL('../../', import.meta.url)));
+assert.deepEqual(standaloneBundle.inputs.filter(file => /(?:^|\/)core\//.test(file)).map(file => file.slice(file.indexOf('core/'))).sort(), ['asset-base64', 'asset-data', 'asset-reference', 'canonical-media-type', 'css-literals', 'resource-carriers', 'source-budget', 'standalone-assets', 'svg-resource-attributes', 'svg-resource', 'validation'].map(name => `core/lib/${name}.ts`).sort());
 assert.deepEqual(declaredBundle.inputs.filter(file => /(?:^|\/)core\//.test(file)).map(file => file.slice(file.indexOf('core/'))).sort(), ['asset-base64', 'asset-data', 'asset-reference', 'canonical-media-type', 'css-literals', 'declared-resources', 'resource-carriers', 'source-budget', 'svg-resource-attributes', 'svg-resource', 'validation'].map(name => `core/lib/${name}.ts`).sort());
 assert.deepEqual(svgBundle.inputs.filter(file => /(?:^|\/)core\//.test(file)).map(file => file.slice(file.indexOf('core/'))).sort(), ['core/lib/source-budget.ts', 'core/lib/svg-resource-attributes.ts', 'core/lib/svg-resource.ts', 'core/lib/validation.ts']);
 assert.ok(carrierBundle.inputs.filter(file => /(?:^|\/)core\//.test(file)).every(file => /core\/lib\/(?:resource-carriers|css-literals|svg-resource-attributes)\.ts$/.test(file)), 'carrier projection imports no model, XML parser, writer or host composition');
@@ -86,6 +91,8 @@ const files = new Map([
   [prefix, ['text/html', '<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><title>Portable validation</title>']],
   [`${prefix}validation.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/validation.ts', import.meta.url), 'utf8'))]],
   [`${prefix}declared-resources.js`, ['text/javascript', declaredBundle.code]],
+  [`${prefix}standalone-assets.js`, ['text/javascript', standaloneBundle.code]],
+  [`${prefix}standalone-asset-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/standalone-assets.js', import.meta.url), 'utf8')]],
   [`${prefix}asset-output-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/asset-output.js', import.meta.url), 'utf8')]],
   [`${prefix}declared-resource-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/declared-resources.js', import.meta.url), 'utf8')]],
   [`${prefix}svg-resource.js`, ['text/javascript', svgBundle.code]],
@@ -545,7 +552,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   const svgContext = await browser.newContext({ serviceWorkers: 'block' });
   const svgRequests = [], svgDenied = [], svgErrors = [], svgOrigin = `http://127.0.0.1:${server.address().port}`;
-  const svgAllowed = ['', 'svg-resource.js', 'resource-carriers.js', 'svg-projection-cases.js', 'svg-resource-cases.js', 'declared-resources.js', 'declared-resource-cases.js', 'asset-reference.ts', 'validation.ts', 'asset-output-cases.js'].map(file => `${svgOrigin}${prefix}${file}`);
+  const svgAllowed = ['', 'svg-resource.js', 'resource-carriers.js', 'svg-projection-cases.js', 'svg-resource-cases.js', 'declared-resources.js', 'declared-resource-cases.js', 'asset-reference.ts', 'validation.ts', 'asset-output-cases.js', 'standalone-assets.js', 'standalone-asset-cases.js'].map(file => `${svgOrigin}${prefix}${file}`);
   svgContext.on('request', request => svgRequests.push(request.url()));
   await svgContext.route('**/*', route => {
     const request = route.request();
@@ -558,6 +565,17 @@ try {
     const [svg, carriers, fixtures, sources] = await Promise.all(['svg-resource.js', 'resource-carriers.js', 'svg-projection-cases.js', 'svg-resource-cases.js'].map(file => import(new URL(file, location.href).href)));
     const [declared, declaredFixtures, references] = await Promise.all(['declared-resources.js', 'declared-resource-cases.js', 'asset-reference.ts'].map(file => import(new URL(file, location.href).href)));
     const declaredResources = await Promise.all(declaredFixtures.declaredResourceCases.map(({ run }) => run({ ...declared, ...references })));
+    const [standalone, standaloneFixtures] = await Promise.all(['standalone-assets.js', 'standalone-asset-cases.js'].map(file => import(new URL(file, location.href).href)));
+    const standaloneAssets = await Promise.all(standaloneFixtures.standaloneAssetCases.map(({ run }) => standaloneFixtures.captureStandalone(standalone, run)));
+    const exported = await standalone.inlineDeclaredAssets('<link rel="stylesheet" href="asset:paint.css"><img src="asset:pixel"><div class="standalone-proof"></div>', standaloneFixtures.standalonePaintAssets(), { fragment: true });
+    const exportHost = document.createElement('div'); exportHost.innerHTML = exported;
+    const stylesheet = exportHost.querySelector('link');
+    const styleReady = new Promise((resolve, reject) => { stylesheet.addEventListener('load', resolve, { once: true }); stylesheet.addEventListener('error', reject, { once: true }); });
+    document.body.append(exportHost); const exportedImage = exportHost.querySelector('img');
+    await Promise.all([styleReady, exportedImage.decode()]);
+    const exportCanvas = document.createElement('canvas'); exportCanvas.width = 7; exportCanvas.height = 9;
+    const exportContext = exportCanvas.getContext('2d'); exportContext.drawImage(exportedImage, 0, 0);
+    const standaloneRendering = { image: [exportedImage.naturalWidth, exportedImage.naturalHeight], padding: getComputedStyle(exportHost.querySelector('.standalone-proof')).paddingLeft, background: getComputedStyle(exportHost.querySelector('.standalone-proof')).backgroundImage.includes('data:image/svg+xml;base64,'), pixel: [...exportContext.getImageData(3, 4, 1, 1).data] }; exportHost.remove();
     const outputFixtures = await import(new URL('asset-output-cases.js', location.href).href);
     const assetOutputs = outputFixtures.assetOutputCases.map(row => {
       const value = references.assetOutputUrl(row.reference, row.output);
@@ -576,8 +594,11 @@ try {
     const image = new Image(); image.src = `data:image/svg+xml,${encodeURIComponent(painted)}`; await image.decode();
     const canvas = document.createElement('canvas'); canvas.width = 7; canvas.height = 9;
     const context = canvas.getContext('2d'); context.drawImage(image, 0, 0);
-    return { assetOutputs, assetOutputFailures, declaredResources, xml, nativeXml, text, runs, image: [image.naturalWidth, image.naturalHeight], pixel: [...context.getImageData(3, 4, 1, 1).data], nodeGlobals: ['Buffer', 'process', 'require'].filter(name => name in globalThis) };
+    return { standaloneAssets, standaloneRendering, assetOutputs, assetOutputFailures, declaredResources, xml, nativeXml, text, runs, image: [image.naturalWidth, image.naturalHeight], pixel: [...context.getImageData(3, 4, 1, 1).data], nodeGlobals: ['Buffer', 'process', 'require'].filter(name => name in globalThis) };
   });
+  assert.deepEqual(svgResult.standaloneAssets, expectedStandaloneAssets, 'single-file resource export runs the real portable implementation in Chromium');
+  for (let index = 0; index < standaloneAssetCases.length; index++) assert.deepEqual(svgResult.standaloneAssets[index], standaloneAssetCases[index].expected, standaloneAssetCases[index].name);
+  assert.deepEqual(svgResult.standaloneRendering, { image: [7, 9], padding: '17px', background: true, pixel: [18, 52, 86, 255] });
   assert.deepEqual(svgResult.assetOutputs, assetOutputCases.map(row => ({ value: row.expected, sameOrigin: true, withinRoot: true, decodedPath: row.reference.path })), 'browser URL resolution keeps every authored asset name inside the hosting prefix');
   assert.deepEqual(svgResult.assetOutputFailures, assetOutputRefusals.map(() => ({ error: 'INVALID_ASSET' })));
   assert.deepEqual(svgResult.declaredResources, expectedDeclaredResources, 'portable declared membership and deferred tasks execute in Chromium');
@@ -594,7 +615,7 @@ try {
   assert.equal(await svgPage.evaluate(async url => { try { await fetch(url); return false; } catch { return true; } }, controlUrl), true);
   assert.deepEqual(svgDenied, [controlUrl], 'the deny-default network guard rejects an actual unrequested fetch');
   await svgContext.close();
-  console.log(`PASS: ${svgResult.assetOutputs.length} asset-output URL + ${svgResult.declaredResources.length} declared-resource + ${svgResult.xml.length} strict XML + ${svgResult.runs.length} SVG transform/budget witnesses + actual image raster + deny-default network control (${svgBundle.bytes} private SVG bytes)`);
+  console.log(`PASS: ${svgResult.standaloneAssets.length} standalone-export + actual exported image/CSS + ${svgResult.assetOutputs.length} asset-output URL + ${svgResult.declaredResources.length} declared-resource + ${svgResult.xml.length} strict XML + ${svgResult.runs.length} SVG transform/budget witnesses + actual image raster + deny-default network control (${svgBundle.bytes} private SVG bytes)`);
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
   console.log(`PASS: ${result.resourceCarriers.length} resource-carrier + actual DOM image/CSS + ${result.assetData.length} asset-data + ${result.assetPort.length} browser asset-port + ${result.assetBase64.length} asset base64 + ${result.mediaTypes.length} canonical MIME + ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.historyCommits.length} accepted history-commit + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
