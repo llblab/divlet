@@ -203,7 +203,7 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `core/lib/canonical-media-type.ts`, `asset-base64.ts` | Portable bounded canonical MIME reads and strict direct base64 bytes. |
 | `core/lib/media-type.ts`, `browser-media-type.ts`, `browser-asset-access.ts` | Native MIMEType/extension compatibility, matching browser facade bindings and one internal asset-byte refusal (`ASSETS_UNAVAILABLE`). |
 | `core/lib/source-budget.ts` | One frozen source-work budget; the model retains its public typed `SOURCE_LIMITS` alias. |
-| `core/lib/declared-resources.ts` | Declared membership/stable output identities and deferred CSS/SVG projection; admitted files and typed allocation/output/queue/rewrite ports, no filesystem, digest or publisher. Native static composition retains mixed-graph authority. |
+| `core/lib/declared-resources.ts` | Declared membership/stable output identities, artifact-relative URLs via `asset-reference.ts` and deferred CSS/SVG projection; admitted files and typed allocation/output/queue/rewrite ports, no filesystem, digest or publisher. Native static composition retains mixed-graph authority. |
 | `core/lib/resource-carriers.ts` | Portable HTML/CSS/srcset URL-token projection, typed rewrite/base/inspection ports and the existing closed-source CSS refusal; no resolver, graph, filesystem or publisher. |
 | `core/lib/svg-resource.ts`, `svg-resource-attributes.ts` | Strict XML SVG projection and its shared carrier-attribute vocabulary; source budgets are imported without runtime model/provider composition. |
 | `core/lib/project.ts` | Project settings/read/write and component expansion/listing. |

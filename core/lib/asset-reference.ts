@@ -1,5 +1,5 @@
 /*
- * Owns: portable declared-asset paths, explicit URI syntax and relative dependency URLs.
+ * Owns: portable declared-asset paths, explicit URI syntax, dependency URLs and artifact-relative URL projection.
  * Excludes: project admission, byte decoding, dependency traversal and publication.
  */
 import { DivletError, withinUtf8Budget } from './validation.ts';
@@ -32,6 +32,16 @@ export function assetReference(path: unknown, suffix: unknown = ''): string {
   validateAssetPath(path);
   validateSuffix(suffix);
   return `asset:${path.split('/').map(encodeName).join('/')}${suffix}`;
+}
+
+/** Project from a raw canonical artifact filename, not an encoded URL or filesystem base. */
+export function assetOutputUrl(reference: AssetReference, output: unknown): string {
+  // Native route/output owners admit non-NUL controls; only path structure matters here.
+  if (typeof output !== 'string' || /[\\\u0000]/.test(output)) fail('Asset output base must be a canonical artifact-relative file path.');
+  const parts = output.split('/');
+  if (parts.some(part => !part || part === '.' || part === '..')) fail('Asset output base must be a canonical artifact-relative file path.');
+  // Always go via the artifact root: raw authored directories and encoded URL components may alias.
+  return `${'../'.repeat(parts.length - 1)}assets/${assetReference(reference.path, reference.suffix).slice(6)}`;
 }
 
 /** Recognize only the explicit scheme. Ordinary file/network URLs and literal Data URLs remain outside this codec. */

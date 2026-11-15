@@ -7,7 +7,7 @@ import postcss from 'postcss';
 import valueParser from 'postcss-value-parser';
 import { createClassResourceMapper } from './style-engines.ts';
 import { readAssets, readAssetText } from './assets.ts';
-import { assetReference, readAssetReference, resolveAssetDependency } from './asset-reference.ts';
+import { readAssetReference, resolveAssetDependency } from './asset-reference.ts';
 import { DivletError } from './validation.ts';
 import { rewriteSvgResource } from './svg-resource.ts';
 import { decodeCss } from './css-literals.ts';
@@ -362,12 +362,6 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
     }
     return output;
   }
-  async function declaredUrl(reference, output) {
-    await declaredResources.add(reference.path);
-    // Go via the artifact root: comparing raw paths with encoded names can alias literal percent components.
-    const up = path.posix.relative(path.posix.dirname(output), '.');
-    return `${up ? up + '/' : ''}assets/${assetReference(reference.path).slice(6)}${reference.suffix}`;
-  }
   function relativeUrl(from, to) {
     const relative = path.posix.relative(path.posix.dirname(from), to) || path.posix.basename(to);
     return /^[^/]*:/.test(relative) ? `./${relative}` : relative;
@@ -390,7 +384,7 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
   async function rewriteUrl(original, source, output, pageRoute, context) {
     const reference = readAssetReference(original);
     if (reference && nativeAssets && context?.tag === 'use') throw new DivletError('INVALID_ASSET', 'Declared SVG use references cannot load in the sandboxed native preview. Use inline SVG with same-document references.');
-    if (reference) return declaredUrl(reference, output);
+    if (reference) return declaredResources.url(reference, output);
     const value = original.trim();
     if (!value || value.startsWith('#')) return original;
     let kind;
@@ -419,7 +413,7 @@ export async function buildStatic({ projectDir, frames, frameFiles, site = new M
     else if (/^(?:https?:|data:|mailto:|tel:)/i.test(value) || value.startsWith('//')) { if (/^(?:https?:|data:|\/\/)/i.test(value)) uninspectedExternal = true; return original; }
     else if (/^[a-z][a-z0-9+.-]*:/i.test(value)) fail(`unsafe URL ${value}`);
     const baseAsset = readAssetReference(source);
-    if (baseAsset) return declaredUrl(readAssetReference(resolveAssetDependency(baseAsset.path, value)), output);
+    if (baseAsset) return declaredResources.url(readAssetReference(resolveAssetDependency(baseAsset.path, value)), output);
     const suffixAt = local.search(/[?#]/);
     const suffix = suffixAt < 0 ? '' : local.slice(suffixAt);
     const pathname = suffixAt < 0 ? local : local.slice(0, suffixAt);

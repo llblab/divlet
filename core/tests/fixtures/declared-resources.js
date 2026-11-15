@@ -17,12 +17,11 @@ export function declaredHarness(api, entries, overrides = {}) {
       ...output,
     },
     defer(task) { tasks.push(task); },
-    async rewrite(value, source) {
+    async rewrite(value, source, output) {
       let reference = api.readAssetReference(value);
       if (!reference && value && !value.startsWith('#') && !/^data:/i.test(value)) reference = api.readAssetReference(api.resolveAssetDependency(api.readAssetReference(source).path, value));
       if (!reference) return value;
-      await graph.add(reference.path);
-      return `/assets/${api.assetReference(reference.path).slice(6)}${reference.suffix}`;
+      return graph.url(reference, output);
     },
     ...ports,
   };
@@ -30,17 +29,23 @@ export function declaredHarness(api, entries, overrides = {}) {
   return { graph, outputs, types, sources, events, tasks, close() { open = false; }, get claimed() { return claimed; }, async drain() { for (let index = 0; index < tasks.length; index++) await tasks[index](); } };
 }
 export const declaredResourceCases = [
+  { name: 'projected URLs register once and retain raw output identity independently of per-use suffixes', async run(api) {
+    const h = declaredHarness(api, [['字/a%2Fb.svg', file('bytes', 'application/octet-stream')]]);
+    const first = await h.graph.url({ path: '字/a%2Fb.svg', suffix: '?v=1#part' }, 'index.html'); h.close();
+    const second = await h.graph.url({ path: '字/a%2Fb.svg', suffix: '#other' }, 'assets/字/style.css');
+    return { first, second, size: h.graph.size, outputs: [...h.outputs.keys()], opens: h.events.filter(value => value === 'open').length };
+  }, expected: { first: 'assets/%E5%AD%97/a%252Fb.svg?v=1#part', second: '../../assets/%E5%AD%97/a%252Fb.svg#other', size: 1, outputs: ['assets/字/a%2Fb.svg'], opens: 1 } },
   { name: 'cyclic CSS closure reserves identity before deferred discovery; aliases and suffixes survive', async run(api) {
     const bytes = file('binary', 'application/octet-stream');
     const h = declaredHarness(api, [['a.css', file(`@import "b.css";.a{background:url("${api.assetReference('字%25.bin')}?q=1#part")}`)], ['b.css', file('@import "a.css";')], ['字%25.bin', bytes], ['alias.bin', { mediaType: bytes.mediaType, bytes: new Uint8Array(bytes.bytes) }]]);
     await h.graph.add('a.css'); await h.graph.add('alias.bin'); await h.drain();
     const a = h.outputs.get('assets/a.css'), b = h.outputs.get('assets/b.css');
-    return { size: h.graph.size, tasks: h.tasks.length, sources: h.sources, cyclic: a.includes('/assets/b.css') && b.includes('/assets/a.css'), suffix: a.includes('/assets/%E5%AD%97%2525.bin?q=1#part'), owned: h.outputs.get('assets/alias.bin').buffer !== h.outputs.get('assets/字%25.bin').buffer };
+    return { size: h.graph.size, tasks: h.tasks.length, sources: h.sources, cyclic: a.includes('../assets/b.css') && b.includes('../assets/a.css'), suffix: a.includes('../assets/%E5%AD%97%2525.bin?q=1#part'), owned: h.outputs.get('assets/alias.bin').buffer !== h.outputs.get('assets/字%25.bin').buffer };
   }, expected: { size: 4, tasks: 2, sources: ['asset:a.css', 'asset:alias.bin', 'asset:%E5%AD%97%2525.bin', 'asset:b.css'], cyclic: true, suffix: true, owned: true } },
   { name: 'SVG text dependency discovery uses strict XML and real CSS carriers', async run(api) {
     const h = declaredHarness(api, [['icon.svg', file('<svg xmlns="http://www.w3.org/2000/svg"><image href="paint.bin"/><rect fill="url(#paint)"/></svg>', 'image/svg+xml')], ['paint.bin', file('bytes', 'application/octet-stream')]]);
     await h.graph.add('icon.svg'); await h.drain();
-    return { size: h.graph.size, mapped: h.outputs.get('assets/icon.svg').includes('href="/assets/paint.bin"'), sameDocument: h.outputs.get('assets/icon.svg').includes('url(&quot;#paint&quot;)') };
+    return { size: h.graph.size, mapped: h.outputs.get('assets/icon.svg').includes('href="../assets/paint.bin"'), sameDocument: h.outputs.get('assets/icon.svg').includes('url(&quot;#paint&quot;)') };
   }, expected: { size: 2, mapped: true, sameDocument: true } },
   { name: 'existing members remain readable when closed; new missing members check authority first', async run(api) {
     const h = declaredHarness(api, [['one', file('x', 'application/octet-stream')]]);

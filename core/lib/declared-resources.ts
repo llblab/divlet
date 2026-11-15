@@ -1,11 +1,12 @@
 /*
- * Owns: declared-resource membership, stable identities and deferred text projection.
+ * Owns: declared-resource membership, stable identities, artifact-relative URLs and deferred text projection.
  * Excludes: URL authority, filesystem reads, mixed-graph budgets, digests and publication.
  */
 import type { AssetFile } from './model.ts';
 import type { CssInspector } from './resource-carriers.ts';
 import { readAssetText } from './asset-data.ts';
-import { assetReference } from './asset-reference.ts';
+import { assetReference, assetOutputUrl } from './asset-reference.ts';
+import type { AssetReference } from './asset-reference.ts';
 import { DivletError } from './validation.ts';
 import { rewriteCss } from './resource-carriers.ts';
 import { rewriteSvgResource } from './svg-resource.ts';
@@ -37,6 +38,10 @@ export class DeclaredResourceGraph {
     this.host = host;
   }
   get size(): number { return this.registered.size; }
+  async url(reference: AssetReference, output: unknown): Promise<string> {
+    await this.add(reference.path);
+    return assetOutputUrl(reference, output);
+  }
   async add(key: string): Promise<void> {
     if (this.registered.has(key)) return;
     const { allocation, output } = this.host;

@@ -4,6 +4,8 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { buildSite } from '../lib/site.ts';
+import { buildStatic } from '../lib/static.js';
+import { OutputStore } from '../lib/output.ts';
 import { decodeHtml, encodeHtml } from '../lib/codec.ts';
 import { DivletError, validateDocument } from '../lib/model.ts';
 import { cssAnnotationCases } from './fixtures/css-annotations.js';
@@ -260,4 +262,28 @@ test('route path segments are canonically encoded and heading anchors are determ
   assert.equal(site.routes[0].path, '/space%20page/');
   const headings = Object.values(site.pages.get('/space%20page/').document.nodes).filter(node => /^h[1-6]$/.test(node.tag ?? '') && node.id !== 'page-title');
   assert.deepEqual(headings.map(node => node.attrs.id), ['repeated-title', 'repeated-title-2']);
+});
+
+test('native site control-bearing filenames retain declared-asset URLs through static publication admission', async t => {
+  const { build, saveConfig, write, document, divletDir } = await fixture(t);
+  await saveConfig();
+  document.nodes.logo.attrs.src = 'asset:image.bin';
+  const names = ['a\u007fb', 'a\nb', 'a\tb', 'a\u0001b'];
+  for (const name of names) await write(`content/${name}.md`, '---\ntitle: Ordinary title\n---\nA page.');
+  const site = await build();
+  const result = await buildStatic({
+    projectDir: divletDir,
+    frames: new Map(),
+    site: new Map([...site.pages].map(([route, page]) => [route, page.html])),
+    assets: { 'image.bin': 'data:application/octet-stream;base64,AQ==' },
+  });
+  const output = new OutputStore(path.join(divletDir, 'project.divlet'));
+  for (const name of names) {
+    const route = `/${encodeURIComponent(name)}/`, file = `${name}/index.html`;
+    assert.ok(site.pages.has(route), 'native route producer encodes the raw filename');
+    assert.ok(result.files.get(file).includes('src="../assets/image.bin"'), 'static projection preserves the root detour');
+    assert.equal(output.file(file), path.join(output.directory, name, 'index.html'));
+  }
+  assert.deepEqual(result.files.get('assets/image.bin'), Buffer.from([1]));
+  await output.preflight(result.files, [], { mediaTypes: result.mediaTypes });
 });
