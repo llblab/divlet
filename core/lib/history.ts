@@ -1,4 +1,4 @@
-/** Session lineage and read-only traversal/navigation planning. Replay candidates and writer authority stay separate. */
+/** Session lineage, accepted-stack commits and read-only traversal/navigation planning. Candidate persistence stays host-owned. */
 import { DivletError } from './validation.ts';
 
 export type HistoryDirection = 'undo' | 'redo';
@@ -78,6 +78,13 @@ export function planHistoryTraversal<Entry extends HistoryTraversalEntry>(stack:
   return { indexes, entries, ordered: direction === 'undo' ? [...entries].reverse() : entries, label: steps === 1 ? entries[0]!.label : `${direction} ${steps} steps` };
 }
 
+/** Mutable session groups: replay payload is opaque here, but extending a gesture appends its original items. */
+export interface HistoryCommitGroup {
+  group?: unknown;
+  label?: unknown;
+  items: unknown[];
+}
+
 interface PointInfo {
   seq: number | null;
   firstSeq?: number | null;
@@ -105,6 +112,25 @@ export class HistoryLine {
 
   reset(info: PointInfo): void {
     this.current = this.point({ ...info, boundary: info.boundary ?? 'untracked' });
+  }
+
+  /** Commit an already accepted edit to the existing stacks and lineage; callers own persistence and the retained bound. */
+  commitGroup<Entry extends HistoryCommitGroup>(undo: Entry[], redo: Entry[], entry: Entry, { seq, firstSeq = seq }: { seq: number; firstSeq?: number }, limit: number): void {
+    const top = undo.at(-1);
+    const merged = !!entry.group && top?.group === entry.group;
+    if (merged) { top!.items.push(...entry.items); if (entry.label) top!.label = entry.label; }
+    else undo.push(entry);
+    if (undo.length > limit) undo.shift();
+    redo.length = 0;
+    const accepted = merged ? top! : entry;
+    this.accept(accepted, { seq, firstSeq, label: accepted.label }, merged);
+  }
+
+  /** Move a trusted traversal after the host persistence boundary resolves; preserve arrays, entries and replay order. */
+  commitTraversal<Entry extends object>(from: Entry[], to: Entry[], plan: Pick<HistoryTraversalPlan<Entry>, 'indexes' | 'entries'>, direction: HistoryDirection, info: PointInfo): void {
+    for (const index of plan.indexes) from.splice(index, 1);
+    to.push(...plan.entries);
+    this.move(plan.entries, direction, info);
   }
 
   /** Capture only after acceptance. Extending a live group invalidates its previous partial endpoint. */

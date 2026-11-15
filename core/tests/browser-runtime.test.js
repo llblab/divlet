@@ -279,6 +279,51 @@ test('project nullable metadata history preserves exact data, disjoint edits and
   } finally { await writers.close(); }
 });
 
+for (const phase of ['edit', 'traversal']) for (const refused of [false, true]) test(`accepted history commits wait for ${phase} persistence (${refused ? 'refusal' : 'success'})`, async () => {
+  const writers = await pair(editable);
+  try {
+    for (const runtime of [writers.node, writers.browser]) {
+      const baseline = runtime.historyHead().pointId;
+      await runtime.patch({ documentId: 'index', expectedVersion: 1, patch: { name: 'First' } });
+      await runtime.patch({ documentId: 'index', expectedVersion: 2, patch: { name: 'Second' } });
+      await runtime.undo();
+      const before = historyState(runtime), undo = runtime.undoStack, redo = runtime.redoStack, writes = writers.stored.length;
+      const source = runtime === writers.node ? await fs.readFile(runtime.projectPath, 'utf8') : runtime.source();
+      const persist = runtime.persist.bind(runtime), error = new Error('refused before persistence');
+      let release, entered, calls = 0;
+      const gate = new Promise(resolve => { release = resolve; }), started = new Promise(resolve => { entered = resolve; });
+      runtime.persist = async (...args) => { calls++; entered(); await gate; if (refused) throw error; return persist(...args); };
+      const pending = (phase === 'edit'
+        ? runtime.patch({ documentId: 'index', expectedVersion: runtime.getEntry('index').document.version, patch: { name: 'Branch' } })
+        : runtime.undo()).then(value => ({ ok: true, value }), error => ({ ok: false, error }));
+      try {
+        await started;
+        assert.deepEqual(historyState(runtime), before, 'a prepared candidate has no accepted stack or point authority');
+        assert.equal(runtime === writers.node ? await fs.readFile(runtime.projectPath, 'utf8') : runtime.source(), source);
+        assert.equal(writers.stored.length, writes);
+        release(); const result = await pending;
+        assert.equal(calls, 1, 'one candidate has one persistence boundary');
+        assert.equal(result.ok, !refused);
+        assert.equal(runtime.undoStack, undo); assert.equal(runtime.redoStack, redo);
+        if (refused) {
+          assert.equal(result.error, error);
+          assert.deepEqual(historyState(runtime), before);
+          assert.equal(runtime === writers.node ? await fs.readFile(runtime.projectPath, 'utf8') : runtime.source(), source);
+          assert.equal(writers.stored.length, writes);
+        } else {
+          assert.equal(runtime.revision, before.revision + 1);
+          assert.equal(undo.length, phase === 'edit' ? before.undo.length + 1 : before.undo.length - 1);
+          assert.equal(redo.length, phase === 'edit' ? 0 : before.redo.length + 1);
+          if (phase === 'traversal') assert.equal(runtime.historyHead().pointId, baseline);
+          else assert.notEqual(runtime.historyHead().pointId, before.timeline.current);
+          assert.equal(writers.stored.length, writes + (runtime === writers.browser ? 1 : 0));
+        }
+      } finally { release(); await pending; runtime.persist = persist; }
+    }
+    sameState(writers, `${phase} persistence ${refused ? 'refusal' : 'success'}`);
+  } finally { await writers.close(); }
+});
+
 test('opt-in native text refusal does not silently replace draft readers or touch accepted writers', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-draft-json-'));
   const file = path.join(directory, 'draft.divlet');

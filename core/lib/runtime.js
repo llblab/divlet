@@ -189,15 +189,7 @@ export class DivletRuntime extends EventEmitter {
   readTimeline() { return this.#historyLine.snapshot(this.undoStack, this.redoStack); }
 
   pushUndo(entry, { seq = this.seq, firstSeq = seq } = {}) {
-    const top = this.undoStack.at(-1);
-    const merged = !!entry.group && top?.group === entry.group;
-    // One gesture that commits while it runs keeps one undo step; its label describes the committed state it ended in.
-    if (merged) { top.items.push(...entry.items); if (entry.label) top.label = entry.label; }
-    else this.undoStack.push(entry);
-    if (this.undoStack.length > UNDO_LIMIT) this.undoStack.shift();
-    this.redoStack.length = 0;
-    const accepted = merged ? top : entry;
-    this.#historyLine.accept(accepted, { seq, firstSeq, label: accepted.label }, merged);
+    this.#historyLine.commitGroup(this.undoStack, this.redoStack, entry, { seq, firstSeq }, UNDO_LIMIT);
   }
 
   enqueue(task) {
@@ -1236,13 +1228,12 @@ await this.importProject(project.settings, project.frames, hash);
   }
 
   async _replay(from, to, direction, { documentId, actor = 'user', steps } = {}) {
-    const { indexes, entries, ordered, label } = planHistoryTraversal(from, direction, { documentId, steps }, UNDO_LIMIT);
+    const plan = planHistoryTraversal(from, direction, { documentId, steps }, UNDO_LIMIT);
+    const { ordered, label } = plan;
     const seq = this.seq;
     await this._applyEntry({ label, items: ordered.flatMap(entry => entry.items) }, direction, actor);
     // Stacks and point identity change only after the complete candidate has validated and persisted.
-    for (const index of indexes) from.splice(index, 1);
-    to.push(...entries);
-    this.#historyLine.move(entries, direction, { seq: this.seq > seq ? this.seq : null, firstSeq: this.seq > seq ? seq + 1 : null, label });
+    this.#historyLine.commitTraversal(from, to, plan, direction, { seq: this.seq > seq ? this.seq : null, firstSeq: this.seq > seq ? seq + 1 : null, label });
     this.publish();
     return { ...this.historyHead(), label };
   }
