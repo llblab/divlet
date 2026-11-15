@@ -3,9 +3,10 @@ import { canonicalMediaType, MAX_MEDIA_TYPE } from './media-type.ts';
 import { DivletError, SOURCE_LIMITS } from './model.ts';
 import type { AssetFile, AssetTree } from './model.ts';
 import { ASSET_REFERENCE_LIMITS, validateAssetName } from './asset-reference.ts';
+import { decodeAssetBase64, ASSET_FILE_BYTES } from './asset-base64.ts';
 
 /** Native payloads retain the existing 20 MiB resource ceiling and 32 MiB source envelope. */
-export const ASSET_LIMITS = Object.freeze({ files: 400, fileBytes: 20 * 1024 * 1024, encodedBytes: SOURCE_LIMITS.bytes, nodes: SOURCE_LIMITS.nodes, depth: ASSET_REFERENCE_LIMITS.depth, path: ASSET_REFERENCE_LIMITS.path, mediaType: MAX_MEDIA_TYPE });
+export const ASSET_LIMITS = Object.freeze({ files: 400, fileBytes: ASSET_FILE_BYTES, encodedBytes: SOURCE_LIMITS.bytes, nodes: SOURCE_LIMITS.nodes, depth: ASSET_REFERENCE_LIMITS.depth, path: ASSET_REFERENCE_LIMITS.path, mediaType: MAX_MEDIA_TYPE });
 export interface ParsedAssets { readonly tree: AssetTree; readonly files: ReadonlyMap<string, AssetFile> }
 export interface AssetText { readonly kind: 'css' | 'svg'; readonly text: string; readonly ascii: boolean }
 
@@ -57,12 +58,9 @@ function decode(value: string, where: string): AssetFile {
   if (!value.startsWith('data:') || comma < 0 || value.slice(comma - 7, comma) !== ';base64') fail(`${where} must be a canonical base64 Data URL.`);
   const mediaType = value.slice(5, comma - 7);
   if (!canonicalMediaType(mediaType) || mediaType.includes('#')) fail(`${where} must use a canonical Data-URL media type without discarded parameters or a fragment delimiter.`);
-  const payload = value.slice(comma + 1), padding = payload.endsWith('==') ? 2 : payload.endsWith('=') ? 1 : 0;
-  const size = payload.length / 4 * 3 - padding;
-  if (size > ASSET_LIMITS.fileBytes) fail(`${where} exceeds the ${ASSET_LIMITS.fileBytes} decoded-byte limit.`);
-  if (payload.length % 4 || /[^A-Za-z0-9+/=]/.test(payload) || payload.slice(0, payload.length - padding).includes('=')) fail(`${where} has invalid base64 data.`);
-  const bytes = Buffer.from(payload, 'base64');
-  if (bytes.toString('base64') !== payload) fail(`${where} has noncanonical base64 data.`);
+  const decoded = decodeAssetBase64(value.slice(comma + 1), ASSET_LIMITS.fileBytes, where);
+  // Preserve the native Buffer API without a second byte allocation; this decoder result has no other owner.
+  const bytes = Buffer.from(decoded.buffer, decoded.byteOffset, decoded.byteLength);
   return { mediaType, bytes };
 }
 

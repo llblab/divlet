@@ -6,6 +6,8 @@ import { once } from 'node:events';
 import { stripTypeScriptTypes } from 'node:module';
 import { MIMEType } from 'node:util';
 import { mimeCandidates } from '../../core/tests/fixtures/media-types.js';
+import { assetBase64Payloads, captureAssetBase64 } from '../../core/tests/fixtures/asset-base64.js';
+import { nativeAssetBase64 } from '../../core/tests/fixtures/asset-base64-oracle.ts';
 import { chromium } from 'playwright';
 import { fileURLToPath } from 'node:url';
 import * as nodeModel from '../../core/lib/model.ts';
@@ -31,6 +33,7 @@ import { prepareFrameWith } from '../../core/lib/prepare.ts';
 import { scopeRenderCases, scopeRenderProject } from '../../core/tests/fixtures/component-scope.js';
 
 const prefix = '/divlet-kernel/';
+const expectedAssetBase64 = assetBase64Payloads().map(input => captureAssetBase64(nativeAssetBase64, input));
 const expectedMediaTypes = mimeCandidates().map(input => {
   if (!input || input.length > 1024 || /[^\x20-\x7e]/.test(input)) return null;
   try { const mime = new MIMEType(input); return mime.toString() === input ? { essence: mime.essence, params: [...mime.params], text: mime.toString() } : null; } catch { return null; }
@@ -58,6 +61,8 @@ for (const row of scopeRenderCases) {
 const files = new Map([
   [prefix, ['text/html', '<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><title>Portable validation</title>']],
   [`${prefix}validation.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/validation.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}asset-base64.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/asset-base64.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}asset-base64-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/asset-base64.js', import.meta.url), 'utf8')]],
   [`${prefix}canonical-media-type.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/canonical-media-type.ts', import.meta.url), 'utf8'))]],
   [`${prefix}browser-media-type.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/browser-media-type.ts', import.meta.url), 'utf8'))]],
   [`${prefix}media-type-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/media-types.js', import.meta.url), 'utf8')]],
@@ -167,6 +172,13 @@ try {
     const mediaTypes = mimeCases.mimeCandidates().map(input => { const parsed = mime.canonicalMediaType(input); return parsed ? { essence: parsed.essence, params: [...parsed.params], text: parsed.toString() } : null; });
     let mimeAssetRefusal;
     try { mimeRefusal.canonicalMediaType('text/plain'); } catch (error) { mimeAssetRefusal = error.code; }
+    const [base64, base64Cases] = await Promise.all(['asset-base64.ts', 'asset-base64-cases.js'].map(file => import(new URL(file, location.href).href)));
+    const base64Witnesses = base64Cases.checkAssetBase64Witnesses(base64);
+    const assetBase64 = base64Cases.assetBase64Payloads().map(input => base64Cases.captureAssetBase64(base64, input));
+    const firstBytes = base64.decodeAssetBase64('TQ=='), secondBytes = base64.decodeAssetBase64('TQ=='); firstBytes[0] = 0;
+    const base64Fresh = secondBytes[0] === 77 && firstBytes.buffer !== secondBytes.buffer;
+    let base64DomainError = false;
+    try { base64.decodeAssetBase64('AB=='); } catch (error) { base64DomainError = error instanceof api.DivletError; }
     const mimeNodeGlobals = ['Buffer', 'process', 'require'].filter(name => name in globalThis);
     const requirementApi = { ...requirements, DivletError: api.DivletError };
     const requirementResults = requirementCases.map(({ name, input, expected, error }) => ({ name, actual: captureRequirements(requirementApi, input), expected: error ? { ok: false, code: error, domainError: true } : { ok: true, value: expected } }));
@@ -336,6 +348,7 @@ try {
       return { name, inline: inline.nodes[inline.rootId].style.content, pasted: pasted[0].style.content, frame, reopened, refusals, computed };
     });
     return {
+      assetBase64, base64Witnesses, base64Fresh, base64DomainError,
       mediaTypes, mimeWitnesses, mimeAssetRefusal, mimeNodeGlobals,
       patchVersions, patchVersionErrorIdentity,
       historyNavigation, navigationDomainError,
@@ -412,6 +425,9 @@ try {
   assert.deepEqual(assetProof, { color: 'rgb(17, 34, 51)', imageWidth: 20, xmlErrors: 0, title: '\u00a0', label: '<brand>', line: 'one\ntwo' }, 'actual browser XML/image and case-insensitive CSS import rendering under a prefix');
   assert.deepEqual(result.nodeGlobals, [], 'no Node globals/polyfills supply the kernel');
   assert.deepEqual(result.orderedCssPadding, ['10px', '20px'], 'validated declaration order survives the shared serializer and actual browser cascade');
+  assert.deepEqual(result.assetBase64, expectedAssetBase64, 'native-browser base64 bytes/refusal messages match the former Buffer oracle');
+  assert.equal(result.base64Witnesses, 17);
+  assert.equal(result.base64Fresh && result.base64DomainError, true);
   assert.deepEqual(result.mediaTypes, expectedMediaTypes, 'actual native-browser MIME reads match the independent Node canonical oracle');
   assert.ok(result.mimeWitnesses > 30);
   assert.equal(result.mimeAssetRefusal, 'ASSETS_UNAVAILABLE');
@@ -470,7 +486,7 @@ try {
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.mediaTypes.length} canonical MIME + ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.historyCommits.length} accepted history-commit + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.assetBase64.length} asset base64 + ${result.mediaTypes.length} canonical MIME + ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.historyCommits.length} accepted history-commit + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();
