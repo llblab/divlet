@@ -10,6 +10,8 @@ import { assetBase64Payloads, captureAssetBase64 } from '../../core/tests/fixtur
 import { nativeAssetBase64 } from '../../core/tests/fixtures/asset-base64-oracle.ts';
 import * as nodeCarriers from '../../core/lib/resource-carriers.ts';
 import { resourceCarrierCases, captureResourceCarrier } from '../../core/tests/fixtures/resource-carriers.js';
+import { rewriteSvgResource } from '../../core/lib/svg-resource.ts';
+import { captureSvgResource, svgProjectionCases, svgBudgetCases } from '../../core/tests/fixtures/svg-projection.js';
 import { assetDataCases, browserAssetCases, captureAssetData, verifyAssetResult } from '../../core/tests/fixtures/asset-data.js';
 import * as nodeAssetData from '../../core/lib/asset-data.ts';
 import { chromium } from 'playwright';
@@ -19,7 +21,7 @@ import * as nodeCodec from '../../core/lib/codec.ts';
 import { cssCascadeCases, cascadeDocuments } from '../../core/tests/fixtures/css-cascade.js';
 import { captureFrame, frameCases, resourceFrame } from '../../core/tests/fixtures/frame-portability.js';
 import { prepareFrame } from '../../core/lib/render.ts';
-import { bundleBrowserModel, bundleBrowserCodec, bundleBrowserProject, bundleBrowserReplay, bundleBrowserAcceptance, bundleBrowserResourceCarriers } from '../../scripts/browser-model.mjs';
+import { bundleBrowserModel, bundleBrowserCodec, bundleBrowserProject, bundleBrowserReplay, bundleBrowserAcceptance, bundleBrowserResourceCarriers, bundleBrowserSvgResource } from '../../scripts/browser-model.mjs';
 import { replayHistory, documentHistoryPatch, projectHistoryItems, assertProjectHistoryRoundTrip } from '../../core/lib/history-replay.ts';
 import { historyReplayCases, captureHistoryReplay, literalStyleReplay } from '../../core/tests/fixtures/history-replay.js';
 import { HistoryLine, planHistoryTraversal, validateHistoryNavigation, planHistoryNavigation } from '../../core/lib/history.ts';
@@ -37,6 +39,11 @@ import { prepareFrameWith } from '../../core/lib/prepare.ts';
 import { scopeRenderCases, scopeRenderProject } from '../../core/tests/fixtures/component-scope.js';
 
 const prefix = '/divlet-kernel/';
+const svgApi = { ...nodeCarriers, rewriteSvgResource };
+const svgInputs = [...svgResourceCases, ...svgProjectionCases.filter(row => row.refused).map(row => ({ name: row.name, text: row.text, accepted: false }))];
+const expectedSvgXml = await Promise.all(svgInputs.map(({ text }) => captureSvgResource(svgApi, text)));
+const svgRuns = [...svgProjectionCases.filter(row => row.run), ...svgBudgetCases];
+const expectedSvgRuns = await Promise.all(svgRuns.map(({ run }) => run(svgApi)));
 const expectedResourceCarriers = await Promise.all(resourceCarrierCases.map(({ run }) => captureResourceCarrier(nodeCarriers, run)));
 const expectedAssetData = assetDataCases.map(({ run }) => captureAssetData(nodeAssetData, run));
 const expectedAssetBase64 = assetBase64Payloads().map(input => captureAssetBase64(nativeAssetBase64, input));
@@ -50,6 +57,8 @@ const projectBundle = await bundleBrowserProject(fileURLToPath(new URL('../../',
 const replayBundle = await bundleBrowserReplay(fileURLToPath(new URL('../../', import.meta.url)));
 const acceptanceBundle = await bundleBrowserAcceptance(fileURLToPath(new URL('../../', import.meta.url)));
 const carrierBundle = await bundleBrowserResourceCarriers(fileURLToPath(new URL('../../', import.meta.url)));
+const svgBundle = await bundleBrowserSvgResource(fileURLToPath(new URL('../../', import.meta.url)));
+assert.deepEqual(svgBundle.inputs.filter(file => /(?:^|\/)core\//.test(file)).map(file => file.slice(file.indexOf('core/'))).sort(), ['core/lib/source-budget.ts', 'core/lib/svg-resource-attributes.ts', 'core/lib/svg-resource.ts', 'core/lib/validation.ts']);
 assert.ok(carrierBundle.inputs.filter(file => /(?:^|\/)core\//.test(file)).every(file => /core\/lib\/(?:resource-carriers|css-literals|svg-resource-attributes)\.ts$/.test(file)), 'carrier projection imports no model, XML parser, writer or host composition');
 const expectedPatchVersions = patchVersionCases.map(({ name, run }) => ({ name, result: capturePatchVersion(nodeAcceptance, run) }));
 const expectedHistoryReplay = historyReplayCases.map(({ name, run }) => ({ name, result: captureHistoryReplay({ ...nodeModel, readProject, replayHistory, documentHistoryPatch, projectHistoryItems, assertProjectHistoryRoundTrip }, run) }));
@@ -69,6 +78,9 @@ for (const row of scopeRenderCases) {
 const files = new Map([
   [prefix, ['text/html', '<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><title>Portable validation</title>']],
   [`${prefix}validation.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/validation.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}svg-resource.js`, ['text/javascript', svgBundle.code]],
+  [`${prefix}svg-projection-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/svg-projection.js', import.meta.url), 'utf8')]],
+  [`${prefix}svg-resource-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/svg-resources.js', import.meta.url), 'utf8')]],
   [`${prefix}resource-carriers.js`, ['text/javascript', carrierBundle.code]],
   [`${prefix}resource-carrier-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/resource-carriers.js', import.meta.url), 'utf8')]],
   [`${prefix}asset-data.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/asset-data.ts', import.meta.url), 'utf8'))]],
@@ -521,6 +533,44 @@ try {
   assert.ok(result.publicPage.nodes > 100);
   assert.deepEqual(Object.values(result.publicPage.capabilities), [false, false, false, false]);
   assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
+  const svgContext = await browser.newContext({ serviceWorkers: 'block' });
+  const svgRequests = [], svgDenied = [], svgErrors = [], svgOrigin = `http://127.0.0.1:${server.address().port}`;
+  const svgAllowed = ['', 'svg-resource.js', 'resource-carriers.js', 'svg-projection-cases.js', 'svg-resource-cases.js'].map(file => `${svgOrigin}${prefix}${file}`);
+  svgContext.on('request', request => svgRequests.push(request.url()));
+  await svgContext.route('**/*', route => {
+    const request = route.request();
+    if (request.method() === 'GET' && svgAllowed.includes(request.url())) return route.continue();
+    svgDenied.push(request.url()); return route.abort();
+  });
+  const svgPage = await svgContext.newPage(); svgPage.on('pageerror', error => svgErrors.push(error.message));
+  await svgPage.goto(`${svgOrigin}${prefix}`);
+  const svgResult = await svgPage.evaluate(async () => {
+    const [svg, carriers, fixtures, sources] = await Promise.all(['svg-resource.js', 'resource-carriers.js', 'svg-projection-cases.js', 'svg-resource-cases.js'].map(file => import(new URL(file, location.href).href)));
+    const api = { ...carriers, ...svg };
+    const inputs = [...sources.svgResourceCases, ...fixtures.svgProjectionCases.filter(row => row.refused).map(row => ({ text: row.text }))];
+    const xml = await Promise.all(inputs.map(({ text }) => fixtures.captureSvgResource(api, text)));
+    const nativeXml = xml.filter(row => row.accepted).map(row => !new DOMParser().parseFromString(row.xml, 'image/svg+xml').querySelector('parsererror'));
+    const text = sources.svgResourceCases.map((row, index) => row.expectedText === undefined ? true : new DOMParser().parseFromString(xml[index].xml, 'image/svg+xml').querySelector('text')?.textContent === row.expectedText);
+    const runs = await Promise.all([...fixtures.svgProjectionCases.filter(row => row.run), ...fixtures.svgBudgetCases].map(({ run }) => run(api)));
+    const painted = await api.rewriteSvgResource(fixtures.svgPaintSource, { url: async value => value, css: (text, inline) => api.rewriteCss(text, value => value === 'asset:paint' ? '#paint' : value, inline, true) });
+    const image = new Image(); image.src = `data:image/svg+xml,${encodeURIComponent(painted)}`; await image.decode();
+    const canvas = document.createElement('canvas'); canvas.width = 7; canvas.height = 9;
+    const context = canvas.getContext('2d'); context.drawImage(image, 0, 0);
+    return { xml, nativeXml, text, runs, image: [image.naturalWidth, image.naturalHeight], pixel: [...context.getImageData(3, 4, 1, 1).data], nodeGlobals: ['Buffer', 'process', 'require'].filter(name => name in globalThis) };
+  });
+  assert.deepEqual(svgResult.xml, expectedSvgXml, 'actual browser executes the same strict XML projector, not a native-DOMParser substitute');
+  for (let index = 0; index < svgInputs.length; index++) assert.equal(svgResult.xml[index].accepted, svgInputs[index].accepted, svgInputs[index].name);
+  assert.ok(svgResult.nativeXml.every(Boolean) && svgResult.text.every(Boolean), 'native browser XML parsing preserves admitted serialization and authored character endpoints');
+  assert.deepEqual(svgResult.runs, expectedSvgRuns);
+  for (let index = 0; index < svgRuns.length; index++) assert.deepEqual(svgResult.runs[index], svgRuns[index].expected, svgRuns[index].name);
+  assert.deepEqual(svgResult.image, [7, 9]); assert.deepEqual(svgResult.pixel, [18, 52, 86, 255]);
+  assert.deepEqual(svgResult.nodeGlobals, []); assert.deepEqual(svgErrors, []); assert.deepEqual(svgDenied, []);
+  assert.deepEqual(svgRequests.filter(url => !url.startsWith('data:')).sort(), svgAllowed.sort(), 'context-wide requests contain only the fixed document and module graph');
+  const controlUrl = `${svgOrigin}${prefix}unrequested-control`;
+  assert.equal(await svgPage.evaluate(async url => { try { await fetch(url); return false; } catch { return true; } }, controlUrl), true);
+  assert.deepEqual(svgDenied, [controlUrl], 'the deny-default network guard rejects an actual unrequested fetch');
+  await svgContext.close();
+  console.log(`PASS: ${svgResult.xml.length} strict XML + ${svgResult.runs.length} SVG transform/budget witnesses + actual image raster + deny-default network control (${svgBundle.bytes} private SVG bytes)`);
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
   console.log(`PASS: ${result.resourceCarriers.length} resource-carrier + actual DOM image/CSS + ${result.assetData.length} asset-data + ${result.assetPort.length} browser asset-port + ${result.assetBase64.length} asset base64 + ${result.mediaTypes.length} canonical MIME + ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.historyCommits.length} accepted history-commit + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);

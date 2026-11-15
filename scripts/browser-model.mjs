@@ -8,6 +8,7 @@ export const bundleBrowserProject = (resolveDir, options) => bundleEntry('@divle
 export const bundleBrowserReplay = resolveDir => bundleEntry('./core/lib/history-replay.ts', resolveDir, { source: true });
 export const bundleBrowserAcceptance = resolveDir => bundleEntry('./core/lib/acceptance.ts', resolveDir, { source: true });
 export const bundleBrowserResourceCarriers = resolveDir => bundleEntry('./core/lib/resource-carriers.ts', resolveDir, { source: true });
+export const bundleBrowserSvgResource = resolveDir => bundleEntry('./core/lib/svg-resource.ts', resolveDir, { source: true });
 
 async function bundleEntry(entry, resolveDir, { source = false } = {}) {
   const result = await build({
