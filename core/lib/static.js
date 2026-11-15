@@ -9,9 +9,10 @@ import { createClassResourceMapper } from './style-engines.ts';
 import { readAssets, readAssetText } from './assets.ts';
 import { assetReference, readAssetReference, resolveAssetDependency } from './asset-reference.ts';
 import { DivletError } from './validation.ts';
-import { rewriteSvgResource, SVG_RESOURCE_ATTRIBUTES } from './svg-resource.ts';
-import { decodeCss, cssString } from './css-literals.ts';
+import { rewriteSvgResource } from './svg-resource.ts';
+import { decodeCss } from './css-literals.ts';
 import { resourceMediaTypeForExtension } from './media-type.ts';
+import { rewriteCss, rewriteSrcset, rewriteHtml, unsupportedSourceCss } from './resource-carriers.ts';
 
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const fail = (message, details) => { throw Object.assign(new Error(`Static bundle: ${message}`), details ? { details } : {}); };
@@ -73,142 +74,6 @@ function routeOutput(route) {
   if (decoded.split('/').some((part) => part === '.' || part === '..') || decoded.includes('//')) fail(`unsafe route ${route}`);
   safeParts(decoded);
   return `${decoded.slice(1)}index.html`;
-}
-
-// Rewrites only URL tokens, never declaration selectors (including Tailwind selectors).
-const literalCssFunctions = new Set('rgb rgba hsl hsla hwb lab lch oklab oklch color color-mix calc min max clamp round mod rem abs sign sin cos tan asin acos atan atan2 pow sqrt hypot log exp linear-gradient radial-gradient conic-gradient repeating-linear-gradient repeating-radial-gradient repeating-conic-gradient matrix matrix3d translate translateX translateY translateZ translate3d scale scaleX scaleY scaleZ scale3d rotate rotateX rotateY rotateZ rotate3d skew skewX skewY perspective blur brightness contrast drop-shadow grayscale hue-rotate invert opacity saturate sepia cubic-bezier steps format tech local'.toLowerCase().split(' '));
-const unsupportedSourceCss = () => { throw Object.assign(new Error('Canonical copy requires literal, fully understood CSS resource carriers; indirect or unsupported CSS was not relocated.'), { code: 'COPY_UNSUPPORTED_RESOURCE' }); };
-function validateSourceCssValue(value, publicVariables = false) {
-  const parsed = valueParser(value);
-  parsed.walk(node => {
-    if (node.unclosed) unsupportedSourceCss();
-    if (node.type !== 'function') return;
-    const name = decodeCss(node.value).toLowerCase();
-    if (name === 'url') {
-      const parts = node.nodes.filter(child => child.type !== 'space');
-      if (parts.length === 1 && parts[0].type === 'string') {
-        if (parts[0].unclosed || /[\r\n\f]/.test(parts[0].value)) unsupportedSourceCss();
-      } else {
-        const raw = valueParser.stringify(node.nodes).trim();
-        if (!raw || /[\s()'"]/.test(raw) || node.nodes.some(child => child.type === 'function' || child.type === 'comment' || child.unclosed)) unsupportedSourceCss();
-      }
-      return false;
-    }
-    if (name === 'var' && publicVariables) return;
-    if (!literalCssFunctions.has(name)) unsupportedSourceCss();
-  });
-}
-
-async function rewriteCss(css, rewrite, inline = false, closed = false, inspectSelectors) {
-  let root;
-  try { root = postcss.parse(inline ? `x{${css}}` : css, { map: false }); }
-  catch (error) { if (closed) unsupportedSourceCss(); throw error; }
-  inspectSelectors?.(root);
-  // PostCSS can split an escaped at-keyword into name + params; never silently miss a browser-recognized import.
-  root.walkAtRules(rule => { if (rule.raws.afterName === '' && rule.params.startsWith('\\')) unsupportedSourceCss(); });
-  if (closed) {
-    root.walkDecls(decl => validateSourceCssValue(decl.value));
-    root.walkAtRules(rule => {
-      if (decodeCss(rule.name).toLowerCase() !== 'import') return;
-      const first = valueParser(rule.params).nodes.find(node => node.type !== 'space' && node.type !== 'comment');
-      if (!first || first.type !== 'string' && !(first.type === 'function' && decodeCss(first.value).toLowerCase() === 'url')) unsupportedSourceCss();
-      validateSourceCssValue(rule.params);
-    });
-  }
-  const jobs = [];
-  root.walkDecls((decl) => jobs.push((async () => { decl.value = await values(decl.value); })()));
-  root.walkAtRules(rule => {
-    if (decodeCss(rule.name).toLowerCase() !== 'import') return;
-    jobs.push((async () => {
-      const parsed = valueParser(rule.params);
-      const first = parsed.nodes.find((node) => node.type !== 'space' && node.type !== 'comment');
-      if (first?.type === 'string') {
-        first.value = cssString(await rewrite(decodeCss(first.value)));
-        first.quote = '"';
-      } else await rewriteNodes(parsed.nodes);
-      rule.params = parsed.toString();
-    })());
-  });
-  async function rewriteNodes(nodes) {
-    for (const node of nodes) {
-      if (node.type !== 'function') continue;
-      if (decodeCss(node.value).toLowerCase() === 'url') {
-        const raw = valueParser.stringify(node.nodes).trim();
-        const url = node.nodes.length === 1 && node.nodes[0].type === 'string' ? node.nodes[0].value : raw;
-        const result = await rewrite(decodeCss(url));
-        node.nodes = [{ type: 'string', quote: '"', value: cssString(result) }];
-      } else await rewriteNodes(node.nodes);
-    }
-  }
-  async function values(value) {
-    const parsed = valueParser(value);
-    await rewriteNodes(parsed.nodes);
-    return parsed.toString();
-  }
-  await Promise.all(jobs);
-  return inline ? root.first.nodes.map((node) => node.toString()).join(';') : root.toString();
-}
-
-async function rewriteSrcset(value, rewrite) {
-  // URL tokens end at whitespace; trailing commas delimit candidates. Data URLs
-  // retain their internal commas, per the HTML srcset tokenization algorithm.
-  let result = '';
-  let i = 0;
-  while (i < value.length) {
-    const leading = value.slice(i).match(/^[\s,]+/)?.[0] || '';
-    result += leading;
-    i += leading.length;
-    if (i >= value.length) break;
-    const token = value.slice(i).match(/^\S+/)[0];
-    i += token.length;
-    const url = token.replace(/,+$/, '');
-    result += await rewrite(url);
-    result += token.slice(url.length);
-    if (url.length !== token.length) continue;
-    const start = i;
-    let depth = 0;
-    while (i < value.length) {
-      if (value[i] === '(') depth++;
-      if (value[i] === ')') depth--;
-      if (value[i++] === ',' && depth === 0) break;
-    }
-    result += value.slice(start, i);
-  }
-  return result;
-}
-
-async function rewriteHtml(html, rewrite, fragment = false, withBase, closed = false, inspectSelectors) {
-  const tree = fragment ? parseFragment(html) : parse(html);
-  if (withBase) {
-    let effective;
-    function find(node) {
-      if (node.tagName === 'base') {
-        const href = node.attrs?.find(attr => attr.name === 'href');
-        if (href && effective === undefined) effective = href.value;
-        node.attrs = node.attrs.filter(attr => attr.name !== 'href');
-      }
-      for (const child of node.childNodes || []) find(child);
-    }
-    find(tree);
-    if (effective !== undefined) rewrite = withBase(effective);
-  }
-  async function visit(node) {
-    for (const attr of node.attrs || []) {
-      if (['src', 'href', 'poster'].includes(attr.name)) attr.value = await rewrite(attr.value, { tag: node.tagName, attribute: attr.name });
-      else if (attr.name === 'srcset') attr.value = await rewriteSrcset(attr.value, rewrite);
-      else if (attr.name === 'style') attr.value = await rewriteCss(attr.value, rewrite, true, closed, inspectSelectors);
-      else if (SVG_RESOURCE_ATTRIBUTES.has(attr.name)) {
-        const declaration = await rewriteCss(`x:${attr.value}`, rewrite, true, closed, inspectSelectors);
-        attr.value = declaration.slice(declaration.indexOf(':') + 1);
-      }
-    }
-    if (node.tagName === 'style') {
-      for (const child of node.childNodes || []) if (child.nodeName === '#text') child.value = await rewriteCss(child.value, rewrite, false, closed, inspectSelectors);
-    } else for (const child of node.childNodes || []) await visit(child);
-    if (node.content) await visit(node.content);
-  }
-  await visit(tree);
-  return serialize(tree);
 }
 
 const stylesheetFailure = () => { throw Object.assign(new Error('Public stylesheet extraction requires a contiguous unscoped head-style group without document-head observers.'), { code: 'UNSUPPORTED_STYLESHEET_BUNDLE' }); };

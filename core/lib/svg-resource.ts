@@ -4,11 +4,12 @@
  */
 import { DOMParser, XMLSerializer, onWarningStopParsing } from '@xmldom/xmldom';
 import type { Element, Node } from '@xmldom/xmldom';
-import { SOURCE_LIMITS } from './model.ts';
+import { SOURCE_LIMITS } from './source-budget.ts';
 import { DivletError } from './validation.ts';
 
 const SVG = 'http://www.w3.org/2000/svg', HTML = 'http://www.w3.org/1999/xhtml', XML = 'http://www.w3.org/XML/1998/namespace', XMLNS = 'http://www.w3.org/2000/xmlns/', XLINK = 'http://www.w3.org/1999/xlink';
-export const SVG_RESOURCE_ATTRIBUTES: ReadonlySet<string> = new Set('fill stroke filter mask clip-path marker marker-start marker-mid marker-end cursor color-profile'.split(' '));
+import { SVG_RESOURCE_ATTRIBUTES } from './svg-resource-attributes.ts';
+export { SVG_RESOURCE_ATTRIBUTES } from './svg-resource-attributes.ts';
 export interface SvgResourceTransforms {
   url(value: string): Promise<string>;
   css(value: string, inline: boolean): Promise<string>;

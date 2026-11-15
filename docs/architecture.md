@@ -203,7 +203,8 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `core/lib/canonical-media-type.ts`, `asset-base64.ts` | Portable bounded canonical MIME reads and strict direct base64 bytes. |
 | `core/lib/media-type.ts`, `browser-media-type.ts`, `browser-asset-access.ts` | Native MIMEType/extension compatibility, matching browser facade bindings and one internal asset-byte refusal (`ASSETS_UNAVAILABLE`). |
 | `core/lib/source-budget.ts` | One frozen source-work budget; the model retains its public typed `SOURCE_LIMITS` alias. |
-| `core/lib/svg-resource.ts` | Strict XML SVG resource projection, not HTML parsing or publication. |
+| `core/lib/resource-carriers.ts` | Portable HTML/CSS/srcset URL-token projection, typed rewrite/base/inspection ports and the existing closed-source CSS refusal; no resolver, graph, filesystem or publisher. |
+| `core/lib/svg-resource.ts`, `svg-resource-attributes.ts` | Strict XML SVG projection and its shared carrier-attribute vocabulary; source budgets are imported without runtime model/provider composition. |
 | `core/lib/project.ts` | Project settings/read/write and component expansion/listing. |
 | `core/lib/codec.ts` | Strict native model ↔ HTML codec, draft inline-map adapter and `renderFile`; public ordered inline-syntax export. |
 | `core/lib/inline-css.ts` | Parser-backed, source-map-inert inline declaration syntax decoding; not value safety or source capacities. |
