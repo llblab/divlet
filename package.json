@@ -77,6 +77,8 @@
   "browser": {
     "./core/lib/model-styles.ts": "./core/lib/browser-styles.ts",
     "./dist/core/lib/model-styles.js": "./dist/core/lib/browser-styles.js",
+    "./core/lib/assets.ts": "./core/lib/browser-assets.ts",
+    "./dist/core/lib/assets.js": "./dist/core/lib/browser-assets.js",
     "./core/lib/media-type.ts": "./core/lib/browser-media-type.ts",
     "./dist/core/lib/media-type.js": "./dist/core/lib/browser-media-type.js"
   },

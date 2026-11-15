@@ -7,6 +7,7 @@
  * allowed to trust nothing.
  */
 import { applyStyles } from './model-styles.ts';
+import { SOURCE_LIMITS as SOURCE_BUDGET } from './source-budget.ts';
 import { readAssetReference } from './asset-reference.ts';
 import type { CssDeclaration, CssDeclarationOperation } from './declarations.ts';
 import type { StyleOptions, StyleEngineRequirement } from './style-engines.ts';
@@ -126,7 +127,7 @@ type Unchecked = Record<string, any>;
 /** Look up an unchecked record entry that a preceding check has already proved present. */
 const at = <T>(record: Record<string, T>, key: string): T => record[key] as T;
 
-export const SOURCE_LIMITS: Readonly<SourceLimits> = Object.freeze({ bytes: 32 * 1024 * 1024, nodes: 10000, depth: 64, roots: 200 });
+export const SOURCE_LIMITS: Readonly<SourceLimits> = SOURCE_BUDGET;
 
 // Admission parses CSS grammar only; source-map comments never load/decode auxiliary inputs.
 const parseCss = (text: string): postcss.Root => postcssParse(text, { map: false }) as postcss.Root;

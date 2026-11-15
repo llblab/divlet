@@ -193,14 +193,16 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `core/model.ts` | Public model subpath: synchronous bundled-default composition, bypassed by the browser export condition. |
 | `core/lib/model-styles.ts`, `browser-styles.ts` | Provider-free native lowering dispatch and explicit absent browser capability. |
 | `core/lib/asset-reference.ts` | Portable declared paths and explicit URI/dependency codec; not project storage. |
-| `core/lib/assets.ts` | Canonical stored/sparse-patch resource trees and MIME-based text decoding. |
+| `core/lib/asset-data.ts`, `assets.ts`, `browser-assets.ts` | Shared portable stored/sparse-patch trees, Data URLs and MIME text reads; native Buffer views and the browser byte-refusal adapter. Host guards only refuse, never replace admission. |
 | `core/lib/font.ts` | Bounded face metadata and CSS descriptors; not glyph validation, upload or font storage. |
 | `core/lib/font-woff.ts` | Bounded WOFF 1 table unpacking into the shared SFNT metadata path; no source conversion. |
 | `core/lib/font-woff2.ts` | Bounded null-transform WOFF2/Brotli metadata input; original resource bytes stay canonical. |
 | `core/lib/font-css.ts` | Non-shadowing face registration against closed, source-owned public styles; no write authority. |
 | `core/lib/capture.ts` | Bounded, self-contained frame font CSS for browser rasterization; no filesystem/publication authority. |
 | `core/lib/css-literals.ts` | Shared CSS escape decoding and quoted-string contents for projection and registration. |
-| `core/lib/media-type.ts`, `browser-media-type.ts` | Canonical bounded MIME syntax and shared HTTP/projection extension defaults; the browser mapping refuses (`ASSETS_UNAVAILABLE`) rather than approximating. |
+| `core/lib/canonical-media-type.ts`, `asset-base64.ts` | Portable bounded canonical MIME reads and strict direct base64 bytes. |
+| `core/lib/media-type.ts`, `browser-media-type.ts`, `browser-asset-access.ts` | Native MIMEType/extension compatibility, matching browser facade bindings and one internal asset-byte refusal (`ASSETS_UNAVAILABLE`). |
+| `core/lib/source-budget.ts` | One frozen source-work budget; the model retains its public typed `SOURCE_LIMITS` alias. |
 | `core/lib/svg-resource.ts` | Strict XML SVG resource projection, not HTML parsing or publication. |
 | `core/lib/project.ts` | Project settings/read/write and component expansion/listing. |
 | `core/lib/codec.ts` | Strict native model ↔ HTML codec, draft inline-map adapter and `renderFile`; public ordered inline-syntax export. |
