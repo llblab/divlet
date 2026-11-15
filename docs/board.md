@@ -28,7 +28,7 @@ One Select tool (`V`) handles artboards and every element, including the root. H
 
 ### Clipboard
 
-`Ctrl C` copies selected elements as clean HTML and remembers an exact copy of their structure. `Ctrl V` inserts it inside the selected container or after the selected element, including across frames. External HTML becomes elements, plain text becomes paragraphs, and an image becomes an `<img>` whose reusable bytes are embedded in the project. Declared image URLs are embedded when writing system clipboard HTML; the internal copy keeps reusable project references. Pasting copied artboards duplicates them.
+`Ctrl C` copies selected elements as clean HTML and remembers an exact copy of their structure. `Ctrl V` inserts it inside the selected container or after the selected element, including across frames. External HTML becomes elements, plain text becomes paragraphs, and an image becomes an `<img>` whose reusable bytes are embedded in the project. Declared image URLs are embedded when writing system clipboard HTML; the internal copy keeps reusable project references. Resource-aware element Copy/Cut requires the host's selected-node export capability; if it is absent or refuses the captured version, the board reports that limitation and does not cut content or fall back to a native server. Pasting copied artboards duplicates them.
 
 ### Context menus
 

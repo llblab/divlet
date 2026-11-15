@@ -1,8 +1,8 @@
 import { createSnapshotReadSession } from '../lib/board-session.ts';
 import type { BoardReadEvent, BoardReadSession, BoardSelection, BoardSelectionPublisher, BoardObservationPublisher } from '../lib/board-session.ts';
 import { createHttpReadSession, createHttpSelectionPublisher, createHttpObservationPublisher } from '../lib/http-session.js';
-import type { BoardHistoryService, BoardSourceUpdates } from '../lib/board-host.ts';
-import { createHttpHistoryService, createHttpSourceUpdates } from '../lib/http-services.js';
+import type { BoardHistoryService, BoardSourceUpdates, BoardExports, BoardNodeExport } from '../lib/board-host.ts';
+import { createHttpHistoryService, createHttpSourceUpdates, createHttpExports } from '../lib/http-services.js';
 import { createJsonTransport } from '../lib/http.js';
 
 const transport = createJsonTransport(new URL('http://127.0.0.1/token/'));
@@ -14,9 +14,20 @@ const source: BoardSourceUpdates = createHttpSourceUpdates(transport);
 const observe: BoardObservationPublisher = createHttpObservationPublisher(transport.post);
 const publish: BoardSelectionPublisher = createHttpSelectionPublisher(transport.post);
 const selection: BoardSelection = { ids: ['index'], nodes: { documentId: 'index', nodeIds: ['root'] } };
+const exports: BoardExports = createHttpExports(transport.request);
+const pageOnly: BoardExports = { page: async () => ({ html: '' }) };
+const nodes: BoardNodeExport = { nodeIds: ['first', 'second'], expectedVersion: 7, expectedProjectVersion: 9 };
 const event: BoardReadEvent = { type: 'state', value: { projectId: 'demo' } };
 void event;
 if (false) {
+  void exports.nodes?.('index', nodes);
+  void pageOnly.page('index');
+  // @ts-expect-error selected-node exports require the captured project version too
+  void exports.nodes?.('index', { nodeIds: ['first'], expectedVersion: 7 });
+  // @ts-expect-error selected-node exports require the captured frame version too
+  void exports.nodes?.('index', { nodeIds: ['first'], expectedProjectVersion: 9 });
+  // @ts-expect-error copied selection addresses are readonly input
+  nodes.nodeIds.push('third');
   void history.navigate?.({ pointId: 'older', expectedPoint: 'current' });
   void auditOnly.readRecent();
   void source.openProject('copy.divlet');

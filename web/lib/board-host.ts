@@ -31,9 +31,18 @@ export interface BoardPreviews {
   readonly release?: (id: string, url: string) => void;
 }
 
+/** A selected-node export is bound to the frame and project versions the user copied. */
+export interface BoardNodeExport {
+  readonly nodeIds: readonly string[];
+  readonly expectedVersion: number;
+  readonly expectedProjectVersion: number;
+}
+
 /** Clean standalone HTML of one frame (`{ html, fileName }`), for Copy/Download HTML. */
 export interface BoardExports {
   readonly page: (id: string) => Promise<unknown>;
+  /** Clean selected-node HTML (`{ html }`), including declared resources; absent means no resource-aware element Copy/Cut. */
+  readonly nodes?: (id: string, options: BoardNodeExport) => Promise<unknown>;
   /** The whole project source (`{ text, fileName }`), where the host's copy is not already a file the user owns. */
   readonly project?: () => Promise<unknown>;
 }

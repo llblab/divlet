@@ -167,6 +167,14 @@ for (const mode of ['absent', 'audit', 'services']) {
     'chat.js': 'export const render = () => {}; export const note = () => {};',
   })) files.set(`${prefix}${mode}/${file}`, ['text/javascript', source]);
 }
+files.set(`${prefix}clipboard-cases.js`, ['text/javascript', await readFile(new URL('./fixtures/clipboard-cases.js', import.meta.url), 'utf8')]);
+const clipboardModules = await Promise.all(['clip', 'host', 'http', 'http-session', 'http-services'].map(async file => [file, await readFile(new URL(`../lib/${file}.js`, import.meta.url), 'utf8')]));
+for (const mode of ['absent', 'page', 'nodes', 'refused']) {
+  for (const [file, source] of [...clipboardModules, ['store', storeSource], ['util', utilSource],
+    ['canvas', 'export const setMode = () => {}; export const flashNodes = () => {};'],
+    ['artboards', 'export const duplicateArtboards = () => { throw new Error("Unexpected artboard copy"); };'],
+  ]) files.set(`${prefix}copy-${mode}/${file}.js`, ['text/javascript', source]);
+}
 const dataUrl = (value, mime) => `data:${mime};base64,${Buffer.from(value).toString('base64')}`;
 const nativeImage = await prepareFrame({ ...resourceFrame('img', { src: 'asset:icon' }), id: 'native-image', head: { icon: 'asset:icon' } });
 const nativeUse = await prepareFrame({ ...resourceFrame('use', { href: 'asset:icon#mark' }, true), id: 'native-use' });
@@ -252,6 +260,8 @@ try {
     const selection = await selectionCases(local, localHost, shared, sharedHost);
     const { serviceCases } = await import(new URL('services-cases.js', location.href).href);
     const services = await serviceCases();
+    const { clipboardCases } = await import(new URL('clipboard-cases.js', location.href).href);
+    const clipboard = await clipboardCases();
     const { serializeDeclarations } = await import(new URL('declarations.ts', location.href).href);
     const declarations = frameApi.validDeclarations([['padding-left', '20px'], ['padding', '10px']], 'root');
     const orderedCssPadding = [declarations, [...declarations].reverse()].map(value => {
@@ -438,6 +448,7 @@ try {
       selection,
       references,
       services,
+      clipboard,
       publicPage,
       sessions,
       nodeGlobals: ['Buffer', 'process', 'require'].filter(name => name in globalThis),
@@ -499,7 +510,7 @@ try {
   assert.equal(result.mimeAssetRefusal, 'ASSETS_UNAVAILABLE');
   assert.deepEqual(result.mimeNodeGlobals, []);
   assert.ok(result.cases.length > 25, 'the shared acceptance/refusal regions are exercised');
-  for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.references, ...result.requirements, ...result.nativeJson, ...result.nativeValues, ...result.nativeEquality, ...result.inlineCss, ...result.componentTexts, ...result.componentValues, ...result.componentAttributes, ...result.componentMetadata, ...result.domIds, ...result.componentScopes, ...result.sessions, ...result.selection, ...result.services]) assert.deepEqual(actual, expected, name);
+  for (const { name, actual, expected } of [...result.cases, ...result.bytes, ...result.references, ...result.requirements, ...result.nativeJson, ...result.nativeValues, ...result.nativeEquality, ...result.inlineCss, ...result.componentTexts, ...result.componentValues, ...result.componentAttributes, ...result.componentMetadata, ...result.domIds, ...result.componentScopes, ...result.sessions, ...result.selection, ...result.services, ...result.clipboard]) assert.deepEqual(actual, expected, name);
   assert.deepEqual(result.styleReplayRendering.map(value => value.html), expectedStyleReplayHtml);
   assert.deepEqual(result.styleReplayRendering.map(value => value.padding), ['10px', '10px', '10px', '10px'], 'removal, Undo and Redo preserve the actual padding cascade');
   assert.equal(result.cssCascade.length, expectedCssCascade.length);
@@ -618,7 +629,7 @@ try {
   console.log(`PASS: ${svgResult.standaloneAssets.length} standalone-export + actual exported image/CSS + ${svgResult.assetOutputs.length} asset-output URL + ${svgResult.declaredResources.length} declared-resource + ${svgResult.xml.length} strict XML + ${svgResult.runs.length} SVG transform/budget witnesses + actual image raster + deny-default network control (${svgBundle.bytes} private SVG bytes)`);
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.resourceCarriers.length} resource-carrier + actual DOM image/CSS + ${result.assetData.length} asset-data + ${result.assetPort.length} browser asset-port + ${result.assetBase64.length} asset base64 + ${result.mediaTypes.length} canonical MIME + ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.historyCommits.length} accepted history-commit + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.resourceCarriers.length} resource-carrier + actual DOM image/CSS + ${result.assetData.length} asset-data + ${result.assetPort.length} browser asset-port + ${result.assetBase64.length} asset base64 + ${result.mediaTypes.length} canonical MIME + ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.historyCommits.length} accepted history-commit + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + ${result.clipboard.length} actual clipboard/host consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

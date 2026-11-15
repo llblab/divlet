@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createJsonTransport } from '../lib/http.js';
 import { createHttpReadSession, createHttpSelectionPublisher, createHttpObservationPublisher } from '../lib/http-session.js';
-import { createHttpHistoryService, createHttpSourceUpdates } from '../lib/http-services.js';
+import { createHttpHistoryService, createHttpSourceUpdates, createHttpExports } from '../lib/http-services.js';
 
 class Stream {
   handlers = new Map();
@@ -64,6 +64,21 @@ test('native optional services preserve history and source-update routes, replie
   const refused = { request: async () => { throw refusal; }, post: async () => { throw refusal; } };
   await assert.rejects(createHttpHistoryService(refused).navigate({ pointId: 'past', expectedPoint: 'now' }), error => error === refusal);
   await assert.rejects(createHttpSourceUpdates(refused).readStatus(), error => error === refusal);
+});
+
+test('native selected-node export preserves encoded order, both guards, empty-selection refusal routing and error identity', async () => {
+  const calls = [], reply = { html: '<p>selected</p>' };
+  const service = createHttpExports(async route => { calls.push(route); return reply; });
+  assert.equal(Object.isFrozen(service), true);
+  assert.equal(await service.page('a/b #'), reply);
+  const options = { nodeIds: ['second', 'one &?'], expectedVersion: 7, expectedProjectVersion: 9 };
+  const before = structuredClone(options);
+  assert.equal(await service.nodes('a/b #', options), reply);
+  assert.deepEqual(options, before);
+  assert.equal(await service.nodes('index', { ...options, nodeIds: [] }), reply);
+  assert.deepEqual(calls, ['api/export/a%2Fb%20%23', 'api/export/a%2Fb%20%23?nodes=second&nodes=one%20%26%3F&version=7&projectVersion=9', 'api/export/index?nodes=&version=7&projectVersion=9']);
+  const refusal = Object.assign(new Error('Changed'), { code: 'REVISION_CONFLICT' });
+  await assert.rejects(createHttpExports(async () => { throw refusal; }).nodes('index', options), error => error === refusal);
 });
 
 test('HTTP read session is lazy, encodes frame identities and grants no raw route or write capability', async () => {

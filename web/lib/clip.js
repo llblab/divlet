@@ -1,4 +1,5 @@
-import { store, capable, documents, descriptor, edit, toast, cachedModel, loadModel, selectNodes, parentOf, canContain, apiUrl, request } from './store.js';
+import { store, capable, documents, descriptor, edit, toast, cachedModel, loadModel, selectNodes, parentOf, canContain, apiUrl } from './store.js';
+import { exports as exportService } from './host.js';
 import * as canvas from './canvas.js';
 import { duplicateArtboards } from './artboards.js';
 
@@ -105,11 +106,13 @@ export function copySelection({ event, cut = false } = {}) {
     const current = clip;
     const declared = (store.state?.project?.resources?.length ?? 0) > 0;
     if (declared) { event?.preventDefault(); current.preferInternal = true; }
-    const written = declared ? request(`api/export/${encodeURIComponent(node.documentId)}?${ids.map(id => `nodes=${encodeURIComponent(id)}`).join('&')}&version=${model.version}&projectVersion=${store.state.project.version}`).then(async result => {
+    const written = declared ? (async () => {
+      if (!exportService?.nodes) throw new Error('This host cannot export selected elements with project resources.');
+      const result = await exportService.nodes(node.documentId, { nodeIds: ids, expectedVersion: model.version, expectedProjectVersion: store.state.project.version });
       if (clip !== current) return false;
       current.text = result.html;
       return writeSystem(result.html);
-    }) : writeSystem(text, event);
+    })() : writeSystem(text, event);
     Promise.resolve(written).then(ok => { if (clip === current) current.preferInternal = !ok; }).catch(error => toast(error.message));
     const what = ids.length === 1 ? `<${model.nodes[ids[0]].tag ?? 'text'}>` : `${ids.length} elements`;
     if (cut) {

@@ -51,7 +51,18 @@ export function createHttpPreviews({ apiUrl, request }) {
 }
 
 /** @param {Request} request @returns {import('@divlet/web/host').BoardExports} */
-export const createHttpExports = request => Object.freeze({ page: (/** @type {string} */ id) => request(`api/export/${encodeURIComponent(id)}`) });
+export function createHttpExports(request) {
+  /** @type {import('@divlet/web/host').BoardExports} */
+  const service = {
+    page: id => request(`api/export/${encodeURIComponent(id)}`),
+    nodes: (id, { nodeIds, expectedVersion, expectedProjectVersion }) => {
+      // Keep even an empty selection on the server's selected-node validation path, never whole-page export.
+      const nodes = nodeIds.map(node => `nodes=${encodeURIComponent(node)}`).join('&') || 'nodes=';
+      return request(`api/export/${encodeURIComponent(id)}?${nodes}&version=${expectedVersion}&projectVersion=${expectedProjectVersion}`);
+    },
+  };
+  return Object.freeze(service);
+}
 
 /** @param {Request} request @returns {import('@divlet/web/host').BoardComponents} */
 export const createHttpComponents = request => Object.freeze({ list: () => request('api/components') });
