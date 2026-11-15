@@ -62,13 +62,19 @@ try {
   assert.deepEqual(Object.entries(read().nodes.root.style), afterSource);
   await runtime.undo(); assert.deepEqual(Object.entries(read().nodes.root.style), beforeSource);
   await runtime.redo(); assert.deepEqual(Object.entries(read().nodes.root.style), afterSource);
-  const acceptedBytes = await readFile(file, 'utf8'), acceptedModel = read();
-  const unsupported = JSON.parse(acceptedBytes); unsupported.metadata = { literal: null };
-  const unacceptedBytes = JSON.stringify(unsupported);
-  await writeFile(file, unacceptedBytes); await runtime.scan();
-  assert.ok(runtime.info().diagnostics.some(item => item.code === 'UNSUPPORTED_SOURCE_REPLAY'));
-  assert.deepEqual(read(), acceptedModel); assert.equal(await readFile(file, 'utf8'), unacceptedBytes);
-  await writeFile(file, acceptedBytes); await runtime.scan(); assert.deepEqual(runtime.info().diagnostics, []);
+  const beforeProjectMetadata = structuredClone(runtime.settings.metadata), externalSettings = JSON.parse(await readFile(file, 'utf8'));
+  externalSettings.metadata = { literal: null, nested: { value: null }, toString: null };
+  await writeFile(file, JSON.stringify(externalSettings)); await runtime.scan();
+  assert.deepEqual(runtime.info().diagnostics, []);
+  const projectMetadata = structuredClone(runtime.settings.metadata);
+  for (let iteration = 0; iteration < 2; iteration++) {
+    await runtime.undo(); assert.deepEqual(runtime.settings.metadata, beforeProjectMetadata);
+    await runtime.redo(); assert.deepEqual(runtime.settings.metadata, projectMetadata);
+  }
+  await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { metadata: { literal: 'Changed', nested: { value: null } } } });
+  await runtime.undo(); assert.deepEqual(runtime.settings.metadata, projectMetadata);
+  assert.deepEqual(JSON.parse(await readFile(file, 'utf8')).metadata, projectMetadata);
+  await runtime.redo(); assert.deepEqual(runtime.settings.metadata, { literal: 'Changed', nested: {}, toString: null });
   const lifecycle = JSON.parse(await readFile(file, 'utf8'));
   lifecycle.frames[0].nodes.nullable = { id: 'nullable', type: 'element', tag: 'section', style: { 'padding-left': '20px', padding: '10px' }, metadata: { literal: null, nested: { value: null } }, children: [] };
   lifecycle.frames[0].nodes.root.children.push('nullable');
@@ -112,5 +118,5 @@ try {
   api.registerStyleEngine(engine);
   await runtime.patch({ documentId: 'plain', expectedVersion: read().version, patch: { nodes: { root: { styles: { padding: '2px' } } } } });
   assert.equal(lowered, 1); assert.match(read().nodes.root.className, /host-custom/);
-  console.log(JSON.stringify({ status: 'passed', mode: 'installed-native', modules: loaded.size, registeredHostProviders: true, sourceHistoryRoundTrip: true, nodeLifecycleRoundTrip: true, retainedNullRoundTrip: true }));
+  console.log(JSON.stringify({ status: 'passed', mode: 'installed-native', modules: loaded.size, registeredHostProviders: true, sourceHistoryRoundTrip: true, nodeLifecycleRoundTrip: true, retainedNullRoundTrip: true, projectNullRoundTrip: true }));
 } finally { await runtime?.close(); }

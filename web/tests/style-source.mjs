@@ -34,12 +34,14 @@ try {
       const edit = JSON.parse(await fs.readFile(file, 'utf8'));
       const target = kind === 'literal' ? edit.frames[0].nodes.button : edit.frames[1].nodes.instance.descendants.button;
       target.style = reordered;
+      edit.metadata = { literal: null };
       if (kind === 'override') target.attrs = { title: 'Changed' };
       await fs.writeFile(file, JSON.stringify(edit)); await runtime.scan();
       assert.equal(runtime.diagnostics.has(file), false);
+      assert.deepEqual(runtime.settings.metadata, { literal: null });
       observed.push(await painted());
-      await runtime.undo(); observed.push(await painted());
-      await runtime.redo(); observed.push(await painted());
+      await runtime.undo(); assert.deepEqual(runtime.settings.metadata, {}); observed.push(await painted());
+      await runtime.redo(); assert.deepEqual(runtime.settings.metadata, { literal: null }); observed.push(await painted());
       assert.deepEqual(observed.map(value => value.padding), ['10px', '20px', '10px', '20px'], `${kind}: actual source/history cascade`);
       const titles = kind === 'override' ? [null, 'Changed', null, 'Changed'] : ['Definition', 'Definition', 'Definition', 'Definition'];
       assert.deepEqual(observed.map(value => value.title), titles, `${kind}: actual nullable attribute history`);

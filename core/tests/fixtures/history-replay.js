@@ -3,6 +3,18 @@ const frame = id => ({ schemaVersion: 1, id, name: id, version: 5, artboard: { x
   root: { id: 'root', type: 'element', tag: 'main', style: { 'padding-left': '20px', padding: '10px' }, children: ['label'] },
   label: { id: 'label', type: 'text', content: 'Alpha' },
 } });
+const nullableTransitions = [
+  ['absence', {}, { slot: null }],
+  ['prototype-named own member', {}, { toString: null }],
+  ['deletion', { slot: null }, {}],
+  ['scalar', { slot: null }, { slot: false }],
+  ['record', { slot: null }, { slot: { literal: null, nested: { value: null } } }],
+  ['array', { slot: null }, { slot: [null, { value: null }] }],
+  ['new subtree', {}, { slot: { literal: null } }],
+  ['removed subtree', { slot: { literal: null } }, {}],
+  ['scalar to record', { slot: 'text' }, { slot: { length: null } }],
+  ['record to array', { slot: { length: null } }, { slot: [null] }],
+];
 function context(api, ids = ['a']) {
   const { frames, settings } = api.readProject({ schemaVersion: 1, version: 7, name: 'Project', frames: ids.map(frame) });
   return { frames: new Map(frames.map(document => [document.id, document])), settings };
@@ -42,21 +54,59 @@ export function literalStyleReplay(api) {
 }
 
 export const historyReplayCases = [
-  { name: 'project transaction planning proves mixed settings/style/membership/order replay', expected: { types: ['project', 'patch', 'delete', 'create', 'order'], redo: ['d', 'c', 'a'], undo: ['a', 'b', 'c'], style: [['padding', '10px'], ['padding-left', '20px']], createdMetadata: { literal: null } }, run: api => {
+  { name: 'project transaction planning proves mixed settings/style/membership/order replay', expected: { types: ['project', 'patch', 'delete', 'create', 'order'], redo: ['d', 'c', 'a'], undo: ['a', 'b', 'c'], style: [['padding', '10px'], ['padding-left', '20px']], createdMetadata: { literal: null }, projectMetadata: { literal: null } }, run: api => {
     const before = context(api, ['a', 'b', 'c']), original = before.frames.get('a');
     const changed = api.validateDocument({ ...original, nodes: { ...original.nodes, root: { ...original.nodes.root, style: { padding: '10px', 'padding-left': '20px' } } } });
     const created = api.validateDocument({ ...frame('d'), metadata: { literal: null } });
-    const next = new Map([['d', created], ['c', before.frames.get('c')], ['a', changed]]), settings = { ...before.settings, name: 'Next' };
+    const next = new Map([['d', created], ['c', before.frames.get('c')], ['a', changed]]), settings = { ...before.settings, name: 'Next', metadata: { literal: null } };
     const items = api.projectHistoryItems(before.frames, before.settings, next, settings);
     const bytes = JSON.stringify([[...before.frames], before.settings, [...next], settings, items]);
     api.assertProjectHistoryRoundTrip(before.frames, before.settings, next, settings, items);
     if (JSON.stringify([[...before.frames], before.settings, [...next], settings, items]) !== bytes) throw new Error('Transaction proof mutated its inputs');
     const redo = replay(api, before, items, 'redo'), undo = replay(api, redo, items, 'undo');
-    return { types: items.map(item => item.type), redo: [...redo.frames.keys()], undo: [...undo.frames.keys()], style: Object.entries(redo.frames.get('a').nodes.root.style), createdMetadata: redo.frames.get('d').metadata };
+    return { types: items.map(item => item.type), redo: [...redo.frames.keys()], undo: [...undo.frames.keys()], style: Object.entries(redo.frames.get('a').nodes.root.style), createdMetadata: redo.frames.get('d').metadata, projectMetadata: redo.settings.metadata };
   } },
-  { name: 'transaction proof refuses lossy project metadata null', error: 'UNSUPPORTED_SOURCE_REPLAY', run: api => {
+  { name: 'transaction proof retains project metadata null', expected: { literal: null }, run: api => {
     const before = context(api), nextSettings = { ...before.settings, metadata: { literal: null } };
-    return api.assertProjectHistoryRoundTrip(before.frames, before.settings, before.frames, nextSettings, api.projectHistoryItems(before.frames, before.settings, before.frames, nextSettings));
+    const items = api.projectHistoryItems(before.frames, before.settings, before.frames, nextSettings);
+    api.assertProjectHistoryRoundTrip(before.frames, before.settings, before.frames, nextSettings, items);
+    return replay(api, before, items, 'redo').settings.metadata;
+  } },
+  ...nullableTransitions.map(([name, from, to]) => ({ name: `project nullable metadata replays ${name} with shared slot semantics`, expected: { undo: from, redo: to, versions: [8, 9] }, run: api => {
+    const before = context(api); before.settings = { ...before.settings, metadata: from };
+    const after = { ...before.settings, metadata: to };
+    const items = api.projectHistoryItems(before.frames, before.settings, before.frames, after);
+    api.assertProjectHistoryRoundTrip(before.frames, before.settings, before.frames, after, items);
+    const redo = replay(api, before, items, 'redo'), undo = replay(api, redo, items, 'undo');
+    return { undo: undo.settings.metadata, redo: redo.settings.metadata, versions: [redo.settings.version, undo.settings.version] };
+  } })),
+  { name: 'project nullable history refuses later changes inside a replaced slot', error: 'CANNOT_UNDO', run: api => {
+    const before = context(api); before.settings = { ...before.settings, metadata: { slot: null } };
+    const after = { ...before.settings, metadata: { slot: { value: 'Changed' } } };
+    const items = api.projectHistoryItems(before.frames, before.settings, before.frames, after);
+    return replay(api, { ...before, settings: { ...after, metadata: { slot: { value: 'Changed', later: true } } } }, items, 'undo');
+  } },
+  { name: 'project nullable snapshots do not bypass ordinary settings patch admission', error: 'INVALID_PATCH', run: api => {
+    const before = context(api), after = { ...before.settings, metadata: { slot: null } };
+    const item = api.projectHistoryItems(before.frames, before.settings, before.frames, after)[0];
+    item.forward.frames = []; item.inverse.frames = null;
+    return replay(api, before, [item], 'redo');
+  } },
+  { name: 'restored project nullable values require final settings admission', error: 'INVALID_DOCUMENT', run: api => {
+    const before = context(api), after = { ...before.settings, metadata: { slot: null } };
+    const item = api.projectHistoryItems(before.frames, before.settings, before.frames, after)[0];
+    item.nullBlocks[0].after = Infinity;
+    return replay(api, before, [item], 'redo');
+  } },
+  { name: 'settings history keeps outputDir normalized-null semantics separate', expected: { undo: null, redo: 'build', blocks: false }, run: api => {
+    const before = context(api), after = { ...before.settings, outputDir: 'build' };
+    const items = api.projectHistoryItems(before.frames, before.settings, before.frames, after);
+    const redo = replay(api, before, items, 'redo'), undo = replay(api, redo, items, 'undo');
+    return { undo: undo.settings.outputDir, redo: redo.settings.outputDir, blocks: !!items[0].nullBlocks };
+  } },
+  { name: 'complete endpoint proof still refuses omitted project metadata history', error: 'UNSUPPORTED_SOURCE_REPLAY', run: api => {
+    const before = context(api), after = { ...before.settings, metadata: { slot: null } };
+    return api.assertProjectHistoryRoundTrip(before.frames, before.settings, before.frames, after, []);
   } },
   { name: 'transaction proof retains node lifecycle metadata and override nulls', expected: { metadata: { literal: null }, attrs: { title: null }, style: [['padding', null]] }, run: api => {
     const before = overrideContext(api, { definition: { style: { padding: null }, attrs: { title: null } } }), frame = before.frames.get('a');
@@ -120,18 +170,7 @@ export const historyReplayCases = [
     api.assertProjectHistoryRoundTrip(before.frames, before.settings, next, before.settings, items);
     return replay(api, before, items, 'redo').frames.get('a').nodes.label.metadata;
   } },
-  ...[
-    ['absence', {}, { slot: null }],
-    ['prototype-named own member', {}, { toString: null }],
-    ['deletion', { slot: null }, {}],
-    ['scalar', { slot: null }, { slot: false }],
-    ['record', { slot: null }, { slot: { literal: null, nested: { value: null } } }],
-    ['array', { slot: null }, { slot: [null, { value: null }] }],
-    ['new subtree', {}, { slot: { literal: null } }],
-    ['removed subtree', { slot: { literal: null } }, {}],
-    ['scalar to record', { slot: 'text' }, { slot: { length: null } }],
-    ['record to array', { slot: { length: null } }, { slot: [null] }],
-  ].map(([name, from, to]) => ({ name: `nullable data slots replay ${name} without interpreting null as deletion`, expected: { undo: from, redo: to }, run: api => {
+  ...nullableTransitions.map(([name, from, to]) => ({ name: `nullable data slots replay ${name} without interpreting null as deletion`, expected: { undo: from, redo: to }, run: api => {
     const before = context(api), frame = before.frames.get('a');
     const original = api.validateDocument({ ...frame, metadata: from }), after = api.validateDocument({ ...frame, metadata: to });
     const item = { type: 'patch', documentId: 'a', ...api.documentHistoryPatch(original, after) };

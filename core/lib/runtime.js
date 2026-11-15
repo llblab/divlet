@@ -15,7 +15,7 @@ import { documentHistoryPatch, diffValue, summarizeChange, touchedNodeIds } from
 import { replayHistory, projectHistoryItems, assertProjectHistoryRoundTrip } from './history-replay.ts';
 import { operationPatch } from './ops.ts';
 import { HistoryLine, planHistoryTraversal, validateHistoryNavigation, planHistoryNavigation } from './history.ts';
-import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertPatchVersion, assertExpectedVersion, assertExpectedRender } from './acceptance.ts';
+import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsHistoryPatch, assertPatchVersion, assertExpectedVersion, assertExpectedRender } from './acceptance.ts';
 import { expandPath, inspectPath, initProject, resolveProject, isProjectFile } from './projects.ts';
 import { OutputStore, safeDirectory } from './output.ts';
 import { buildStatic, inlineDeclaredAssets, readResourceBytes, normalizeExternalFiles } from './static.js';
@@ -1094,7 +1094,7 @@ await this.importProject(project.settings, project.frames, hash);
     await this.refreshSite();
     const fields = SETTINGS_FIELDS.filter(key => !isDeepStrictEqual(previous[key], settings[key]));
     const change = this.record({ actor, kind, documentId: null, name: settings.name, group, label, text: fields.length ? `project ${fields.join(', ')}` : 'no change' });
-    if (undoable && fields.length) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `project ${fields.join(', ')}`, items: [{ type: 'project', inverse: settingsPatch(settings, previous), forward: settingsPatch(previous, settings) }] }, { seq: change.seq });
+    if (undoable && fields.length) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `project ${fields.join(', ')}`, items: [{ type: 'project', ...settingsHistoryPatch(previous, settings) }] }, { seq: change.seq });
     else if (fields.length) this.#historyLine.reset({ seq: change.seq, label: change.summary });
     this.publish();
     const warnings = styleWarnings({ css: patch && Object.hasOwn(patch, 'css') ? [previous.css, settings.css] : null, where: 'Project css' });

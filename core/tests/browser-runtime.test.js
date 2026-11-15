@@ -250,6 +250,35 @@ test('retained-node nullable history restores data without blocking disjoint lat
   } finally { await writers.close(); }
 });
 
+test('project nullable metadata history preserves exact data, disjoint edits and refusal authority', async () => {
+  const source = JSON.parse(editable);
+  source.metadata = { literal: null, nested: { value: null }, toString: null, array: [null, { value: null }] };
+  const writers = await pair(JSON.stringify(source));
+  try {
+    for (const runtime of [writers.node, writers.browser]) {
+      const original = structuredClone(runtime.settings.metadata), point = runtime.historyHead().pointId;
+      await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { metadata: { literal: 'Changed', nested: { value: null }, toString: 'Changed' } } });
+      const changed = structuredClone(runtime.settings.metadata), changedPoint = runtime.historyHead().pointId;
+      for (let iteration = 0; iteration < 2; iteration++) {
+        await runtime.undo(); assert.deepEqual(runtime.settings.metadata, original); assert.equal(runtime.historyHead().pointId, point);
+        await runtime.redo(); assert.deepEqual(runtime.settings.metadata, changed); assert.equal(runtime.historyHead().pointId, changedPoint);
+      }
+      await runtime.patchProject({ expectedVersion: runtime.settings.version, undoable: false, patch: { metadata: { sibling: 'retained' } } });
+      await runtime.undo(); assert.deepEqual(runtime.settings.metadata, { ...original, sibling: 'retained' });
+      const serialized = runtime === writers.node ? await fs.readFile(runtime.projectPath, 'utf8') : runtime.source();
+      assert.deepEqual(JSON.parse(serialized).metadata, { ...original, sibling: 'retained' });
+      await runtime.redo(); assert.deepEqual(runtime.settings.metadata, { ...changed, sibling: 'retained' });
+      await runtime.patchProject({ expectedVersion: runtime.settings.version, undoable: false, patch: { metadata: { literal: 'Later' } } });
+      const before = historyState(runtime), text = runtime === writers.node ? await fs.readFile(runtime.projectPath, 'utf8') : runtime.source(), writes = writers.stored.length;
+      await assert.rejects(runtime.undo(), { code: 'CANNOT_UNDO' });
+      assert.deepEqual(historyState(runtime), before);
+      assert.equal(runtime === writers.node ? await fs.readFile(runtime.projectPath, 'utf8') : runtime.source(), text);
+      assert.equal(writers.stored.length, writes);
+    }
+    sameState(writers, 'project nullable history');
+  } finally { await writers.close(); }
+});
+
 test('opt-in native text refusal does not silently replace draft readers or touch accepted writers', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-draft-json-'));
   const file = path.join(directory, 'draft.divlet');

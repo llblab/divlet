@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { validateDocument, applyDocumentPatch } from '../lib/model.ts';
-import { sameDocument } from '../lib/acceptance.ts';
-import { documentHistoryPatch, matchesDocumentHistoryPatch, summarizeChange } from '../lib/diff.ts';
+import { sameDocument, settingsHistoryPatch } from '../lib/acceptance.ts';
+import { validateSettings } from '../lib/project.ts';
+import { documentHistoryPatch, matchesDocumentHistoryPatch, summarizeChange, captureHistoryNulls } from '../lib/diff.ts';
 import type { DocumentHistoryPatch } from '../lib/diff.ts';
 import { sampleFrame } from './fixtures/frame-portability.js';
 
@@ -80,6 +81,25 @@ test('nullable slot capture is independent and skips unchanged nulls and atomic 
   assert.deepEqual(item.nullBlocks?.[0]?.after, { nested: { value: null } });
   const renamed = documentHistoryPatch(before, applyDocumentPatch(before, { name: 'Renamed' }));
   assert.equal(renamed.nullBlocks, undefined, 'unchanged nullable data must not turn disjoint edits into conflicts');
+});
+
+test('project snapshot producer limits nullable guards to metadata, not outputDir defaults', () => {
+  const before = validateSettings({ metadata: { slot: null } });
+  const after = validateSettings({ metadata: { slot: { literal: null } }, outputDir: 'build' });
+  const item = settingsHistoryPatch(before, after);
+  assert.deepEqual(item.nullBlocks, [{ path: ['metadata', 'slot'], before: null, after: { literal: null } }]);
+  after.metadata.slot = 'later';
+  assert.deepEqual(item.nullBlocks?.[0]?.after, { literal: null });
+  assert.equal(settingsHistoryPatch(before, { ...before, name: 'Renamed', outputDir: 'build' }).nullBlocks, undefined);
+});
+
+test('shared nullable capture leaves caller-owned roots and paths untouched', () => {
+  const path = ['metadata'], value: Record<string, unknown> = { literal: null };
+  const roots = Object.freeze([Object.freeze([null, value, path] as const)]);
+  const before = JSON.stringify(roots), blocks = captureHistoryNulls(roots);
+  assert.equal(JSON.stringify(roots), before);
+  path.push('later'); value.literal = 'later';
+  assert.deepEqual(blocks, [{ path: ['metadata'], before: null, after: { literal: null } }]);
 });
 
 function readonlyHistoryContract(item: DocumentHistoryPatch) {

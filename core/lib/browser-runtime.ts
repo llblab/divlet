@@ -20,7 +20,7 @@ import { exportHtml } from './codec.ts';
 import type { ProjectSettings } from './project.ts';
 import { prepareFrameWith } from './prepare.ts';
 import type { FrameCompiler, PreparedFrame } from './prepare.ts';
-import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsPatch, assertPatchVersion, assertExpectedVersion, assertExpectedRender } from './acceptance.ts';
+import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsHistoryPatch, assertPatchVersion, assertExpectedVersion, assertExpectedRender } from './acceptance.ts';
 import { sameJson } from './validation.ts';
 import { runOnRuntime, toolByName, toolList } from './tools.ts';
 
@@ -397,7 +397,7 @@ export class BrowserRuntime {
     this.revision++;
     const fields = SETTINGS_FIELDS.filter(key => !sameJson((previous as any)[key], (settings as any)[key]));
     const change = this.record({ actor, kind, documentId: null, name: settings.name, group, label, text: fields.length ? `project ${fields.join(', ')}` : 'no change' });
-    if (undoable && fields.length) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `project ${fields.join(', ')}`, items: [{ type: 'project', inverse: settingsPatch(settings, previous), forward: settingsPatch(previous, settings) }] }, { seq: change.seq });
+    if (undoable && fields.length) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `project ${fields.join(', ')}`, items: [{ type: 'project', ...settingsHistoryPatch(previous, settings) }] }, { seq: change.seq });
     else if (fields.length) this.#historyLine.reset({ seq: change.seq, label: change.summary });
     this.publish();
     return { project: true, version: settings.version, revision: this.revision, seq: change.seq, summary: change.summary, saved: true };

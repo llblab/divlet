@@ -4,11 +4,11 @@
  */
 import { applyDocumentPatch, validateDocument, DivletError } from './model.ts';
 import type { DocumentModel } from './model.ts';
-import { patchSettings } from './project.ts';
+import { patchSettings, validateSettings } from './project.ts';
 import type { ProjectSettings } from './project.ts';
-import { matchesPatch, matchesDocumentHistoryPatch, documentHistoryPatch } from './diff.ts';
-import type { ValuePatch, DocumentHistoryPatch } from './diff.ts';
-import { sameDocument, sameSettings, settingsPatch } from './acceptance.ts';
+import { matchesHistoryPatch, matchesDocumentHistoryPatch, documentHistoryPatch } from './diff.ts';
+import type { ValueHistoryPatch, DocumentHistoryPatch, HistoryNullBlock } from './diff.ts';
+import { sameDocument, sameSettings, settingsHistoryPatch } from './acceptance.ts';
 import { sameJson } from './validation.ts';
 import type { HistoryDirection } from './history.ts';
 export { documentHistoryPatch } from './diff.ts';
@@ -16,17 +16,39 @@ export { documentHistoryPatch } from './diff.ts';
 /** Session-owned records, not a wire format or an admission boundary for foreign history. */
 export type HistoryReplayItem = Readonly<
   | ({ type: 'patch'; documentId: string } & DocumentHistoryPatch)
-  | { type: 'project'; inverse: ValuePatch; forward: ValuePatch }
+  | ({ type: 'project' } & ValueHistoryPatch)
   | { type: 'order'; inverse: readonly string[]; forward: readonly string[] }
   | { type: 'create' | 'delete'; documentId: string; index?: number; document: DocumentModel }>;
 export interface HistoryCandidate { frames: Map<string, DocumentModel>; settings: ProjectSettings }
 
 function refuse(message: string): never { throw new DivletError('CANNOT_UNDO', message); }
 
+/** Restore trusted nullable endpoints only on a private, already patch-admitted candidate; its owner validates again. */
+function restoreNullBlocks(raw: Record<string, any>, blocks: readonly HistoryNullBlock[], undoing: boolean): void {
+  for (const block of blocks) {
+    const value = block[undoing ? 'before' : 'after'];
+    let parent: Record<string, any> | undefined = raw;
+    for (const key of block.path.slice(0, -1)) {
+      const child: unknown = parent && Object.hasOwn(parent, key) ? parent[key] : undefined;
+      if (!child || typeof child !== 'object' || Array.isArray(child)) {
+        if (value !== undefined) refuse('History nullable value container is missing.');
+        parent = undefined;
+        break;
+      }
+      parent = child as Record<string, any>;
+    }
+    if (parent) {
+      const key = block.path.at(-1)!;
+      if (value === undefined) delete parent[key];
+      else parent[key] = structuredClone(value);
+    }
+  }
+}
+
 /** A canonical project transition in replay order; logging, source hashes and publication remain writer-owned. */
 export function projectHistoryItems(previous: ReadonlyMap<string, DocumentModel>, previousSettings: ProjectSettings, next: ReadonlyMap<string, DocumentModel>, nextSettings: ProjectSettings): HistoryReplayItem[] {
   const items: HistoryReplayItem[] = [];
-  if (!sameSettings(previousSettings, nextSettings)) items.push({ type: 'project', inverse: settingsPatch(nextSettings, previousSettings), forward: settingsPatch(previousSettings, nextSettings) });
+  if (!sameSettings(previousSettings, nextSettings)) items.push({ type: 'project', ...settingsHistoryPatch(previousSettings, nextSettings) });
   for (const [id, to] of next) {
     const from = previous.get(id);
     if (from && !sameDocument(from, to)) items.push({ type: 'patch', documentId: id, ...documentHistoryPatch(from, to) });
@@ -70,24 +92,7 @@ export function replayHistory(previous: ReadonlyMap<string, DocumentModel>, prev
             if (value === undefined) delete raw.nodes[block.nodeId];
             else raw.nodes[block.nodeId] = structuredClone(value);
           }
-          for (const block of item.nullBlocks ?? []) {
-            const value = block[undoing ? 'before' : 'after'];
-            let parent: Record<string, any> | undefined = raw;
-            for (const key of block.path.slice(0, -1)) {
-              const child: unknown = parent && Object.hasOwn(parent, key) ? parent[key] : undefined;
-              if (!child || typeof child !== 'object' || Array.isArray(child)) {
-                if (value !== undefined) refuse('History nullable value container is missing.');
-                parent = undefined;
-                break;
-              }
-              parent = child as Record<string, any>;
-            }
-            if (parent) {
-              const key = block.path.at(-1)!;
-              if (value === undefined) delete parent[key];
-              else parent[key] = structuredClone(value);
-            }
-          }
+          restoreNullBlocks(raw, item.nullBlocks ?? [], undoing);
           for (const block of item.styleBlocks ?? []) {
             const node = raw.nodes?.[block.nodeId], value = block[undoing ? 'before' : 'after'];
             if (block.address === null) {
@@ -105,9 +110,13 @@ export function replayHistory(previous: ReadonlyMap<string, DocumentModel>, prev
         break;
       }
       case 'project': {
-        const change = undoing ? item.inverse : item.forward, expected = undoing ? item.forward : item.inverse;
-        if (!matchesPatch({ ...settings, outputDir: settings.outputDir ?? undefined }, expected, change)) refuse('Later changes touched the same project fields.');
-        settings = patchSettings(settings, change);
+        const change = undoing ? item.inverse : item.forward;
+        if (!matchesHistoryPatch({ ...settings, outputDir: settings.outputDir ?? undefined }, item, undoing)) refuse('Later changes touched the same project fields.');
+        const candidate = patchSettings(settings, change);
+        if (item.nullBlocks?.length) {
+          restoreNullBlocks(candidate, item.nullBlocks, undoing);
+          settings = validateSettings(candidate);
+        } else settings = candidate;
         break;
       }
       case 'order': {

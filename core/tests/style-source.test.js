@@ -61,6 +61,9 @@ const transitions = ['literal', 'override'].flatMap(kind => [
 ].map(([name, style]) => ({ kind, name, edit: source => { location(source, kind).style = style; } })));
 const storedNull = { 'padding-left': null, padding: '10px' };
 transitions.push(
+  { kind: 'literal', name: 'collateral project metadata null', edit: source => { source.frames[0].nodes.button.style = reordered; source.metadata = { literal: null }; } },
+  { kind: 'literal', name: 'project-only null insertion', edit: source => { source.metadata = { literal: null, nested: { value: null }, toString: null }; } },
+  { kind: 'literal', name: 'project null restoration', setup: source => { source.metadata = { literal: null, nested: { value: null } }; }, edit: source => { source.metadata = {}; } },
   { kind: 'override', name: 'stored-null node removal', initialStyle: storedNull, edit: source => { delete source.frames[1].nodes.instance; source.frames[1].nodes.root.children = []; } },
   { kind: 'override', name: 'stored-null address removal', initialStyle: storedNull, edit: source => { delete source.frames[1].nodes.instance.descendants.button; } },
   { kind: 'override', name: 'stored-null node creation', edit: source => {
@@ -86,20 +89,23 @@ const stylesOf = frames => frames.flatMap(frame => Object.keys(frame.nodes).sort
 }));
 const acceptedStyles = runtime => stylesOf([...runtime.documents.values()].map(entry => entry.document));
 const acceptedContent = runtime => [...runtime.documents.values()].map(entry => structuredClone({ ...entry.document, version: 0 }));
+const acceptedSettings = runtime => structuredClone({ ...runtime.settings, version: 0 });
 
 for (const { kind, name, edit, initialStyle, setup } of transitions) test(`live ${kind} source accepts and replays ${name} exactly`, async t => {
   const { runtime, file } = await fixture(t, kind, initialStyle, setup);
   runtime.setSelection({ documentId: 'consumer', ids: [runtime.getEntry('consumer').document.rootId] });
-  const before = await state(runtime), original = acceptedStyles(runtime), originalContent = acceptedContent(runtime), originalName = runtime.settings.name;
+  const before = await state(runtime), original = acceptedStyles(runtime), originalContent = acceptedContent(runtime), originalSettings = acceptedSettings(runtime);
   const source = JSON.parse(await fs.readFile(file, 'utf8'));
   edit(source); source.name = 'Accepted external style edit';
-  const expected = stylesOf(source.frames), expectedContent = readProject(source).frames.map(frame => ({ ...frame, version: 0 }));
+  const prepared = readProject(source), expected = stylesOf(source.frames), expectedContent = prepared.frames.map(frame => ({ ...frame, version: 0 })), expectedSettings = { ...prepared.settings, version: 0 };
   await fs.writeFile(file, JSON.stringify(source, null, '\t') + '\r\n');
   await runtime.scan();
   assert.equal(runtime.diagnostics.has(file), false);
   assert.deepEqual(acceptedStyles(runtime), expected);
   assert.deepEqual(acceptedContent(runtime), expectedContent);
-  assert.deepEqual(stylesOf(JSON.parse(await fs.readFile(file, 'utf8')).frames), expected);
+  assert.deepEqual(acceptedSettings(runtime), expectedSettings);
+  const canonical = JSON.parse(await fs.readFile(file, 'utf8'));
+  assert.deepEqual(stylesOf(canonical.frames), expected); assert.deepEqual(canonical.metadata, expectedSettings.metadata);
   assert.equal(runtime.knownHashes.get(file), digest(await fs.readFile(file, 'utf8')));
   assert.deepEqual(runtime.selection, before.selection, 'captured selection is not refreshed by content/history');
   assert.equal(runtime.settings.name, source.name);
@@ -112,13 +118,16 @@ for (const { kind, name, edit, initialStyle, setup } of transitions) test(`live 
     await runtime.undo();
     assert.deepEqual(acceptedStyles(runtime), original);
     assert.deepEqual(acceptedContent(runtime), originalContent);
-    assert.deepEqual(stylesOf(JSON.parse(await fs.readFile(file, 'utf8')).frames), original);
-    assert.equal(runtime.settings.name, originalName);
+    assert.deepEqual(acceptedSettings(runtime), originalSettings);
+    const undone = JSON.parse(await fs.readFile(file, 'utf8'));
+    assert.deepEqual(stylesOf(undone.frames), original); assert.deepEqual(undone.metadata, originalSettings.metadata);
     assert.equal(runtime.historyHead().pointId, before.point);
     await runtime.redo();
     assert.deepEqual(acceptedStyles(runtime), expected);
     assert.deepEqual(acceptedContent(runtime), expectedContent);
-    assert.deepEqual(stylesOf(JSON.parse(await fs.readFile(file, 'utf8')).frames), expected);
+    assert.deepEqual(acceptedSettings(runtime), expectedSettings);
+    const redone = JSON.parse(await fs.readFile(file, 'utf8'));
+    assert.deepEqual(stylesOf(redone.frames), expected); assert.deepEqual(redone.metadata, expectedSettings.metadata);
     assert.equal(runtime.historyHead().pointId, point);
     assert.deepEqual(runtime.selection, before.selection);
   }
@@ -130,7 +139,6 @@ async function refusedSource(t, { kind = 'literal', initialStyle, edit, code }) 
   const { runtime, file } = await fixture(t, kind, initialStyle);
   const before = await state(runtime), accepted = await fs.readFile(file, 'utf8');
   const source = JSON.parse(accepted); edit(source);
-  if (code === 'UNSUPPORTED_SOURCE_REPLAY') assert.doesNotThrow(() => readProject(source), 'live replay refusal does not change fresh reader grammar');
   const authored = JSON.stringify(source, null, '\t') + '\r\n';
   await fs.writeFile(file, authored); await runtime.scan();
   assert.equal(runtime.diagnostics.get(file)?.code, code);
@@ -149,11 +157,6 @@ async function refusedSource(t, { kind = 'literal', initialStyle, edit, code }) 
   await runtime.patch({ documentId: 'definitions', expectedVersion: runtime.getEntry('definitions').document.version, patch: { nodes: { label: { content: 'Recovered' } } } });
   assert.equal(runtime.getEntry('definitions').document.nodes.label.content, 'Recovered');
 }
-
-for (const row of [
-  { name: 'collateral project metadata null', edit: source => { source.frames[0].nodes.button.style = reordered; source.metadata = { literal: null }; } },
-  { name: 'project-only null insertion', edit: source => { source.metadata = { literal: null }; } },
-]) test(`unreplayable source refuses ${row.name} before accepting its hash`, t => refusedSource(t, { ...row, code: 'UNSUPPORTED_SOURCE_REPLAY' }));
 
 for (const row of [
   { name: 'unsafe CSS', edit: source => { source.frames[0].nodes.button.style = { color: 'red;display:none' }; } },

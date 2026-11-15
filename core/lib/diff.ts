@@ -77,7 +77,8 @@ export interface HistoryNullBlock {
   readonly before: unknown;
   readonly after: unknown;
 }
-export interface DocumentHistoryPatch { inverse: ValuePatch; forward: ValuePatch; styleBlocks?: readonly HistoryStyleBlock[]; nodeBlocks?: readonly HistoryNodeBlock[]; nullBlocks?: readonly HistoryNullBlock[] }
+export interface ValueHistoryPatch { inverse: ValuePatch; forward: ValuePatch; nullBlocks?: readonly HistoryNullBlock[] }
+export interface DocumentHistoryPatch extends ValueHistoryPatch { styleBlocks?: readonly HistoryStyleBlock[]; nodeBlocks?: readonly HistoryNodeBlock[] }
 
 function readHistoryValue(value: unknown, path: readonly string[]): unknown {
   for (const key of path) { if (!plain(value) || !Object.hasOwn(value, key)) return undefined; value = value[key]; }
@@ -85,33 +86,39 @@ function readHistoryValue(value: unknown, path: readonly string[]): unknown {
 }
 
 /** Only changed slots involving stored null need supplementing; unchanged branches and array contents remain sparse/atomic. */
-function captureNullBlocks(roots: Array<readonly [unknown, unknown, string[]]>): HistoryNullBlock[] {
-  const blocks: HistoryNullBlock[] = [];
-  while (roots.length) {
-    const [before, after, path] = roots.pop()!;
+export function captureHistoryNulls(roots: readonly (readonly [unknown, unknown, readonly string[]])[]): HistoryNullBlock[] {
+  const pending = [...roots], blocks: HistoryNullBlock[] = [];
+  while (pending.length) {
+    const [before, after, path] = pending.pop()!;
     if (isDeepStrictEqual(before, after)) continue;
-    if (before === null || after === null) { blocks.push({ path, before: structuredClone(before), after: structuredClone(after) }); continue; }
+    if (before === null || after === null) { blocks.push({ path: [...path], before: structuredClone(before), after: structuredClone(after) }); continue; }
     const from = plain(before) ? before : {}, to = plain(after) ? after : {};
-    for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) roots.push([Object.hasOwn(from, key) ? from[key] : undefined, Object.hasOwn(to, key) ? to[key] : undefined, [...path, key]]);
+    for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) pending.push([Object.hasOwn(from, key) ? from[key] : undefined, Object.hasOwn(to, key) ? to[key] : undefined, [...path, key]]);
   }
   return blocks;
 }
 
-/** Check exact lifecycle/style snapshots first; their sparse encoding cannot guard stored nulls or declaration order. */
-export function matchesDocumentHistoryPatch(current: DocumentModel, item: DocumentHistoryPatch, undoing: boolean): boolean {
+/** Exact null endpoints supplement sparse guards; callers may skip paths they have already guarded atomically. */
+export function matchesHistoryPatch(current: unknown, item: ValueHistoryPatch, undoing: boolean, guardedPaths: readonly (readonly string[])[] = []): boolean {
   const expected = undoing ? item.forward : item.inverse, change = undoing ? item.inverse : item.forward;
-  const styleBlocks = item.styleBlocks ?? [], nodeBlocks = item.nodeBlocks ?? [], nullBlocks = item.nullBlocks ?? [];
+  const nullBlocks = item.nullBlocks ?? [];
   if (nullBlocks.some(block => !isDeepStrictEqual(readHistoryValue(current, block.path), block[undoing ? 'after' : 'before']))) return false;
-  if (nodeBlocks.some(block => !sameNode(Object.hasOwn(current.nodes, block.nodeId) ? current.nodes[block.nodeId] : undefined, block[undoing ? 'after' : 'before']))) return false;
-  if (styleBlocks.some(block => !isDeepStrictEqual(readStyleBlock(current, block.nodeId, block.address), block[undoing ? 'after' : 'before']))) return false;
-  if (!styleBlocks.length && !nodeBlocks.length && !nullBlocks.length) return matchesPatch(current, expected, change);
-  const paths = new Set([...nullBlocks.map(block => JSON.stringify(block.path)), ...nodeBlocks.map(block => JSON.stringify(['nodes', block.nodeId])), ...styleBlocks.map(block => JSON.stringify(['nodes', block.nodeId, ...(block.address === null ? ['style'] : ['descendants', block.address, 'style'])]))]);
+  if (!guardedPaths.length && !nullBlocks.length) return matchesPatch(current, expected, change);
+  const paths = new Set([...nullBlocks.map(block => JSON.stringify(block.path)), ...guardedPaths.map(path => JSON.stringify(path))]);
   function matches(value: unknown, prior: unknown, patch: unknown, path: string[]): boolean {
     if (paths.has(JSON.stringify(path))) return true;
     if (plain(patch) && plain(prior)) return Object.keys(patch).every(key => matches((value as any)?.[key], prior[key], patch[key], [...path, key]));
     return matchesPatch(value, prior, patch);
   }
   return matches(current, expected, change, []);
+}
+
+/** Check exact lifecycle/style snapshots before delegating nullable and ordinary sparse guards. */
+export function matchesDocumentHistoryPatch(current: DocumentModel, item: DocumentHistoryPatch, undoing: boolean): boolean {
+  const styleBlocks = item.styleBlocks ?? [], nodeBlocks = item.nodeBlocks ?? [];
+  if (nodeBlocks.some(block => !sameNode(Object.hasOwn(current.nodes, block.nodeId) ? current.nodes[block.nodeId] : undefined, block[undoing ? 'after' : 'before']))) return false;
+  if (styleBlocks.some(block => !isDeepStrictEqual(readStyleBlock(current, block.nodeId, block.address), block[undoing ? 'after' : 'before']))) return false;
+  return matchesHistoryPatch(current, item, undoing, [...nodeBlocks.map(block => ['nodes', block.nodeId]), ...styleBlocks.map(block => ['nodes', block.nodeId, ...(block.address === null ? ['style'] : ['descendants', block.address, 'style'])])]);
 }
 
 export function readStyleBlock(document: DocumentModel, nodeId: string, address: string | null): readonly CssDeclarationOperation[] | undefined {
@@ -144,7 +151,7 @@ export function documentHistoryPatch(from: DocumentModel, to: DocumentModel): Do
       for (const key of ['attrs', 'metadata'] as const) nullable.push([a[address]?.[key], b[address]?.[key], ['nodes', id, 'descendants', address, key]]);
     }
   }
-  const nullBlocks = captureNullBlocks(nullable);
+  const nullBlocks = captureHistoryNulls(nullable);
   return { forward, inverse, ...(styleBlocks.length ? { styleBlocks } : {}), ...(nodeBlocks.length ? { nodeBlocks } : {}), ...(nullBlocks.length ? { nullBlocks } : {}) };
 }
 
