@@ -160,6 +160,24 @@ try {
   const identityAudit = auditRendererIdentity(path.join(target, 'node_modules/@divlet/core'));
   assert.equal(identityAudit.reports.installed.version, renderer, 'the audit observes the same installed renderer the smoke exercised');
   const rendererIdentity = { phase: 'core-cli-mcp', comparisons: identityAudit.comparisons, inputs: Object.fromEntries(Object.entries(identityAudit.reports).map(([name, report]) => [name, report.inputs])) };
+  // Internal browser packaging proof: tools come from checkout; every product/vendor input comes from this consumer.
+  const rendererBrowserEntry = path.join(root, 'plugins/tailwind/tests/browser.mjs');
+  const rendererBrowserEnv = { ...process.env }; delete rendererBrowserEnv.NODE_OPTIONS; delete rendererBrowserEnv.NODE_PATH;
+  const rendererBrowserOptions = { cwd: target, env: rendererBrowserEnv, encoding: 'utf8', timeout: 90000, maxBuffer: 4 * 1024 * 1024 };
+  const rendererBrowser = JSON.parse(execFileSync(process.execPath, [rendererBrowserEntry, '--installed', target], rendererBrowserOptions));
+  assert.equal(rendererBrowser.status, 'passed');
+  assert.equal(rendererBrowser.mode, 'private installed-package bundle in Chromium');
+  assert.equal(rendererBrowser.sharedProfile, renderer);
+  assert.equal(rendererBrowser.installedInputsConfined && rendererBrowser.nodeImportsConfined, true);
+  const refusalControls = [];
+  for (const [flag, code] of [['--node-core-only', 'INSTALLED_DEPENDENCY_ESCAPE'], ['--browser-core-only', 'INSTALLED_BROWSER_DEPENDENCY_ESCAPE']]) {
+    let refused;
+    try { execFileSync(process.execPath, [rendererBrowserEntry, '--installed', target, flag], rendererBrowserOptions); } catch (error) { refused = error; }
+    assert.equal(refused?.status, 1, `${flag}: narrowing the allowed root must refuse actual vendor imports`);
+    assert.ok(refused.stderr.includes(code), `${flag}: the corresponding confinement guard must own the refusal`);
+    refusalControls.push(code);
+  }
+  rendererBrowser.refusalControls = refusalControls;
 
   // The MCP server from the installed package: initialize, list the shared tools, open a project, read it, and stop on EOF.
   await writeFile(path.join(target, 'mcp-smoke.mjs'), `
@@ -241,5 +259,5 @@ try {
     installedPi = JSON.parse(execFileSync(process.execPath, [path.join(root, 'pi/tests/e2e/pi.mjs')], { cwd: target, env: { ...process.env, NODE_OPTIONS: '', PI_DIVLET_INSTALLED_ROOT: target }, encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 }).trim());
     assert.equal(installedPi.status, 'passed'); assert.equal(installedPi.installed, true); assert.equal(installedPi.installedFonts.status, 'passed', 'required installed Pi mode cannot silently skip the real host/browser case');
   }
-  console.log(JSON.stringify({ status: 'passed', registryInstallation: registry, frozenManifest: Boolean(candidate), files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, rendererIdentity, pluginTypes: true, browserModelBundle: true, webPackage: webPacked.name, installedFonts, ...(installedPi ? { installedPi } : {}), mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
+  console.log(JSON.stringify({ status: 'passed', registryInstallation: registry, frozenManifest: Boolean(candidate), files: packed.entryCount, packedKB: Math.round(packed.size / 1024), ...result, rendererIdentity, rendererBrowser, pluginTypes: true, browserModelBundle: true, webPackage: webPacked.name, installedFonts, ...(installedPi ? { installedPi } : {}), mcpProtocol: mcp.protocol, mcpTools: mcp.tools.length, adapterPackages: ['@divlet/cli', '@divlet/mcp', '@divlet/pi'] }));
 } finally { await rm(work, { recursive: true, force: true }); }

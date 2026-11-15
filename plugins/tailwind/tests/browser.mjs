@@ -1,27 +1,72 @@
-// Real browser execution/required dispatch of the private shared renderer, not installed-package or board integration evidence.
+// Real browser execution of private renderer internals in source, workspace-build or installed modes; not a public SDK or board integration.
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { once } from 'node:events';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import path from 'node:path';
+import { realpathSync } from 'node:fs';
+import { registerHooks, findPackageJSON } from 'node:module';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
 
-const compiled = process.argv.includes('--compiled');
-const { createRenderer } = await import(compiled ? '../../../dist/plugins/tailwind/lib/renderer.js' : '../lib/renderer.ts');
-const { rendererSource } = await import(compiled ? '../../../dist/plugins/tailwind/lib/identity.js' : '../lib/identity.ts');
-const prefix = compiled ? './dist/' : './', extension = compiled ? 'js' : 'ts';
-const entry = `export * from '${prefix}plugins/tailwind/lib/compiler.${extension}'; export * from '${prefix}plugins/tailwind/lib/renderer-profile.${extension}'; export * from '${prefix}core/lib/style-engines.${extension}';`;
-const bundle = await build({ stdin: { contents: entry, resolveDir: fileURLToPath(new URL('../../../', import.meta.url)) }, bundle: true, write: false, platform: 'browser', format: 'esm', target: 'es2022', metafile: true, define: { 'process.env.NODE_ENV': '"production"' } });
+const compiled = process.argv.includes('--compiled'), installedAt = process.argv.indexOf('--installed');
+assert.ok(installedAt < 0 || (process.argv[installedAt + 1] && !process.argv[installedAt + 1].startsWith('--')), '--installed requires an existing consumer directory');
+const installed = installedAt < 0 ? null : realpathSync(path.resolve(process.argv[installedAt + 1]));
+assert.ok(!installed || !compiled, 'installed mode never uses the workspace build');
+const checkout = fileURLToPath(new URL('../../../', import.meta.url)), workingDir = installed ?? checkout;
+const nodeModules = installed && realpathSync(path.join(installed, 'node_modules'));
+const product = installed ? realpathSync(path.join(nodeModules, '@divlet/core/dist')) : path.join(checkout, compiled ? 'dist' : '.');
+const inside = (root, file) => { const relative = path.relative(root, file); return relative === '' || (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`)); };
+const nodeCoreOnly = process.argv.includes('--node-core-only'), browserCoreOnly = process.argv.includes('--browser-core-only');
+assert.ok(installed || !(nodeCoreOnly || browserCoreOnly), 'narrow-root refusal controls require installed mode');
+if (installed) {
+  assert.ok(!process.env.NODE_OPTIONS && !process.env.NODE_PATH, 'installed mode requires cleared source conditions/search paths');
+  assert.ok(inside(installed, nodeModules) && inside(nodeModules, product), 'the dependency directory and product must be installed, not linked outside the consumer');
+}
+const observedNodeFiles = new Set();
+const nodeGuard = installed && registerHooks({ resolve(specifier, context, nextResolve) {
+  const result = nextResolve(specifier, context);
+  const parent = context.parentURL?.startsWith('file:') && fileURLToPath(context.parentURL);
+  const file = result.url.startsWith('file:') && realpathSync(fileURLToPath(result.url));
+  if (parent && inside(nodeModules, parent) && !result.url.startsWith('node:') && (!file || !inside(nodeCoreOnly ? product : nodeModules, file))) {
+    throw Object.assign(new Error(`Installed renderer dependency escaped its allowed root: ${specifier}`), { code: 'INSTALLED_DEPENDENCY_ESCAPE' });
+  }
+  if (file && inside(nodeModules, file)) {
+    assert.ok(!file.endsWith('.ts'), 'installed Node controls execute emitted JavaScript, never product source');
+    observedNodeFiles.add(file);
+  }
+  return result;
+} });
+const extension = installed || compiled ? 'js' : 'ts';
+const moduleFile = name => path.join(product, `plugins/tailwind/lib/${name}.${extension}`);
+if (installed) for (const name of ['renderer', 'identity']) assert.ok(inside(nodeModules, realpathSync(moduleFile(name))), 'Node control entries cannot escape through links');
+const { createRenderer } = await import(pathToFileURL(moduleFile('renderer')).href);
+const { rendererSource } = await import(pathToFileURL(moduleFile('identity')).href);
+const entryFiles = [moduleFile('compiler'), moduleFile('renderer-profile'), path.join(product, `core/lib/style-engines.${extension}`)];
+const entry = entryFiles.map(file => `export * from ${JSON.stringify(file)};`).join('\n');
+const bundle = await build({ absWorkingDir: workingDir, stdin: { contents: entry, resolveDir: workingDir }, bundle: true, write: false, platform: 'browser', format: 'esm', target: 'es2022', metafile: true, define: { 'process.env.NODE_ENV': '"production"' } });
 const inputs = Object.keys(bundle.metafile.inputs);
 assert.equal(Object.values(bundle.metafile.outputs).flatMap(output => output.imports).length, 0, 'no runtime dependency rescue');
 assert.equal(inputs.some(file => /@tailwindcss\/node|plugins\/tailwind\/lib\/(?:styling|renderer|identity)\.(?:js|ts)$/.test(file)), false, 'no Node wrapper, identity discovery or provider bootstrap');
-assert.ok(inputs.filter(file => /(?:^|\/)core\//.test(file)).every(file => /core\/lib\/(?:style-engines|validation)\.(?:js|ts)$/.test(file)), 'only the portable registry/validation slice enters the test composition');
+const productInputs = inputs.map(file => path.relative(product, path.resolve(workingDir, file)).split(path.sep).join('/'));
+assert.ok(productInputs.filter(file => file.startsWith('core/')).every(file => /^core\/lib\/(?:style-engines|validation)\.(?:js|ts)$/.test(file)), 'only the portable registry/validation slice enters the test composition');
+if (installed) for (const file of inputs.filter(file => !file.startsWith('(disabled):') && file !== '<stdin>')) {
+  const real = realpathSync(path.resolve(workingDir, file));
+  if (!inside(browserCoreOnly ? product : nodeModules, real)) throw Object.assign(new Error(`Installed browser renderer input escaped its allowed root: ${file}`), { code: 'INSTALLED_BROWSER_DEPENDENCY_ESCAPE' });
+  assert.ok(!/\.ts$/.test(real), 'installed browser inputs are emitted JavaScript, never product source');
+}
 const disabled = inputs.filter(file => file.startsWith('(disabled):'));
 const vendorMappings = new Set(['(disabled):node_modules/postcss/lib/terminal-highlight', '(disabled):path', '(disabled):node_modules/source-map-js/source-map.js', '(disabled):url', '(disabled):fs']);
 assert.ok(disabled.every(file => vendorMappings.has(file)), 'only the declared vendor browser mappings may disable optional host branches');
-const source = rendererSource(), styles = source.stylesheets, candidates = ['p-[37px]', 'md:p-[41px]', 'text-brand', 'data-[state=on]:opacity-25'], tokens = { '--color-brand': '#123456' };
+const source = rendererSource(), candidates = ['p-[37px]', 'md:p-[41px]', 'text-brand', 'data-[state=on]:opacity-25'], tokens = { '--color-brand': '#123456' };
 const nodeRenderer = createRenderer(), expectedCss = await nodeRenderer.compileClasses(tokens, candidates), requests = [];
 assert.equal(nodeRenderer.version, source.version);
+if (installed) {
+  const manifest = findPackageJSON('tailwindcss', pathToFileURL(moduleFile('identity')));
+  assert.ok(inside(nodeModules, realpathSync(manifest)), 'stylesheet discovery stays in the installed consumer');
+  for (const name of Object.keys(source.stylesheets)) assert.ok(inside(nodeModules, realpathSync(path.join(path.dirname(manifest), name))), 'captured stylesheet files cannot escape through links');
+  assert.ok(observedNodeFiles.size > 0, 'the Node import guard observed installed product execution');
+}
 const server = http.createServer((request, response) => {
   requests.push(request.url);
   if (request.url === '/') response.writeHead(200, { 'Content-Type': 'text/html' }).end('<!doctype html><link rel="icon" href="data:,"><main>New classes, no prepared CSS</main>');
@@ -89,5 +134,5 @@ try {
   assert.deepEqual(actual.nodeGlobals, []);
   assert.deepEqual([...new Set(requests)].sort(), ['/', '/compiler.js'], 'only the declared local routes were requested');
   assert.deepEqual(browserRequests, [{ url: `${origin}/`, method: 'GET', type: 'document' }, { url: `${origin}/compiler.js`, method: 'GET', type: 'script' }], 'browser-wide observation also detects blocked out-of-origin or nonstatic requests');
-  console.log(JSON.stringify({ status: 'passed', mode: compiled ? 'private compiled-workspace bundle in Chromium' : 'private source-bundle in Chromium', bytes: bundle.outputFiles[0].contents.length, inputs: inputs.length, vendorBrowserMappings: disabled, newUtility: actual.normal, responsivePadding: '41px', stateOpacity: actual.onOpacity, sharedProfile: actual.version, nodeCssEqual: true, selectionRefusals: actual.selectionRefusals, nativeCss: actual.native, fallbackCalls: actual.fallbackCalls, refusals: actual.refusals, nodeGlobals: actual.nodeGlobals, requests, browserRequests: browserRequests.map(({ url, ...request }) => ({ ...request, path: new URL(url).pathname })) }, null, 2));
-} finally { await browser?.close(); server.close(); await once(server, 'close'); }
+  console.log(JSON.stringify({ status: 'passed', mode: installed ? 'private installed-package bundle in Chromium' : compiled ? 'private compiled-workspace bundle in Chromium' : 'private source-bundle in Chromium', ...(installed ? { installedInputsConfined: true, nodeImportsConfined: true, nodeFileCount: observedNodeFiles.size } : {}), bytes: bundle.outputFiles[0].contents.length, inputs: inputs.length, vendorBrowserMappings: disabled, newUtility: actual.normal, responsivePadding: '41px', stateOpacity: actual.onOpacity, sharedProfile: actual.version, nodeCssEqual: true, selectionRefusals: actual.selectionRefusals, nativeCss: actual.native, fallbackCalls: actual.fallbackCalls, refusals: actual.refusals, nodeGlobals: actual.nodeGlobals, requests, browserRequests: browserRequests.map(({ url, ...request }) => ({ ...request, path: new URL(url).pathname })) }, null, 2));
+} finally { await browser?.close(); server.close(); await once(server, 'close'); nodeGuard?.deregister(); }
