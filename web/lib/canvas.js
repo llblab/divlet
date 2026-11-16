@@ -979,7 +979,8 @@ function handlePreviewMessage(entry, data) {
     entry.awaitingVersion = 0;
     entry.placeholder.hidden = true;
     if (data.version >= entry.doc.render) queueCapture(entry);
-    if (entry.ghost) requestAnimationFrame(() => requestAnimationFrame(() => dropGhost(entry)));
+    const ghost = entry.ghost;
+    if (ghost) requestAnimationFrame(() => requestAnimationFrame(() => { if (entry.ghost === ghost) dropGhost(entry); }));
     setFrameStatus(entry, data.version >= entry.doc.render ? 'live' : 'updating');
     entry.port?.postMessage({ type: 'divlet:inspect', enabled: inspectFlag() });
     syncNodeSelection(entry);

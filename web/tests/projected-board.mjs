@@ -243,6 +243,55 @@ try {
     assert.equal(await page.locator('iframe[data-document-id="index"]').getAttribute('sandbox'), 'allow-scripts');
     assert.equal(await page.locator('iframe[data-document-id="index"]').getAttribute('referrerpolicy'), 'no-referrer');
   }
+  const generationContent = () => page.evaluate(() => JSON.stringify({ source: projectedApp.runtime.source(), revision: projectedApp.runtime.revision, renderSeq: projectedApp.runtime.renderSeq, history: projectedApp.runtime.readHistory() }));
+  const beforeGeneration = await generationContent(), generationRecord = await page.evaluate(storedRecord);
+  // Control parent animation callbacks only; child painting and authenticated bridge ACKs remain real.
+  await page.evaluate(() => {
+    const request = requestAnimationFrame, cancel = cancelAnimationFrame, callbacks = new Map();
+    let next = 0;
+    globalThis.paintClock = {
+      step() { const batch = [...callbacks.values()]; callbacks.clear(); for (const callback of batch) callback(performance.now()); },
+      restore() { window.requestAnimationFrame = request; window.cancelAnimationFrame = cancel; for (const callback of callbacks.values()) request(callback); callbacks.clear(); },
+    };
+    window.requestAnimationFrame = callback => { const id = --next; callbacks.set(id, callback); return id; };
+    window.cancelAnimationFrame = id => { if (!callbacks.delete(id)) cancel(id); };
+    document.querySelector('.ab-expand').click(); document.querySelector('#expanded-back').click();
+  });
+  const paintVersion = await page.evaluate(() => projectedApp.runtime.getEntry('index').render);
+  await page.waitForFunction(version => testCanvas.entries.get('index').renderedVersion === version, paintVersion, { polling: 20, timeout: 10000 });
+  const acknowledged = await page.evaluate(() => {
+    const e = testCanvas.entries.get('index');
+    globalThis.acknowledgedGhost = e.ghost;
+    const result = { ghost: !!e.ghost?.isConnected, port: !!e.port, loaded: e.loaded, released: previewUrls.revoked.includes(e.ghost?.src) };
+    paintClock.step(); // The acknowledged generation's outer rAF schedules its inner retirement callback.
+    return result;
+  });
+  assert.deepEqual(acknowledged, { ghost: true, port: true, loaded: true, released: false });
+  const deferred = await page.evaluate(() => {
+    const e = testCanvas.entries.get('index'), previous = e.iframe;
+    document.querySelector('.ab-expand').click(); document.querySelector('#expanded-back').click();
+    const current = e.iframe;
+    globalThis.latestPaintGhost = previous;
+    const before = { ghost: e.ghost === previous && previous.isConnected, authenticated: !!e.port, rendered: e.renderedVersion };
+    paintClock.step(); // Earlier inner cleanup runs in this task, before the new document can authenticate.
+    return { before, retained: e.ghost === previous && previous.isConnected, released: previewUrls.revoked.includes(previous.src), current: e.iframe === current && current.isConnected, olderRetired: !acknowledgedGhost.isConnected && previewUrls.revoked.includes(acknowledgedGhost.src) };
+  });
+  assert.deepEqual(deferred, { before: { ghost: true, authenticated: false, rendered: 0 }, retained: true, released: false, current: true, olderRetired: true }, 'an older paint callback must not retire a later reset ghost');
+  await page.waitForFunction(version => testCanvas.entries.get('index').renderedVersion === version, paintVersion, { polling: 20, timeout: 10000 });
+  const ownPaint = await page.evaluate(() => {
+    const before = { retained: latestPaintGhost.isConnected && testCanvas.entries.get('index').ghost === latestPaintGhost, released: previewUrls.revoked.includes(latestPaintGhost.src) };
+    paintClock.step(); paintClock.step(); // Its own ACK's two rAF callbacks, not the four-second fallback timer.
+    const after = { removed: !latestPaintGhost.isConnected, releases: previewUrls.revoked.filter(url => url === latestPaintGhost.src).length, currentRevoked: previewUrls.revoked.includes(testCanvas.entries.get('index').iframe.src) };
+    paintClock.restore();
+    return { before, after };
+  });
+  assert.deepEqual(ownPaint, { before: { retained: true, released: false }, after: { removed: true, releases: 1, currentRevoked: false } }, 'its own authenticated paint callbacks still retire the latest ghost without the fallback timer');
+  assert.deepEqual(await endpoints(), { ...changed, padding: '47px' });
+  assert.equal(await generationContent(), beforeGeneration, 'deferred cleanup and reset do not author content or history');
+  assert.deepEqual(await page.evaluate(storedRecord), generationRecord);
+  const afterPaint = await page.evaluate(async () => { const r = projectedApp.runtime; return r.patch({ documentId: 'index', expectedVersion: r.getEntry('index').document.version, patch: { name: 'After deferred paint reset' } }); });
+  await rendered(afterPaint.render);
+  assert.deepEqual(await endpoints(), { ...changed, padding: '47px' });
   for (const kind of ['initial projection refusal', 'byte reader refusal']) {
     const isolated = await browser.newContext({ serviceWorkers: 'block' }); await guard(isolated);
     const fresh = await isolated.newPage();
@@ -261,5 +310,5 @@ try {
   const control = url + 'unrequested';
   assert.equal(await page.evaluate(async target => { try { await fetch(target); return false; } catch { return true; } }, control), true); assert.deepEqual(denied, [control]);
   await context.close();
-  console.log(JSON.stringify({ status: 'passed', scope: 'trusted projector in actual board/canvas with literal Data URLs only; declared bytes still refused', checks: ['initial and live authenticated preview', 'same iframe/root/input focus/draft', 'host writer and shared tool', 'Undo/Redo and one history entry per action', 'refused output retains render/source/history/IndexedDB without publication', 'same-session post-refusal ACK retains root/focus/draft', 'restored-copy projection refusal preserves record', 'successful restoration reuses projector', 'no byte/node-export activation or native fallback', 'two opaque expand/reset cycles with literal endpoints', 'ghost URL release through actual API', 'old capability and Window edit refusal with causal barrier and writer fence', 'post-reset live ACK', 'context-wide network refusal control'], browser: browser.version() }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', scope: 'trusted projector in actual board/canvas with literal Data URLs only; declared bytes still refused', checks: ['initial and live authenticated preview', 'same iframe/root/input focus/draft', 'host writer and shared tool', 'Undo/Redo and one history entry per action', 'refused output retains render/source/history/IndexedDB without publication', 'same-session post-refusal ACK retains root/focus/draft', 'restored-copy projection refusal preserves record', 'successful restoration reuses projector', 'no byte/node-export activation or native fallback', 'two opaque expand/reset cycles with literal endpoints', 'ghost URL release through actual API', 'old capability and Window edit refusal with causal barrier and writer fence', 'post-reset live ACK', 'ACK then reset then earlier cleanup retains the newer ghost', 'own ACK releases that ghost once; later writer remains live', 'context-wide network refusal control'], browser: browser.version() }, null, 2));
 } finally { await browser?.close(); server.close(); await once(server, 'close'); }
