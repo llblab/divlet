@@ -88,7 +88,14 @@ try {
   await page.addInitScript(() => {
     if (top !== self) return;
     const create = URL.createObjectURL, revoke = URL.revokeObjectURL;
-    globalThis.previewUrls = { created: [], revoked: [] };
+    globalThis.previewUrls = { created: [], revoked: [], firedTimers: [] };
+    const timeout = setTimeout;
+    window.setTimeout = function (callback, delay, ...args) {
+      if (typeof callback !== 'function' || delay !== 4000) return timeout.call(this, callback, delay, ...args);
+      let id;
+      id = timeout.call(this, function (...values) { previewUrls.firedTimers.push(id); return callback.apply(this, values); }, delay, ...args);
+      return id;
+    };
     URL.createObjectURL = function (blob) { const url = create.call(this, blob); previewUrls.created.push(url); return url; };
     URL.revokeObjectURL = function (url) { const result = revoke.call(this, url); previewUrls.revoked.push(url); return result; };
   });
@@ -292,6 +299,57 @@ try {
   const afterPaint = await page.evaluate(async () => { const r = projectedApp.runtime; return r.patch({ documentId: 'index', expectedVersion: r.getEntry('index').document.version, patch: { name: 'After deferred paint reset' } }); });
   await rendered(afterPaint.render);
   assert.deepEqual(await endpoints(), { ...changed, padding: '47px' });
+  for (const trigger of ['timeout', 'unmount']) {
+    const beforeCleanup = await generationContent(), cleanupRecord = await page.evaluate(storedRecord);
+    let captureRoute;
+    const capturedRoute = new Promise(resolve => { captureRoute = resolve; });
+    const bridgeUrl = url + 'preview-bridge.js', holdBridge = route => { captureRoute(route); };
+    let held, settled = false;
+    await page.route(bridgeUrl, holdBridge);
+    try {
+      const request = page.waitForRequest(bridgeUrl, { timeout: 10000 });
+      const pending = await page.evaluate(() => {
+        const e = testCanvas.entries.get('index'), previous = e.iframe;
+        document.querySelector('.ab-expand').click(); document.querySelector('#expanded-back').click();
+        globalThis.cleanupPreview = { ghost: e.ghost, iframe: e.iframe, src: e.iframe.src, timer: e.ghostTimer };
+        return { oldSrc: e.ghost.src, activeSrc: e.iframe.src, ghost: e.ghost === previous && previous.isConnected, port: !!e.port, rendered: e.renderedVersion, timer: e.ghostTimer };
+      });
+      await request; held = await capturedRoute;
+      assert.deepEqual({ ...pending, oldSrc: undefined, activeSrc: undefined, timer: undefined }, { oldSrc: undefined, activeSrc: undefined, ghost: true, port: false, rendered: 0, timer: undefined });
+      assert.notEqual(pending.oldSrc, pending.activeSrc);
+      assert.equal(await page.evaluate(() => previewUrls.firedTimers.includes(cleanupPreview.timer)), false);
+      if (trigger === 'timeout') {
+        await page.waitForFunction(() => previewUrls.firedTimers.includes(cleanupPreview.timer), null, { timeout: 10000 });
+        assert.deepEqual(await page.evaluate(() => { const e = testCanvas.entries.get('index'); return { oldRemoved: !cleanupPreview.ghost.isConnected, current: e.iframe === cleanupPreview.iframe && e.iframe.isConnected, port: !!e.port, rendered: e.renderedVersion, oldReleases: previewUrls.revoked.filter(url => url === cleanupPreview.ghost.src).length, currentRevoked: previewUrls.revoked.includes(e.iframe.src) }; }), { oldRemoved: true, current: true, port: false, rendered: 0, oldReleases: 1, currentRevoked: false }, 'native timeout retires only its ghost while the bridge remains held');
+        assert.equal(await generationContent(), beforeCleanup); assert.deepEqual(await page.evaluate(storedRecord), cleanupRecord);
+        await held.continue(); settled = true;
+      } else {
+        const authored = frame => { const { version, ...content } = frame; return content; };
+        const previousFrame = authored(JSON.parse(cleanupRecord.text).frames[0]);
+        await page.evaluate(async () => { const host = globalThis[Symbol.for('divlet.board-host/1')], r = projectedApp.runtime; await host.writer.deleteArtboard({ documentId: 'index', expectedVersion: r.getEntry('index').document.version }); });
+        await page.waitForFunction(() => !testCanvas.entries.has('index') && !document.querySelector('.artboard[data-artboard-id="index"]'));
+        assert.deepEqual(await page.evaluate(() => ({ ghostRemoved: !cleanupPreview.ghost.isConnected, currentRemoved: !cleanupPreview.iframe.isConnected, timerFired: previewUrls.firedTimers.includes(cleanupPreview.timer), releases: [cleanupPreview.ghost.src, cleanupPreview.iframe.src].map(src => previewUrls.revoked.filter(url => url === src).length) })), { ghostRemoved: true, currentRemoved: true, timerFired: false, releases: [1, 1] }, 'unmount releases both URLs without paint or fallback');
+        assert.deepEqual(JSON.parse((await page.evaluate(storedRecord)).text).frames, []);
+        await held.abort('aborted'); settled = true;
+        await page.unroute(bridgeUrl, holdBridge);
+        await page.evaluate(() => globalThis[Symbol.for('divlet.board-host/1')].writer.undo());
+        await ready();
+        const restoredFrame = JSON.parse((await page.evaluate(storedRecord)).text).frames[0];
+        assert.deepEqual(authored(restoredFrame), previousFrame, 'Undo restores authored frame and literal resources');
+        const restoredSrc = await page.locator('iframe[data-document-id="index"]').getAttribute('src');
+        assert.ok(restoredSrc !== pending.oldSrc && restoredSrc !== pending.activeSrc);
+        assert.equal(await page.evaluate(src => previewUrls.revoked.includes(src), restoredSrc), false);
+      }
+    } finally {
+      if (held && !settled) await held.abort('aborted');
+      await page.unroute(bridgeUrl, holdBridge);
+    }
+    await rendered(await page.evaluate(() => projectedApp.runtime.getEntry('index').render));
+    if (trigger === 'timeout') assert.equal(await page.evaluate(() => { const e = testCanvas.entries.get('index'); return e.iframe === cleanupPreview.iframe && e.iframe.src === cleanupPreview.src; }), true, 'late bridge resumes the same current iframe and URL');
+    assert.deepEqual(await endpoints(), { ...changed, padding: '47px' });
+    const resumed = await page.evaluate(async trigger => { const r = projectedApp.runtime; return r.patch({ documentId: 'index', expectedVersion: r.getEntry('index').document.version, patch: { name: `After ${trigger} cleanup` } }); }, trigger);
+    await rendered(resumed.render); assert.deepEqual(await endpoints(), { ...changed, padding: '47px' });
+  }
   for (const kind of ['initial projection refusal', 'byte reader refusal']) {
     const isolated = await browser.newContext({ serviceWorkers: 'block' }); await guard(isolated);
     const fresh = await isolated.newPage();
@@ -310,5 +368,5 @@ try {
   const control = url + 'unrequested';
   assert.equal(await page.evaluate(async target => { try { await fetch(target); return false; } catch { return true; } }, control), true); assert.deepEqual(denied, [control]);
   await context.close();
-  console.log(JSON.stringify({ status: 'passed', scope: 'trusted projector in actual board/canvas with literal Data URLs only; declared bytes still refused', checks: ['initial and live authenticated preview', 'same iframe/root/input focus/draft', 'host writer and shared tool', 'Undo/Redo and one history entry per action', 'refused output retains render/source/history/IndexedDB without publication', 'same-session post-refusal ACK retains root/focus/draft', 'restored-copy projection refusal preserves record', 'successful restoration reuses projector', 'no byte/node-export activation or native fallback', 'two opaque expand/reset cycles with literal endpoints', 'ghost URL release through actual API', 'old capability and Window edit refusal with causal barrier and writer fence', 'post-reset live ACK', 'ACK then reset then earlier cleanup retains the newer ghost', 'own ACK releases that ghost once; later writer remains live', 'context-wide network refusal control'], browser: browser.version() }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', scope: 'trusted projector in actual board/canvas with literal Data URLs only; declared bytes still refused', checks: ['initial and live authenticated preview', 'same iframe/root/input focus/draft', 'host writer and shared tool', 'Undo/Redo and one history entry per action', 'refused output retains render/source/history/IndexedDB without publication', 'same-session post-refusal ACK retains root/focus/draft', 'restored-copy projection refusal preserves record', 'successful restoration reuses projector', 'no byte/node-export activation or native fallback', 'two opaque expand/reset cycles with literal endpoints', 'ghost URL release through actual API', 'old capability and Window edit refusal with causal barrier and writer fence', 'post-reset live ACK', 'ACK then reset then earlier cleanup retains the newer ghost', 'own ACK releases that ghost once; later writer remains live', 'native four-second timeout with bridge held; same-frame recovery', 'unmount releases ghost/current before timeout; Undo and new live ACK', 'context-wide network refusal control'], browser: browser.version() }, null, 2));
 } finally { await browser?.close(); server.close(); await once(server, 'close'); }
