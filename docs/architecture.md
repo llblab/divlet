@@ -231,7 +231,8 @@ Timeline reads are lazy while History is closed and serial/coalesced while visib
 | `core/lib/contract.ts` | Sessions and board resolution over `tools.ts`, which it re-exports. |
 | `core/lib/browser-runtime.ts` | Browser-local project writer over the shared kernel; no files, assets, sites or conversation. |
 | `core/lib/browser-board.ts` | Static-site composition: the browser writer, board ports, MCP provider and IndexedDB copy. |
-| `core/lib/browser-preview.ts` | Pure browser preview HTML/CSP envelope and static serialized-bridge bootstrap; no resource projection, lifecycle or writer authority. |
+| `core/lib/browser-preview.ts` | Host-independent preview UTF-8 byte admission, HTML/CSP envelope and static serialized-bridge bootstrap; no resource projection, lifecycle or writer authority. |
+| `core/lib/closed-preview.ts` | Limited single-file preview projection with the browser's 4 MiB work/output policy and an independent resource-free HTML bound; no source admission or activation. |
 | `core/lib/browser-mcp.ts` | `@divlet/core/browser-mcp`: agent-side transport to a website's browser MCP provider. |
 | `core/lib/output.ts` | Generated-file hashes/MIME provenance, collision checks and safe publication. |
 | `core/lib/static.js` | Resource closure/previews and bounded declared-byte HTML export. |

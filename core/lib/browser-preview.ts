@@ -1,7 +1,17 @@
 /*
- * Owns: the browser preview HTML/CSP envelope and static bridge bootstrap. Excludes: resource projection, document admission,
+ * Owns: browser preview HTML byte admission, its CSP envelope and static bridge bootstrap. Excludes: resource projection, model admission,
  * frame/port lifecycle, writer state and host composition. Inputs are trusted prepared HTML and a trusted serialized bridge.
  */
+import { DivletError, withinUtf8Budget } from './validation.ts';
+
+export const PREVIEW_HTML_BYTES = 4 * 1024 * 1024;
+
+/** Bound derived HTML independently of resource closure's deliberate no-files bypass. */
+export function assertPreviewHtml(html: unknown): asserts html is string {
+  if (typeof html !== 'string') throw new TypeError('A preview projection must return HTML text.');
+  if (!withinUtf8Budget(html, PREVIEW_HTML_BYTES)) throw new DivletError('FILE_TOO_LARGE', 'The projected preview exceeds the 4 MiB limit.');
+}
+
 const escapeAttribute = (value: string) => value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
 /**

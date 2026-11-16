@@ -2,15 +2,17 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { once } from 'node:events';
+import { readFile } from 'node:fs/promises';
+import { expectedPreviewCandidates } from '../../core/tests/fixtures/preview-candidates.js';
 import { chromium } from 'playwright';
 import { previewBridge } from '../../core/lib/bridge.js';
 import { previewBridgeScript } from '../../core/lib/browser-preview.ts';
 import { fontDataUrl } from '../../core/tests/fixtures/font.js';
-import { bundleBrowserCodec, bundleBrowserPrepare, bundleBrowserPreview, bundleBrowserStandaloneAssets } from '../../scripts/browser-model.mjs';
+import { bundleBrowserCodec, bundleBrowserPrepare, bundleBrowserPreview, bundleBrowserClosedPreview, bundleBrowserRuntime } from '../../scripts/browser-model.mjs';
 
 const root = process.cwd(), prefix = '/closed-preview/';
-const bundles = await Promise.all([bundleBrowserCodec(root, { source: true }), bundleBrowserPrepare(root), bundleBrowserPreview(root), bundleBrowserStandaloneAssets(root)]);
-assert.deepEqual(bundles[2].inputs, ['core/lib/browser-preview.ts', '<stdin>'], 'the envelope has no writer, storage, provider or host bootstrap');
+const bundles = await Promise.all([bundleBrowserCodec(root, { source: true }), bundleBrowserPrepare(root), bundleBrowserPreview(root), bundleBrowserClosedPreview(root), bundleBrowserRuntime(root)]);
+assert.deepEqual([...bundles[2].inputs].sort(), ['<stdin>', 'core/lib/browser-preview.ts', 'core/lib/validation.ts'], 'preview byte admission/envelope has no writer, storage, provider or host bootstrap');
 const svg = color => `<svg xmlns="http://www.w3.org/2000/svg" width="7" height="9"><rect id="mark" width="7" height="9" fill="${color}"/></svg>`;
 const data = text => `data:image/svg+xml;base64,${Buffer.from(text).toString('base64')}`;
 const assets = (color, advance) => ({ icons: { 'mark.svg': data(svg(color)), 'equal-alias.svg': data(svg(color)) }, fonts: { 'face.ttf': fontDataUrl(advance) }, unused: 'data:application/octet-stream;base64,AQID' });
@@ -18,9 +20,10 @@ const html = padding => `<!doctype html><html><head><style>@font-face{font-famil
 const fixture = { initial: assets('#123456', 600), next: assets('#654321', 900), html: [html(17), html(31)], expanded: data(svg('#123456').replace('</svg>', `<metadata>${'x'.repeat(3 * 1024 * 1024)}</metadata></svg>`)) };
 const files = new Map([
   [prefix, ['text/html', '<!doctype html><html><head><title>Closed preview proof</title></head><body></body></html>']],
-  ...['codec', 'prepare', 'preview', 'closure'].map((name, index) => [prefix + name + '.js', ['text/javascript', bundles[index].code]]),
+  ...['codec', 'prepare', 'preview', 'closure', 'runtime'].map((name, index) => [prefix + name + '.js', ['text/javascript', bundles[index].code]]),
   [prefix + 'bridge.js', ['text/javascript', previewBridgeScript(previewBridge.toString())]],
   [prefix + 'fixtures.json', ['application/json', JSON.stringify(fixture)]],
+  [prefix + 'candidate-cases.js', ['text/javascript', await readFile(new URL('../../core/tests/fixtures/preview-candidates.js', import.meta.url), 'utf8')]],
 ]);
 const served = [];
 const server = http.createServer((req, res) => {
@@ -45,16 +48,21 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(origin + prefix);
   const initial = await page.evaluate(async () => {
-    const [codec, prepare, envelope, closure, fixture] = await Promise.all([import('./codec.js'), import('./prepare.js'), import('./preview.js'), import('./closure.js'), fetch('./fixtures.json').then(r => r.json())]);
+    const [codec, prepare, envelope, closure, fixture, { BrowserRuntime }, candidates] = await Promise.all([import('./codec.js'), import('./prepare.js'), import('./preview.js'), import('./closure.js'), fetch('./fixtures.json').then(r => r.json()), import('./runtime.js'), import('./candidate-cases.js')]);
+    const writerCandidates = await candidates.previewCandidateCases({ BrowserRuntime, ...closure, ...envelope });
+    let byteGate, byteProjectionCalls = 0;
+    try {
+      await BrowserRuntime.open({ source: { ...candidates.previewCandidateSource, assets: fixture.initial }, file: 'project.divlet', projectId: 'refused-bytes', compiler: { compile: () => '', unknown: () => ({}) }, projectPreview: html => { byteProjectionCalls++; return html; } });
+      byteGate = 'accepted';
+    } catch (error) { byteGate = error.code; }
     const compiler = { compile: () => '', unknown: () => ({}) };
     const source = JSON.stringify(fixture);
-    const derive = async (html, assets, maxWorkBytes = 4 * 1024 * 1024) => {
+    const derive = async (html, assets) => {
       const document = codec.decodeHtml(html, { fallbackId: 'closed' });
       const before = JSON.stringify({ document, assets });
       const prepared = await prepare.prepareFrameWith(document, { compiler });
-      const projected = await closure.inlineDeclaredAssets(prepared.html, assets, { maxWorkBytes });
+      const projected = await closure.projectClosedPreview(prepared.html, assets);
       if (JSON.stringify({ document, assets }) !== before) throw Error('Canonical source changed');
-      if (new TextEncoder().encode(projected).length > 4 * 1024 * 1024 || projected.length > 8 * 1024 * 1024) throw Error('Projection exceeds preview/channel bounds');
       return { document, assets, html: projected };
     };
     const prepared = await derive(fixture.html[0], fixture.initial);
@@ -72,14 +80,16 @@ try {
     };
     addEventListener('message', receive);
     frame.src = blob; document.body.append(frame);
-    state.publish = async (html, assets, maxWorkBytes) => {
-      const next = await derive(html, assets, maxWorkBytes);
+    state.publish = async (html, assets) => {
+      const next = await derive(html, assets);
       state.port.postMessage({ type: 'divlet:update', documentId: 'closed', version: state.version + 1, html: next.html });
       state.prepared = next; state.version++; state.posts++;
     };
-    return { bytes: new TextEncoder().encode(prepared.html).length, nodeGlobals: ['Buffer', 'process', 'require'].filter(key => key in globalThis), canonical: prepared.document.css.includes('asset:fonts/face.ttf') && Object.values(prepared.document.nodes).some(node => node.attrs?.src === 'asset:icons/mark.svg') };
+    return { writerCandidates, byteGate, byteProjectionCalls, bytes: new TextEncoder().encode(prepared.html).length, nodeGlobals: ['Buffer', 'process', 'require'].filter(key => key in globalThis), canonical: prepared.document.css.includes('asset:fonts/face.ttf') && Object.values(prepared.document.nodes).some(node => node.attrs?.src === 'asset:icons/mark.svg') };
   });
   assert.deepEqual(initial.nodeGlobals, []); assert.equal(initial.canonical, true);
+  assert.deepEqual(initial.writerCandidates, expectedPreviewCandidates, 'actual browser writer passes authored preparation/refusal/queue/history witnesses');
+  assert.equal(initial.byteGate, 'ASSETS_UNAVAILABLE'); assert.equal(initial.byteProjectionCalls, 0);
   await page.waitForFunction(() => proof.port && proof.messages.some(m => m.type === 'divlet:rendered' && m.version === 1));
   const frame = page.locator('iframe').contentFrame();
   const endpoints = () => frame.locator('main').evaluate(async main => {

@@ -22,6 +22,7 @@ import { prepareFrameWith } from './prepare.ts';
 import type { FrameCompiler, PreparedFrame } from './prepare.ts';
 import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsHistoryPatch, assertPatchVersion, assertExpectedVersion, assertExpectedRender } from './acceptance.ts';
 import { sameJson } from './validation.ts';
+import { assertPreviewHtml } from './browser-preview.ts';
 import { runOnRuntime, toolByName, toolList } from './tools.ts';
 
 const HISTORY_LIMIT = 500;
@@ -37,6 +38,9 @@ export const BROWSER_TOOLS: readonly string[] = Object.freeze(['divlet_read', 'd
 interface Entry extends PreparedFrame { render: number; savedVersion: number }
 type Listener = (type: 'state' | 'change', value: unknown) => void;
 
+/** Trusted host projection of derived HTML only. Receives a detached asset tree and must preserve authored meaning. */
+export type BrowserPreviewProjector = (html: string, assets: ProjectSettings['assets']) => Promise<string> | string;
+
 export interface BrowserRuntimeOptions {
   /** The project source (`.divlet` JSON text or the parsed object). */
   readonly source: unknown;
@@ -45,6 +49,8 @@ export interface BrowserRuntimeOptions {
   /** A stable identifier for this browser copy of the project. */
   readonly projectId: string;
   readonly compiler: FrameCompiler;
+  /** Runs inside candidate preparation before persistence/acceptance. Not selected by project data or permission to admit bytes. */
+  readonly projectPreview?: BrowserPreviewProjector;
   /** Called after every accepted change with the serialized project; a rejection is reported as a diagnostic, never retried. */
   readonly persist?: (text: string) => Promise<void> | void;
   /** Capabilities the composition adds (for example `captureFonts: false`); merged into `project.capabilities`. */
@@ -57,6 +63,7 @@ export class BrowserRuntime {
   #queue: Promise<unknown> = Promise.resolve();
   #persist: BrowserRuntimeOptions['persist'];
   #compiler: FrameCompiler;
+  #projectPreview: BrowserPreviewProjector | undefined;
   #stateKey = '';
   #capabilities: Record<string, unknown>;
   readonly file: string;
@@ -84,6 +91,7 @@ export class BrowserRuntime {
     this.file = options.file;
     this.projectId = options.projectId;
     this.#compiler = options.compiler;
+    this.#projectPreview = options.projectPreview;
     this.#persist = options.persist;
     this.#capabilities = options.capabilities ?? {};
   }
@@ -229,8 +237,12 @@ export class BrowserRuntime {
 
   /* ---- preparation ------------------------------------------------------------------------------- */
 
-  prepare(input: unknown, { frames, settings = this.settings }: { frames?: Map<string, DocumentModel>; settings?: ProjectSettings } = {}) {
-    return prepareFrameWith(input, { lookup: id => frames ? frames.get(id) : this.documents.get(id)?.document, settings, limits: LIMITS, compiler: this.#compiler });
+  async prepare(input: unknown, { frames, settings = this.settings }: { frames?: Map<string, DocumentModel>; settings?: ProjectSettings } = {}) {
+    const prepared = await prepareFrameWith(input, { lookup: id => frames ? frames.get(id) : this.documents.get(id)?.document, settings, limits: LIMITS, compiler: this.#compiler });
+    if (!this.#projectPreview) return prepared;
+    const html = await this.#projectPreview(prepared.html, clone(settings.assets));
+    assertPreviewHtml(html);
+    return { ...prepared, html };
   }
 
   entryFor(prepared: PreparedFrame, previous?: Entry): Entry {
