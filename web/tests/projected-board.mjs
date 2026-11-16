@@ -86,7 +86,15 @@ try {
   await guard(context);
   const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => {
-    if (top !== self) return;
+    if (top !== self) {
+      // Privileged fixture observation of the real child endpoint; every send still invokes the native method.
+      const post = MessagePort.prototype.postMessage;
+      MessagePort.prototype.postMessage = function (message, ...args) {
+        if (message?.type === 'divlet:rendered' && message.documentId === 'index') globalThis.previewEndpoint = this;
+        return post.call(this, message, ...args);
+      };
+      return;
+    }
     const create = URL.createObjectURL, revoke = URL.revokeObjectURL;
     globalThis.previewUrls = { created: [], revoked: [], firedTimers: [] };
     const timeout = setTimeout;
@@ -350,6 +358,52 @@ try {
     const resumed = await page.evaluate(async trigger => { const r = projectedApp.runtime; return r.patch({ documentId: 'index', expectedVersion: r.getEntry('index').document.version, patch: { name: `After ${trigger} cleanup` } }); }, trigger);
     await rendered(resumed.render); assert.deepEqual(await endpoints(), { ...changed, padding: '47px' });
   }
+  const beforeRetiredPacket = await generationContent(), retiredPacketRecord = await page.evaluate(storedRecord);
+  await page.evaluate(async () => {
+    globalThis.portStore = await import('./lib/store.js');
+    const e = testCanvas.entries.get('index'), port = e.port, handler = port.onmessage;
+    globalThis.retiredDelivery = { port, handler, iframe: e.iframe, packet: null };
+    port.onmessage = function (event) {
+      if (event.data?.type === 'divlet:text-edit' && event.data.content === 'STALE PORT REPLAY') retiredDelivery.packet = event;
+      else handler.call(this, event);
+    };
+  });
+  const oldRender = await page.evaluate(() => projectedApp.runtime.getEntry('index').render);
+  await frame.locator('main').evaluate((_, version) => {
+    previewEndpoint.postMessage({ type: 'divlet:text-edit', documentId: 'index', version, renderVersion: version, nodeId: 'label', content: 'STALE PORT REPLAY' });
+  }, oldRender);
+  await page.waitForFunction(() => !!retiredDelivery.packet, null, { timeout: 10000 });
+  assert.deepEqual(await page.evaluate(() => ({ native: retiredDelivery.packet instanceof MessageEvent, trusted: retiredDelivery.packet.isTrusted, target: retiredDelivery.packet.target === retiredDelivery.port, current: testCanvas.entries.get('index').port === retiredDelivery.port })), { native: true, trusted: true, target: true, current: true });
+  assert.equal(await generationContent(), beforeRetiredPacket, 'holding delivery does not edit accepted content');
+  const replay = await page.evaluate(async () => {
+    document.querySelector('.ab-expand').click(); document.querySelector('#expanded-back').click();
+    const e = testCanvas.entries.get('index');
+    const state = { replaced: e.iframe !== retiredDelivery.iframe, retired: e.port !== retiredDelivery.port, authenticated: !!e.port, rendered: e.renderedVersion };
+    // Delay an actual native MessageEvent's original product callback until its captured frame/port have retired.
+    retiredDelivery.handler.call(retiredDelivery.port, retiredDelivery.packet);
+    await portStore.idle('index'); // Drain the UI document queue before the runtime writer fence.
+    await projectedApp.runtime.enqueue(() => undefined);
+    return state;
+  });
+  assert.deepEqual(replay, { replaced: true, retired: true, authenticated: false, rendered: 0 });
+  assert.equal(await generationContent(), beforeRetiredPacket, 'delayed old-port delivery cannot edit the accepted model/history');
+  assert.deepEqual(await page.evaluate(storedRecord), retiredPacketRecord);
+  await rendered(await page.evaluate(() => projectedApp.runtime.getEntry('index').render));
+  assert.equal(await page.evaluate(() => testCanvas.entries.get('index').port !== retiredDelivery.port), true);
+  assert.deepEqual(await endpoints(), { ...changed, padding: '47px' });
+  const liveRender = await page.evaluate(() => projectedApp.runtime.getEntry('index').render);
+  await frame.locator('main').evaluate((_, version) => {
+    previewEndpoint.postMessage({ type: 'divlet:text-edit', documentId: 'index', version, renderVersion: version, nodeId: 'label', content: 'AAA' });
+  }, liveRender);
+  await page.waitForFunction(() => projectedApp.runtime.getEntry('index').document.nodes.label.content === 'AAA', null, { timeout: 10000 });
+  await page.evaluate(() => portStore.idle('index'));
+  await rendered(await page.evaluate(() => projectedApp.runtime.getEntry('index').render));
+  assert.deepEqual(await endpoints(), { ...changed, padding: '47px', fontWidth: 270 });
+  assert.equal(JSON.parse((await page.evaluate(storedRecord)).text).frames[0].nodes.label.content, 'AAA');
+  await page.evaluate(() => globalThis[Symbol.for('divlet.board-host/1')].writer.undo());
+  await rendered(await page.evaluate(() => projectedApp.runtime.getEntry('index').render));
+  assert.deepEqual(await endpoints(), { ...changed, padding: '47px' });
+  assert.equal(JSON.parse((await page.evaluate(storedRecord)).text).frames[0].nodes.label.content, 'AA');
   for (const kind of ['initial projection refusal', 'byte reader refusal']) {
     const isolated = await browser.newContext({ serviceWorkers: 'block' }); await guard(isolated);
     const fresh = await isolated.newPage();
@@ -368,5 +422,5 @@ try {
   const control = url + 'unrequested';
   assert.equal(await page.evaluate(async target => { try { await fetch(target); return false; } catch { return true; } }, control), true); assert.deepEqual(denied, [control]);
   await context.close();
-  console.log(JSON.stringify({ status: 'passed', scope: 'trusted projector in actual board/canvas with literal Data URLs only; declared bytes still refused', checks: ['initial and live authenticated preview', 'same iframe/root/input focus/draft', 'host writer and shared tool', 'Undo/Redo and one history entry per action', 'refused output retains render/source/history/IndexedDB without publication', 'same-session post-refusal ACK retains root/focus/draft', 'restored-copy projection refusal preserves record', 'successful restoration reuses projector', 'no byte/node-export activation or native fallback', 'two opaque expand/reset cycles with literal endpoints', 'ghost URL release through actual API', 'old capability and Window edit refusal with causal barrier and writer fence', 'post-reset live ACK', 'ACK then reset then earlier cleanup retains the newer ghost', 'own ACK releases that ghost once; later writer remains live', 'native four-second timeout with bridge held; same-frame recovery', 'unmount releases ghost/current before timeout; Undo and new live ACK', 'context-wide network refusal control'], browser: browser.version() }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', scope: 'trusted projector in actual board/canvas with literal Data URLs only; declared bytes still refused', checks: ['initial and live authenticated preview', 'same iframe/root/input focus/draft', 'host writer and shared tool', 'Undo/Redo and one history entry per action', 'refused output retains render/source/history/IndexedDB without publication', 'same-session post-refusal ACK retains root/focus/draft', 'restored-copy projection refusal preserves record', 'successful restoration reuses projector', 'no byte/node-export activation or native fallback', 'two opaque expand/reset cycles with literal endpoints', 'ghost URL release through actual API', 'old capability and Window edit refusal with causal barrier and writer fence', 'post-reset live ACK', 'ACK then reset then earlier cleanup retains the newer ghost', 'own ACK releases that ghost once; later writer remains live', 'native four-second timeout with bridge held; same-frame recovery', 'unmount releases ghost/current before timeout; Undo and new live ACK', 'held native old-port MessageEvent refused after reset with UI/runtime fences', 'new genuine port edit persists and renders; Undo restores literal endpoints', 'context-wide network refusal control'], browser: browser.version() }, null, 2));
 } finally { await browser?.close(); server.close(); await once(server, 'close'); }
