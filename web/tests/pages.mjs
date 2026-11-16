@@ -4,6 +4,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { readProject } from '../../core/lib/project.ts';
+import { previewCandidateSource } from '../../core/tests/fixtures/preview-candidates.js';
 import { chromium } from 'playwright';
 import { Client } from '@modelcontextprotocol/client';
 import { pagesEntries } from '../../scripts/pages-build.mjs';
@@ -26,6 +29,28 @@ const base = `http://127.0.0.1:${server.address().port}${prefix}`;
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'], ...(process.env.PI_DIVLET_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PI_DIVLET_CHROMIUM_EXECUTABLE } : {}) });
 test.after(async () => { await browser.close(); server.close(); });
 
+const publishedText = files.get('project.divlet').toString('utf8');
+const publishedBase = createHash('sha256').update(publishedText).digest('hex');
+
+// One origin-owned record, through the real IndexedDB rather than a storage substitute.
+async function browserRecord({ write = false, value } = {}) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('divlet-browser', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result, tx = db.transaction('projects', write ? 'readwrite' : 'readonly');
+      const store = tx.objectStore('projects'), key = location.pathname + '#landing';
+      const action = write ? store.put(value, key) : store.get(key);
+      let result;
+      action.onsuccess = () => { result = action.result; };
+      tx.oncomplete = () => { db.close(); resolve(result); };
+      tx.onabort = () => { db.close(); reject(tx.error); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  });
+}
+
+const startupSettled = page => page.waitForFunction(() => document.querySelector('#loading .host-error') || !!globalThis[Symbol.for('divlet.board-host/1')]);
 const frameText = (page, selector) => page.frameLocator('iframe[data-document-id="index"]').locator(selector).first().textContent();
 const parse = result => { assert.equal(result.isError, false, result.content?.[0]?.text); return result.structuredContent; };
 
@@ -215,4 +240,101 @@ test('the official SDK client drives the real application through the browser tr
     await connection.page.waitForSelector('.artboard[data-artboard-id="phone"]', { state: 'detached' });
     await client.close();
   } finally { await connection.close(); }
+});
+
+const preparationRefusalSource = structuredClone(previewCandidateSource);
+const largeFrame = preparationRefusalSource.frames[0];
+largeFrame.nodes.text.content = '&'.repeat(8 * 1024);
+largeFrame.nodes.part = { id: 'part', type: 'element', tag: 'section', reusable: true, children: ['text'] };
+largeFrame.nodes.root.children = ['part', ...Array.from({ length: 160 }, (_, index) => {
+  const id = `instance-${index}`;
+  largeFrame.nodes[id] = { id, type: 'ref', ref: 'part' };
+  return id;
+})];
+const bytesRefusalSource = JSON.parse(publishedText);
+bytesRefusalSource.assets = { unopened: 'data:application/octet-stream;base64,AQID' };
+assert.doesNotThrow(() => readProject(preparationRefusalSource), 'the oversized derived preview starts from admitted canonical source');
+assert.doesNotThrow(() => readProject(bytesRefusalSource), 'the unavailable-byte copy is valid native source, not corrupt JSON');
+
+for (const row of [
+  { name: 'malformed JSON', text: '{"schemaVersion":1,', cause: 'INVALID_PROJECT' },
+  { name: 'unavailable bytes', text: '\n  ' + JSON.stringify(bytesRefusalSource) + '\n\n', cause: 'ASSETS_UNAVAILABLE' },
+  { name: 'derived preparation refusal', text: JSON.stringify(preparationRefusalSource), cause: 'FILE_TOO_LARGE' },
+  { name: 'non-text record', text: { retained: true }, cause: 'INVALID_PROJECT' },
+]) test(`a stored browser copy is retained on ${row.name}`, async () => {
+  const page = await browser.newPage();
+  const pageErrors = [], restoreRequests = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
+  page.on('request', request => restoreRequests.push(request.url()));
+  await page.addInitScript(() => {
+    window.startupErrors = [];
+    addEventListener('error', event => startupErrors.push({ code: event.error?.code, details: event.error?.details }));
+  });
+  try {
+    await page.goto(base); await page.waitForSelector('#loading', { state: 'hidden' });
+    const record = { base: publishedBase, text: row.text, savedAt: 'unchanged-sentinel', opaque: { retained: [1, null, 'raw'] } };
+    await page.evaluate(browserRecord, { write: true, value: record });
+    restoreRequests.length = 0;
+    await page.reload(); await startupSettled(page);
+    assert.deepEqual(await page.evaluate(browserRecord), record, 'failed restoration does not delete, normalize, migrate or replace the record');
+    const error = await page.locator('#loading .host-error').innerText();
+    assert.match(error, /saved browser copy could not be opened and was kept unchanged/i);
+    assert.deepEqual(await page.evaluate(() => ({ host: !!globalThis[Symbol.for('divlet.board-host/1')], provider: !!globalThis[Symbol.for('browser-mcp/1')], frames: document.querySelectorAll('.artboard').length })), { host: false, provider: false, frames: 0 }, 'no fallback writer, page agent or native board starts');
+    assert.deepEqual(await page.evaluate(() => startupErrors), [{ code: 'BROWSER_RESTORE_FAILED', details: { causeCode: row.cause } }]);
+    assert.equal(pageErrors.length, 1, 'one expected startup refusal');
+    await page.reload(); await startupSettled(page);
+    assert.deepEqual(await page.evaluate(browserRecord), record, 'repeated refusal is not an automatic reset');
+    assert.equal(pageErrors.length, 2);
+    assert.ok(restoreRequests.every(url => !/\/(?:board\.js|api\/|events(?:\?|$))/.test(url)), 'blocked startup never imports the native-fallback board or requests its routes');
+  } finally { await page.close(); }
+});
+
+for (const row of [
+  { name: 'invalid JSON', text: '{"schemaVersion":1,', cause: 'SyntaxError' },
+  { name: 'derived preview refusal', text: JSON.stringify(preparationRefusalSource), cause: 'FILE_TOO_LARGE' },
+]) test(`a new publication with ${row.name} cannot delete the older browser copy`, async () => {
+  const page = await browser.newPage(), restoreRequests = [];
+  page.on('request', request => restoreRequests.push(request.url()));
+  await page.addInitScript(() => {
+    window.startupCauses = [];
+    addEventListener('error', event => startupCauses.push(event.error?.code ?? event.error?.name));
+  });
+  try {
+    await page.goto(base); await page.waitForSelector('#loading', { state: 'hidden' });
+    const record = { base: publishedBase, text: '\n' + publishedText + '\n', savedAt: 'older-copy', opaque: true };
+    await page.evaluate(browserRecord, { write: true, value: record });
+    await page.route(base + 'project.divlet', route => route.fulfill({ contentType: 'application/octet-stream', body: row.text }));
+    restoreRequests.length = 0;
+    await page.reload(); await startupSettled(page);
+    assert.deepEqual(await page.evaluate(browserRecord), record, 'replacement source must prepare before any old-copy cleanup');
+    assert.equal(await page.locator('#loading .host-error').count(), 1);
+    assert.deepEqual(await page.evaluate(() => ({ host: !!globalThis[Symbol.for('divlet.board-host/1')], provider: !!globalThis[Symbol.for('browser-mcp/1')], frames: document.querySelectorAll('.artboard').length })), { host: false, provider: false, frames: 0 });
+    assert.deepEqual(await page.evaluate(() => startupCauses), [row.cause]);
+    assert.ok(restoreRequests.every(url => !/\/(?:board\.js|api\/|events(?:\?|$))/.test(url)));
+  } finally { await page.close(); }
+});
+
+test('a valid new publication still replaces the old baseline and persists its own edits', async () => {
+  const page = await browser.newPage();
+  const next = JSON.parse(publishedText); next.name = 'Next publication';
+  const text = JSON.stringify(next), fingerprint = createHash('sha256').update(text).digest('hex');
+  try {
+    await page.goto(base); await page.waitForSelector('#loading', { state: 'hidden' });
+    await page.evaluate(browserRecord, { write: true, value: { base: publishedBase, text: publishedText, savedAt: 'old' } });
+    await page.route(base + 'project.divlet', route => route.fulfill({ contentType: 'application/octet-stream', body: text }));
+    await page.reload(); await page.waitForSelector('#loading', { state: 'hidden' });
+    assert.equal(await page.evaluate(browserRecord), undefined, 'admitted changed publication retires the old baseline');
+    const state = await page.evaluate(() => globalThis[Symbol.for('divlet.board-host/1')].readSession.readState());
+    assert.equal(state.project.name, 'Next publication');
+    await page.evaluate(async () => {
+      const host = globalThis[Symbol.for('divlet.board-host/1')], frame = await host.readSession.readFrame('index');
+      await host.writer.patch({ documentId: 'index', expectedVersion: frame.version, patch: { name: 'Edited next publication' } });
+    });
+    const record = await page.evaluate(browserRecord);
+    assert.equal(record.base, fingerprint);
+    assert.equal(JSON.parse(record.text).frames[0].name, 'Edited next publication');
+    await page.reload(); await page.waitForSelector('#loading', { state: 'hidden' });
+    assert.equal(await page.evaluate(async () => (await globalThis[Symbol.for('divlet.board-host/1')].readSession.readFrame('index')).name), 'Edited next publication');
+    assert.deepEqual(await page.evaluate(browserRecord), record, 'successful restoration does not rewrite the source record');
+  } finally { await page.close(); }
 });

@@ -5,14 +5,15 @@
  * output, asset, font, site and conversation capabilities, which are absent here rather than emulated.
  *
  * Storage policy: the visitor's copy lives in this origin's IndexedDB, keyed by `storageKey` and tied to the fingerprint of the
- * published source it started from. When the publication changes, the copy starts again from the new source. Nothing is
+ * published source it started from. A refused restore retains the record and blocks startup. A changed publication replaces
+ * the old baseline only after its source prepares successfully. Nothing is
  * uploaded; a private project is never fetched or paired.
  */
 import { BrowserRuntime } from './browser-runtime.ts';
 import { previewDocument } from './browser-preview.ts';
 export { previewDocument, previewBridgeScript } from './browser-preview.ts';
 import { inputSchema, forAgent, toolByName } from './tools.ts';
-import { sameJson } from './validation.ts';
+import { DivletError, sameJson } from './validation.ts';
 import type { FrameCompiler } from './prepare.ts';
 import { createBrowserMcpProvider, exposeBrowserMcp, defineTools, registerWebMcpTools } from '@divlet/web/mcp';
 import type { BrowserTool } from '@divlet/web/mcp';
@@ -62,7 +63,7 @@ async function fingerprint(text: string): Promise<string> {
   return [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-/** A tiny IndexedDB key/value store; every failure resolves to "nothing stored" so storage problems never block opening. */
+/** A tiny IndexedDB key/value store; read failures resolve to "nothing stored", while write/delete failures reject. */
 /** The DOM storage surface used here, typed locally: core's compiler profile has no DOM library. */
 type Database = { transaction(store: string, mode?: string): any };
 function browserStore(name = 'divlet-browser') {
@@ -107,12 +108,17 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
   const open = (source: string) => BrowserRuntime.open({ source, file: options.file, projectId: `browser-${base.slice(0, 16)}`, compiler, persist, capabilities: { browser: true, assets: false, export: false } });
   let runtime: BrowserRuntime;
   let restored = false;
-  if (stored?.base === base && typeof stored.text === 'string') {
-    try { runtime = await open(stored.text); restored = true; }
-    catch { await store.delete(options.storageKey).catch(() => {}); runtime = await open(published); }
+  if (stored?.base === base) {
+    try {
+      if (typeof stored.text !== 'string') throw new DivletError('INVALID_PROJECT', 'The saved browser copy has no project text.');
+      runtime = await open(stored.text); restored = true;
+    } catch (error: any) {
+      const causeCode = typeof error?.code === 'string' ? error.code : error instanceof SyntaxError ? 'INVALID_PROJECT' : 'UNKNOWN';
+      throw new DivletError('BROWSER_RESTORE_FAILED', `The saved browser copy could not be opened and was kept unchanged. ${error?.message || error}`, { causeCode });
+    }
   } else {
-    if (stored) await store.delete(options.storageKey).catch(() => {});
     runtime = await open(published);
+    if (stored) await store.delete(options.storageKey).catch(() => {});
   }
   runtime.url = new URL('./', (globalThis as any).location.href).href;
 
