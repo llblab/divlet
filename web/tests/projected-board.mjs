@@ -85,6 +85,13 @@ try {
   };
   await guard(context);
   const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(() => {
+    if (top !== self) return;
+    const create = URL.createObjectURL, revoke = URL.revokeObjectURL;
+    globalThis.previewUrls = { created: [], revoked: [] };
+    URL.createObjectURL = function (blob) { const url = create.call(this, blob); previewUrls.created.push(url); return url; };
+    URL.revokeObjectURL = function (url) { const result = revoke.call(this, url); previewUrls.revoked.push(url); return result; };
+  });
   const ready = async () => {
     await page.waitForSelector('#loading', { state: 'hidden' });
     await page.waitForFunction(() => document.querySelector('.artboard[data-artboard-id="index"]')?.dataset.status === 'live', null, { timeout: 10000 });
@@ -171,6 +178,71 @@ try {
   const canonical = JSON.parse(restoredRecord.text);
   assert.equal(canonical.frames[0].nodes.image.attrs.src, image('#654321')); assert.match(canonical.frames[0].css, /data:font\/ttf;base64,/); assert.deepEqual(canonical.assets ?? {}, {});
   assert.deepEqual(await page.evaluate(() => ({ assets: projectedApp.runtime.info().project.capabilities.assets, nodes: typeof globalThis[Symbol.for('divlet.board-host/1')].exports.nodes, nodeGlobals: ['Buffer', 'process', 'require'].filter(key => key in globalThis) })), { assets: false, nodes: 'undefined', nodeGlobals: [] });
+  // This host has no public viewUrl: expansion keeps the opaque editor document; collapse explicitly resets it.
+  for (const cycle of [0, 1]) {
+    const activeSrc = await page.locator('iframe[data-document-id="index"]').getAttribute('src');
+    assert.deepEqual(await page.evaluate(src => ({ allocated: previewUrls.created.includes(src), revoked: previewUrls.revoked.includes(src) }), activeSrc), { allocated: true, revoked: false }, 'actual URL APIs allocate the current preview');
+    const content = () => page.evaluate(() => JSON.stringify({ source: projectedApp.runtime.source(), revision: projectedApp.runtime.revision, renderSeq: projectedApp.runtime.renderSeq, history: projectedApp.runtime.readHistory() }));
+    let accepted = await content();
+    await page.evaluate(() => { const e = testCanvas.entries.get('index'); globalThis.retiredPreview = { iframe: e.iframe, port: e.port, token: e.bridgeToken }; });
+    await frame.locator('input').evaluate(input => { input.value = 'expanded local draft'; });
+    await page.locator('.ab-expand').click();
+    await page.waitForSelector('#expanded-preview:not([hidden])');
+    assert.equal(await content(), accepted, 'entering expansion is not authored content');
+    assert.deepEqual(await page.evaluate(() => { const e = testCanvas.entries.get('index'); return { same: e.iframe === retiredPreview.iframe, port: e.port === retiredPreview.port, token: e.bridgeToken === retiredPreview.token, publicView: !!e.doc.viewUrl }; }), { same: true, port: true, token: true, publicView: false });
+    assert.equal(await frame.locator('input').inputValue(), 'expanded local draft');
+    if (cycle === 0) {
+      await page.evaluate(async () => { const r = projectedApp.runtime; await r.callTool('divlet_patch', { frameId: 'index', expectedVersion: r.getEntry('index').document.version, patch: { nodes: { root: { style: { padding: '47px' } } } } }); });
+      const expandedFrame = await (await page.locator('iframe[data-document-id="index"]').elementHandle()).contentFrame();
+      await expandedFrame.waitForFunction(() => getComputedStyle(document.querySelector('main')).paddingTop === '47px');
+      assert.deepEqual(await endpoints(), { ...changed, padding: '47px' });
+      assert.equal(await frame.locator('input').inputValue(), 'expanded local draft');
+      accepted = await content();
+    }
+    const reset = await page.locator('#expanded-back').evaluate((button, cycle) => {
+      button.click();
+      const e = testCanvas.entries.get('index');
+      let ghost = retiredPreview.iframe, displaced = null;
+      if (cycle === 1) {
+        // Another reset in the same browser task supersedes the first ghost before a replacement can paint.
+        ghost = e.iframe;
+        document.querySelector('.ab-expand').click(); button.click();
+        displaced = { removed: !retiredPreview.iframe.isConnected, releases: previewUrls.revoked.filter(url => url === retiredPreview.iframe.src).length };
+      }
+      return { replaced: e.iframe !== retiredPreview.iframe, ghost: e.ghost === ghost && ghost.isConnected, ghostSrc: ghost.src, rotated: e.bridgeToken !== retiredPreview.token, portRetired: e.port !== retiredPreview.port, displaced };
+    }, cycle);
+    assert.deepEqual({ ...reset, ghostSrc: undefined }, { replaced: true, ghost: true, ghostSrc: undefined, rotated: true, portRetired: true, displaced: cycle === 1 ? { removed: true, releases: 1 } : null });
+    await rendered(await page.evaluate(() => projectedApp.runtime.getEntry('index').render));
+    await page.waitForFunction(() => !testCanvas.entries.get('index').ghost);
+    assert.equal(await content(), accepted, 'collapse/reset is not authored content');
+    assert.notEqual(await page.locator('iframe[data-document-id="index"]').getAttribute('src'), activeSrc);
+    assert.deepEqual(await endpoints(), { ...changed, padding: '47px' });
+    assert.equal(await frame.locator('input').inputValue(), 'authored', 'explicit reset discards only the local DOM draft');
+    for (const retiredSrc of new Set([activeSrc, reset.ghostSrc])) assert.equal(await page.evaluate(src => previewUrls.revoked.filter(url => url === src).length, retiredSrc), 1, 'each removed or superseded ghost URL is revoked once');
+    assert.equal(await page.evaluate(() => previewUrls.revoked.includes(testCanvas.entries.get('index').iframe.src)), false, 'current generation remains allocated');
+    await page.evaluate(() => {
+      globalThis.resetPort = testCanvas.entries.get('index').port;
+      globalThis.windowBarrier = new Promise(resolve => {
+        const listener = event => { if (event.source === testCanvas.entries.get('index').iframe.contentWindow && event.data?.type === 'fixture:reset-barrier') { removeEventListener('message', listener); resolve(); } };
+        addEventListener('message', listener);
+      });
+    });
+    const attack = await page.evaluate(() => ({ token: retiredPreview.token, version: projectedApp.runtime.getEntry('index').render }));
+    await frame.locator('main').evaluate((_, { token, version }) => {
+      const channel = new MessageChannel(); globalThis.replayPort = channel.port1; channel.port1.start();
+      parent.postMessage({ type: 'divlet:connect', bridgeToken: token }, '*', [channel.port2]);
+      parent.postMessage({ type: 'divlet:text-edit', documentId: 'index', version, renderVersion: version, nodeId: 'label', content: 'FORGED' }, '*');
+      parent.postMessage({ type: 'fixture:reset-barrier' }, '*');
+    }, attack);
+    await page.evaluate(async () => { await windowBarrier; await projectedApp.runtime.enqueue(() => undefined); });
+    assert.equal(await page.evaluate(() => testCanvas.entries.get('index').port === resetPort), true, 'old capability cannot replace the current document port');
+    assert.equal(await content(), accepted, 'Window traffic cannot edit the accepted model');
+    const next = await page.evaluate(async cycle => { const r = projectedApp.runtime; return r.patch({ documentId: 'index', expectedVersion: r.getEntry('index').document.version, patch: { name: `After reset ${cycle}` } }); }, cycle);
+    await rendered(next.render);
+    assert.deepEqual(await endpoints(), { ...changed, padding: '47px' });
+    assert.equal(await page.locator('iframe[data-document-id="index"]').getAttribute('sandbox'), 'allow-scripts');
+    assert.equal(await page.locator('iframe[data-document-id="index"]').getAttribute('referrerpolicy'), 'no-referrer');
+  }
   for (const kind of ['initial projection refusal', 'byte reader refusal']) {
     const isolated = await browser.newContext({ serviceWorkers: 'block' }); await guard(isolated);
     const fresh = await isolated.newPage();
@@ -189,5 +261,5 @@ try {
   const control = url + 'unrequested';
   assert.equal(await page.evaluate(async target => { try { await fetch(target); return false; } catch { return true; } }, control), true); assert.deepEqual(denied, [control]);
   await context.close();
-  console.log(JSON.stringify({ status: 'passed', scope: 'trusted projector in actual board/canvas with literal Data URLs only; declared bytes still refused', checks: ['initial and live authenticated preview', 'same iframe/root/input focus/draft', 'host writer and shared tool', 'Undo/Redo and one history entry per action', 'refused output retains render/source/history/IndexedDB without publication', 'same-session post-refusal ACK retains root/focus/draft', 'restored-copy projection refusal preserves record', 'successful restoration reuses projector', 'no byte/node-export activation or native fallback', 'context-wide network refusal control'], browser: browser.version() }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', scope: 'trusted projector in actual board/canvas with literal Data URLs only; declared bytes still refused', checks: ['initial and live authenticated preview', 'same iframe/root/input focus/draft', 'host writer and shared tool', 'Undo/Redo and one history entry per action', 'refused output retains render/source/history/IndexedDB without publication', 'same-session post-refusal ACK retains root/focus/draft', 'restored-copy projection refusal preserves record', 'successful restoration reuses projector', 'no byte/node-export activation or native fallback', 'two opaque expand/reset cycles with literal endpoints', 'ghost URL release through actual API', 'old capability and Window edit refusal with causal barrier and writer fence', 'post-reset live ACK', 'context-wide network refusal control'], browser: browser.version() }, null, 2));
 } finally { await browser?.close(); server.close(); await once(server, 'close'); }

@@ -546,6 +546,7 @@ function mount(entry, { revision = false } = {}) {
 function dropGhost(entry) {
   clearTimeout(entry.ghostTimer);
   entry.ghostTimer = null;
+  if (entry.ghost) previews.release?.(entry.doc.id, entry.ghost.src);
   entry.ghost?.remove();
   entry.ghost = null;
 }
@@ -771,7 +772,7 @@ export function closeExpanded({ reset = true } = {}) {
     entry.port?.close();
     entry.port = null;
     entry.iframe = null;
-    entry.ghost?.remove();
+    dropGhost(entry);
     entry.ghost = ghost;
     ghost.classList.add('frame-ghost');
     ghost.removeAttribute('id');
