@@ -161,7 +161,7 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
     }),
     components: Object.freeze({ list: async () => ({ components: copy(runtime.components()) }) }),
     exports: Object.freeze({
-      page: async (id: string) => copy(runtime.exportDocument(id)),
+      page: async (id: string) => copy(await runtime.exportDocument(id)),
       project: async () => ({ text: runtime.source(), fileName: options.file }),
     }),
     historyService: Object.freeze({

@@ -1,7 +1,7 @@
 /*
  * Owns: a browser-local project writer — one in-memory accepted state for a `.divlet` project opened in a page, with the same
  * tool-facing behaviour as the Node runtime for reading, frame/project patches, structural edits, frame lifecycle, work marks
- * and guarded Undo/Redo. Excludes: filesystem, watcher, HTTP, static output, fonts, embedded asset bytes, Markdown sites and
+ * and guarded Undo/Redo. Excludes: filesystem, watcher, HTTP, static output, font-device access, project-byte activation, Markdown sites and
  * agent conversation; those stay with the local Node host and are reported as absent capabilities, never emulated.
  *
  * Validation, patch application, operations, component expansion, rendering checks, diffs, acceptance rules and the history
@@ -23,6 +23,7 @@ import type { FrameCompiler, PreparedFrame } from './prepare.ts';
 import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsHistoryPatch, assertPatchVersion, assertExpectedVersion, assertExpectedRender } from './acceptance.ts';
 import { sameJson } from './validation.ts';
 import { assertPreviewHtml } from './browser-preview.ts';
+import { inlineDeclaredAssets } from './standalone-assets.ts';
 import { runOnRuntime, toolByName, toolList } from './tools.ts';
 
 const HISTORY_LIMIT = 500;
@@ -217,8 +218,8 @@ export class BrowserRuntime {
     return { documentId: id, version: entry.document.version, render: entry.render, html: entry.html };
   }
 
-  /** Clean standalone HTML of a frame or of some of its nodes, as the Node host exports it (no embedded assets here). */
-  exportDocument(id: string, { nodeId, nodeIds, expectedVersion, expectedProjectVersion }: any = {}) {
+  /** Clean standalone HTML through the shared resource projector. Does not grant browser project-byte admission. */
+  async exportDocument(id: string, { nodeId, nodeIds, expectedVersion, expectedProjectVersion }: any = {}) {
     const entry = this.getEntry(id);
     assertExpectedVersion(expectedVersion, entry.document);
     assertExpectedVersion(expectedProjectVersion, this.settings, 'project');
@@ -226,10 +227,11 @@ export class BrowserRuntime {
     if (nodeId || nodeIds !== undefined) {
       const ids = nodeIds ?? [nodeId];
       if (!Array.isArray(ids) || !ids.length || ids.length > 100 || ids.some(node => typeof node !== 'string' || !Object.hasOwn(entry.document.nodes, node))) fail('NOT_FOUND', 'Export requires existing node IDs in one frame.');
-      return { documentId: id, version: entry.document.version, ...(nodeId ? { nodeId } : { nodeIds: ids }), html: ids.map((item: string) => exportHtml(expanded, { nodeId: item, limits: LIMITS })).join('\n') };
+      const html = ids.map((item: string) => exportHtml(expanded, { nodeId: item, limits: LIMITS })).join('\n');
+      return { documentId: id, version: entry.document.version, ...(nodeId ? { nodeId } : { nodeIds: ids }), html: await inlineDeclaredAssets(html, this.settings.assets, { fragment: true }) };
     }
     const compiled = /<style data-divlet-compiled>([\s\S]*?)<\/style>/.exec(entry.html)?.[1] ?? '';
-    return { documentId: id, version: entry.document.version, html: exportHtml(expanded, { compiledCss: compiled, limits: LIMITS }), fileName: `${id}.html` };
+    return { documentId: id, version: entry.document.version, html: await inlineDeclaredAssets(exportHtml(expanded, { compiledCss: compiled, limits: LIMITS }), this.settings.assets), fileName: `${id}.html` };
   }
 
   /** The serialized project, as the Node host would write it to its `.divlet` file. */

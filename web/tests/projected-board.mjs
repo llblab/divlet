@@ -116,15 +116,15 @@ try {
     const entry = testCanvas.entries.get('index'); return entry?.loaded && entry.renderedVersion === version;
   }, version);
   const frame = page.frameLocator('iframe[data-document-id="index"]');
-  const endpoints = () => frame.locator('main').evaluate(async main => {
-    const image = document.querySelector('[data-divlet-id="image"]'); await image.decode();
+  const endpoints = (target = frame, clean = false) => target.locator('main').evaluate(async (main, clean) => {
+    const image = document.querySelector(clean ? 'img' : '[data-divlet-id="image"]'); await image.decode();
     const fonts = await document.fonts.load('100px ProjectedBoard', 'AA'); await document.fonts.ready;
-    const use = document.querySelector('[data-divlet-id="use"]').getBBox();
+    const use = document.querySelector(clean ? 'svg use' : '[data-divlet-id="use"]').getBBox();
     const canvas = document.createElement('canvas'); canvas.width = 7; canvas.height = 9;
     const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
     let isolated = false; try { void parent.document.body; } catch (error) { isolated = error.name === 'SecurityError'; }
     return { image: [image.naturalWidth, image.naturalHeight], use: [use.width, use.height], fonts: fonts.length, fontWidth: document.getElementById('font').getBoundingClientRect().width, padding: getComputedStyle(main).paddingTop, pixel: [...ctx.getImageData(3, 4, 1, 1).data], isolated, referrer: document.referrer };
-  });
+  }, clean);
   await page.goto(url); await ready();
   assert.equal(await page.evaluate(() => projectionControl.calls), 1, 'real board forwards the trusted projector during initial preparation');
   const initial = { image: [7, 9], use: [7, 9], fonts: 1, fontWidth: 120, padding: '17px', pixel: [18, 52, 86, 255], isolated: true, referrer: '' };
@@ -404,6 +404,18 @@ try {
   await rendered(await page.evaluate(() => projectedApp.runtime.getEntry('index').render));
   assert.deepEqual(await endpoints(), { ...changed, padding: '47px' });
   assert.equal(JSON.parse((await page.evaluate(storedRecord)).text).frames[0].nodes.label.content, 'AA');
+  const beforeExport = await generationContent(), exportRecord = await page.evaluate(storedRecord);
+  const exported = await page.evaluate(() => globalThis[Symbol.for('divlet.board-host/1')].exports.page('index'));
+  assert.equal(exported.documentId, 'index'); assert.equal(exported.fileName, 'index.html');
+  assert.equal(exported.version, await page.evaluate(() => projectedApp.runtime.getEntry('index').document.version));
+  assert.ok(exported.html.includes(image('#654321'))); assert.match(exported.html, /data:font\/ttf;base64,/);
+  assert.ok(!exported.html.includes('data-divlet-id')); assert.ok(!exported.html.includes('data-divlet-manifest')); assert.ok(!exported.html.includes('preview-bridge.js'));
+  const standalone = await context.newPage(); standalone.on('pageerror', error => errors.push(error.message));
+  await standalone.setContent(exported.html);
+  assert.deepEqual(await endpoints(standalone, true), { ...changed, padding: '47px', isolated: false });
+  await standalone.close();
+  assert.equal(await generationContent(), beforeExport); assert.deepEqual(await page.evaluate(storedRecord), exportRecord);
+  assert.equal(await page.evaluate(() => typeof globalThis[Symbol.for('divlet.board-host/1')].exports.nodes), 'undefined');
   for (const kind of ['initial projection refusal', 'byte reader refusal']) {
     const isolated = await browser.newContext({ serviceWorkers: 'block' }); await guard(isolated);
     const fresh = await isolated.newPage();
@@ -422,5 +434,5 @@ try {
   const control = url + 'unrequested';
   assert.equal(await page.evaluate(async target => { try { await fetch(target); return false; } catch { return true; } }, control), true); assert.deepEqual(denied, [control]);
   await context.close();
-  console.log(JSON.stringify({ status: 'passed', scope: 'trusted projector in actual board/canvas with literal Data URLs only; declared bytes still refused', checks: ['initial and live authenticated preview', 'same iframe/root/input focus/draft', 'host writer and shared tool', 'Undo/Redo and one history entry per action', 'refused output retains render/source/history/IndexedDB without publication', 'same-session post-refusal ACK retains root/focus/draft', 'restored-copy projection refusal preserves record', 'successful restoration reuses projector', 'no byte/node-export activation or native fallback', 'two opaque expand/reset cycles with literal endpoints', 'ghost URL release through actual API', 'old capability and Window edit refusal with causal barrier and writer fence', 'post-reset live ACK', 'ACK then reset then earlier cleanup retains the newer ghost', 'own ACK releases that ghost once; later writer remains live', 'native four-second timeout with bridge held; same-frame recovery', 'unmount releases ghost/current before timeout; Undo and new live ACK', 'held native old-port MessageEvent refused after reset with UI/runtime fences', 'new genuine port edit persists and renders; Undo restores literal endpoints', 'context-wide network refusal control'], browser: browser.version() }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', scope: 'trusted projector in actual board/canvas with literal Data URLs only; declared bytes still refused', checks: ['initial and live authenticated preview', 'same iframe/root/input focus/draft', 'host writer and shared tool', 'Undo/Redo and one history entry per action', 'refused output retains render/source/history/IndexedDB without publication', 'same-session post-refusal ACK retains root/focus/draft', 'restored-copy projection refusal preserves record', 'successful restoration reuses projector', 'no byte/node-export activation or native fallback', 'two opaque expand/reset cycles with literal endpoints', 'ghost URL release through actual API', 'old capability and Window edit refusal with causal barrier and writer fence', 'post-reset live ACK', 'ACK then reset then earlier cleanup retains the newer ghost', 'own ACK releases that ghost once; later writer remains live', 'native four-second timeout with bridge held; same-frame recovery', 'unmount releases ghost/current before timeout; Undo and new live ACK', 'held native old-port MessageEvent refused after reset with UI/runtime fences', 'new genuine port edit persists and renders; Undo restores literal endpoints', 'awaited page-export port produces clean standalone literal-resource rendering', 'context-wide network refusal control'], browser: browser.version() }, null, 2));
 } finally { await browser?.close(); server.close(); await once(server, 'close'); }
