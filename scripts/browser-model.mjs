@@ -6,6 +6,7 @@ export const bundleBrowserCodec = (resolveDir, options) => bundleEntry('@divlet/
 export const bundleBrowserProject = (resolveDir, options) => bundleEntry('@divlet/core/project', resolveDir, options);
 // Checkout-only private kernel profile; not an installed/public browser API.
 export const bundleBrowserPrepare = resolveDir => bundleEntry('./core/lib/prepare.ts', resolveDir, { source: true });
+export const bundleBrowserBoard = resolveDir => bundleEntry('./core/lib/browser-board.ts', resolveDir, { source: true });
 export const bundleBrowserRuntime = resolveDir => bundleEntry('./core/lib/browser-runtime.ts', resolveDir, { source: true });
 export const bundleBrowserClosedPreview = resolveDir => bundleEntry('./core/lib/closed-preview.ts', resolveDir, { source: true });
 export const bundleBrowserPreview = resolveDir => bundleEntry('./core/lib/browser-preview.ts', resolveDir, { source: true });

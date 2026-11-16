@@ -10,6 +10,7 @@
  * uploaded; a private project is never fetched or paired.
  */
 import { BrowserRuntime } from './browser-runtime.ts';
+import type { BrowserPreviewProjector } from './browser-runtime.ts';
 import { previewDocument } from './browser-preview.ts';
 export { previewDocument, previewBridgeScript } from './browser-preview.ts';
 import { inputSchema, forAgent, toolByName } from './tools.ts';
@@ -30,6 +31,8 @@ export interface BrowserBoardOptions {
   readonly version: string;
   /** The static preview bridge script (`previewBridgeScript()` output), served by the same site. */
   readonly bridgeUrl: URL;
+  /** Trusted candidate projection for published and restored copies. Does not grant byte access or add capabilities. */
+  readonly projectPreview?: BrowserPreviewProjector;
   /** The frame a first visit opens as a readable page (absent: the board fits all frames). */
   readonly entryFrame?: string;
   readonly target?: object;
@@ -105,7 +108,7 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
   const stored = await store.get(options.storageKey);
   const compiler = snapshotCompiler(styles);
   const persist = (text: string) => store.put(options.storageKey, { base, text, savedAt: new Date().toISOString() });
-  const open = (source: string) => BrowserRuntime.open({ source, file: options.file, projectId: `browser-${base.slice(0, 16)}`, compiler, persist, capabilities: { browser: true, assets: false, export: false } });
+  const open = (source: string) => BrowserRuntime.open({ source, file: options.file, projectId: `browser-${base.slice(0, 16)}`, compiler, persist, projectPreview: options.projectPreview, capabilities: { browser: true, assets: false, export: false } });
   let runtime: BrowserRuntime;
   let restored = false;
   if (stored?.base === base) {

@@ -1,0 +1,193 @@
+// Trusted source composition of the actual board/canvas; literal resources only, never a byte-reader override.
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import path from 'node:path';
+import { once } from 'node:events';
+import { chromium } from 'playwright';
+import { pagesEntries } from '../../scripts/pages-build.mjs';
+import { bundleBrowserBoard, bundleBrowserClosedPreview } from '../../scripts/browser-model.mjs';
+import { fontDataUrl } from '../../core/tests/fixtures/font.js';
+
+const prefix = '/projected-board/', files = new Map(await pagesEntries());
+const [board, closed] = await Promise.all([bundleBrowserBoard(process.cwd()), bundleBrowserClosedPreview(process.cwd())]);
+files.set('projected-board.js', Buffer.from(board.code)); files.set('projected-closure.js', Buffer.from(closed.code));
+const image = color => `data:image/svg+xml;base64,${Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="7" height="9"><rect width="7" height="9" fill="${color}"/></svg>`).toString('base64')}`;
+const css = (padding, advance) => `@font-face{font-family:ProjectedBoard;src:url("${fontDataUrl(advance)}")}main{padding:${padding}px}#font{display:inline-block;font:100px/1 ProjectedBoard}`;
+const source = { schemaVersion: 1, name: 'Literal projection proof', frames: [{
+  id: 'index', name: 'Literal frame', version: 1, rootId: 'root', artboard: { x: 0, y: 0, width: 600, height: 400 }, css: css(17, 600),
+  nodes: {
+    root: { id: 'root', type: 'element', tag: 'main', children: ['font', 'image', 'svg', 'input'] },
+    font: { id: 'font', type: 'element', tag: 'span', attrs: { id: 'font' }, children: ['label'] },
+    label: { id: 'label', type: 'text', content: 'AA' },
+    image: { id: 'image', type: 'element', tag: 'img', attrs: { src: image('#123456') }, children: [] },
+    svg: { id: 'svg', type: 'element', tag: 'svg', attrs: { width: '7', height: '9' }, children: ['defs', 'use'] },
+    defs: { id: 'defs', type: 'element', tag: 'defs', children: ['rect'] },
+    rect: { id: 'rect', type: 'element', tag: 'rect', attrs: { id: 'local-mark', width: '7', height: '9' }, children: [] },
+    use: { id: 'use', type: 'element', tag: 'use', attrs: { href: '#local-mark' }, children: [] },
+    input: { id: 'input', type: 'element', tag: 'input', attrs: { value: 'authored' }, children: [] },
+  },
+}] };
+files.set('project.divlet', Buffer.from(JSON.stringify(source)));
+files.set('styles.json', Buffer.from(JSON.stringify({ entries: [{ tokens: {}, candidates: [], css: '' }] })));
+const shell = files.get('index.html').toString('utf8');
+assert.equal(shell.split('src="./divlet-host.js"').length, 2);
+files.set('index.html', Buffer.from(shell.replace('src="./divlet-host.js"', 'src="./projected-host.js"')));
+// This caller owns the trusted callback. Mutable failure controls and returned runtime handle exist only in this fixture.
+files.set('projected-host.js', Buffer.from(`
+import { startBrowserBoard } from ${JSON.stringify('./projected-board.js')};
+import { projectClosedPreview } from ${JSON.stringify('./projected-closure.js')};
+const here = new URL('./', import.meta.url);
+globalThis.projectionControl = { mode: localStorage.getItem('fixture.projector-mode') || 'pass', calls: 0 };
+try {
+  globalThis.projectedApp = await startBrowserBoard({ projectUrl: new URL('project.divlet', here), stylesUrl: new URL('styles.json', here), bridgeUrl: new URL('preview-bridge.js', here), storageKey: location.pathname + '#projection', file: 'project.divlet', version: 'source-test',
+    projectPreview: async (html, assets) => {
+      projectionControl.calls++;
+      if (projectionControl.mode === 'large') return 'x'.repeat(4 * 1024 * 1024 + 1);
+      return projectClosedPreview(html, assets);
+    },
+  });
+  await import('./board.js');
+} catch (error) {
+  globalThis.startupFailure = { code: error.code, details: error.details };
+  document.getElementById('loading').replaceChildren(Object.assign(document.createElement('p'), { className: 'host-error', textContent: error.message }));
+}
+`));
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.divlet': 'application/octet-stream' };
+const server = http.createServer((req, res) => {
+  const name = req.url?.startsWith(prefix) ? req.url.slice(prefix.length) || 'index.html' : '';
+  const bytes = req.method === 'GET' && files.get(name);
+  res.writeHead(bytes ? 200 : 404, { 'Content-Type': types[path.extname(name)] || 'text/plain', 'Cache-Control': 'no-store' }); res.end(bytes || 'missing');
+});
+server.listen(0, '127.0.0.1'); await once(server, 'listening');
+let browser;
+async function storedRecord() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('divlet-browser', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result, tx = db.transaction('projects'), get = tx.objectStore('projects').get(location.pathname + '#projection');
+      let value; get.onsuccess = () => { value = get.result; };
+      tx.oncomplete = () => { db.close(); resolve(value); }; tx.onabort = () => { db.close(); reject(tx.error); };
+    };
+  });
+}
+try {
+  const origin = `http://127.0.0.1:${server.address().port}`, url = origin + prefix;
+  browser = await chromium.launch({ headless: true, executablePath: process.env.PI_DIVLET_CHROMIUM_EXECUTABLE, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  const context = await browser.newContext({ viewport: { width: 1400, height: 900 }, serviceWorkers: 'block' });
+  const allowed = new Set([...files.keys()].map(name => url + (name === 'index.html' ? '' : name))), requested = [], denied = [], errors = [];
+  const guard = async ctx => {
+    ctx.on('request', request => requested.push(request.url()));
+    await ctx.route('**/*', route => {
+      if (route.request().method() === 'GET' && allowed.has(route.request().url())) return route.continue();
+      denied.push(route.request().url()); return route.abort();
+    });
+  };
+  await guard(context);
+  const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
+  const ready = async () => {
+    await page.waitForSelector('#loading', { state: 'hidden' });
+    await page.waitForFunction(() => document.querySelector('.artboard[data-artboard-id="index"]')?.dataset.status === 'live', null, { timeout: 10000 });
+    await page.evaluate(async () => { globalThis.testCanvas = await import('./lib/canvas.js'); });
+  };
+  const rendered = version => page.waitForFunction(version => {
+    const entry = testCanvas.entries.get('index'); return entry?.loaded && entry.renderedVersion === version;
+  }, version);
+  const frame = page.frameLocator('iframe[data-document-id="index"]');
+  const endpoints = () => frame.locator('main').evaluate(async main => {
+    const image = document.querySelector('[data-divlet-id="image"]'); await image.decode();
+    const fonts = await document.fonts.load('100px ProjectedBoard', 'AA'); await document.fonts.ready;
+    const use = document.querySelector('[data-divlet-id="use"]').getBBox();
+    const canvas = document.createElement('canvas'); canvas.width = 7; canvas.height = 9;
+    const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+    let isolated = false; try { void parent.document.body; } catch (error) { isolated = error.name === 'SecurityError'; }
+    return { image: [image.naturalWidth, image.naturalHeight], use: [use.width, use.height], fonts: fonts.length, fontWidth: document.getElementById('font').getBoundingClientRect().width, padding: getComputedStyle(main).paddingTop, pixel: [...ctx.getImageData(3, 4, 1, 1).data], isolated, referrer: document.referrer };
+  });
+  await page.goto(url); await ready();
+  assert.equal(await page.evaluate(() => projectionControl.calls), 1, 'real board forwards the trusted projector during initial preparation');
+  const initial = { image: [7, 9], use: [7, 9], fonts: 1, fontWidth: 120, padding: '17px', pixel: [18, 52, 86, 255], isolated: true, referrer: '' };
+  assert.deepEqual(await endpoints(), initial);
+  assert.equal(await page.locator('iframe[data-document-id="index"]').getAttribute('sandbox'), 'allow-scripts');
+  assert.equal(await page.locator('iframe[data-document-id="index"]').getAttribute('referrerpolicy'), 'no-referrer');
+  const src = await page.locator('iframe[data-document-id="index"]').getAttribute('src');
+  await frame.locator('[data-divlet-id="input"]').evaluate(input => { window.heldInput = input; window.heldRoot = document.querySelector('main'); input.focus(); input.value = 'local draft'; });
+  const user = await page.evaluate(async ({ css, image }) => globalThis[Symbol.for('divlet.board-host/1')].writer.patch({ documentId: 'index', expectedVersion: 1, patch: { css, nodes: { image: { attrs: { src: image } } } } }), { css: css(31, 900), image: image('#654321') });
+  await rendered(user.render);
+  const changed = { ...initial, fontWidth: 180, padding: '31px', pixel: [101, 67, 33, 255] };
+  assert.deepEqual(await endpoints(), changed);
+  assert.equal(await page.locator('iframe[data-document-id="index"]').getAttribute('src'), src);
+  assert.deepEqual(await frame.locator('[data-divlet-id="input"]').evaluate(input => ({ same: input === heldInput, root: document.querySelector('main') === heldRoot, focus: document.activeElement === input, value: input.value })), { same: true, root: true, focus: true, value: 'local draft' });
+  const agent = await page.evaluate(() => projectedApp.runtime.callTool('divlet_patch', { frameId: 'index', expectedVersion: 2, patch: { nodes: { root: { style: { padding: '43px' } } } } }));
+  await rendered(agent.render); assert.deepEqual(await endpoints(), { ...changed, padding: '43px' });
+  assert.equal(await page.evaluate(() => projectedApp.runtime.history.length), 2, 'one accepted history entry per host-writer/shared-tool action');
+  await page.evaluate(() => globalThis[Symbol.for('divlet.board-host/1')].writer.undo());
+  await rendered(await page.evaluate(() => projectedApp.runtime.getEntry('index').render)); assert.deepEqual(await endpoints(), changed);
+  await page.evaluate(() => globalThis[Symbol.for('divlet.board-host/1')].writer.redo());
+  await rendered(await page.evaluate(() => projectedApp.runtime.getEntry('index').render)); assert.deepEqual(await endpoints(), { ...changed, padding: '43px' });
+  assert.equal(await page.evaluate(() => projectionControl.calls), 5);
+  assert.deepEqual(await frame.locator('[data-divlet-id="input"]').evaluate(input => ({ same: input === heldInput, root: document.querySelector('main') === heldRoot, focus: document.activeElement === input, value: input.value })), { same: true, root: true, focus: true, value: 'local draft' });
+  const beforeRecord = await page.evaluate(storedRecord);
+  const snapshot = () => page.evaluate(() => JSON.stringify({ source: projectedApp.runtime.source(), entries: [...projectedApp.runtime.documents], revision: projectedApp.runtime.revision, renderSeq: projectedApp.runtime.renderSeq, history: projectedApp.runtime.readHistory(), undo: projectedApp.runtime.undoStack, redo: projectedApp.runtime.redoStack }));
+  const before = await snapshot();
+  await page.evaluate(() => {
+    globalThis.refusalEvents = [];
+    globalThis.stopRefusalObserver = projectedApp.runtime.subscribe(type => refusalEvents.push(type));
+  });
+  const refusal = await page.evaluate(async () => {
+    projectionControl.mode = 'large';
+    const host = globalThis[Symbol.for('divlet.board-host/1')], current = await host.readSession.readFrame('index');
+    try { await host.writer.patch({ documentId: 'index', expectedVersion: current.version, patch: { name: 'Must refuse' } }); return 'accepted'; } catch (error) { return error.code; }
+  });
+  assert.equal(refusal, 'FILE_TOO_LARGE'); assert.equal(await snapshot(), before); assert.deepEqual(await page.evaluate(storedRecord), beforeRecord);
+  assert.deepEqual(await endpoints(), { ...changed, padding: '43px' });
+  assert.equal(await page.locator('iframe[data-document-id="index"]').getAttribute('src'), src);
+  const assetGate = await page.evaluate(async () => {
+    const r = projectedApp.runtime, calls = projectionControl.calls;
+    try { await r.patchProject({ expectedVersion: r.settings.version, patch: { assets: { unused: 'data:application/octet-stream;base64,AQID' } } }); return { error: 'accepted' }; }
+    catch (error) { return { error: error.code, callsUnchanged: projectionControl.calls === calls }; }
+  });
+  assert.deepEqual(assetGate, { error: 'ASSETS_UNAVAILABLE', callsUnchanged: true });
+  assert.deepEqual(await page.evaluate(() => { stopRefusalObserver(); return refusalEvents; }), [], 'neither refusal publishes state/change');
+  const recovered = await page.evaluate(async () => {
+    projectionControl.mode = 'pass';
+    const host = globalThis[Symbol.for('divlet.board-host/1')], current = await host.readSession.readFrame('index');
+    return host.writer.patch({ documentId: 'index', expectedVersion: current.version, patch: { name: 'Recovered literal frame' } });
+  });
+  await rendered(recovered.render);
+  assert.deepEqual(await endpoints(), { ...changed, padding: '43px' });
+  assert.equal(await page.locator('iframe[data-document-id="index"]').getAttribute('src'), src);
+  assert.deepEqual(await frame.locator('[data-divlet-id="input"]').evaluate(input => ({ same: input === heldInput, root: document.querySelector('main') === heldRoot, focus: document.activeElement === input, value: input.value })), { same: true, root: true, focus: true, value: 'local draft' });
+  const restoredRecord = await page.evaluate(storedRecord);
+  assert.equal(JSON.parse(restoredRecord.text).frames[0].name, 'Recovered literal frame');
+  await page.evaluate(() => localStorage.setItem('fixture.projector-mode', 'large'));
+  await page.reload(); await page.waitForSelector('#loading .host-error');
+  assert.deepEqual(await page.evaluate(() => startupFailure), { code: 'BROWSER_RESTORE_FAILED', details: { causeCode: 'FILE_TOO_LARGE' } });
+  assert.equal(await page.evaluate(() => projectionControl.calls), 1); assert.deepEqual(await page.evaluate(storedRecord), restoredRecord);
+  assert.deepEqual(await page.evaluate(() => ({ host: !!globalThis[Symbol.for('divlet.board-host/1')], provider: !!globalThis[Symbol.for('browser-mcp/1')] })), { host: false, provider: false });
+  await page.evaluate(() => localStorage.removeItem('fixture.projector-mode'));
+  await page.reload(); await ready(); assert.equal(await page.evaluate(() => projectedApp.restored), true);
+  assert.equal(await page.evaluate(() => projectionControl.calls), 1); assert.deepEqual(await page.evaluate(storedRecord), restoredRecord);
+  assert.deepEqual(await endpoints(), { ...changed, padding: '43px' });
+  const canonical = JSON.parse(restoredRecord.text);
+  assert.equal(canonical.frames[0].nodes.image.attrs.src, image('#654321')); assert.match(canonical.frames[0].css, /data:font\/ttf;base64,/); assert.deepEqual(canonical.assets ?? {}, {});
+  assert.deepEqual(await page.evaluate(() => ({ assets: projectedApp.runtime.info().project.capabilities.assets, nodes: typeof globalThis[Symbol.for('divlet.board-host/1')].exports.nodes, nodeGlobals: ['Buffer', 'process', 'require'].filter(key => key in globalThis) })), { assets: false, nodes: 'undefined', nodeGlobals: [] });
+  for (const kind of ['initial projection refusal', 'byte reader refusal']) {
+    const isolated = await browser.newContext({ serviceWorkers: 'block' }); await guard(isolated);
+    const fresh = await isolated.newPage();
+    if (kind === 'initial projection refusal') await fresh.addInitScript(() => { if (top === self) localStorage.setItem('fixture.projector-mode', 'large'); });
+    else await fresh.route(url + 'project.divlet', route => route.fulfill({ contentType: 'application/octet-stream', body: JSON.stringify({ ...source, assets: { unused: 'data:application/octet-stream;base64,AQID' } }) }));
+    await fresh.goto(url); await fresh.waitForSelector('#loading .host-error');
+    assert.equal(await fresh.evaluate(() => startupFailure.code), kind === 'initial projection refusal' ? 'FILE_TOO_LARGE' : 'ASSETS_UNAVAILABLE');
+    assert.equal(await fresh.evaluate(() => projectionControl.calls), kind === 'initial projection refusal' ? 1 : 0);
+    assert.deepEqual(await fresh.evaluate(() => ({ host: !!globalThis[Symbol.for('divlet.board-host/1')], provider: !!globalThis[Symbol.for('browser-mcp/1')], frames: document.querySelectorAll('.artboard').length })), { host: false, provider: false, frames: 0 });
+    assert.equal(await fresh.evaluate(storedRecord), undefined);
+    await isolated.close();
+  }
+  assert.deepEqual(errors, []); assert.deepEqual(denied, []);
+  assert.ok(requested.every(target => target.startsWith('blob:') || target.startsWith('data:') || allowed.has(target)), 'context-wide requests stay in the fixed public static graph');
+  assert.ok(requested.some(target => target.endsWith('/lib/canvas.js')) && requested.some(target => target.endsWith('/preview-bridge.js')));
+  const control = url + 'unrequested';
+  assert.equal(await page.evaluate(async target => { try { await fetch(target); return false; } catch { return true; } }, control), true); assert.deepEqual(denied, [control]);
+  await context.close();
+  console.log(JSON.stringify({ status: 'passed', scope: 'trusted projector in actual board/canvas with literal Data URLs only; declared bytes still refused', checks: ['initial and live authenticated preview', 'same iframe/root/input focus/draft', 'host writer and shared tool', 'Undo/Redo and one history entry per action', 'refused output retains render/source/history/IndexedDB without publication', 'same-session post-refusal ACK retains root/focus/draft', 'restored-copy projection refusal preserves record', 'successful restoration reuses projector', 'no byte/node-export activation or native fallback', 'context-wide network refusal control'], browser: browser.version() }, null, 2));
+} finally { await browser?.close(); server.close(); await once(server, 'close'); }
