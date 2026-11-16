@@ -41,6 +41,7 @@ import { landingDemoSnapshot } from '../../scripts/landing-demo.mjs';
 import { buildStatic } from '../../core/lib/static.js';
 import { svgResourceCases } from '../../core/tests/fixtures/svg-resources.js';
 import { readProject } from '../../core/lib/project.ts';
+import { projectAccessCases, projectAccessSource } from '../../core/tests/fixtures/project-access.js';
 import { prepareFrameWith } from '../../core/lib/prepare.ts';
 import { scopeRenderCases, scopeRenderProject } from '../../core/tests/fixtures/component-scope.js';
 
@@ -91,6 +92,7 @@ for (const row of scopeRenderCases) {
 const files = new Map([
   [prefix, ['text/html', '<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><title>Portable validation</title>']],
   [`${prefix}validation.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/validation.ts', import.meta.url), 'utf8'))]],
+  [`${prefix}project-access-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/project-access.js', import.meta.url), 'utf8')]],
   [`${prefix}declared-resources.js`, ['text/javascript', declaredBundle.code]],
   [`${prefix}standalone-assets.js`, ['text/javascript', standaloneBundle.code]],
   [`${prefix}standalone-asset-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/standalone-assets.js', import.meta.url), 'utf8')]],
@@ -291,6 +293,20 @@ try {
     const componentTexts = componentCases(componentTextCases), componentValues = componentCases(componentValueCases), componentAttributes = componentCases(componentAttributeCases), componentMetadata = componentCases(componentMetadataCases);
     const [replayApi, { historyReplayCases, captureHistoryReplay, literalStyleReplay }] = await Promise.all(['history-replay.js', 'history-replay-cases.js'].map(file => import(new URL(file, location.href).href)));
     const historyReplay = historyReplayCases.map(({ name, run }) => ({ name, result: captureHistoryReplay({ ...frameApi, ...project, ...replayApi }, run) }));
+    const { projectAccessCases, projectAccessSource } = await import(new URL('project-access-cases.js', location.href).href);
+    const accessCode = action => { try { action(); return 'accepted'; } catch (error) { return error.code || error.name; } };
+    const defaultBeforeAccess = accessCode(() => project.readProject(projectAccessSource()));
+    const projectAccess = projectAccessCases.map(({ name, run, expected }) => ({ name, actual: run({ ...project, ...replayApi }), expected }));
+    const accessed = project.readProject(projectAccessSource(), () => {}), emptyFrames = new Map();
+    const accessNext = project.patchSettings(accessed.settings, { name: 'Later' }, () => {});
+    const accessItems = replayApi.projectHistoryItems(emptyFrames, accessed.settings, emptyFrames, accessNext);
+    const defaultAfterAccess = [
+      () => project.readProject(projectAccessSource(), undefined),
+      () => project.validateSettings(projectAccessSource()),
+      () => project.patchSettings(accessed.settings, { name: 'No permission' }),
+      () => project.writeProject(accessed.settings, accessed.frames),
+      () => replayApi.replayHistory(emptyFrames, accessed.settings, accessItems, 'redo'),
+    ].map(accessCode);
     const [historyApi, { historyTraversalCases, captureHistoryTraversal }] = await Promise.all(['history.ts', 'history-traversal-cases.js'].map(file => import(new URL(file, location.href).href)));
     const historyTraversal = historyTraversalCases.map(({ name, run }) => ({ name, result: captureHistoryTraversal({ ...project, ...replayApi, ...historyApi }, run) }));
     const { historyNavigationCases, captureHistoryNavigation } = await import(new URL('history-navigation-cases.js', location.href).href);
@@ -425,6 +441,7 @@ try {
       historyCommits,
       historyTraversal, traversalDomainError,
       historyReplay,
+      projectAccess, defaultBeforeAccess, defaultAfterAccess,
       componentTexts,
       componentValues,
       componentAttributes,
@@ -539,6 +556,9 @@ try {
   assert.equal(result.deepNativeEqual, true, 'caller-selected deep native value normalization/equality is iterative in Chromium');
   assert.deepEqual(result.frames, expectedFrames, 'the same full-frame validation, patch and inspection semantics run in Node and browser');
   assert.deepEqual(result.historyReplay, expectedHistoryReplay, 'the shared history candidate kernel runs actual replay/refusal and input-isolation vectors in Chromium');
+  for (const row of result.projectAccess) assert.deepEqual(row.actual, row.expected, row.name);
+  assert.equal(result.defaultBeforeAccess, 'ASSETS_UNAVAILABLE');
+  assert.deepEqual(result.defaultAfterAccess, Array(5).fill('ASSETS_UNAVAILABLE'), 'explicit per-call access never changes default browser read/settings/patch/write/replay authority');
   assert.deepEqual(result.historyTraversal, expectedHistoryTraversal, 'native browser ESM runs the same traversal, refusal, identity and replay-composition vectors');
   assert.deepEqual(result.historyCommits.map(({ name, result }) => ({ name, result })), expectedHistoryCommits, 'accepted stack and lineage commits run through native browser imports');
   for (const row of result.historyCommits) assert.deepEqual(row.result, row.expected, row.name);
@@ -633,7 +653,7 @@ try {
   console.log(`PASS: ${svgResult.standaloneAssets.length} standalone-export + ${svgResult.standaloneBudgets.length} caller-owned closure-budget + actual exported image/CSS + ${svgResult.assetOutputs.length} asset-output URL + ${svgResult.declaredResources.length} declared-resource + ${svgResult.xml.length} strict XML + ${svgResult.runs.length} SVG transform/budget witnesses + actual image raster + deny-default network control (${svgBundle.bytes} private SVG bytes)`);
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.resourceCarriers.length} resource-carrier + actual DOM image/CSS + ${result.assetData.length} asset-data + ${result.assetPort.length} browser asset-port + ${result.assetBase64.length} asset base64 + ${result.mediaTypes.length} canonical MIME + ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.historyCommits.length} accepted history-commit + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + ${result.clipboard.length} actual clipboard/host consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.resourceCarriers.length} resource-carrier + actual DOM image/CSS + ${result.assetData.length} asset-data + ${result.assetPort.length} browser asset-port + ${result.assetBase64.length} asset base64 + ${result.mediaTypes.length} canonical MIME + ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.projectAccess.length} trusted project-access + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.historyCommits.length} accepted history-commit + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + ${result.clipboard.length} actual clipboard/host consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

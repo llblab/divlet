@@ -8,6 +8,8 @@
  * "/" to reach into nested instances), following the Pencil .pen conventions.
  */
 import { readAssets, validateAssetPatch } from './assets.ts';
+import { readAssets as readAssetData, validateAssetPatch as validateAssetDataPatch } from './asset-data.ts';
+import type { AssetByteAccess } from './asset-data.ts';
 import type { AssetTree } from './model.ts';
 import {
   DivletError, validateDocument, SOURCE_LIMITS, LIMITS, PROJECTION_LIMITS, documentLimits, validateTokens, validateCss,
@@ -66,8 +68,8 @@ export function storedFrame(document: DocumentModel): Omit<DocumentModel, 'schem
   return frame;
 }
 
-/** Project-level fields (everything but frames), validated. */
-export function validateSettings(source: unknown = {}): ProjectSettings {
+/** Project-level fields, validated. Trusted byte access may refuse, never replace admission; omission retains the host port. */
+export function validateSettings(source: unknown = {}, access?: AssetByteAccess): ProjectSettings {
   if (!isObject(source)) fail('INVALID_PROJECT', 'Project settings must be an object');
   const input = source;
   let name: string;
@@ -84,22 +86,25 @@ export function validateSettings(source: unknown = {}): ProjectSettings {
     css: validateCss(input.css ?? ''),
     metadata: validateMetadata(input.metadata ?? {}, 'project metadata'),
     outputDir: outputDir as string | null,
-    assets: readAssets(input.assets === undefined ? {} : input.assets).tree,
+    assets: projectAssets(input.assets === undefined ? {} : input.assets, access),
   };
 }
 
 /** Patch project settings, including the relative output directory, with divlet merge rules. */
-export function patchSettings(settings: ProjectSettings, patch: unknown): ProjectSettings {
+export function patchSettings(settings: ProjectSettings, patch: unknown, access?: AssetByteAccess): ProjectSettings {
   if (!isObject(patch)) fail('INVALID_PATCH', 'A project patch must be an object');
   for (const key of Object.keys(patch)) {
     if (!FIELDS.includes(key)) fail('INVALID_PATCH', key === 'nodes' || key === 'artboard' || key === 'rootId' ? `${key} belongs to a frame; pass frameId to patch a frame.` : `Unsupported project field: ${key}. A project patch may change name, tokens, css, metadata, outputDir and assets.`);
   }
-  if (Object.hasOwn(patch, 'assets') && patch.assets !== null) validateAssetPatch(patch.assets);
-  return validateSettings(merge(settings, patch));
+  if (Object.hasOwn(patch, 'assets') && patch.assets !== null) {
+    if (access === undefined) validateAssetPatch(patch.assets);
+    else validateAssetDataPatch(patch.assets, () => access());
+  }
+  return validateSettings(merge(settings, patch), access);
 }
 
 /** Admit stored frames and their expanded candidates, returning the stored frames rather than flattened copies. */
-export function readProject(source: unknown): ProjectFile {
+export function readProject(source: unknown, access?: AssetByteAccess): ProjectFile {
   if (!isObject(source)) fail('INVALID_PROJECT', 'A .divlet project must be a JSON object');
   const input = source;
   if (typeof input.version === 'string') fail('UNSUPPORTED_SOURCE', 'This file is a foreign source (for example PEN), not a Divlet project. Open it through divlet, which converts it.');
@@ -107,7 +112,7 @@ export function readProject(source: unknown): ProjectFile {
   if (input.schemaVersion !== PROJECT_SCHEMA) fail('INVALID_PROJECT', `schemaVersion must be ${PROJECT_SCHEMA}`);
   if (!Array.isArray(input.frames)) fail('INVALID_PROJECT', 'frames must be an array');
   if (input.frames.length > MAX_FRAMES) fail('INVALID_PROJECT', `A project can hold at most ${MAX_FRAMES} frames`);
-  const settings = validateSettings(input);
+  const settings = validateSettings(input, access);
   const frames: DocumentModel[] = [];
   const seen = new Set<NodeId>();
   for (const [index, frame] of (input.frames as unknown[]).entries()) {
@@ -125,13 +130,18 @@ export function readProject(source: unknown): ProjectFile {
 }
 
 /** Serialize the project source, or the legacy settings/frames pair during the runtime transition. */
-export function writeProject(settings: ProjectSettings, frames: DocumentModel[]): string {
+export function writeProject(settings: ProjectSettings, frames: DocumentModel[], access?: AssetByteAccess): string {
   if (!Array.isArray(frames)) fail('INVALID_PROJECT', 'A Divlet project is written from its settings and frames.');
   if (frames.length > MAX_FRAMES) fail('INVALID_PROJECT', `A project can hold at most ${MAX_FRAMES} frames`);
-  const assets = readAssets(settings.assets ?? {}).tree;
+  const assets = projectAssets(settings.assets ?? {}, access);
   const text = JSON.stringify({ schemaVersion: PROJECT_SCHEMA, name: settings.name, version: settings.version, tokens: settings.tokens, css: settings.css, metadata: settings.metadata, ...(settings.outputDir !== null && settings.outputDir !== undefined ? { outputDir: settings.outputDir } : {}), ...(Object.keys(assets).length ? { assets } : {}), frames: frames.map(storedFrame) }, null, 2) + '\n';
   if (!withinUtf8Budget(text, SOURCE_LIMITS.bytes)) fail('FILE_TOO_LARGE', 'The serialized project exceeds the source read limit.');
   return text;
+}
+
+/** Keep the host's default (including native byte views) unless trusted composition explicitly supplies access. */
+function projectAssets(input: unknown, access?: AssetByteAccess): AssetTree {
+  return (access === undefined ? readAssets(input) : readAssetData(input, () => access())).tree;
 }
 
 export { PROJECTION_LIMITS } from './model.ts';

@@ -6,6 +6,7 @@ import { applyDocumentPatch, validateDocument, DivletError } from './model.ts';
 import type { DocumentModel } from './model.ts';
 import { patchSettings, validateSettings } from './project.ts';
 import type { ProjectSettings } from './project.ts';
+import type { AssetByteAccess } from './asset-data.ts';
 import { matchesHistoryPatch, matchesDocumentHistoryPatch, documentHistoryPatch } from './diff.ts';
 import type { ValueHistoryPatch, DocumentHistoryPatch, HistoryNullBlock } from './diff.ts';
 import { sameDocument, sameSettings, settingsHistoryPatch } from './acceptance.ts';
@@ -65,16 +66,16 @@ export function projectHistoryItems(previous: ReadonlyMap<string, DocumentModel>
 }
 
 /** Prove the actual transaction in both directions before adopting external source bytes; not foreign-history admission. */
-export function assertProjectHistoryRoundTrip(previous: ReadonlyMap<string, DocumentModel>, previousSettings: ProjectSettings, next: ReadonlyMap<string, DocumentModel>, nextSettings: ProjectSettings, items: readonly HistoryReplayItem[]): void {
+export function assertProjectHistoryRoundTrip(previous: ReadonlyMap<string, DocumentModel>, previousSettings: ProjectSettings, next: ReadonlyMap<string, DocumentModel>, nextSettings: ProjectSettings, items: readonly HistoryReplayItem[], access?: AssetByteAccess): void {
   const matches = (candidate: HistoryCandidate, frames: ReadonlyMap<string, DocumentModel>, settings: ProjectSettings): boolean => sameSettings(candidate.settings, settings) && sameJson([...candidate.frames.keys()], [...frames.keys()]) && [...frames].every(([id, frame]) => sameDocument(candidate.frames.get(id)!, frame));
   try {
-    if (matches(replayHistory(previous, previousSettings, items, 'redo'), next, nextSettings) && matches(replayHistory(next, nextSettings, items, 'undo'), previous, previousSettings)) return;
+    if (matches(replayHistory(previous, previousSettings, items, 'redo', access), next, nextSettings) && matches(replayHistory(next, nextSettings, items, 'undo', access), previous, previousSettings)) return;
   } catch { /* An unrepresentable replay is a source refusal, never a partially accepted transaction. */ }
   throw new DivletError('UNSUPPORTED_SOURCE_REPLAY', 'This live source edit cannot round-trip through current Undo/Redo. Restore the accepted source or explicitly reopen it; the board keeps its last working state.');
 }
 
 /** Does not mutate inputs; unchanged documents may be shared. Callers prepare and persist the full candidate before acceptance. */
-export function replayHistory(previous: ReadonlyMap<string, DocumentModel>, previousSettings: ProjectSettings, items: readonly HistoryReplayItem[], direction: HistoryDirection): HistoryCandidate {
+export function replayHistory(previous: ReadonlyMap<string, DocumentModel>, previousSettings: ProjectSettings, items: readonly HistoryReplayItem[], direction: HistoryDirection, access?: AssetByteAccess): HistoryCandidate {
   const undoing = direction === 'undo';
   let frames = new Map(previous), settings = previousSettings;
   for (const item of undoing ? [...items].reverse() : items) {
@@ -112,10 +113,10 @@ export function replayHistory(previous: ReadonlyMap<string, DocumentModel>, prev
       case 'project': {
         const change = undoing ? item.inverse : item.forward;
         if (!matchesHistoryPatch({ ...settings, outputDir: settings.outputDir ?? undefined }, item, undoing)) refuse('Later changes touched the same project fields.');
-        const candidate = patchSettings(settings, change);
+        const candidate = patchSettings(settings, change, access);
         if (item.nullBlocks?.length) {
           restoreNullBlocks(candidate, item.nullBlocks, undoing);
-          settings = validateSettings(candidate);
+          settings = validateSettings(candidate, access);
         } else settings = candidate;
         break;
       }
