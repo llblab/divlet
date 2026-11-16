@@ -27,7 +27,7 @@ import * as nodeCodec from '../../core/lib/codec.ts';
 import { cssCascadeCases, cascadeDocuments } from '../../core/tests/fixtures/css-cascade.js';
 import { captureFrame, frameCases, resourceFrame } from '../../core/tests/fixtures/frame-portability.js';
 import { prepareFrame } from '../../core/lib/render.ts';
-import { bundleBrowserModel, bundleBrowserCodec, bundleBrowserProject, bundleBrowserReplay, bundleBrowserAcceptance, bundleBrowserResourceCarriers, bundleBrowserSvgResource, bundleBrowserDeclaredResources, bundleBrowserStandaloneAssets } from '../../scripts/browser-model.mjs';
+import { bundleBrowserModel, bundleBrowserCodec, bundleBrowserProject, bundleBrowserReplay, bundleBrowserAcceptance, bundleBrowserResourceCarriers, bundleBrowserSvgResource, bundleBrowserDeclaredResources, bundleBrowserStandaloneAssets, bundleBrowserRuntime, bundleBrowserClosedPreview } from '../../scripts/browser-model.mjs';
 import { replayHistory, documentHistoryPatch, projectHistoryItems, assertProjectHistoryRoundTrip } from '../../core/lib/history-replay.ts';
 import { historyReplayCases, captureHistoryReplay, literalStyleReplay } from '../../core/tests/fixtures/history-replay.js';
 import { HistoryLine, planHistoryTraversal, validateHistoryNavigation, planHistoryNavigation } from '../../core/lib/history.ts';
@@ -70,6 +70,8 @@ const carrierBundle = await bundleBrowserResourceCarriers(fileURLToPath(new URL(
 const svgBundle = await bundleBrowserSvgResource(fileURLToPath(new URL('../../', import.meta.url)));
 const declaredBundle = await bundleBrowserDeclaredResources(fileURLToPath(new URL('../../', import.meta.url)));
 const standaloneBundle = await bundleBrowserStandaloneAssets(fileURLToPath(new URL('../../', import.meta.url)));
+const runtimeBundle = await bundleBrowserRuntime(fileURLToPath(new URL('../../', import.meta.url)));
+const closedPreviewBundle = await bundleBrowserClosedPreview(fileURLToPath(new URL('../../', import.meta.url)));
 assert.deepEqual(standaloneBundle.inputs.filter(file => /(?:^|\/)core\//.test(file)).map(file => file.slice(file.indexOf('core/'))).sort(), ['asset-base64', 'asset-data', 'asset-reference', 'canonical-media-type', 'css-literals', 'resource-carriers', 'source-budget', 'standalone-assets', 'svg-resource-attributes', 'svg-resource', 'validation'].map(name => `core/lib/${name}.ts`).sort());
 assert.deepEqual(declaredBundle.inputs.filter(file => /(?:^|\/)core\//.test(file)).map(file => file.slice(file.indexOf('core/'))).sort(), ['asset-base64', 'asset-data', 'asset-reference', 'canonical-media-type', 'css-literals', 'declared-resources', 'resource-carriers', 'source-budget', 'svg-resource-attributes', 'svg-resource', 'validation'].map(name => `core/lib/${name}.ts`).sort());
 assert.deepEqual(svgBundle.inputs.filter(file => /(?:^|\/)core\//.test(file)).map(file => file.slice(file.indexOf('core/'))).sort(), ['core/lib/source-budget.ts', 'core/lib/svg-resource-attributes.ts', 'core/lib/svg-resource.ts', 'core/lib/validation.ts']);
@@ -93,6 +95,9 @@ const files = new Map([
   [prefix, ['text/html', '<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><title>Portable validation</title>']],
   [`${prefix}validation.ts`, ['text/javascript', stripTypeScriptTypes(await readFile(new URL('../../core/lib/validation.ts', import.meta.url), 'utf8'))]],
   [`${prefix}project-access-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/project-access.js', import.meta.url), 'utf8')]],
+  [`${prefix}browser-resources.js`, ['text/javascript', runtimeBundle.code]],
+  [`${prefix}closed-preview.js`, ['text/javascript', closedPreviewBundle.code]],
+  [`${prefix}browser-resource-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/browser-resources.js', import.meta.url), 'utf8')]],
   [`${prefix}declared-resources.js`, ['text/javascript', declaredBundle.code]],
   [`${prefix}standalone-assets.js`, ['text/javascript', standaloneBundle.code]],
   [`${prefix}standalone-asset-cases.js`, ['text/javascript', await readFile(new URL('../../core/tests/fixtures/standalone-assets.js', import.meta.url), 'utf8')]],
@@ -307,6 +312,17 @@ try {
       () => project.writeProject(accessed.settings, accessed.frames),
       () => replayApi.replayHistory(emptyFrames, accessed.settings, accessItems, 'redo'),
     ].map(accessCode);
+    const [{ BrowserRuntime }, { projectClosedPreview }, { browserResourceCases, browserResourceSource }] = await Promise.all(['browser-resources.js', 'closed-preview.js', 'browser-resource-cases.js'].map(file => import(new URL(file, location.href).href)));
+    const resourceCode = async action => { try { await action(); return 'accepted'; } catch (error) { return error.code || error.name; } };
+    const defaultOptions = { source: browserResourceSource(), file: 'closed.divlet', projectId: 'default-proof', compiler: { compile: () => '', unknown: () => ({}) } };
+    let defaultProjections = 0;
+    const defaultResourceOpenBefore = await resourceCode(() => BrowserRuntime.open(defaultOptions));
+    const browserResources = [];
+    for (const { name, run, expected } of browserResourceCases) browserResources.push({ name, actual: await run({ BrowserRuntime, projectClosedPreview }), expected });
+    const defaultResourceOpenAfter = await resourceCode(() => BrowserRuntime.open({ ...defaultOptions, capabilities: { assets: true }, projectPreview: () => { defaultProjections++; return ''; } }));
+    const defaultResourceRuntime = await BrowserRuntime.open({ ...defaultOptions, source: { schemaVersion: 1, frames: [] }, capabilities: { assets: true } });
+    const defaultResourcePatch = await resourceCode(() => defaultResourceRuntime.patchProject({ expectedVersion: 1, patch: { assets: browserResourceSource().assets } }));
+    await defaultResourceRuntime.close();
     const [historyApi, { historyTraversalCases, captureHistoryTraversal }] = await Promise.all(['history.ts', 'history-traversal-cases.js'].map(file => import(new URL(file, location.href).href)));
     const historyTraversal = historyTraversalCases.map(({ name, run }) => ({ name, result: captureHistoryTraversal({ ...project, ...replayApi, ...historyApi }, run) }));
     const { historyNavigationCases, captureHistoryNavigation } = await import(new URL('history-navigation-cases.js', location.href).href);
@@ -442,6 +458,7 @@ try {
       historyTraversal, traversalDomainError,
       historyReplay,
       projectAccess, defaultBeforeAccess, defaultAfterAccess,
+      browserResources, defaultResourceOpenBefore, defaultResourceOpenAfter, defaultResourcePatch, defaultProjections,
       componentTexts,
       componentValues,
       componentAttributes,
@@ -557,6 +574,9 @@ try {
   assert.deepEqual(result.frames, expectedFrames, 'the same full-frame validation, patch and inspection semantics run in Node and browser');
   assert.deepEqual(result.historyReplay, expectedHistoryReplay, 'the shared history candidate kernel runs actual replay/refusal and input-isolation vectors in Chromium');
   for (const row of result.projectAccess) assert.deepEqual(row.actual, row.expected, row.name);
+  for (const row of result.browserResources) assert.deepEqual(row.actual, row.expected, row.name);
+  assert.deepEqual([result.defaultResourceOpenBefore, result.defaultResourceOpenAfter, result.defaultResourcePatch], Array(3).fill('ASSETS_UNAVAILABLE'), 'explicit runtime policies never change default browser open/patch authority; capability data and projection alone grant no bytes');
+  assert.equal(result.defaultProjections, 0, 'default byte admission still precedes the projector');
   assert.equal(result.defaultBeforeAccess, 'ASSETS_UNAVAILABLE');
   assert.deepEqual(result.defaultAfterAccess, Array(5).fill('ASSETS_UNAVAILABLE'), 'explicit per-call access never changes default browser read/settings/patch/write/replay authority');
   assert.deepEqual(result.historyTraversal, expectedHistoryTraversal, 'native browser ESM runs the same traversal, refusal, identity and replay-composition vectors');
@@ -653,7 +673,7 @@ try {
   console.log(`PASS: ${svgResult.standaloneAssets.length} standalone-export + ${svgResult.standaloneBudgets.length} caller-owned closure-budget + actual exported image/CSS + ${svgResult.assetOutputs.length} asset-output URL + ${svgResult.declaredResources.length} declared-resource + ${svgResult.xml.length} strict XML + ${svgResult.runs.length} SVG transform/budget witnesses + actual image raster + deny-default network control (${svgBundle.bytes} private SVG bytes)`);
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
-  console.log(`PASS: ${result.resourceCarriers.length} resource-carrier + actual DOM image/CSS + ${result.assetData.length} asset-data + ${result.assetPort.length} browser asset-port + ${result.assetBase64.length} asset base64 + ${result.mediaTypes.length} canonical MIME + ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.projectAccess.length} trusted project-access + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.historyCommits.length} accepted history-commit + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + ${result.clipboard.length} actual clipboard/host consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
+  console.log(`PASS: ${result.resourceCarriers.length} resource-carrier + actual DOM image/CSS + ${result.assetData.length} asset-data + ${result.assetPort.length} browser asset-port + ${result.assetBase64.length} asset base64 + ${result.mediaTypes.length} canonical MIME + ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.projectAccess.length} trusted project-access + ${result.browserResources.length} private writer-resource policy + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.historyCommits.length} accepted history-commit + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + ${result.clipboard.length} actual clipboard/host consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);
 } finally {
   await browser?.close();
   server.close();

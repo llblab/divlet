@@ -1,7 +1,7 @@
 /*
  * Owns: a browser-local project writer — one in-memory accepted state for a `.divlet` project opened in a page, with the same
  * tool-facing behaviour as the Node runtime for reading, frame/project patches, structural edits, frame lifecycle, work marks
- * and guarded Undo/Redo. Excludes: filesystem, watcher, HTTP, static output, font-device access, project-byte activation, Markdown sites and
+ * and guarded Undo/Redo. Excludes: filesystem, watcher, HTTP, static output, font-device access, default project-byte activation, Markdown sites and
  * agent conversation; those stay with the local Node host and are reported as absent capabilities, never emulated.
  *
  * Validation, patch application, operations, component expansion, rendering checks, diffs, acceptance rules and the history
@@ -24,6 +24,9 @@ import { SETTINGS_FIELDS, sameDocument, sameSettings, settingsHistoryPatch, asse
 import { sameJson } from './validation.ts';
 import { assertPreviewHtml } from './browser-preview.ts';
 import { inlineDeclaredAssets } from './standalone-assets.ts';
+import { readAssets } from './asset-data.ts';
+import type { AssetByteAccess } from './asset-data.ts';
+import { assetReference } from './asset-reference.ts';
 import { runOnRuntime, toolByName, toolList } from './tools.ts';
 
 const HISTORY_LIMIT = 500;
@@ -42,6 +45,13 @@ type Listener = (type: 'state' | 'change', value: unknown) => void;
 /** Trusted host projection of derived HTML only. Receives a detached asset tree and must preserve authored meaning. */
 export type BrowserPreviewProjector = (html: string, assets: ProjectSettings['assets']) => Promise<string> | string;
 
+/** Trusted composition must select admission and derived preview projection together; never a project field. */
+export interface BrowserResourcePolicy {
+  readonly requireAssetBytes: AssetByteAccess;
+  readonly projectPreview: BrowserPreviewProjector;
+}
+type ResourceDescription = { file: string; path: string; mediaType: string; size: number };
+
 export interface BrowserRuntimeOptions {
   /** The project source (`.divlet` JSON text or the parsed object). */
   readonly source: unknown;
@@ -52,6 +62,8 @@ export interface BrowserRuntimeOptions {
   readonly compiler: FrameCompiler;
   /** Runs inside candidate preparation before persistence/acceptance. Not selected by project data or permission to admit bytes. */
   readonly projectPreview?: BrowserPreviewProjector;
+  /** Private resource integration seam. Mutually exclusive with standalone projectPreview; omission retains both default byte gates. */
+  readonly resourcePolicy?: BrowserResourcePolicy;
   /** Called after every accepted change with the serialized project; a rejection is reported as a diagnostic, never retried. */
   readonly persist?: (text: string) => Promise<void> | void;
   /** Capabilities the composition adds (for example `captureFonts: false`); merged into `project.capabilities`. */
@@ -65,6 +77,8 @@ export class BrowserRuntime {
   #persist: BrowserRuntimeOptions['persist'];
   #compiler: FrameCompiler;
   #projectPreview: BrowserPreviewProjector | undefined;
+  #assetAccess: AssetByteAccess | undefined;
+  #resources: ResourceDescription[] = [];
   #stateKey = '';
   #capabilities: Record<string, unknown>;
   readonly file: string;
@@ -93,6 +107,12 @@ export class BrowserRuntime {
     this.projectId = options.projectId;
     this.#compiler = options.compiler;
     this.#projectPreview = options.projectPreview;
+    const policy = options.resourcePolicy;
+    if (policy !== undefined) {
+      if (!policy || typeof policy.requireAssetBytes !== 'function' || typeof policy.projectPreview !== 'function' || options.projectPreview !== undefined) throw new TypeError('A browser resource policy requires byte access and preview projection together, without a separate projectPreview.');
+      this.#assetAccess = policy.requireAssetBytes;
+      this.#projectPreview = policy.projectPreview;
+    }
     this.#persist = options.persist;
     this.#capabilities = options.capabilities ?? {};
   }
@@ -101,10 +121,12 @@ export class BrowserRuntime {
   static async open(options: BrowserRuntimeOptions): Promise<BrowserRuntime> {
     const runtime = new BrowserRuntime(options);
     const source = typeof options.source === 'string' ? JSON.parse(options.source) : options.source;
-    const { settings, frames } = readProject(source);
+    const { settings, frames } = readProject(source, runtime.#assetAccess);
+    const resources = runtime.prepareResources(settings);
     const lookup = new Map(frames.map(frame => [frame.id, frame]));
     const prepared = await runtime.prepareAll(frames.map(frame => frame.id), lookup, settings);
     runtime.settings = settings;
+    runtime.#resources = resources;
     runtime.documents = new Map([...prepared].map(([id, item]) => [id, runtime.entryFor(item)]));
     runtime.revision = 1; // as the Node host after loading its source
     return runtime;
@@ -154,7 +176,7 @@ export class BrowserRuntime {
       project: {
         file: this.file, format: 'divlet',
         capabilities: { properties: true, settings: false, frames: true, saveAs: false, ...this.#capabilities },
-        name: this.settings.name, version: this.settings.version, tokens: this.settings.tokens, css: this.settings.css, metadata: this.settings.metadata, outputDir: this.settings.outputDir, resources: [],
+        name: this.settings.name, version: this.settings.version, tokens: this.settings.tokens, css: this.settings.css, metadata: this.settings.metadata, outputDir: this.settings.outputDir, resources: this.#resources.map(item => ({ ...item })),
       },
       documents: [...this.documents.values()].map(entry => this.describe(entry)),
       diagnostics: [...this.diagnostics.values()],
@@ -235,9 +257,14 @@ export class BrowserRuntime {
   }
 
   /** The serialized project, as the Node host would write it to its `.divlet` file. */
-  source(): string { return writeProject(this.settings, [...this.documents.values()].map(entry => entry.document)); }
+  source(): string { return writeProject(this.settings, [...this.documents.values()].map(entry => entry.document), this.#assetAccess); }
 
   /* ---- preparation ------------------------------------------------------------------------------- */
+
+  private prepareResources(settings: ProjectSettings): ResourceDescription[] {
+    if (!this.#assetAccess) return [];
+    return [...readAssets(settings.assets ?? {}, this.#assetAccess).files].map(([file, asset]) => ({ file, path: assetReference(file), mediaType: asset.mediaType, size: asset.bytes.byteLength }));
+  }
 
   async prepare(input: unknown, { frames, settings = this.settings }: { frames?: Map<string, DocumentModel>; settings?: ProjectSettings } = {}) {
     const prepared = await prepareFrameWith(input, { lookup: id => frames ? frames.get(id) : this.documents.get(id)?.document, settings, limits: LIMITS, compiler: this.#compiler });
@@ -267,11 +294,20 @@ export class BrowserRuntime {
   }
 
   /** Persist the candidate through the host. A failing store keeps the accepted state and reports a diagnostic. */
-  async persist(next: Map<string, Entry>, settings: ProjectSettings) {
-    const text = writeProject(settings, [...next.values()].map(entry => entry.document));
+  async persist(next: Map<string, PreparedFrame>, settings: ProjectSettings) {
+    const text = writeProject(settings, [...next.values()].map(entry => entry.document), this.#assetAccess);
     if (!this.#persist) return;
     try { await this.#persist(text); this.diagnostics.delete('storage'); }
     catch (error: any) { this.diagnostics.set('storage', { path: 'storage', code: 'STORAGE_FAILED', message: `The browser could not store this project: ${error?.message || error}`, at: new Date().toISOString() }); }
+  }
+
+  /** Validate/serialize and cross the host persistence boundary before allocating accepted render IDs. */
+  private async persistPrepared(next: Map<string, PreparedFrame>, settings: ProjectSettings): Promise<Map<string, Entry>> {
+    await this.persist(next, settings);
+    return new Map([...next].map(([id, prepared]) => {
+      const previous = this.documents.get(id);
+      return [id, prepared === previous ? previous : this.entryFor(prepared, previous)];
+    }));
   }
 
   /* ---- history ------------------------------------------------------------------------------------ */
@@ -314,12 +350,11 @@ export class BrowserRuntime {
     frames.set(candidate.id, candidate);
     const prepared = await this.prepare(candidate, { frames });
     const id = prepared.document.id;
-    const next = new Map(this.documents);
-    next.set(id, this.entryFor(prepared));
-    await this.persist(next, this.settings);
-    this.documents = next;
+    const next = new Map<string, PreparedFrame>(this.documents);
+    next.set(id, prepared);
+    this.documents = await this.persistPrepared(next, this.settings);
     this.revision++;
-    const entry = next.get(id)!;
+    const entry = this.getEntry(id);
     const count = Object.keys(entry.document.nodes).length;
     const change = this.record({ actor, kind, documentId: id, toVersion: entry.document.version, group, label, to: entry.document, from: { ...entry.document, nodes: {} }, text: text ?? `${kind === 'create' ? 'created' : 'restored'} “${entry.document.name}” · ${count} node${count === 1 ? '' : 's'}` });
     if (undoable) this.pushUndo({ group: group ?? this.newGroup(), label: label ?? `create ${entry.document.name}`, items: [{ type: 'create', documentId: id, index: next.size - 1, document: clone(entry.document) }] }, { seq: change.seq });
@@ -367,11 +402,10 @@ export class BrowserRuntime {
     frames.set(documentId, candidate);
     const dependents = this.dependentsOf([documentId]);
     const prepared = await this.prepareAll([documentId, ...dependents], frames, this.settings);
-    const next = new Map(this.documents);
-    for (const [id, item] of prepared) next.set(id, this.entryFor(item, this.documents.get(id)));
-    await this.persist(next, this.settings);
-    this.documents = next;
-    const entry = next.get(documentId)!;
+    const next = new Map<string, PreparedFrame>(this.documents);
+    for (const [id, item] of prepared) next.set(id, item);
+    this.documents = await this.persistPrepared(next, this.settings);
+    const entry = this.getEntry(documentId);
     this.revision++;
     const change = this.record({ actor, kind, documentId, fromVersion: previous.document.version, toVersion: entry.document.version, group, label, from: previous.document, to: entry.document });
     if (undoable && change.summary !== 'no change') {
@@ -391,16 +425,15 @@ export class BrowserRuntime {
 
   async _patchProject({ expectedVersion, patch, actor = 'agent', group, label, undoable = true, kind = 'patch' }: any) {
     assertPatchVersion(expectedVersion, this.settings, 'project');
-    if (patch && typeof patch === 'object' && Object.hasOwn(patch, 'assets') && patch.assets !== null) fail('ASSETS_UNAVAILABLE', 'Embedded assets need the local divlet host: this browser build does not decode project asset bytes.');
+    if (!this.#assetAccess && patch && typeof patch === 'object' && Object.hasOwn(patch, 'assets') && patch.assets !== null) fail('ASSETS_UNAVAILABLE', 'Embedded assets need the local divlet host: this browser build does not decode project asset bytes.');
     const previous = this.settings;
-    const settings = { ...patchSettings(previous, patch), version: previous.version + 1 };
+    const settings = { ...patchSettings(previous, patch, this.#assetAccess), version: previous.version + 1 };
+    const resources = this.prepareResources(settings);
     const frames = new Map([...this.documents].map(([id, entry]) => [id, entry.document]));
     const prepared = await this.prepareAll([...frames.keys()], frames, settings);
-    const next = new Map(this.documents);
-    for (const [id, item] of prepared) next.set(id, this.entryFor(item, this.documents.get(id)));
-    await this.persist(next, settings);
-    this.documents = next;
+    this.documents = await this.persistPrepared(prepared, settings);
     this.settings = settings;
+    this.#resources = resources;
     this.revision++;
     const fields = SETTINGS_FIELDS.filter(key => !sameJson((previous as any)[key], (settings as any)[key]));
     const change = this.record({ actor, kind, documentId: null, name: settings.name, group, label, text: fields.length ? `project ${fields.join(', ')}` : 'no change' });
@@ -474,18 +507,20 @@ export class BrowserRuntime {
     const previousSettings = this.settings;
     let settings = previousSettings;
     let prepared: Map<string, PreparedFrame>;
+    let resources: ResourceDescription[];
     try {
-      const candidate = replayHistory(new Map([...previous].map(([id, item]) => [id, item.document])), previousSettings, entry.items, direction);
+      const candidate = replayHistory(new Map([...previous].map(([id, item]) => [id, item.document])), previousSettings, entry.items, direction, this.#assetAccess);
       settings = candidate.settings;
+      resources = this.prepareResources(settings);
       prepared = await this.prepareAll([...candidate.frames.keys()], candidate.frames, settings);
     } catch (error: any) {
       fail('CANNOT_UNDO', `This step no longer applies cleanly (${error.message}).`);
     }
-    const next = new Map([...prepared].map(([id, item]) => [id, this.entryFor(item, previous.get(id))]));
+    const next = await this.persistPrepared(prepared, settings);
     const removed = [...previous.keys()].filter(id => !next.has(id));
-    await this.persist(next, settings);
     this.documents = next;
     this.settings = settings;
+    this.#resources = resources;
     this.work = this.work.filter(item => next.has(item.documentId));
     for (const id of removed) this.observations.delete(id);
     if (removed.length) {
