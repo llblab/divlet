@@ -14,7 +14,7 @@ import { readProject, expandFrame } from '../core/lib/project.ts';
 import { compileClasses } from '../core/lib/engine.ts';
 import { safeDirectory } from '../core/lib/output.ts';
 import { previewBridge } from '../core/lib/bridge.js';
-import { previewBridgeScript } from '../core/lib/browser-board.ts';
+import { previewBridgeScript } from '../core/lib/browser-preview.ts';
 import { landingEntries, landingSource } from './landing-hash.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
