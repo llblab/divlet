@@ -4,12 +4,16 @@ import { inlineDeclaredAssets } from '../lib/standalone-assets.ts';
 import { inlineDeclaredAssets as nativeFacade } from '../lib/static.js';
 import { ASSET_FILE_BYTES } from '../lib/asset-base64.ts';
 import { nativeInlineDeclaredAssets } from './fixtures/standalone-native-oracle.js';
-import { standaloneAssetCases, captureStandalone } from './fixtures/standalone-assets.js';
+import { standaloneAssetCases, standaloneBudgetCases, captureStandalone } from './fixtures/standalone-assets.js';
 
 for (const { name, run, expected } of standaloneAssetCases) test(`standalone assets: ${name}`, async () => {
   const actual = await captureStandalone({ inlineDeclaredAssets }, run);
   assert.deepEqual(actual, expected);
   assert.deepEqual(actual, await captureStandalone({ inlineDeclaredAssets: nativeInlineDeclaredAssets }, run), 'captured prior Buffer implementation');
+});
+
+for (const { name, run, expected } of standaloneBudgetCases) test(`standalone budget: ${name}`, async () => {
+  assert.deepEqual(await captureStandalone({ inlineDeclaredAssets }, run), expected);
 });
 
 test('native standalone export keeps the original static binding and does not mutate canonical assets', async () => {

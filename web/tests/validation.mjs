@@ -17,7 +17,7 @@ import * as nodeAssetReferences from '../../core/lib/asset-reference.ts';
 import { declaredResourceCases } from '../../core/tests/fixtures/declared-resources.js';
 import { assetOutputCases, assetOutputRefusals } from '../../core/tests/fixtures/asset-output.js';
 import { inlineDeclaredAssets } from '../../core/lib/standalone-assets.ts';
-import { standaloneAssetCases, captureStandalone } from '../../core/tests/fixtures/standalone-assets.js';
+import { standaloneAssetCases, standaloneBudgetCases, captureStandalone } from '../../core/tests/fixtures/standalone-assets.js';
 import { assetDataCases, browserAssetCases, captureAssetData, verifyAssetResult } from '../../core/tests/fixtures/asset-data.js';
 import * as nodeAssetData from '../../core/lib/asset-data.ts';
 import { chromium } from 'playwright';
@@ -46,6 +46,7 @@ import { scopeRenderCases, scopeRenderProject } from '../../core/tests/fixtures/
 
 const prefix = '/divlet-kernel/';
 const expectedStandaloneAssets = await Promise.all(standaloneAssetCases.map(({ run }) => captureStandalone({ inlineDeclaredAssets }, run)));
+const expectedStandaloneBudgets = await Promise.all(standaloneBudgetCases.map(({ run }) => captureStandalone({ inlineDeclaredAssets }, run)));
 const expectedDeclaredResources = await Promise.all(declaredResourceCases.map(({ run }) => run({ DeclaredResourceGraph, ...nodeAssetReferences })));
 const svgApi = { ...nodeCarriers, rewriteSvgResource };
 const svgInputs = [...svgResourceCases, ...svgProjectionCases.filter(row => row.refused).map(row => ({ name: row.name, text: row.text, accepted: false }))];
@@ -578,6 +579,7 @@ try {
     const declaredResources = await Promise.all(declaredFixtures.declaredResourceCases.map(({ run }) => run({ ...declared, ...references })));
     const [standalone, standaloneFixtures] = await Promise.all(['standalone-assets.js', 'standalone-asset-cases.js'].map(file => import(new URL(file, location.href).href)));
     const standaloneAssets = await Promise.all(standaloneFixtures.standaloneAssetCases.map(({ run }) => standaloneFixtures.captureStandalone(standalone, run)));
+    const standaloneBudgets = await Promise.all(standaloneFixtures.standaloneBudgetCases.map(({ run }) => standaloneFixtures.captureStandalone(standalone, run)));
     const exported = await standalone.inlineDeclaredAssets('<link rel="stylesheet" href="asset:paint.css"><img src="asset:pixel"><div class="standalone-proof"></div>', standaloneFixtures.standalonePaintAssets(), { fragment: true });
     const exportHost = document.createElement('div'); exportHost.innerHTML = exported;
     const stylesheet = exportHost.querySelector('link');
@@ -605,10 +607,12 @@ try {
     const image = new Image(); image.src = `data:image/svg+xml,${encodeURIComponent(painted)}`; await image.decode();
     const canvas = document.createElement('canvas'); canvas.width = 7; canvas.height = 9;
     const context = canvas.getContext('2d'); context.drawImage(image, 0, 0);
-    return { standaloneAssets, standaloneRendering, assetOutputs, assetOutputFailures, declaredResources, xml, nativeXml, text, runs, image: [image.naturalWidth, image.naturalHeight], pixel: [...context.getImageData(3, 4, 1, 1).data], nodeGlobals: ['Buffer', 'process', 'require'].filter(name => name in globalThis) };
+    return { standaloneAssets, standaloneBudgets, standaloneRendering, assetOutputs, assetOutputFailures, declaredResources, xml, nativeXml, text, runs, image: [image.naturalWidth, image.naturalHeight], pixel: [...context.getImageData(3, 4, 1, 1).data], nodeGlobals: ['Buffer', 'process', 'require'].filter(name => name in globalThis) };
   });
   assert.deepEqual(svgResult.standaloneAssets, expectedStandaloneAssets, 'single-file resource export runs the real portable implementation in Chromium');
   for (let index = 0; index < standaloneAssetCases.length; index++) assert.deepEqual(svgResult.standaloneAssets[index], standaloneAssetCases[index].expected, standaloneAssetCases[index].name);
+  assert.deepEqual(svgResult.standaloneBudgets, expectedStandaloneBudgets, 'lower caller-owned closure budgets run identically in Chromium');
+  for (let index = 0; index < standaloneBudgetCases.length; index++) assert.deepEqual(svgResult.standaloneBudgets[index], standaloneBudgetCases[index].expected, standaloneBudgetCases[index].name);
   assert.deepEqual(svgResult.standaloneRendering, { image: [7, 9], padding: '17px', background: true, pixel: [18, 52, 86, 255] });
   assert.deepEqual(svgResult.assetOutputs, assetOutputCases.map(row => ({ value: row.expected, sameOrigin: true, withinRoot: true, decodedPath: row.reference.path })), 'browser URL resolution keeps every authored asset name inside the hosting prefix');
   assert.deepEqual(svgResult.assetOutputFailures, assetOutputRefusals.map(() => ({ error: 'INVALID_ASSET' })));
@@ -626,7 +630,7 @@ try {
   assert.equal(await svgPage.evaluate(async url => { try { await fetch(url); return false; } catch { return true; } }, controlUrl), true);
   assert.deepEqual(svgDenied, [controlUrl], 'the deny-default network guard rejects an actual unrequested fetch');
   await svgContext.close();
-  console.log(`PASS: ${svgResult.standaloneAssets.length} standalone-export + actual exported image/CSS + ${svgResult.assetOutputs.length} asset-output URL + ${svgResult.declaredResources.length} declared-resource + ${svgResult.xml.length} strict XML + ${svgResult.runs.length} SVG transform/budget witnesses + actual image raster + deny-default network control (${svgBundle.bytes} private SVG bytes)`);
+  console.log(`PASS: ${svgResult.standaloneAssets.length} standalone-export + ${svgResult.standaloneBudgets.length} caller-owned closure-budget + actual exported image/CSS + ${svgResult.assetOutputs.length} asset-output URL + ${svgResult.declaredResources.length} declared-resource + ${svgResult.xml.length} strict XML + ${svgResult.runs.length} SVG transform/budget witnesses + actual image raster + deny-default network control (${svgBundle.bytes} private SVG bytes)`);
   assert.deepEqual([...new Set(requests)].sort(), [...files.keys()].sort(), 'only static module/fixture bytes are served; no API, SSE or dependency rescue');
   assert.deepEqual(errors, []);
   console.log(`PASS: ${result.resourceCarriers.length} resource-carrier + actual DOM image/CSS + ${result.assetData.length} asset-data + ${result.assetPort.length} browser asset-port + ${result.assetBase64.length} asset base64 + ${result.mediaTypes.length} canonical MIME + ${result.cases.length} admission + ${result.bytes.length} UTF-8 + ${result.frames.length} frame + ${result.historyReplay.length} history-replay + ${result.styleReplayRendering.length} actual style-replay padding endpoints + ${result.historyTraversal.length} history-traversal + ${result.historyNavigation.length} history-navigation + ${result.historyCommits.length} accepted history-commit + ${result.patchVersions.length} patch-version + ${result.cssCascade.length} CSS cascade migration (current emitters/reference conversion, not native activation) + ${result.componentTexts.length} component-text + ${result.componentValues.length} component-literal + ${result.componentAttributes.length} component-attribute + ${result.componentMetadata.length} component-metadata + ${result.domIds.length} DOM-ID + actual label/ARIA/SVG/iframe reference checks + ${result.attributeReferences.length} final attribute namespace/reference checks + ${result.componentScopes.length} component-scope + ${result.scopeRendering.length} Node/browser CSS/token render checks + ${result.cssAnnotations.length} inert CSS-annotation codec + ${result.inlineCss.length} ordered inline-CSS syntax + ${result.references.length} asset-reference + ${result.requirements.length} requirement + ${result.nativeJson.length} native-JSON + ${result.nativeValues.length} object-value + ${result.nativeEquality.length} native-equality + ${result.sessions.length} snapshot-session witnesses + ${result.selection.length} actual-store selection checks + ${result.services.length} optional-service consumer checks + ${result.clipboard.length} actual clipboard/host consumer checks + verified public landing data + declared SVG/CSS and native model image/use rendering in native browser ESM; no Node globals, provider bootstrap or backend API (${bundle.bytes} model bytes)`);

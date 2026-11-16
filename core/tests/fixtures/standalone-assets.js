@@ -43,5 +43,45 @@ export const standaloneAssetCases = [
   { name: 'indirect closed CSS carriers keep their conservative refusal', run: api => api.inlineDeclaredAssets('<link href="asset:one">', { one: ascii('.a{background:var(--image)}') }, fragment), expected: { error: 'COPY_UNSUPPORTED_RESOURCE' } },
   { name: 'repeated references consume the expanded HTML work budget', run: api => api.inlineDeclaredAssets('<img src="asset:one">'.repeat(50), { one: ascii('x'.repeat(1024 * 1024), 'application/octet-stream') }, fragment), expected: { error: 'FILE_TOO_LARGE' } },
 ];
+// Smaller trusted-consumer budgets retain the original accounting; they are not source-file or general HTML limits.
+export const standaloneBudgetCases = [
+  { name: 'lower work budget has an exact authored boundary independent of final HTML size', async run(api) {
+    const assets = { one: 'data:application/octet-stream;base64,AQID' };
+    const call = maxWorkBytes => api.inlineDeclaredAssets('<img src="asset:one">', assets, { fragment: true, maxWorkBytes });
+    let refused; try { await call(61); } catch (error) { refused = error.code; }
+    return { refused, html: await call(62), unchanged: assets.one };
+  }, expected: { value: { refused: 'FILE_TOO_LARGE', html: '<img src="data:application/octet-stream;base64,AQID">', unchanged: 'data:application/octet-stream;base64,AQID' } } },
+  { name: 'cached repeated resources still consume per-reference work and independent invocations reset it', async run(api) {
+    const call = maxWorkBytes => api.inlineDeclaredAssets('<img src="asset:one">'.repeat(2), { one: 'data:application/octet-stream;base64,AQID' }, { fragment: true, maxWorkBytes });
+    let refused; try { await call(123); } catch (error) { refused = error.code; }
+    const first = await call(124), second = await call(124);
+    return { refused, length: first.length, repeated: first === second };
+  }, expected: { value: { refused: 'FILE_TOO_LARGE', length: 106, repeated: true } } },
+  { name: 'lower work budget counts UTF-8 source bytes rather than UTF-16 units', async run(api) {
+    const call = maxWorkBytes => api.inlineDeclaredAssets('<p>λ</p><img src="asset:one">', { one: 'data:application/octet-stream;base64,AQID' }, { fragment: true, maxWorkBytes });
+    let refused; try { await call(70); } catch (error) { refused = error.code; }
+    return { refused, html: await call(71) };
+  }, expected: { value: { refused: 'FILE_TOO_LARGE', html: '<p>λ</p><img src="data:application/octet-stream;base64,AQID">' } } },
+  { name: 'HTML normalization cannot erase the initial charge of an explicit budget', async run(api) {
+    const html = '\r\n'.repeat(8) + '<p>x</p>', assets = { unused: 'data:application/octet-stream;base64,AQID' };
+    let refused; try { await api.inlineDeclaredAssets(html, assets, { fragment: true, maxWorkBytes: 16 }); } catch (error) { refused = error.code; }
+    const exact = await api.inlineDeclaredAssets(html, assets, { fragment: true, maxWorkBytes: 24 });
+    const legacy = await api.inlineDeclaredAssets(html, assets, { fragment: true });
+    return { refused, exact, legacy };
+  }, expected: { value: { refused: 'FILE_TOO_LARGE', exact: '\n'.repeat(8) + '<p>x</p>', legacy: '\n'.repeat(8) + '<p>x</p>' } } },
+  { name: 'final output remains bounded even when no declaration is reached', run: api => api.inlineDeclaredAssets('x', { unused: 'data:application/octet-stream;base64,AQID' }, { maxWorkBytes: 1 }), expected: { error: 'FILE_TOO_LARGE' } },
+  { name: 'zero is a valid empty projection budget with unused declarations', run: api => api.inlineDeclaredAssets('', { unused: 'data:application/octet-stream;base64,AQID' }, { fragment: true, maxWorkBytes: 0 }), expected: { value: '' } },
+  { name: 'invalid or raised budgets cannot coerce or increase the native ceiling', async run(api) {
+    let coercions = 0;
+    const values = [-1, 0.5, NaN, Infinity, 2 ** 53, '64', true, null, 64 * 1024 * 1024 + 1, { valueOf() { coercions++; return 62; } }];
+    const errors = [];
+    for (const maxWorkBytes of values) {
+      try { await api.inlineDeclaredAssets('<img src="asset:one">', { one: 'data:application/octet-stream;base64,AQID' }, { fragment: true, maxWorkBytes }); errors.push(null); }
+      catch (error) { errors.push(error.code); }
+    }
+    return { errors, coercions };
+  }, expected: { value: { errors: Array(10).fill('INVALID_ASSET'), coercions: 0 } } },
+  { name: 'no declared files retain the exact no-op path under a lower closure budget', run: api => api.inlineDeclaredAssets('<IMG  src="./legacy.png" >', {}, { fragment: true, maxWorkBytes: 0 }), expected: { value: '<IMG  src="./legacy.png" >' } },
+];
 export const standalonePaintSource = '<svg xmlns="http://www.w3.org/2000/svg" width="7" height="9"><rect width="7" height="9" fill="#123456"/></svg>';
 export const standalonePaintAssets = () => ({ pixel: ascii(standalonePaintSource, 'image/svg+xml'), 'paint.css': ascii('.standalone-proof{padding-left:17px;background-image:url(asset:pixel)}') });
