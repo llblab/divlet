@@ -4,7 +4,7 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased
 
-## 0.1.1 — Hotfix: compact color controls and a full-window connection
+## 0.1.2 — Hotfix: compact color controls and a full-window connection
 
 - **Fill and Text share one row.** Appearance keeps the background and text color controls side by side, including project swatches and narrow panels at 200% interface size; color edits and removal keep their existing behavior.
 - **A connected website fills its window.** `--connect` opens its browser window maximized and no longer emulates a fixed 1440×900 viewport there, so the board follows the window as it is resized; a headless connection keeps the fixed desktop size (`core/tests/browser-mcp-launch.test.js`).

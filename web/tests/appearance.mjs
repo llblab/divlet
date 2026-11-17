@@ -41,19 +41,23 @@ try {
   const select = id => page.evaluate(async id => { document.activeElement?.blur?.(); const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', [id]); }, id);
   const afterVersion = () => runtime.read({ view: 'document', documentId: 'welcome' }).version;
   const colorRow = async label => {
-    const layout = await page.locator('#inspector [data-section="appearance"]').evaluate(section => {
+    // Resolve and measure in one browser task: a preview measurement may replace a previously resolved section.
+    const layout = await page.evaluate(() => {
+      const section = document.querySelector('#inspector [data-section="appearance"]');
       const fields = ['fill', 'ink'].map(key => section.querySelector(`[data-key="${key}"]`).closest('.color-field'));
       const [fill, ink] = fields.map(field => field.getBoundingClientRect());
       const bounds = section.getBoundingClientRect();
       return {
-        paired: Math.abs(fill.top - ink.top) < 1 && fill.right < ink.left,
+        rects: [fill.toJSON(), ink.toJSON()],
+        paired: fill.width > 0 && ink.width > 0 && Math.abs(fill.top - ink.top) < 1 && fill.right < ink.left,
         contained: fields.every(field => {
           const rect = field.getBoundingClientRect();
           return rect.left >= bounds.left && rect.right <= bounds.right + 1 && field.scrollWidth <= field.clientWidth + 1;
         }),
       };
     });
-    assert.deepEqual(layout, { paired: true, contained: true }, `Fill and Text share one row without overflow (${label})`);
+    const { rects, ...result } = layout;
+    assert.deepEqual(result, { paired: true, contained: true }, `Fill and Text share one row without overflow (${label}): ${JSON.stringify(rects)}`);
   };
 
   // With a style engine, More CSS takes the common path: custom properties stay native declarations, other properties become
@@ -630,7 +634,7 @@ try {
   await waitUntil(() => family.locator('.pick-v').innerText().then(text => text === longFamily), 'accepted family reaches the inspector before measuring its whole label');
   // A selected element's accepted edit is followed by a burst of measurement-driven inspector redraws; measure and focus after they settle.
   await settleInspector(page);
-  const geometry = await family.evaluate(button => { const box = button.parentElement; return { fieldWidth: box.clientWidth, contentsWidth: box.scrollWidth, inspectorWidth: document.querySelector('#inspector').clientWidth, text: button.querySelector('.pick-v').textContent, nowrap: getComputedStyle(button.querySelector('.pick-v')).whiteSpace }; });
+  const geometry = await page.evaluate(() => { const button = document.querySelector('#inspector [data-key="font-family"]'), box = button.parentElement; return { fieldWidth: box.clientWidth, contentsWidth: box.scrollWidth, inspectorWidth: document.querySelector('#inspector').clientWidth, text: button.querySelector('.pick-v').textContent, nowrap: getComputedStyle(button.querySelector('.pick-v')).whiteSpace }; });
   assert.equal(geometry.text, longFamily);
   assert.equal(geometry.nowrap, 'nowrap');
   assert.ok(geometry.fieldWidth <= geometry.inspectorWidth && geometry.contentsWidth > geometry.fieldWidth, 'only the overlong whole control pans, not the inspector');
