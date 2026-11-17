@@ -157,7 +157,8 @@ try {
   const { renderer, ...board } = result;
   assert.deepEqual(board, { frames: 1, index: 200, board: 200, lib: 200, panel: 200 }, 'the installed package starts a board and serves it');
   assert.match(renderer, /^divlet-tailwind-2-[a-f0-9]{64}$/, 'the installed build establishes and executes an exact renderer identity');
-  const identityAudit = auditRendererIdentity(path.join(target, 'node_modules/@divlet/core'));
+  // A registry verification installs published names into a checkout that is not built; it has no local build to compare.
+  const identityAudit = auditRendererIdentity(path.join(target, 'node_modules/@divlet/core'), undefined, { built: !registry });
   assert.equal(identityAudit.reports.installed.version, renderer, 'the audit observes the same installed renderer the smoke exercised');
   const rendererIdentity = { phase: 'core-cli-mcp', comparisons: identityAudit.comparisons, inputs: Object.fromEntries(Object.entries(identityAudit.reports).map(([name, report]) => [name, report.inputs])) };
   // Internal browser packaging proof: tools come from checkout; every product/vendor input comes from this consumer.

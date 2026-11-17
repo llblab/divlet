@@ -4,6 +4,8 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased
 
+- **The release's registry verification no longer needs a local build.** The renderer identity audit compares source and installation directly in `--registry` mode; it compared against a checkout build that the registry job never makes, which failed the 0.1.0 run after a successful publication (re-run locally against the frozen 0.1.0 manifest: passed).
+
 ## 0.1.0 — Native CSS controls and Tailwind in the browser board
 
 - **A rebuilt landing, styled with Tailwind utilities only.** The headline spans the page, with the pitch and calls to action beside the agent/board transcript of one edit; four cards say what divlet is; how a change lands reads as four steps in a row; the CSS → Tailwind flow and the guided tour (two columns, no duplicate cards) follow; install is three wide rows whose commands never break inside a flag; the seven tools are grouped by job; formats sit beside the honest boundaries; a closing call ends the page. Every element is styled with utilities — the frame CSS only defines the light/dark palette the project's colour tokens point at — so selecting anything on the board shows real classes in the editor.

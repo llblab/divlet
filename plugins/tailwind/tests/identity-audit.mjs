@@ -20,15 +20,22 @@ function compare(expected, actual) {
   return { relationship: equal ? 'same-inputs' : 'selected-inputs-differ', expected: expected.version, actual: actual.version, roots: { expected: expected.inputs.roots, actual: actual.inputs.roots }, packages: { onlyExpected: [...left].filter(([key]) => !right.has(key)).map(([, value]) => value), onlyActual: [...right].filter(([key]) => !left.has(key)).map(([, value]) => value) }, sameStylesheets: JSON.stringify(expected.inputs.stylesheets) === JSON.stringify(actual.inputs.stylesheets), sameProbeCss: expected.cssHash === actual.cssHash, sourceRequirementCheck: actual.requirementCheck };
 }
 
-/** Observe the real recipe in isolated subprocesses; paths are diagnostics, never identity inputs. */
-export function auditRendererIdentity(installedCore, equivalentCore) {
+/**
+ * Observe the real recipe in isolated subprocesses; paths are diagnostics, never identity inputs. `built: false` is for a
+ * checkout that installs from the registry without building (the release's registry verification): there is no local build
+ * to compare, so source and installation are compared directly.
+ */
+export function auditRendererIdentity(installedCore, equivalentCore, { built: withBuild = true } = {}) {
   const source = inspect(path.join(root, 'plugins/tailwind/lib/renderer.ts'));
-  const built = inspect(entry(root), source.version);
   const installed = inspect(entry(path.resolve(installedCore)), source.version);
-  const sourceBuild = compare(source, built), sourceInstalled = compare(source, installed);
-  const buildInstalled = compare(built, installed);
-  const reports = { source, built, installed };
-  const result = { sourceBuild, sourceInstalled, buildInstalled };
+  const sourceInstalled = compare(source, installed);
+  const reports = { source, installed };
+  const result = { sourceInstalled };
+  if (withBuild) {
+    const built = inspect(entry(root), source.version);
+    reports.built = built;
+    Object.assign(result, { sourceBuild: compare(source, built), buildInstalled: compare(built, installed) });
+  }
   if (equivalentCore) {
     const equivalent = inspect(entry(path.resolve(equivalentCore)), source.version);
     assert.deepEqual(equivalent.inputs, source.inputs, 'the caller-selected control installation really has equivalent inputs');
