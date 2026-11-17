@@ -436,11 +436,12 @@ export function reconcileArtboards() {
   if (!initialFit && documents().length && viewport.clientWidth) {
     initialFit = true;
     const saved = viewState(store.state.projectId);
-    if (saved && Number.isFinite(saved.k) && Number.isFinite(saved.x) && Number.isFinite(saved.y)) setCamera(saved);
+    if (saved && Number.isFinite(saved.k) && Number.isFinite(saved.x) && Number.isFinite(saved.y)) { setCamera(saved); emit('initial-view', null); }
     else {
       fit(null, { animate: false });
       // A first visit to a published board reads the page itself; the board is one step back.
-      if (initialView?.expand && descriptor(initialView.expand)) requestAnimationFrame(() => openExpanded(initialView.expand, undefined, { title: initialView.title }));
+      if (initialView?.expand && descriptor(initialView.expand)) requestAnimationFrame(() => { openExpanded(initialView.expand, undefined, { title: initialView.title }); emit('initial-view', store.expanded?.entry.doc.id ?? null); });
+      else emit('initial-view', null);
     }
   }
   updateHandles();

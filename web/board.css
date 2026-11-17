@@ -164,21 +164,14 @@ kbd { flex: none; white-space: nowrap; font: 600 11px var(--mono); color: var(--
 .cta:hover { background: var(--accent-ink); }
 .cta:active { transform: scale(.97); }
 .cta kbd { color: inherit; border-color: rgba(255, 255, 255, .35); }
-.loading { position: absolute; inset: 0; display: grid; grid-auto-flow: row; align-content: center; justify-items: center; gap: 18px; }
-/* A small board assembling itself: three artboards settle onto a dotted canvas, and the selection hops between them. */
-.boot { position: relative; display: flex; align-items: flex-end; gap: 10px; width: 196px; height: 108px; padding: 14px; border: 1px solid var(--hair); border-radius: 16px; background-color: var(--panel); background-image: radial-gradient(circle at 1px 1px, var(--hair) 1px, transparent 0); background-size: 12px 12px; box-shadow: var(--shadow); }
-.boot-art { position: relative; flex: none; border: 1px solid var(--hair); border-radius: 5px; background: var(--solid, #fff) linear-gradient(var(--hair), var(--hair)) 6px 7px / 38% 3px no-repeat; opacity: 0; transform: translateY(6px) scale(.9); animation: boot-in 2.7s cubic-bezier(.2, .7, .2, 1) infinite; }
-.boot-art::before { content: ""; position: absolute; left: 6px; right: 6px; top: 14px; height: 7px; border-radius: 2px; background: var(--ink); opacity: .75; }
-.boot-art::after { content: ""; position: absolute; inset: -4px; border: 1.5px solid var(--accent); border-radius: 7px; opacity: 0; animation: boot-select 2.7s ease-in-out infinite; }
-.boot-art.wide { width: 82px; height: 56px; }
-.boot-art.tablet { width: 34px; height: 46px; animation-delay: .25s; }
-.boot-art.tablet::after { animation-delay: .9s; }
-.boot-art.phone { width: 22px; height: 40px; animation-delay: .5s; }
-.boot-art.phone::after { animation-delay: 1.8s; }
-.boot-text { margin: 0; color: var(--muted); font-size: 12.5px; letter-spacing: .01em; }
-@keyframes boot-in { 0% { opacity: 0; transform: translateY(6px) scale(.9); } 22%, 88% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-2px) scale(.98); } }
-@keyframes boot-select { 0%, 6% { opacity: 0; } 12%, 30% { opacity: 1; } 36%, 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .boot-art { animation: none; opacity: 1; transform: none; } .boot-art::after { animation: none; } .boot-art.wide::after { opacity: 1; } }
+.loading { position: absolute; inset: 0; display: grid; place-items: center; }
+/* One quiet spinner, shown only if starting takes long enough to notice. */
+.boot-spinner { width: 26px; height: 26px; border: 2.5px solid var(--hair); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite, fade .2s .25s ease-out backwards; }
+@media (prefers-reduced-motion: reduce) { .boot-spinner { animation-duration: 2.4s, .2s; } }
+/* A host's boot cover (the static site's prepared landing) is the first paint: the canvas and its chrome stay out of sight
+   behind it, and only the expanded page's way back to the board shows above it (board.js removes the cover). */
+.boot-cover { position: fixed; inset: 0; z-index: 49; display: block; width: 100%; height: 100%; border: 0; background: var(--bg); }
+body:has(> .boot-cover) #loading { display: none; }
 /* ---- chrome --------------------------------------------------------------- */
 /* Left column: logo + search on top, the sidebar, its tabs below. Folded, the top and bottom pieces stay as two separate pills. */
 :root { --chrome-h: 44px; --edge: 10px; }
@@ -267,7 +260,7 @@ body.agent-busy #open-agent { background-image: linear-gradient(100deg, transpar
 .resize-handle:hover::after, .resize-handle:focus-visible::after, .resize-handle.dragging::after { background: var(--accent); }
 body.resizing-panel { cursor: ew-resize; user-select: none; }
 body.resizing-panel iframe { pointer-events: none; }
-body.is-expanded .resize-handle, body:has(.scrim:not([hidden])) .resize-handle { display: none; }
+body.is-expanded .resize-handle, body:has(> .boot-cover) .resize-handle, body:has(.scrim:not([hidden])) .resize-handle { display: none; }
 .pane { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .pane[hidden] { display: none; }
 .panel-head { position: relative; display: flex; align-items: center; gap: 2px; padding: 6px 8px 4px; }
@@ -880,7 +873,7 @@ html.w720 body.agent-busy:not(.has-sidebar) .panel.right { max-height: min(calc(
 html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { display: none; }
       html.w440 .search-pill-text, html.w440 .search-pill kbd { display: none; } html.w440 .search-pill { padding: 0 9px; }
 /* A full-screen page owns the screen: only the Back pill and the page title stay. */
-body.is-expanded .brand, body.is-expanded .sidebar-foot, body.is-expanded .panel, body.is-expanded .dock, body.is-expanded .crumbs-bar { display: none; }
+:is(body.is-expanded, body:has(> .boot-cover)) :is(.brand, .sidebar-foot, .panel, .dock, .crumbs-bar) { display: none; }
 /* Phones: the dock keeps tools, zoom, undo and settings; the rest is in Ctrl K and the menus. */ html.w420 .dock .zoom-step { display: none; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; } }
 

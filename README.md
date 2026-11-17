@@ -2,187 +2,120 @@
 
 **Design in the browser. Change it in conversation.**
 
-A local layout board for coding agents. Work with real HTML in live artboards, reuse components across pages, and make changes through Pi, MCP or the project file. The browser renders the layout; divlet handles structure, selection, validation and history.
+A layout board for coding agents. Your pages are real HTML in live artboards; you point at what should change, the agent edits through validated tools, and every accepted change is versioned, logged and one Undo away.
 
-[Quick start](#quick-start) · [Connect an agent](#connect-an-agent) · [Board guide](docs/board.md) · [Documentation](docs/README.md)
+[Try it in your browser](https://llblab.github.io/divlet/) · [Quick start](#quick-start) · [Connect an agent](#connect-an-agent) · [Board guide](docs/board.md) · [Documentation](docs/README.md)
 
-> **0.1.0.** The native project format remains a pre-freeze draft; keep backups because future versions may require explicit conversion. A versioned source tree is not proof of npm publication; see the [release workflow](docs/publishing.md#github-actions-publishing) for registry verification.
+## Why divlet
 
-## Real pages, not pictures of pages
-
-- **See the actual layout.** Each artboard is an iframe with real HTML, locally compiled Tailwind and CSS. Resize it to check responsive behavior.
-- **Plain CSS first, Tailwind where it fits.** The inspector edits CSS properties, not class names: layout, spacing, border, colour, type and effects work in any project with no plugin. The optional Tailwind plugin stores the same edit as an atomic class, reads typed classes back into the controls, and keeps anything no utility can express as plain CSS.
-- **Point, then ask.** Select an element and ask your connected agent to change it. Pi and MCP use the same seven validated tools.
+- **Real pages, not pictures of pages.** Each artboard is an iframe with real HTML and CSS. Resize it to check responsive behavior.
+- **Plain CSS first, Tailwind where it fits.** The inspector edits CSS properties — layout, spacing, border, color, type and effects — with no plugin. The optional Tailwind plugin reads classes back into the same controls and can move inline CSS to utilities.
+- **Point, then ask.** Select an element and ask your agent to change it. Pi and MCP share the same validated tools.
 - **Build once, reuse.** Components, instance overrides, shared tokens and project CSS keep related pages connected.
-- **Keep your work local.** The board binds to loopback. Projects are files in your workspace, with autosave, history and undo—not a hosted design service.
+- **Local and yours.** Projects are files in your workspace with autosave, history and undo. The board binds to loopback.
 
 ## Quick start
 
-Requires **Node.js 22.19 or later**. Pi is optional.
-
-Open a standalone board:
+Requires **Node.js 22.19 or later**.
 
 ```bash
-npx -y @divlet/cli@0.1.0 /absolute/path/to/workspace
+npx -y @divlet/cli /absolute/path/to/workspace
 ```
 
-Or run from a source checkout:
+Open the printed URL. An empty folder gets `project.divlet` with a starter artboard; an existing project opens directly.
 
-```bash
-cd /path/to/divlet
-npm ci --legacy-peer-deps
-npm start -- /absolute/path/to/workspace
-```
+**First moves:** `V` selects, `P` lets the page behave normally, `L` opens Layers, `H` opens History, `A` opens Agent. `Ctrl K` finds any command; `?` lists every shortcut.
 
-Open the URL printed in the terminal. An empty workspace gets `project.divlet` with a starter artboard; an existing project opens directly, and a folder with several projects opens the launcher.
-
-`npm run demo` opens the real onboarding page, [examples/landing/landing.divlet](examples/landing/landing.divlet). On GitHub Pages the same project opens in the real board running entirely in your browser, which is also an MCP provider for agents ([browser-hosted MCP](docs/browser-mcp.md)); see [editing and rebuilding the landing](examples/README.md). `npm run demo:site` opens the Markdown handbook in `examples/handbook/`; `examples/studio/` holds a separate layout scenario. Pencil import remains supported, but no authored PEN demo is bundled.
-
-**First moves:** `V` selects, `P` lets the page behave normally, `L` opens Layers and `H` opens History. `Ctrl K` finds commands; `?` shows shortcuts. See the [board guide](docs/board.md) for direct editing, the inspector and touch controls.
+No install at all: the [website board](https://llblab.github.io/divlet/) runs the same editor entirely in your browser on the landing project.
 
 ## Connect an agent
 
 ### Pi
 
-Install the Pi adapter:
-
 ```bash
-pi install npm:@divlet/pi@0.1.0
+pi install npm:@divlet/pi
 ```
 
-For checkout development, load the source adapter for a one-off session instead (no build needed):
-
-```bash
-NODE_OPTIONS=--conditions=divlet-source pi -e /absolute/path/to/divlet/pi/index.js
-```
-
-For a persistent local package installation, first run `npm run build`, then `pi install /absolute/path/to/divlet/pi`. Choose one method; never load both.
-
-Open Pi in your workspace, run `/reload` if it is already running, then:
-
-```text
-/divlet
-```
-
-Open the returned board URL, select something and press `A` to ask about it. Pi supplies the tools, the bundled divlet skill and the Agent conversation. Replies stay in Agent; accepted edits appear in History.
+Then, in your workspace, run `/divlet` and open the returned URL. Pi brings the tools, the divlet skill and the Agent conversation.
 
 ### MCP
 
-Two separate steps: the workflow skill teaches the agent the loop, the MCP server gives it the tools. Installing the skill registers no tools.
-
-**1. Install the skill** (user-level, so every project sees it; the installer asks which agents to target):
+**1. Install the skill**, which teaches the agent the read → edit → verify loop:
 
 ```bash
 npx skills add llblab/divlet --skill divlet --global
 ```
 
-Drop `--global` to install into the current project only. Skip this step under Pi: the extension below already registers the same bundled skill, and installing it twice makes two copies compete.
+Skip this step under Pi: its extension already registers the same skill.
 
-**2. Register the server.** Use the npm adapter:
+**2. Register the server**, which gives the agent the tools:
 
 ```json
 {
   "mcpServers": {
     "divlet": {
       "command": "npx",
-      "args": ["-y", "@divlet/mcp@0.1.0", "--cwd", "/absolute/path/to/workspace"]
+      "args": ["-y", "@divlet/mcp", "--cwd", "/absolute/path/to/workspace"]
     }
   }
 }
 ```
 
-Call `divlet_open` and open its returned URL. No Pi installation is needed. Clients that support **sampling** can also answer requests typed in the board's Agent tab.
+Call `divlet_open` and open the returned URL. Clients that support sampling can also answer requests typed in the board's Agent tab.
 
 ### A board on a website
 
-The [Pages board](https://llblab.github.io/divlet/) is a static site that is its own MCP provider: register it by URL and the tools run in a browser page, on that site's project, with no server deployed for it. From a checkout: `node scripts/source.mjs mcp/index.js --connect <url>`.
+The [website board](https://llblab.github.io/divlet/) is its own MCP provider. Connect an agent to it by URL and the tools run inside that browser page:
 
 ```bash
-npx -y @divlet/mcp@0.1.0 --connect https://llblab.github.io/divlet/
+npx -y @divlet/mcp --connect https://llblab.github.io/divlet/
 ```
 
-The page opens in a managed browser window (headless without a display). Edits persist in that browser profile until the publication changes; Tailwind utilities compile inside the page, while images, fonts and opening other projects stay with the local server. Website descriptions and results are treated as website text, and redirects to other origins are refused. See [browser-hosted MCP](docs/browser-mcp.md) for the protocol, security boundaries and how to make another static app a provider.
+Edits stay in that browser profile; images, fonts and other projects need the local server. See [browser-hosted MCP](docs/browser-mcp.md).
 
-[Agent integration guide](docs/agents.md) → Alternative Pi installation, MCP options, the workflow skill and JavaScript entry points.
+More options — source checkouts, version pinning, the JavaScript API — are in the [agent integration guide](docs/agents.md).
 
-<details>
-<summary><strong>Package roles and alternative installation</strong></summary>
+## Agent tools
 
-**`@divlet/core`** owns the library, model/runtime, server, built-in plugins and shared workflow skill. **`@divlet/web`** owns browser assets and portable host ports, without a dependency back on core. Core's HTTP composition uses its public asset locator. Three real adapter packages own their implementation and commands: **`@divlet/cli`**, **`@divlet/mcp`** and **`@divlet/pi`**. Each adapter pins the exact matching core version; core pins web. All five packages share one product release. See the [web package](https://github.com/llblab/divlet/blob/main/web/README.md).
+The agent reads a frame and its version, submits a labelled change, then checks the result. A stale version is refused instead of overwriting newer work.
 
-```bash
-# Open a standalone board:
-npx -y @divlet/cli ./my-project
+- **Open and inspect:** `divlet_open`, `divlet_read`
+- **Change the layout:** `divlet_patch`, `divlet_edit`, `divlet_frame_manage`
+- **Explain and recover:** `divlet_mark`, `divlet_undo`
 
-# Launch the server from an MCP host:
-npx -y @divlet/mcp --cwd ./workspace
+The [tool guide](docs/agents.md#agent-tools) covers views, components, overrides and refusal codes.
 
-# Or install both commands globally:
-npm install -g @divlet/cli @divlet/mcp
-```
-
-For Pi, run `pi install npm:@divlet/pi@0.1.0`. Shared setups should pin `@divlet/cli@0.1.0`, `@divlet/mcp@0.1.0` and `npm:@divlet/pi@0.1.0`. The root package has no commands or Pi manifest; there is no wrapper layer.
-
-Source and local builds, and the 0.1.0 packages once published, also provide a [provider-free Node host entry](docs/agents.md#provider-free-node-host); it is not an adapter/browser-mode switch.
-
-See [npm publication](docs/publishing.md) for version pinning, package identity and release gates.
-
-</details>
-
-## A project you can keep
+## Your project
 
 ```text
 workspace/
 ├─ project.divlet      Frames, components, tokens, CSS and embedded resources
-├─ assets/             Legacy local inputs, when still referenced
-└─ .divlet/project/    Generated HTML, metadata and build assets
+└─ .divlet/project/    Generated HTML, rebuildable
 ```
 
-The `.divlet` JSON file is the source. Edit it through the board, agent tools or your editor: valid external changes appear on the board, and invalid ones leave the last working state visible. New image uploads are embedded in that file; explicitly named resources are materialized only as rebuildable output. Existing local-file references still work without silent conversion. Generated output belongs to one project and does not overwrite unowned files.
+The `.divlet` JSON file is the source; edit it through the board, an agent or your editor. Valid external changes appear on the board, invalid ones leave the last working state visible. The generated HTML can be served as a static site. Opening a Pencil `.pen` or static `.html` file imports it into a sibling `.divlet` and leaves the original untouched.
 
-Open a Pencil `.pen` or static `.html` file to import it into a sibling `.divlet` project. The source stays untouched and an existing destination is not overwritten. The generated output can also be served independently as a static site.
+> The project format is a pre-freeze draft in 0.1.0: keep backups, since a later version may need an explicit conversion.
 
 [Project format](docs/format.md) · [Files, imports and output](docs/board.md#where-projects-live) · [Markdown sites](docs/site.md)
 
-## Agent tools
+## Boundaries
 
-**Read → edit → verify.** The agent reads the current frame and version, submits a labelled change, then checks the result. A stale version is refused rather than silently overwriting newer work.
-
-- **Open and inspect:** `divlet_open`, `divlet_read`.
-- **Change the layout:** `divlet_patch`, `divlet_edit`, `divlet_frame_manage`.
-- **Explain and recover:** `divlet_mark`, `divlet_undo`.
-
-These are the canonical names introduced in 0.0.5; legacy `*_divlet` spellings remain compatibility aliases ([migration details](docs/agents.md#tool-name-compatibility)). Use the names advertised by your installed version.
-
-The [workflow skill](skills/divlet/SKILL.md) teaches the loop; the [tool guide](docs/agents.md#agent-tools) covers views, components, overrides and refusal codes.
-
-## Current boundaries
-
-- **Static web layouts, not application code.** HTML, SVG, CSS and Tailwind classes; no scripts, event handlers or build directives.
-- **Property overrides, not arbitrary subtree replacement.** Change a component reference or detach the instance for structural changes.
-- **Generated HTML is not an editing round trip yet.** Hand edits are reported and preserved on regeneration, not imported into the project. Make persistent changes in the model.
-- **One live owner per project.** Other clients attach to its board and share revisions; independent writers are not supported.
-
-## Go deeper
-
-- [Board guide](docs/board.md) — Canvas, selection, panels, components, files and static output.
-- [Agent integration](docs/agents.md) — Pi, MCP, tools and the JavaScript API.
-- [Format reference](docs/format.md) — The JSON model and generated files.
-- [Architecture](docs/architecture.md) — Core, plugins, adapters and trust boundaries.
-- [Web-native core contract](docs/web-native.md) — Accepted design direction; implementation gaps remain in the backlog.
-- [Documentation index](docs/README.md) — All guides, examples and contributor references.
+- **Static layouts, not applications:** HTML, SVG and CSS; no scripts or event handlers.
+- **Overrides, not subtree replacement:** detach a component instance to change its structure.
+- **The project file is the source:** hand edits to generated HTML are preserved but not imported back.
+- **One live board per project:** other clients attach to it rather than writing alongside it.
 
 ## Development
 
-These checks run from the source checkout. Frontend unit and browser suites live in `web/tests/`; server/model unit suites live in `core/tests/`. Tests are neither served as client assets nor shipped in the npm package.
-
 ```bash
-npm test                      # Type checking and unit tests
+npm ci --legacy-peer-deps
+npm start -- /absolute/path/to/workspace   # run from source
+npm test                                   # type checking and unit tests
 npx playwright install chromium
-npm run test:browser:all      # Browser suites
-npm run test:release          # Install local tarballs; publish nothing
+npm run test:browser:all                   # browser suites
 ```
 
-See [testing and validation](docs/testing.md) for focused suites and prerequisites. Contributor rules live in [AGENTS.md](AGENTS.md); remaining work in [BACKLOG.md](BACKLOG.md); completed changes in [CHANGELOG.md](CHANGELOG.md).
+See [testing](docs/testing.md), [architecture](docs/architecture.md) and [AGENTS.md](AGENTS.md) for contributor rules; open work is in [BACKLOG.md](BACKLOG.md) and delivered changes in [CHANGELOG.md](CHANGELOG.md).
 
-[MIT license](LICENSE). Local files. Real HTML. Your agent, your workflow.
+[MIT license](LICENSE)

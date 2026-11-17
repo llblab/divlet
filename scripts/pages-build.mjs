@@ -57,6 +57,7 @@ try {
   await import(new URL('./board.js', import.meta.url).href);
 } catch (error) {
   // Without its composition the board must not start: it would fall back to native routes that a static host does not have.
+  document.getElementById('boot-cover')?.remove();
   const loading = document.getElementById('loading');
   if (loading) loading.replaceChildren(Object.assign(document.createElement('p'), { className: 'host-error', textContent: 'The board could not start in this browser: ' + (error?.message || error) }));
   throw error;
@@ -93,11 +94,15 @@ async function shell() {
   let html = await readFile(path.join(web, 'index.html'), 'utf8');
   const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => `'sha256-${createHash('sha256').update(match[1]).digest('base64')}'`);
     // Previews are blob documents that inherit this policy, so it also admits what project pages may load (https images/fonts).
-  const csp = `default-src 'self'; script-src 'self' ${inline.join(' ')}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' data: https:; font-src 'self' data: https:; frame-src blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'`;
+  const csp = `default-src 'self'; script-src 'self' ${inline.join(' ')}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' data: https:; font-src 'self' data: https:; frame-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'`;
   const head = `<meta http-equiv="Content-Security-Policy" content="${csp}">\n    <meta name="browser-mcp" content="browser-mcp/1">\n    <meta name="description" content="divlet, a layout board for agents, running in your browser. Agents connect to this page as an MCP provider: npx -y @divlet/mcp --connect <this page>.">`;
   if (!html.includes('<script type="module" src="./board.js"></script>')) throw new Error('web/index.html no longer loads ./board.js as expected.');
   html = html.replace('<meta charset="utf-8">', `<meta charset="utf-8">\n    ${head}`).replace('<script type="module" src="./board.js"></script>', '<script type="module" src="./divlet-host.js"></script>');
   html = html.replace('<title>divlet</title>', '<title>divlet — a layout board for agents</title>');
+  // The prepared landing is the first paint: a plain same-site page in front of the board, readable before any script has loaded.
+  // board.js removes it once the board shows something other than that unchanged page (web/board.js, `#boot-cover`).
+  if (!html.includes('<body>')) throw new Error('web/index.html no longer has a plain <body> to put the landing cover in.');
+  html = html.replace('<body>', '<body>\n    <iframe id="boot-cover" class="boot-cover" src="./page/index.html" title="divlet" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"></iframe>');
   return text(html);
 }
 

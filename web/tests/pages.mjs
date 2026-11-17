@@ -145,6 +145,40 @@ test('the static board opens the landing project with no backend', async () => {
   await page.close();
 });
 
+test('the prepared landing is the first paint and stays until the visitor leaves it', async () => {
+  const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  // Hold the board back: whatever the visitor sees meanwhile is what a slow connection shows first.
+  let release;
+  const held = new Promise(resolve => { release = resolve; });
+  await page.route(base + 'divlet-host.js', async route => { await held; await route.continue(); });
+  await page.goto(base, { waitUntil: 'commit' });
+  const cover = page.frameLocator('#boot-cover');
+  await cover.locator('h1').first().waitFor();
+  const first = await page.evaluate(() => {
+    const node = document.querySelector('#boot-cover'), box = node.getBoundingClientRect(), hit = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+    return { covers: box.left <= 0 && box.top <= 0 && box.right >= innerWidth && box.bottom >= innerHeight, top: hit === node, spinner: getComputedStyle(document.querySelector('#loading')).display, chrome: ['#brand', '#dock', '#sidebar-foot'].map(selector => getComputedStyle(document.querySelector(selector)).display), host: !!globalThis[Symbol.for('divlet.board-host/1')] };
+  });
+  assert.deepEqual(first, { covers: true, top: true, spinner: 'none', chrome: ['none', 'none', 'none'], host: false }, 'before any board script runs the visitor reads the landing, with no preloader or editor chrome');
+  release();
+  // The board starts behind the landing and only adds the way to it.
+  await page.waitForSelector('#expanded-preview:not([hidden])');
+  await page.frameLocator('iframe[data-document-id="index"]').locator('h1').first().waitFor();
+  await page.waitForTimeout(200);
+  const ready = await page.evaluate(() => {
+    const control = document.querySelector('#expanded-back').getBoundingClientRect();
+    return { cover: !!document.querySelector('#boot-cover'), control: document.elementFromPoint(control.left + control.width / 2, control.top + control.height / 2)?.closest('#expanded-back') !== null, tip: document.querySelector('.tip')?.classList.contains('show') ?? false };
+  });
+  assert.deepEqual(ready, { cover: true, control: true, tip: false }, 'the unchanged landing never swaps under the reader; Edit on the board sits above it with no tip over the page');
+  await page.click('#expanded-back');
+  await page.waitForSelector('#expanded-preview', { state: 'hidden' });
+  assert.equal(await page.locator('#boot-cover').count(), 0, 'collapsing reveals the board itself');
+  assert.equal(await page.locator('#brand').isVisible(), true);
+  assert.deepEqual(errors, []);
+  await page.close();
+});
+
 test('a first visit on a phone reads the landing as a phone page', async () => {
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await phone.goto(base);
@@ -218,6 +252,9 @@ test('an agent connects by URL, edits the project and the visitor sees it; the c
     const restored = parse(await connection.callTool('divlet_read', { view: 'frame', frameId: 'index', full: true }));
     assert.equal(restored.name, 'Visitor renamed', 'IndexedDB kept the browser copy');
     assert.equal(restored.nodes[text.id].content, 'Edited by an agent in your browser');
+    // The published landing would contradict the restored copy: the live page replaces it once painted.
+    await page.waitForSelector('#boot-cover', { state: 'detached' });
+    await page.frameLocator('iframe[data-document-id="index"]').locator('h1', { hasText: 'Edited by an agent in your browser' }).waitFor();
     // Undo history belongs to the page instance, not to storage: a reload starts a new history line.
     const undo = await connection.callTool('divlet_undo', {});
     assert.equal(undo.isError, true);

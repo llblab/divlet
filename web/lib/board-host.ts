@@ -73,7 +73,9 @@ export interface BoardHostComposition {
   readonly publishObservations?: import('./board-session.ts').BoardObservationPublisher;
   /**
    * What a visitor with no saved view of this project sees first: `expand` opens that frame as a readable page, and `title`
-   * names the way back to the board. Absent: the board fits all frames, as the native host does.
+   * names the way back to the board. `published` says that frame is still the page the host published unchanged (not a restored
+   * or edited copy), so a boot cover showing that published page may stay in front of it. Absent: the board fits all frames, as
+   * the native host does.
    */
-  readonly initialView?: { readonly expand: string; readonly title?: string };
+  readonly initialView?: { readonly expand: string; readonly title?: string; readonly published?: boolean };
 }

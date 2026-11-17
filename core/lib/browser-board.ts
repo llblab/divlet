@@ -199,7 +199,7 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
     // Selection and measurements are shared with the browser writer, so an agent reads what the visitor selected and sees.
     shareSelection: async (selection: any) => copy(runtime.setSelection(copy(selection))),
     publishObservations: async (report: any) => copy(runtime.setObservations(copy(report))),
-    ...(options.entryFrame && runtime.documents.has(options.entryFrame) ? { initialView: Object.freeze({ expand: options.entryFrame, title: 'Edit on the board' }) } : {}),
+    ...(options.entryFrame && runtime.documents.has(options.entryFrame) ? { initialView: Object.freeze({ expand: options.entryFrame, title: 'Edit on the board', published: !restored }) } : {}),
   });
   Object.defineProperty(target, HOST_KEY, { value: composition, configurable: false, enumerable: false, writable: false });
 

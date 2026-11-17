@@ -266,11 +266,11 @@ try {
     await waitUntil(async () => {
       const state = await page.evaluate(() => ({ panels: document.documentElement.dataset.panels, sidebar: document.querySelector('#sidebar').hidden, inspector: document.querySelector('#inspector').hidden }));
       return state.panels === 'none';
-    }, 'folding both panels restores the frosted chrome');
+    }, 'both panels fold');
     const again = await readPills();
-    for (const pill of again) assert.ok(pill.alpha < 1, `${pill.selector} is frosted again (${pill.alpha})`);
+    for (const pill of again) assert.equal(pill.alpha, 1, `${pill.selector} stays opaque after folding (${pill.alpha})`);
   }
-  checks.push('the pinned chrome is frosted while panels are folded and solid while one is open');
+  checks.push('the pinned chrome is opaque whether panels are folded or open');
 
   // One design contract: two inner radii plus the outer pill radius, one focus ring, one disabled step, and one height per
   // control family. The same element used differently in two places is the drift this guards against.

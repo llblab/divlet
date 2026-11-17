@@ -1,7 +1,7 @@
 import { $, el, icon, button, clamp, keys, shortcutKey, uiScale } from './lib/util.js';
 import { store, on, emit, documents, descriptor, apiUrl, request, receiveState, setConnection, selectArtboards, selectNodes, undo, redo, toast } from './lib/store.js';
 import * as canvas from './lib/canvas.js';
-import { readSession, native } from './lib/host.js';
+import { readSession, native, initialView } from './lib/host.js';
 import './lib/inspector.js';
 import { loadClientPlugins } from './lib/panels.js';
 import * as layers from './lib/layers.js';
@@ -372,6 +372,27 @@ const stopWatching = readSession.subscribe(event => {
     if (entry && change.actor !== 'user') { entry.el.classList.add('touched'); setTimeout(() => entry.el.classList.remove('touched'), 1800); }
   } catch { /* ignore malformed change */ }
 });
+/*
+ * A host may put the entry frame's published page in front of the board while it starts (`#boot-cover`, the static site's
+ * prepared landing). It stays only while the board shows that same unchanged page expanded beneath it, so the visitor reads
+ * a page that never swaps; it goes as soon as the board shows anything else: the board itself, a restored or edited copy
+ * (once its live page has painted), any change, or a failed start whose message must be seen.
+ */
+const bootCover = document.getElementById('boot-cover');
+if (bootCover) {
+  const drop = () => { if (bootCover.isConnected) bootCover.remove(); };
+  on('initial-view', id => {
+    if (!id) return drop();
+    if (initialView?.published) return;
+    // The expanded preview document carries its whole render, so its load is the first paint of the live page.
+    const entry = entries.get(id);
+    if (!entry?.iframe || entry.loaded) return requestAnimationFrame(() => requestAnimationFrame(drop));
+    entry.iframe.addEventListener('load', () => requestAnimationFrame(() => requestAnimationFrame(drop)), { once: true });
+  });
+  on('expanded', open => { if (!open) drop(); });
+  on('change', drop);
+  bootstrap.catch(drop);
+}
 bootstrap.then(info => { receiveState(info); project.checkImport(); }).catch(error => {
   $('#loading').hidden = true;
   setConnection('offline');
@@ -414,7 +435,12 @@ document.addEventListener('pointerover', event => {
   if (target && event.pointerType !== 'touch' && target.dataset.tip && !target.closest('.menu')) tipTimer = setTimeout(() => showTip(target), tip.classList.contains('show') ? 0 : 280);
   else hideTip();
 });
-document.addEventListener('focusin', event => { const target = event.target.closest?.('[data-tip]'); if (target?.dataset.tip && target.matches(':focus-visible')) showTip(target); });
+// A focus tip answers the keyboard: focus the board moved on its own (the first visit's expanded view) or a pointer gave shows
+// no tip over the page being read.
+let keyboardLed = false;
+addEventListener('keydown', () => { keyboardLed = true; }, true);
+addEventListener('pointerdown', () => { keyboardLed = false; }, true);
+document.addEventListener('focusin', event => { const target = event.target.closest?.('[data-tip]'); if (keyboardLed && target?.dataset.tip && target.matches(':focus-visible')) showTip(target); });
 document.addEventListener('focusout', hideTip);
 document.addEventListener('pointerdown', hideTip, true);
 document.addEventListener('keydown', hideTip, true);
