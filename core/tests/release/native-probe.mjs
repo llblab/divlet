@@ -34,7 +34,7 @@ try {
   for (const [expectedVersion, patch, code] of [
     [version, { name: 'stale' }, 'REVISION_CONFLICT'],
     [accepted.version, { nodes: { root: { style: { color: 'red;display:none' } } } }, 'INVALID_DOCUMENT'],
-    [accepted.version, { nodes: { root: { styles: { color: 'green' } } } }, 'NO_STYLE_ENGINE'],
+    [accepted.version, { nodes: { root: { styles: { color: 'green;display:none' } } } }, 'INVALID_PATCH'],
   ]) {
     await assert.rejects(runtime.patch({ documentId: 'plain', expectedVersion, patch }), { code });
     assert.deepEqual(read(), accepted); assert.equal(await readFile(file, 'utf8'), source);

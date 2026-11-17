@@ -286,7 +286,7 @@ for (const selection of ['empty', 'set', 'register']) test(`provider-free ${sele
   const model = await import('@divlet/core/model');
   const base = model.createDemoDocument();
   const patch = { nodes: { [base.rootId]: { styles: input } } };
-  ${selection === 'empty' ? "assert.throws(() => model.applyDocumentPatch(base, patch), { code: 'NO_STYLE_ENGINE' });" : "assert.equal(model.applyDocumentPatch(base, patch).nodes[base.rootId].className, 'host-authored');"}
+  ${selection === 'empty' ? "assert.equal(model.applyDocumentPatch(base, patch).nodes[base.rootId].style.opacity, '0.5');" : "assert.equal(model.applyDocumentPatch(base, patch).nodes[base.rootId].className, 'host-authored');"}
 `));
 
 test('explicit engine absence survives late model, importer and root imports', () => coldStandalone(`
@@ -301,7 +301,7 @@ test('explicit engine absence survives late model, importer and root imports', (
   assert.equal(await engine.compileClasses({}, ['pt-3']), '');
   const base = model.createDemoDocument();
   const patch = input => model.applyDocumentPatch(base, { nodes: { [base.rootId]: input } });
-  assert.throws(() => patch({ styles: { color: 'red' } }), { code: 'NO_STYLE_ENGINE' });
+  assert.equal(patch({ styles: { color: 'red' } }).nodes[base.rootId].style.color, 'red');
   assert.equal(patch({ style: { color: 'red' } }).nodes[base.rootId].style.color, 'red');
 `));
 

@@ -55,7 +55,7 @@ try {
   const browserModel = await import(`data:text/javascript;base64,${Buffer.from(browserBundle.code).toString('base64')}`);
   const browserFrame = browserModel.createDemoDocument();
   assert.equal(browserModel.validateDocument(browserFrame).schemaVersion, 1);
-  assert.throws(() => browserModel.applyDocumentPatch(browserFrame, { nodes: { root: { styles: { color: 'red' } } } }), { code: 'NO_STYLE_ENGINE' });
+  assert.equal(browserModel.applyDocumentPatch(browserFrame, { nodes: { root: { styles: { color: 'red' } } } }).nodes.root.style.color, 'red');
 
   // Installed paths are the published build: `dist/` holds the compiled JavaScript the package exports.
   assert.equal(packed.files.some(file => /^dist\/(?:packages|adapters|cli|mcp|pi|web)\//.test(file.path)), false, 'the product contains no adapter implementations');

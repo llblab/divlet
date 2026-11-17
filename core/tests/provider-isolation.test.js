@@ -101,7 +101,7 @@ function probe(isolate, { escape = false } = {}) {
       const accepted = structuredClone(next);
       assert.throws(() => api.applyDocumentPatch(next, { nodes: { label: null } }), { code: 'INVALID_DOCUMENT' });
       assert.deepEqual(next, accepted);
-      assert.throws(() => api.applyDocumentPatch(next, { nodes: { root: { styles: { color: 'red' } } } }), { code: 'NO_STYLE_ENGINE' });
+      assert.equal(api.applyDocumentPatch(next, { nodes: { root: { styles: { color: 'red' } } } }).nodes.root.style.color, 'red');
       assert.ok(loaded.has('core/lib/model-styles.ts') && loaded.has('core/lib/style-engines.ts'));
       assert.ok(![...loaded].some(file => file.startsWith('plugins/') || /^core\\/lib\\/(engine|browser-styles)\\.ts$/.test(file)));
       console.log(JSON.stringify({ ok: true, witnesses: frameCases.length, modules: [...loaded].sort() }));
@@ -256,7 +256,7 @@ test('the native Node writer/server runs without plugin source or provider packa
       const accepted = read(), source = await fs.readFile(file, 'utf8');
       await assert.rejects(runtime.patch({ documentId: 'plain', expectedVersion: version, patch: { name: 'stale' } }), { code: 'REVISION_CONFLICT' });
       await assert.rejects(runtime.patch({ documentId: 'plain', expectedVersion: accepted.version, patch: { nodes: { root: { style: { color: 'red;display:none' } } } } }), { code: 'INVALID_DOCUMENT' });
-      await assert.rejects(runtime.patch({ documentId: 'plain', expectedVersion: accepted.version, patch: { nodes: { root: { styles: { color: 'green' } } } } }), { code: 'NO_STYLE_ENGINE' });
+      await assert.rejects(runtime.patch({ documentId: 'plain', expectedVersion: accepted.version, patch: { nodes: { root: { styles: { color: 'green;display:none' } } } } }), { code: 'INVALID_PATCH' });
       assert.deepEqual(read(), accepted); assert.equal(await fs.readFile(file, 'utf8'), source);
       await runtime.undo(); assert.equal(read().nodes.root.style.color, 'red');
       await runtime.redo(); assert.equal(read().nodes.root.style.color, 'blue');

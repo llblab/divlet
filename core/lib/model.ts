@@ -7,6 +7,8 @@
  * allowed to trust nothing.
  */
 import { applyStyles } from './model-styles.ts';
+import { applyNativeStyles, releaseForUtilities, checkEdit } from './native-styles.ts';
+import type { StyleEdits } from './native-styles.ts';
 import { SOURCE_LIMITS as SOURCE_BUDGET } from './source-budget.ts';
 import { readAssetReference } from './asset-reference.ts';
 import type { CssDeclaration, CssDeclarationOperation } from './declarations.ts';
@@ -407,20 +409,51 @@ export const colourNames = (...tokenMaps: Array<Record<string, string> | undefin
 }));
 
 /**
- * `nodes.<id>.styles = { property: value }` declares CSS and becomes Tailwind classes: each property replaces the class that set it
- * (null removes it); a `className` given in the same node patch is the starting point.
+ * `nodes.<id>.styles = { property: value }` declares CSS. Without a style engine each property becomes an inline declaration
+ * (native CSS, ordered so the edit wins over a covering shorthand). With one, the engine writes utility classes, and inline
+ * declarations that would defeat them are released first; a property the engine cannot override stays native. `null` removes a
+ * property. A `className` given in the same node patch is the starting point for the engine.
  */
-function withStyles(base: DocumentModel, patch: Unchecked, options: StyleOptions = {}): Unchecked {
-  if (!patch.nodes || typeof patch.nodes !== 'object') return patch;
+function withStyles(base: DocumentModel, patch: Unchecked, options: StyleOptions = {}): { patch: Unchecked; finish(merged: DocumentModel): DocumentModel } {
+  const finals: Record<string, Style> = {};
+  if (!patch.nodes || typeof patch.nodes !== 'object') return { patch, finish: merged => merged };
   let nodes = patch.nodes as Unchecked;
   for (const [id, value] of Object.entries(nodes)) {
     if (!value || typeof value !== 'object' || !Object.hasOwn(value, 'styles')) continue;
     const node = base.nodes[id];
     if (!node || node.type !== 'element') fail(`styles apply to an element: ${id}`);
     const { styles, ...rest } = value as Unchecked;
-    nodes = { ...nodes, [id]: { ...rest, className: applyStyles(Object.hasOwn(rest, 'className') ? rest.className : node.className, styles, options) } };
+    if (!styles || typeof styles !== 'object' || Array.isArray(styles)) throw Object.assign(new Error('styles must be an object of CSS declarations.'), { code: 'INVALID_PATCH' });
+    const edits = styles as StyleEdits;
+    for (const [property, input] of Object.entries(edits)) checkEdit(property, input);
+    // An explicit inline `style` in the same patch is part of the starting point, exactly as `className` is.
+    const inline = Object.hasOwn(rest, 'style') ? applyNativeStyles(node.style, rest.style as StyleEdits) : { ...node.style };
+    let className = Object.hasOwn(rest, 'className') ? rest.className : node.className;
+    // Utilities replace the classes that set a property and must not lose to an inline declaration of it; a property that
+    // cannot be released stays native. Without an engine every property is a native inline declaration.
+    const released = releaseForUtilities(inline, Object.keys(edits));
+    const remaining: StyleEdits = released.blocked.length ? Object.fromEntries(Object.entries(edits).filter(([property]) => !released.blocked.includes(property))) : edits;
+    let style: Record<string, string>;
+    try {
+      className = applyStyles(className, remaining, options);
+      style = applyNativeStyles(released.style, Object.fromEntries(released.blocked.map(property => [property, edits[property] as string | number | null])));
+    } catch (error) {
+      if ((error as { code?: string })?.code !== 'NO_STYLE_ENGINE') throw error;
+      style = applyNativeStyles(inline, edits);
+    }
+    const { style: _style, ...others } = rest;
+    nodes = { ...nodes, [id]: { ...others, className } };
+    finals[id] = style;
   }
-  return nodes === patch.nodes ? patch : { ...patch, nodes };
+  if (nodes === patch.nodes) return { patch, finish: merged => merged };
+  return {
+    patch: { ...patch, nodes },
+    // The merge keeps existing declaration slots; a native edit replaces the whole ordered declaration list.
+    finish(merged) {
+      for (const [id, style] of Object.entries(finals)) { const node = merged.nodes[id]; if (node?.type === 'element') node.style = style; }
+      return merged;
+    },
+  };
 }
 
 export function applyDocumentPatch(document: unknown, patch: unknown, options: StyleOptions = {}): DocumentModel {
@@ -428,7 +461,8 @@ export function applyDocumentPatch(document: unknown, patch: unknown, options: S
   const rawPatch = object(patch, 'patch');
   json(rawPatch, 'patch');
   keys(rawPatch, new Set('name head artboard tokens css metadata rootId nodes'.split(' ')), 'patch');
-  return validateDocument(merge(base, withStyles(base, rawPatch, options)));
+  const styled = withStyles(base, rawPatch, options);
+  return validateDocument(styled.finish(merge(base, styled.patch)));
 }
 
 export function inspectDocument(document: unknown, { ids, query, depth = 1, limit = 80 }: InspectQuery = {}, { limits = LIMITS }: { limits?: Limits } = {}): InspectResult {

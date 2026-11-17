@@ -20,13 +20,16 @@ test('CSS admission never interprets source-map payloads', () => {
   assert.equal(model.validateTokens({ '--brand': token })['--brand'], 'red ');
 });
 
-test('missing browser lowering matches the existing no-engine Node refusal', () => {
+test('without a style engine a styles patch is a native inline declaration edit', () => {
   const saved = styleEngine();
   try {
     setStyleEngines([]);
-    assert.throws(() => model.applyDocumentPatch(sampleFrame(), { nodes: { root: { styles: { color: 'red' } } } }), {
-      name: 'Error', code: 'NO_STYLE_ENGINE', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).',
-    });
+    const base = sampleFrame();
+    const next = model.applyDocumentPatch(base, { nodes: { root: { styles: { color: 'red', 'padding-right': '4px' } } } });
+    assert.equal(next.nodes.root.style.color, 'red');
+    assert.equal(next.nodes.root.style['padding-right'], '4px');
+    assert.equal(next.nodes.root.className, '', 'no utility class is invented without an engine');
+    assert.throws(() => model.applyDocumentPatch(base, { nodes: { root: { styles: { color: 'red;display:none' } } } }), { code: 'INVALID_PATCH' });
   } finally { setStyleEngines([saved]); }
 });
 

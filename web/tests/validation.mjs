@@ -601,7 +601,8 @@ try {
   assert.equal(result.publicPage.metadataEmpty && result.publicPage.versionMatches, true);
   assert.ok(result.publicPage.nodes > 100);
   assert.deepEqual(Object.values(result.publicPage.capabilities), [false, false, false, false]);
-  assert.deepEqual(result.lowering, { ok: false, code: 'NO_STYLE_ENGINE', name: 'Error', message: 'No style engine is installed, so applyStyles is unavailable (the project still renders with its own CSS).', domainError: false });
+  assert.equal(result.lowering.ok, true, 'a styles patch is a native inline edit with no engine');
+  assert.equal(result.lowering.value.nodes.root.style.color, 'red');
   const svgContext = await browser.newContext({ serviceWorkers: 'block' });
   const svgRequests = [], svgDenied = [], svgErrors = [], svgOrigin = `http://127.0.0.1:${server.address().port}`;
   const svgAllowed = ['', 'svg-resource.js', 'resource-carriers.js', 'svg-projection-cases.js', 'svg-resource-cases.js', 'declared-resources.js', 'declared-resource-cases.js', 'asset-reference.ts', 'validation.ts', 'asset-output-cases.js', 'standalone-assets.js', 'standalone-asset-cases.js'].map(file => `${svgOrigin}${prefix}${file}`);
