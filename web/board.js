@@ -176,9 +176,9 @@ toastNode.addEventListener('pointerenter', () => clearTimeout(toastTimer));
 toastNode.addEventListener('pointerleave', () => { if (toastDuration && !toastNode.hidden) toastTimer = setTimeout(hideToast, 2500); });
 
 /* ---- context menus -------------------------------------------------------- */
-on('context', ({ kind, id, x, y, anchor, world }) => {
+on('context', ({ kind, id, x, y, anchor, world, expand }) => {
   const position = anchor ? { anchor } : { x, y };
-  if (kind === 'artboard') actions.artboardMenu(id, position);
+  if (kind === 'artboard') actions.artboardMenu(id, position, { expand });
   else if (kind === 'node') actions.nodeMenu(id, position);
   else actions.canvasMenu(position, world);
 });

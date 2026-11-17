@@ -308,7 +308,9 @@ function createArtboard(doc) {
   error.setAttribute('role', 'img');
   error.setAttribute('aria-label', 'Preview unavailable');
   error.title = 'Preview unavailable';
-  label.append(error, name, size, expand, more);
+  const title = el('span', 'ab-title');
+  title.append(name, size);
+  label.append(error, title, expand, more);
   const body = el('div', 'ab-body');
   const placeholder = el('div', 'frame-placeholder');
   const cover = el('div', 'frame-cover');
@@ -321,19 +323,40 @@ function createArtboard(doc) {
   }
   wrapper.append(label, body, handles);
   stage.append(wrapper);
-  const entry = { el: wrapper, label, name, size, expand, more, body, placeholder, cover, doc, iframe: null, loaded: false, renderedVersion: 0, awaitingVersion: 0, pendingFetch: false, abort: null, reportTimer: null, latestReport: null, deliveryGeneration: 0, expectedNavigationVersion: 0, pendingFlash: null, pendingEdit: null };
+  const entry = { el: wrapper, label, title, name, size, expand, more, expandHidden: false, body, placeholder, cover, doc, iframe: null, loaded: false, renderedVersion: 0, awaitingVersion: 0, pendingFetch: false, abort: null, reportTimer: null, latestReport: null, deliveryGeneration: 0, expectedNavigationVersion: 0, pendingFlash: null, pendingEdit: null };
   expand.addEventListener('click', event => { event.stopPropagation(); openExpanded(entry.doc.id, expand); });
   more.addEventListener('click', event => {
     event.stopPropagation();
     if (!store.selected.has(entry.doc.id)) selectArtboards([entry.doc.id]);
-    emit('context', { kind: 'artboard', id: entry.doc.id, anchor: more });
+    syncHeading(entry);
+    emit('context', { kind: 'artboard', id: entry.doc.id, anchor: more, expand: entry.expandHidden });
   });
   for (const control of [expand, more]) control.addEventListener('pointerdown', event => event.stopPropagation());
   wrapper.inert = !!store.expanded;
   entries.set(doc.id, entry);
   visibility.observe(wrapper);
+  headingFit.observe(label);
+  headingFit.observe(title);
   return entry;
 }
+
+/*
+ * The heading clips to the artboard from the right (board.css): when the title and both buttons do not fit, Expand wraps out
+ * of sight first. A wrapped Expand leaves the keyboard order and the accessibility tree, and the More menu offers it instead.
+ * Read after layout (a ResizeObserver callback), so following zoom costs no forced layout.
+ */
+function syncHeading(entry) {
+  const hidden = entry.expand.offsetTop > entry.label.clientHeight / 2;
+  if (hidden === entry.expandHidden) return;
+  entry.expandHidden = hidden;
+  entry.expand.inert = hidden;
+}
+const headingFit = new ResizeObserver(records => {
+  for (const record of records) {
+    const entry = entries.get(record.target.closest('.artboard')?.dataset.artboardId);
+    if (entry) syncHeading(entry);
+  }
+});
 
 function renameArtboard(entry) {
   if (entry.name.querySelector('input')) return;
@@ -412,6 +435,8 @@ export function reconcileArtboards() {
   for (const [id, entry] of entries) {
     if (current.has(id)) continue;
     visibility.unobserve(entry.el);
+    headingFit.unobserve(entry.label);
+    headingFit.unobserve(entry.title);
     unmount(entry);
     entry.el.remove();
     entries.delete(id);

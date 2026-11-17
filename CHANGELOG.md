@@ -7,6 +7,7 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 ## 0.1.0 — Native CSS controls and Tailwind in the browser board
 
 - **The website opens on the landing, not a preloader.** The Pages `index.html` paints the prepared landing (`page/index.html`) in a full-window cover before any script loads; the board starts behind it and only adds "Edit on the board" on top. The cover stays while the board shows that same unchanged page and goes on collapse, any change, a restored browser copy, a remembered canvas view or a failed start (`web/tests/pages.mjs`). Focus tips now follow keyboard use, so the first visit shows no tip over the page.
+- **Artboard headings fit their artboard.** The name, size, Expand and ⋯ More controls keep a readable size at any zoom and never extend past the artboard on screen. When room runs out, Expand moves into the More menu first, then the size and name are cut, with ⋯ sitting on the cut (`web/tests/toolbars.mjs`).
 - **A plain spinner while the board starts.** The animated mini-board preloader is replaced by one small spinner that fades in only if starting takes long enough to notice.
 - **Opaque editor chrome.** Pills, tabs, the dock, the crumbs and the expanded-page bar no longer use a translucent, blurred background.
 - **Tidier inspector and History.** The border color field is one row like Fill and Text, the inspector says "color", the font family control drops its cascade note, and the History footer is one line of counters with feedback below it only while there is something to say.

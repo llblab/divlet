@@ -747,13 +747,42 @@ try {
   await runtime.patch({ documentId: 'welcome', expectedVersion: unnamed.version, actor: 'user', patch: { nodes: { nav: { metadata: { name: null } } } } });
   checks.push('a named layer shows its name in the inspector');
 
-  // A hovered or selected artboard label shows its whole name; only the idle label is clipped to the artboard's width.
+  // An artboard heading is never wider than the artboard on screen, at any zoom or state. It gives way from the right: Expand
+  // first (into the More menu), then the name; More stays on the cut.
   await select(['welcome']);
   const label = page.locator('.artboard[data-artboard-id="welcome"] .ab-label');
   await label.locator('.ab-name').evaluate(node => { node.textContent = 'A rather long artboard name that no narrow frame could ever hold whole'; });
-  const clipped = await label.locator('.ab-name').evaluate(node => node.scrollWidth > node.clientWidth + 1);
-  assert.equal(clipped, false, 'the selected artboard label shows its whole name');
-  checks.push('the selected or hovered artboard label shows its whole name');
+  const camera = await page.evaluate(async () => ({ ...(await import('./lib/canvas.js')).camera }));
+  const heading = async k => {
+    await page.evaluate(async k => (await import('./lib/canvas.js')).setCamera({ k, x: 40, y: 120 }), k);
+    await page.waitForTimeout(200);
+    return label.evaluate(node => {
+      const art = node.closest('.artboard').getBoundingClientRect(), box = node.getBoundingClientRect(), title = node.querySelector('.ab-title');
+      const more = node.querySelector('.ab-more'), expand = node.querySelector('.ab-expand'), moreBox = more.getBoundingClientRect();
+      return { inside: box.left >= art.left - 1 && box.right <= art.right + 1, clipped: title.scrollWidth > title.clientWidth + 1, moreOnEdge: Math.abs(moreBox.right - art.right) <= 1 && getComputedStyle(more).opacity === '1', expandAway: expand.inert, font: Number.parseFloat(getComputedStyle(node).fontSize) };
+    });
+  };
+  for (const k of [0.6, 0.15, 0.05]) {
+    const fit = await heading(k);
+    assert.deepEqual({ inside: fit.inside, moreOnEdge: fit.moreOnEdge }, { inside: true, moreOnEdge: true }, `the long heading stays inside its artboard at zoom ${k}`);
+    if (fit.clipped) assert.equal(fit.expandAway, true, `Expand gives way before the name is cut at zoom ${k}`);
+    if (k === 0.05) assert.equal(fit.clipped, true, 'a far zoom cuts the name rather than overflowing');
+    assert.ok(fit.font >= 12, 'the heading keeps a readable size when zoomed out');
+  }
+  await label.locator('.ab-more').evaluate(node => node.click());
+  await page.locator('.menu').waitFor();
+  const first = await page.locator('.menu [role="menuitem"]').first().innerText();
+  assert.match(first, /^Expand/, 'the More menu carries Expand while the heading has no room for it');
+  await page.keyboard.press('Escape');
+  await label.locator('.ab-name').evaluate(node => { node.textContent = 'Short'; });
+  const roomy = await heading(0.6);
+  assert.deepEqual({ inside: roomy.inside, clipped: roomy.clipped, expandAway: roomy.expandAway }, { inside: true, clipped: false, expandAway: false }, 'a short heading keeps Expand beside More');
+  await label.locator('.ab-more').evaluate(node => node.click());
+  await page.locator('.menu').waitFor();
+  assert.doesNotMatch(await page.locator('.menu [role="menuitem"]').first().innerText(), /^Expand/, 'Expand has one home at a time');
+  await page.keyboard.press('Escape');
+  await page.evaluate(async camera => (await import('./lib/canvas.js')).setCamera(camera), camera);
+  checks.push('artboard headings clip to the artboard, keep More on the cut and move Expand into its menu when there is no room');
 
   // Nothing in the chrome is clipped at phone width, at 100% and 200% interface size, for an artboard and for an element.
   for (const [w, size] of [[1280, 100], [390, 100], [390, 200]]) {

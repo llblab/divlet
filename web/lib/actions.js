@@ -404,8 +404,11 @@ export function artboardItems(id) {
   ];
 }
 
-export function artboardMenu(id, position) {
-  openMenu(artboardItems(id), { ...position, label: 'Artboard' });
+/** `expand`: the heading had no room for its Expand button, so its menu carries Expand instead (one slot, one occupant). */
+export function artboardMenu(id, position, { expand = false } = {}) {
+  const items = artboardItems(id);
+  if (expand) items.unshift({ label: 'Expand', icon: 'expand', keys: 'E', run: () => canvas.openExpanded(id, canvas.entries.get(id)?.more) }, '-');
+  openMenu(items, { ...position, label: 'Artboard' });
 }
 
 export async function nodeMenu(documentId, position) {

@@ -119,13 +119,17 @@ kbd { flex: none; white-space: nowrap; font: 600 11px var(--mono); color: var(--
 .artboard[data-status="live"] .frame-placeholder, .artboard[data-status="updating"] .frame-placeholder { display: none; }
 @keyframes shimmer { to { background-position: -220% 0; } }
 
-.ab-label { --label-scale: min(1, var(--canvas-scale, 1)); position: absolute; left: 0; bottom: calc(100% + 6px * min(1, var(--canvas-scale, 1))); display: flex; align-items: center; gap: 6px; width: calc(100% / var(--label-scale)); min-width: 0; height: calc(22px * var(--ui)); color: var(--muted); font-size: calc(12px * var(--ui)); white-space: nowrap; cursor: grab; transform: scale(var(--label-scale)); transform-origin: bottom left; transition: color .15s; }
-.artboard:is(:hover, .selected, :focus-within) .ab-label { --label-scale: 1; min-width: min(220px, calc(100vw - 32px)); }
-.artboard:is(:hover, .selected, :focus-within) .ab-name { flex: none; overflow: visible; max-width: calc(100vw - 32px); }
+.ab-label { position: absolute; left: 0; bottom: calc(100% + 6px * min(1, var(--canvas-scale, 1))); display: flex; flex-wrap: wrap; align-items: center; align-content: flex-start; column-gap: 4px; row-gap: 16px; width: 100%; min-width: 24px; height: calc(22px * var(--ui)); padding: 1px 24px 1px 0; overflow: clip; overflow-clip-margin: 3px; color: var(--muted); font-size: calc(12px * var(--ui)); white-space: nowrap; cursor: grab; transition: color .15s; }
 .artboard:hover .ab-label, .artboard.selected .ab-label { color: var(--ink); }
-.ab-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.ab-size { font: calc(11px * var(--ui)) var(--mono); color: var(--muted); opacity: 0; transition: opacity .15s; flex: none; }
-.artboard:hover .ab-size, .artboard.selected .ab-size, .artboard.resizing .ab-size { opacity: 1; }
+/* The heading is exactly as wide as the artboard on screen and keeps a readable size at any zoom. It gives way from the right:
+   Expand goes first (it wraps out of sight and moves into the More menu), then the size, then the name; More always stays
+   and, when the name is cut, sits on the cut as its ellipsis. */
+.ab-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.artboard:is(:hover, .selected, :focus-within) .ab-title { text-overflow: clip; }
+.ab-label:has(input) { width: max(100%, 16em); flex-wrap: nowrap; overflow: visible; }
+.ab-label:has(input) .ab-title { overflow: visible; }
+.ab-size { display: none; margin-left: 6px; font: calc(11px * var(--ui)) var(--mono); color: var(--muted); }
+.artboard:hover .ab-size, .artboard.selected .ab-size, .artboard.resizing .ab-size, .ab-size:has(input) { display: inline; }
 .artboard.resizing .ab-size { color: var(--accent); }
 .ab-size-input { width: 9.5em; font: 11px var(--mono); }
 .ab-size { cursor: text; }
@@ -133,6 +137,7 @@ kbd { flex: none; white-space: nowrap; font: 600 11px var(--mono); color: var(--
 .chip.lock .icon { width: 13px; height: 13px; }
 .ab-rename { font: inherit; width: 14em; padding: 1px 5px; border: 0; border-radius: var(--radius-small); background: var(--solid); color: var(--ink); outline: var(--focus-ring) solid var(--accent); }
 .ab-expand { margin-left: auto; }
+.ab-more { position: absolute; right: 0; top: 0; bottom: 0; margin: auto 0; }
 .ab-expand, .ab-more { display: grid; place-items: center; width: 20px; height: 20px; flex: none; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); opacity: 0; transition: opacity .15s, background .15s; }
 .artboard:hover :is(.ab-expand, .ab-more), .artboard.selected :is(.ab-expand, .ab-more), :is(.ab-expand, .ab-more):focus-visible { opacity: 1; }
 :is(.ab-expand, .ab-more):hover { background: var(--field-hover); color: var(--ink); }
