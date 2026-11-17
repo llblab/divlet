@@ -36,7 +36,7 @@ try {
       client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth,
       heading: getComputedStyle(document.querySelector('h1')).fontSize,
       background: getComputedStyle(document.body).backgroundColor,
-      logo: [...document.querySelectorAll('.mark svg path')].map(node => ({ fill: getComputedStyle(node).fill, stroke: getComputedStyle(node).stroke })),
+      logo: [...document.querySelectorAll('header a[href="#top"] svg path')].map(node => ({ fill: getComputedStyle(node).fill, stroke: getComputedStyle(node).stroke })),
       links: [...document.querySelectorAll('a')].map(node => { const rect = node.getBoundingClientRect(); return { left: rect.left, right: rect.right, width: rect.width }; }),
     }));
     assert.ok(layout.scroll <= layout.client + 1, `${width}/${colorScheme}: no horizontal page overflow`);
