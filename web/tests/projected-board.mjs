@@ -6,27 +6,12 @@ import { once } from 'node:events';
 import { chromium } from 'playwright';
 import { pagesEntries } from '../../scripts/pages-build.mjs';
 import { bundleBrowserBoard, bundleBrowserClosedPreview } from '../../scripts/browser-model.mjs';
-import { fontDataUrl } from '../../core/tests/fixtures/font.js';
+import { image, css, projectedSource, resourceEndpoints } from './fixtures/projected-resources.js';
 
 const prefix = '/projected-board/', files = new Map(await pagesEntries());
 const [board, closed] = await Promise.all([bundleBrowserBoard(process.cwd()), bundleBrowserClosedPreview(process.cwd())]);
 files.set('projected-board.js', Buffer.from(board.code)); files.set('projected-closure.js', Buffer.from(closed.code));
-const image = color => `data:image/svg+xml;base64,${Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="7" height="9"><rect width="7" height="9" fill="${color}"/></svg>`).toString('base64')}`;
-const css = (padding, advance) => `@font-face{font-family:ProjectedBoard;src:url("${fontDataUrl(advance)}")}main{padding:${padding}px}#font{display:inline-block;font:100px/1 ProjectedBoard}`;
-const source = { schemaVersion: 1, name: 'Literal projection proof', frames: [{
-  id: 'index', name: 'Literal frame', version: 1, rootId: 'root', artboard: { x: 0, y: 0, width: 600, height: 400 }, css: css(17, 600),
-  nodes: {
-    root: { id: 'root', type: 'element', tag: 'main', children: ['font', 'image', 'svg', 'input'] },
-    font: { id: 'font', type: 'element', tag: 'span', attrs: { id: 'font' }, children: ['label'] },
-    label: { id: 'label', type: 'text', content: 'AA' },
-    image: { id: 'image', type: 'element', tag: 'img', attrs: { src: image('#123456') }, children: [] },
-    svg: { id: 'svg', type: 'element', tag: 'svg', attrs: { width: '7', height: '9' }, children: ['defs', 'use'] },
-    defs: { id: 'defs', type: 'element', tag: 'defs', children: ['rect'] },
-    rect: { id: 'rect', type: 'element', tag: 'rect', attrs: { id: 'local-mark', width: '7', height: '9' }, children: [] },
-    use: { id: 'use', type: 'element', tag: 'use', attrs: { href: '#local-mark' }, children: [] },
-    input: { id: 'input', type: 'element', tag: 'input', attrs: { value: 'authored' }, children: [] },
-  },
-}] };
+const source = projectedSource();
 files.set('project.divlet', Buffer.from(JSON.stringify(source)));
 files.set('styles.json', Buffer.from(JSON.stringify({ entries: [{ tokens: {}, candidates: [], css: '' }] })));
 const shell = files.get('index.html').toString('utf8');
@@ -116,15 +101,7 @@ try {
     const entry = testCanvas.entries.get('index'); return entry?.loaded && entry.renderedVersion === version;
   }, version);
   const frame = page.frameLocator('iframe[data-document-id="index"]');
-  const endpoints = (target = frame, clean = false) => target.locator('main').evaluate(async (main, clean) => {
-    const image = document.querySelector(clean ? 'img' : '[data-divlet-id="image"]'); await image.decode();
-    const fonts = await document.fonts.load('100px ProjectedBoard', 'AA'); await document.fonts.ready;
-    const use = document.querySelector(clean ? 'svg use' : '[data-divlet-id="use"]').getBBox();
-    const canvas = document.createElement('canvas'); canvas.width = 7; canvas.height = 9;
-    const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
-    let isolated = false; try { void parent.document.body; } catch (error) { isolated = error.name === 'SecurityError'; }
-    return { image: [image.naturalWidth, image.naturalHeight], use: [use.width, use.height], fonts: fonts.length, fontWidth: document.getElementById('font').getBoundingClientRect().width, padding: getComputedStyle(main).paddingTop, pixel: [...ctx.getImageData(3, 4, 1, 1).data], isolated, referrer: document.referrer };
-  }, clean);
+  const endpoints = (target = frame, clean = false) => target.locator('main').evaluate(resourceEndpoints, clean);
   await page.goto(url); await ready();
   assert.equal(await page.evaluate(() => projectionControl.calls), 1, 'real board forwards the trusted projector during initial preparation');
   const initial = { image: [7, 9], use: [7, 9], fonts: 1, fontWidth: 120, padding: '17px', pixel: [18, 52, 86, 255], isolated: true, referrer: '' };

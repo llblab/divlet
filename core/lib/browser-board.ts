@@ -2,7 +2,8 @@
  * Owns: the static-site composition of the real board — one browser-local copy of a published project, the board's host ports
  * over the browser writer, and the same contract tools exposed to agents through the page's browser MCP provider (and WebMCP
  * when the browser has it). Excludes: the board UI itself (`@divlet/web`), any network service and the Node host's file,
- * output, asset, font, site and conversation capabilities, which are absent here rather than emulated.
+ * output, device-upload, site and conversation capabilities, which are absent here rather than emulated. Declared source bytes
+ * require an explicit paired resource policy; the default entry does not select it.
  *
  * Storage policy: the visitor's copy lives in this origin's IndexedDB, keyed by `storageKey` and tied to the fingerprint of the
  * published source it started from. A refused restore retains the record and blocks startup. A changed publication replaces
@@ -10,7 +11,7 @@
  * uploaded; a private project is never fetched or paired.
  */
 import { BrowserRuntime } from './browser-runtime.ts';
-import type { BrowserPreviewProjector } from './browser-runtime.ts';
+import type { BrowserPreviewProjector, BrowserResourcePolicy } from './browser-runtime.ts';
 import { previewDocument } from './browser-preview.ts';
 export { previewDocument, previewBridgeScript } from './browser-preview.ts';
 import { inputSchema, forAgent, toolByName } from './tools.ts';
@@ -33,6 +34,8 @@ export interface BrowserBoardOptions {
   readonly bridgeUrl: URL;
   /** Trusted candidate projection for published and restored copies. Does not grant byte access or add capabilities. */
   readonly projectPreview?: BrowserPreviewProjector;
+  /** Trusted opt-in source-byte admission/projection for published/restored copies; exclusive with projectPreview, not upload/node-export authority. */
+  readonly resourcePolicy?: BrowserResourcePolicy;
   /** The frame a first visit opens as a readable page (absent: the board fits all frames). */
   readonly entryFrame?: string;
   readonly target?: object;
@@ -108,7 +111,7 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
   const stored = await store.get(options.storageKey);
   const compiler = snapshotCompiler(styles);
   const persist = (text: string) => store.put(options.storageKey, { base, text, savedAt: new Date().toISOString() });
-  const open = (source: string) => BrowserRuntime.open({ source, file: options.file, projectId: `browser-${base.slice(0, 16)}`, compiler, persist, projectPreview: options.projectPreview, capabilities: { browser: true, assets: false, export: false } });
+  const open = (source: string) => BrowserRuntime.open({ source, file: options.file, projectId: `browser-${base.slice(0, 16)}`, compiler, persist, projectPreview: options.projectPreview, resourcePolicy: options.resourcePolicy, capabilities: { browser: true, assets: options.resourcePolicy !== undefined, export: false } });
   let runtime: BrowserRuntime;
   let restored = false;
   if (stored?.base === base) {
@@ -194,7 +197,7 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
   // Browser transports allow only listed tools, and WebMCP requires explicit alias registrations.
   const provider = createBrowserMcpProvider({
     name: 'divlet', title: 'divlet in the browser', version: options.version, tools: registry,
-    instructions: `divlet is a layout board for agents. This page holds a browser-local copy of the ${options.file} project (HTML/SVG/CSS frames), stored only in this browser. Read the project with divlet_read, then change it with divlet_patch or divlet_edit using the versions you read; divlet_frame_manage adds or removes frames and divlet_undo reverts. The visitor watches every change live. Utility classes are not compiled here: style with the frame css or inline style. Files, fonts, embedded assets and opening other projects need the local divlet host (npx -y @divlet/mcp).`,
+    instructions: `divlet is a layout board for agents. This page holds a browser-local copy of the ${options.file} project (HTML/SVG/CSS frames), stored only in this browser. Read the project with divlet_read, then change it with divlet_patch or divlet_edit using the versions you read; divlet_frame_manage adds or removes frames and divlet_undo reverts. The visitor watches every change live. Utility classes are not compiled here: style with the frame css or inline style. ${options.resourcePolicy ? 'This composition accepts declared embedded source assets through its trusted projection policy; unsupported resource references may be refused. File/image/font-device upload, sites and opening other projects still need the local divlet host (npx -y @divlet/mcp).' : 'Files, fonts, embedded assets and opening other projects need the local divlet host (npx -y @divlet/mcp).'}`,
   });
   exposeBrowserMcp(provider, target);
   const webmcp = await registerWebMcpTools(registry);
