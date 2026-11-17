@@ -166,18 +166,18 @@ kbd { flex: none; white-space: nowrap; font: 600 11px var(--mono); color: var(--
 .cta kbd { color: inherit; border-color: rgba(255, 255, 255, .35); }
 .loading { position: absolute; inset: 0; display: grid; grid-auto-flow: row; align-content: center; justify-items: center; gap: 18px; }
 /* A small board assembling itself: three artboards settle onto a dotted canvas, and the selection hops between them. */
-.boot { position: relative; display: flex; align-items: flex-end; gap: 10px; width: 176px; height: 108px; padding: 14px; border: 1px solid var(--hair); border-radius: 16px; background-color: var(--panel); background-image: radial-gradient(circle at 1px 1px, var(--hair) 1px, transparent 0); background-size: 12px 12px; box-shadow: var(--shadow); }
+.boot { position: relative; display: flex; align-items: flex-end; gap: 10px; width: 196px; height: 108px; padding: 14px; border: 1px solid var(--hair); border-radius: 16px; background-color: var(--panel); background-image: radial-gradient(circle at 1px 1px, var(--hair) 1px, transparent 0); background-size: 12px 12px; box-shadow: var(--shadow); }
 .boot-art { position: relative; flex: none; border: 1px solid var(--hair); border-radius: 5px; background: var(--solid, #fff) linear-gradient(var(--hair), var(--hair)) 6px 7px / 38% 3px no-repeat; opacity: 0; transform: translateY(6px) scale(.9); animation: boot-in 2.7s cubic-bezier(.2, .7, .2, 1) infinite; }
 .boot-art::before { content: ""; position: absolute; left: 6px; right: 6px; top: 14px; height: 7px; border-radius: 2px; background: var(--ink); opacity: .75; }
 .boot-art::after { content: ""; position: absolute; inset: -4px; border: 1.5px solid var(--accent); border-radius: 7px; opacity: 0; animation: boot-select 2.7s ease-in-out infinite; }
 .boot-art.wide { width: 82px; height: 56px; }
 .boot-art.tablet { width: 34px; height: 46px; animation-delay: .25s; }
-.boot-art.tablet::after { animation-delay: .25s; }
+.boot-art.tablet::after { animation-delay: .9s; }
 .boot-art.phone { width: 22px; height: 40px; animation-delay: .5s; }
-.boot-art.phone::after { animation-delay: .5s; }
+.boot-art.phone::after { animation-delay: 1.8s; }
 .boot-text { margin: 0; color: var(--muted); font-size: 12.5px; letter-spacing: .01em; }
 @keyframes boot-in { 0% { opacity: 0; transform: translateY(6px) scale(.9); } 22%, 88% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-2px) scale(.98); } }
-@keyframes boot-select { 0%, 24% { opacity: 0; } 34%, 52% { opacity: 1; } 62%, 100% { opacity: 0; } }
+@keyframes boot-select { 0%, 6% { opacity: 0; } 12%, 30% { opacity: 1; } 36%, 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .boot-art { animation: none; opacity: 1; transform: none; } .boot-art::after { animation: none; } .boot-art.wide::after { opacity: 1; } }
 /* ---- chrome --------------------------------------------------------------- */
 /* Left column: logo + search on top, the sidebar, its tabs below. Folded, the top and bottom pieces stay as two separate pills. */

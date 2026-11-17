@@ -22,6 +22,8 @@ const launch = { headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage
 if (process.env.PI_DIVLET_CHROMIUM_EXECUTABLE) launch.executablePath = process.env.PI_DIVLET_CHROMIUM_EXECUTABLE;
 const errors = [], checks = [];
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+// An accepted edit is followed by a burst of measurement-driven inspector redraws; measure and focus after they settle.
+const settleInspector = page => page.evaluate(() => new Promise(resolve => { let timer; const done = () => { observer.disconnect(); resolve(); }; const observer = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(done, 500); }); observer.observe(document.querySelector('#inspector'), { childList: true, subtree: true }); timer = setTimeout(done, 500); }));
 const waitUntil = async (fn, label, timeout = 8000) => {
   const end = Date.now() + timeout; let last;
   while (Date.now() < end) { try { last = await fn(); if (last) return last; } catch (error) { last = error; } await sleep(40); }
@@ -571,6 +573,7 @@ try {
     const load = FontFace.prototype.load;
     FontFace.prototype.load = async function () { const face = await load.call(this); if (this.family === 'divlet-device-probe') { window.deviceProbeLoads = (window.deviceProbeLoads || 0) + 1; await new Promise(resolve => { window.releaseDeviceFont = resolve; }); } return face; };
   });
+  await settleInspector(page);
   const idleUpload = await page.getByRole('button', { name: 'Upload font', exact: true }).boundingBox();
   await deviceUpload(fontBytes(600, { family: 'Stale Device' }));
   await waitUntil(() => page.evaluate(() => !!window.releaseDeviceFont), 'hold a decoded device font before its accepted request');
@@ -600,15 +603,18 @@ try {
   await waitUntil(() => native.getEntry('plain').document.nodes.first.style['font-family']?.startsWith(longFamily), 'a long comma-bearing family is one literal choice');
   await waitUntil(() => family.locator('.pick-v').innerText().then(text => text === longFamily), 'accepted family reaches the inspector before measuring its whole label');
   // A selected element's accepted edit is followed by a burst of measurement-driven inspector redraws; measure and focus after they settle.
-  await page.evaluate(() => new Promise(resolve => { let timer; const done = () => { observer.disconnect(); resolve(); }; const observer = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(done, 500); }); observer.observe(document.querySelector('#inspector'), { childList: true, subtree: true }); timer = setTimeout(done, 500); }));
+  await settleInspector(page);
   const geometry = await family.evaluate(button => { const box = button.parentElement; return { fieldWidth: box.clientWidth, contentsWidth: box.scrollWidth, inspectorWidth: document.querySelector('#inspector').clientWidth, text: button.querySelector('.pick-v').textContent, nowrap: getComputedStyle(button.querySelector('.pick-v')).whiteSpace }; });
   assert.equal(geometry.text, longFamily);
   assert.equal(geometry.nowrap, 'nowrap');
   assert.ok(geometry.fieldWidth <= geometry.inspectorWidth && geometry.contentsWidth > geometry.fieldWidth, 'only the overlong whole control pans, not the inspector');
   const beforePan = native.getEntry('plain').document.version;
-  await page.locator('.font-family-scroll').evaluate(node => { node.scrollLeft = 0; });
-  await page.locator('.font-family-scroll').focus(); await page.keyboard.press('ArrowRight');
-  await waitUntil(() => page.locator('.font-family-scroll').evaluate(node => node.scrollLeft > 0), 'long values are keyboard-scrollable, not ellipsized or reduced');
+  // A late measurement redraw may replace the control between focus and key; each attempt targets the live element.
+  await waitUntil(async () => {
+    await page.locator('.font-family-scroll').evaluate(node => { node.scrollLeft = 0; });
+    await page.locator('.font-family-scroll').focus(); await page.keyboard.press('ArrowRight');
+    return page.locator('.font-family-scroll').evaluate(node => node.scrollLeft > 0);
+  }, 'long values are keyboard-scrollable, not ellipsized or reduced');
   assert.equal(native.getEntry('plain').document.version, beforePan, 'panning a value never invokes canvas nudge shortcuts');
   await family.click({ trial: true });
   await mkdir('artifacts', { recursive: true });
