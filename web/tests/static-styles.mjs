@@ -8,6 +8,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { pagesEntries } from '../../scripts/pages-build.mjs';
+import { connectBrowserMcp } from '../../core/lib/browser-mcp.ts';
 
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.divlet': 'application/octet-stream' };
 const prefix = '/divlet/';
@@ -152,4 +153,33 @@ test('without the provider the same controls write native inline CSS and there i
     assert.deepEqual(site.requests.filter(line => /plugins\/tailwind/.test(line)), [], 'no Tailwind module is requested');
     assert.deepEqual(site.requests.filter(line => !line.startsWith('GET ')), [], 'only static GETs');
   } finally { await context.close(); await site.close(); }
+});
+
+test('an agent styles patch and a visitor control edit share one writer, one History and the same utilities', async () => {
+  const site = await serve();
+  const connection = await connectBrowserMcp(site.base, { browser, readyTimeoutMs: 15_000 });
+  const parse = result => { assert.equal(result.isError, false, result.content?.[0]?.text); return result.structuredContent; };
+  try {
+    const page = connection.page;
+    await page.getByRole('button', { name: 'Collapse to the board', exact: true }).click({ timeout: 4000 }).catch(() => {});
+    const frame = parse(await connection.callTool('divlet_read', { view: 'frame', frameId: 'index', full: true }));
+    const heading = Object.values(frame.nodes).find(node => node.type === 'element' && node.tag === 'h1');
+    // The agent writes plain CSS declarations; the page lowers them to utilities with the bundled provider.
+    const patched = parse(await connection.callTool('divlet_patch', { frameId: 'index', expectedVersion: frame.version, label: 'agent padding', patch: { nodes: { [heading.id]: { styles: { 'padding-right': '4px' } } } } }));
+    await until(async () => (await computed(page, 'paddingRight')) === '4px', 'the agent edit renders in the visitor\'s page');
+    assert.match(await attr(page, 'class') ?? '', /(?:^|\s)pr-1(?:\s|$)/, 'the declaration became the matching utility');
+    // The visitor selects the element the agent just changed: the control already reads the agent's edit.
+    await selectHeading(page);
+    await until(async () => (await page.locator('#inspector [data-key="p-r"]').inputValue()) === '4', 'the control shows the agent\'s padding');
+    await setField(page, 'p-l', '8');
+    await until(async () => (await computed(page, 'paddingLeft')) === '8px', 'the visitor edit renders');
+    const read = parse(await connection.callTool('divlet_read', { view: 'frame', frameId: 'index', full: true }));
+    assert.match(read.nodes[heading.id].className, /pr-1/); assert.match(read.nodes[heading.id].className, /pl-2/);
+    const history = parse(await connection.callTool('divlet_read', { view: 'history' }));
+    assert.deepEqual(history.changes.map(change => change.actor), ['agent', 'user'], 'two accepted changes, one per actor');
+    // Undo is whole-edit and shared: the agent undoes the visitor's change.
+    parse(await connection.callTool('divlet_undo', {}));
+    await until(async () => (await computed(page, 'paddingLeft')) === '0px' && (await computed(page, 'paddingRight')) === '4px', 'one Undo reverts exactly the latest edit');
+    assert.equal(patched.version, frame.version + 1);
+  } finally { await connection.close(); await site.close(); }
 });
