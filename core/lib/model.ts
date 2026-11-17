@@ -431,12 +431,15 @@ function withStyles(base: DocumentModel, patch: Unchecked, options: StyleOptions
     let className = Object.hasOwn(rest, 'className') ? rest.className : node.className;
     // Utilities replace the classes that set a property and must not lose to an inline declaration of it; a property that
     // cannot be released stays native. Without an engine every property is a native inline declaration.
-    const released = releaseForUtilities(inline, Object.keys(edits));
-    const remaining: StyleEdits = released.blocked.length ? Object.fromEntries(Object.entries(edits).filter(([property]) => !released.blocked.includes(property))) : edits;
+    // Custom properties are values, not styling: they stay native declarations under any engine, in their authored spelling.
+    const variables = Object.keys(edits).filter(property => property.startsWith('--'));
+    const released = releaseForUtilities(inline, Object.keys(edits).filter(property => !property.startsWith('--')));
+    const native = [...released.blocked, ...variables];
+    const remaining: StyleEdits = native.length ? Object.fromEntries(Object.entries(edits).filter(([property]) => !native.includes(property))) : edits;
     let style: Record<string, string>;
     try {
-      className = applyStyles(className, remaining, options);
-      style = applyNativeStyles(released.style, Object.fromEntries(released.blocked.map(property => [property, edits[property] as string | number | null])));
+      className = Object.keys(remaining).length ? applyStyles(className, remaining, options) : className;
+      style = applyNativeStyles(released.style, Object.fromEntries(native.map(property => [property, edits[property] as string | number | null])));
     } catch (error) {
       if ((error as { code?: string })?.code !== 'NO_STYLE_ENGINE') throw error;
       style = applyNativeStyles(inline, edits);

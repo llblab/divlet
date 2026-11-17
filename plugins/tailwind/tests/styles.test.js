@@ -140,6 +140,7 @@ test('an edit replaces every named utility that set the property, so the old cla
     ['italic', { 'font-style': 'normal' }, 'not-italic'],
     ['underline', { 'text-decoration-line': 'none' }, 'no-underline'],
     ['font-mono', { 'font-family': 'serif' }, '[font-family:serif]'],
+    ['font-lock font-mono', { 'font-family': 'serif' }, '[font-family:serif] font-lock'],
     ['flex gap-x-4', { 'column-gap': '6px' }, 'flex gap-x-[6px]'],
     ['overflow-y-scroll', { 'overflow-y': 'auto' }, 'overflow-y-auto'],
     ['grid justify-items-start', { 'justify-items': 'center' }, 'grid justify-items-center'],
@@ -164,7 +165,9 @@ test('a utility that sets more than the edit keeps its other parts as narrower u
   assert.equal(set('overflow-hidden', { 'overflow-y': 'auto' }), 'overflow-x-hidden overflow-y-auto');
   assert.equal(set('text-sm/6', { 'font-size': '15px' }), 'leading-6 text-[length:15px]', 'a slash line height outlives the size');
   assert.equal(set('place-items-center', { 'align-items': 'start' }), 'items-start justify-items-center');
-  assert.equal(set('border-x-2', { 'border-left-width': '1px' }), '[border-left-width:1px] border-r-2');
+  assert.equal(set('[border-width:3px]', { 'border-top-width': '2px' }), '[border-bottom-width:3px] [border-left-width:3px] [border-right-width:3px] [border-top-width:2px]', 'a one-value arbitrary shorthand keeps its other sides');
+  assert.equal(set('[border-width:1px_2px]', { 'border-top-width': '4px' }), '[border-top-width:4px] [border-width:1px_2px]', 'a per-side list stays and the side is written after it');
+  assert.equal(set('border-x-2', { 'border-left-width': '1px' }), '[border-left-width:1px] border-r-2 border-solid', 'the edited side keeps the line its utility drew');
   // Tailwind's width utilities also draw the line; replacing the width keeps it drawn unless a style utility does that.
   assert.equal(set('border-2', { 'border-width': '3px' }), '[border-width:3px] border-solid');
   assert.equal(set('border-2 border-dashed', { 'border-width': '3px' }), '[border-width:3px] border-dashed');
@@ -183,4 +186,16 @@ test('interactive edits write idiomatic utilities where one says exactly the sam
   assert.equal(propertyOfClass('rounded-lg'), 'border-radius');
   assert.equal(propertyOfClass('max-w-md'), 'max-width');
   assert.equal(propertyOfClass('hover:max-w-md'), null, 'a variant is never a base owner');
+});
+
+test('an important declaration is the same utility with the important modifier, and reads back as important', async () => {
+  const { classView } = await import('../web/view.js');
+  const set = (cls, styles) => applyStyles(cls, styles).split(' ').sort().join(' ');
+  assert.equal(set('', { 'font-family': '"Face", serif !important' }), '[font-family:"Face",_serif]!');
+  assert.equal(set('[font-family:serif]!', { 'font-family': 'monospace' }), '[font-family:monospace]', 'the important utility is replaced like any other');
+  assert.equal(set('', { color: '#fff !important' }), 'text-[color:#fff]!');
+  assert.equal(propertyOfClass('pr-1!'), null, 'box utilities stay with the padding merge');
+  assert.equal(propertyOfClass('[font-family:serif]!'), 'font-family');
+  assert.deepEqual(classView('p-4 [padding-top:2px]!')['padding-top'], '2px !important', 'an important side wins the readback over the box shorthand');
+  assert.equal(classView('[font-family:"Face",_serif]!')['font-family'], '"Face", serif !important');
 });

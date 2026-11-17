@@ -15,8 +15,9 @@ const source = projectedSource();
 files.set('project.divlet', Buffer.from(JSON.stringify(source)));
 files.set('styles.json', Buffer.from(JSON.stringify({ entries: [{ tokens: {}, candidates: [], css: '' }] })));
 const shell = files.get('index.html').toString('utf8');
-assert.equal(shell.split('src="./divlet-host.js"').length, 2);
-files.set('index.html', Buffer.from(shell.replace('src="./divlet-host.js"', 'src="./projected-host.js"')));
+const hostSrc = /src="\.\/divlet-host\.js\?v=[0-9a-f]{12}"/g;
+assert.equal(shell.match(hostSrc)?.length, 1, 'the shell loads one stamped host bundle');
+files.set('index.html', Buffer.from(shell.replace(hostSrc, 'src="./projected-host.js"')));
 // This caller owns the trusted callback. Mutable failure controls and returned runtime handle exist only in this fixture.
 files.set('projected-host.js', Buffer.from(`
 import { startBrowserBoard } from ${JSON.stringify('./projected-board.js')};
@@ -39,7 +40,7 @@ try {
 `));
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.divlet': 'application/octet-stream' };
 const server = http.createServer((req, res) => {
-  const name = req.url?.startsWith(prefix) ? req.url.slice(prefix.length) || 'index.html' : '';
+  const name = req.url?.startsWith(prefix) ? req.url.slice(prefix.length).split('?')[0] || 'index.html' : '';
   const bytes = req.method === 'GET' && files.get(name);
   res.writeHead(bytes ? 200 : 404, { 'Content-Type': types[path.extname(name)] || 'text/plain', 'Cache-Control': 'no-store' }); res.end(bytes || 'missing');
 });
@@ -60,11 +61,13 @@ try {
   const origin = `http://127.0.0.1:${server.address().port}`, url = origin + prefix;
   browser = await chromium.launch({ headless: true, executablePath: process.env.PI_DIVLET_CHROMIUM_EXECUTABLE, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const context = await browser.newContext({ viewport: { width: 1400, height: 900 }, serviceWorkers: 'block' });
+  // The shell stamps the files of one publication (`?v=<hash>`); the allowlist names the files themselves.
+  const unstamped = target => target.replace(/\?v=[0-9a-f]{12}$/, '');
   const allowed = new Set([...files.keys()].map(name => url + (name === 'index.html' ? '' : name))), requested = [], denied = [], errors = [];
   const guard = async ctx => {
     ctx.on('request', request => requested.push(request.url()));
     await ctx.route('**/*', route => {
-      if (route.request().method() === 'GET' && allowed.has(route.request().url())) return route.continue();
+      if (route.request().method() === 'GET' && allowed.has(unstamped(route.request().url()))) return route.continue();
       denied.push(route.request().url()); return route.abort();
     });
   };
@@ -406,7 +409,7 @@ try {
     await isolated.close();
   }
   assert.deepEqual(errors, []); assert.deepEqual(denied, []);
-  assert.ok(requested.every(target => target.startsWith('blob:') || target.startsWith('data:') || allowed.has(target)), 'context-wide requests stay in the fixed public static graph');
+  assert.ok(requested.every(target => target.startsWith('blob:') || target.startsWith('data:') || allowed.has(unstamped(target))), 'context-wide requests stay in the fixed public static graph');
   assert.ok(requested.some(target => target.endsWith('/lib/canvas.js')) && requested.some(target => target.endsWith('/preview-bridge.js')));
   const control = url + 'unrequested';
   assert.equal(await page.evaluate(async target => { try { await fetch(target); return false; } catch { return true; } }, control), true); assert.deepEqual(denied, [control]);

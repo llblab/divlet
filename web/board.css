@@ -945,11 +945,13 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .border-geometry > .radius-presets { flex: 1 1 130px; }
 .radius-presets { display: flex; flex-wrap: wrap; gap: 4px; }
 .radius-presets .chip.on { background: var(--accent-soft); color: var(--accent-ink); }
-.color-field { position: relative; display: flex; align-items: center; gap: 6px; min-width: 0; min-height: 28px; padding: 0 4px 0 0; border-radius: var(--radius-inner); background: var(--field); }
+.color-field { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; min-width: 0; min-height: 28px; padding: 0 4px 0 0; border-radius: var(--radius-inner); background: var(--field); }
 .color-field:focus-within { outline-offset: 1px; outline: var(--focus-ring) solid var(--accent); }
 .color-field .vf-k { min-width: 30px; }
 .color-field .swatch { flex: none; width: 20px; height: 20px; border-radius: var(--radius-small); }
-.color-field .color-hex { min-width: 0; flex: 1; }
+/* One row while the value fits; a value wider than what is left wraps whole onto its own line instead of clipping. */
+.color-field .color-hex { flex: 1 1 var(--hex-width, 9ch); min-width: min(100%, var(--hex-width, 9ch)); min-height: 28px; }
+@supports (field-sizing: content) { .color-field .color-hex { field-sizing: content; flex: 1 0 auto; min-width: 0; max-width: 100%; } }
 .color-block { display: grid; gap: 4px; }
 .token-swatches { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 36px; }
 .token-swatch { width: 18px; height: 18px; padding: 0; border: 1px solid var(--hair); border-radius: 50%; cursor: pointer; }

@@ -100,7 +100,12 @@ export function classView(className, { tokens = {} } = {}) {
   const names = new Set(Object.keys(tokens).flatMap(token => { const match = /^--color-(.+)$/.exec(token); return match ? [match[1]] : []; }));
   tw.setColorNames(names);
   const view = {};
-  for (const name of tw.split(className).filter(item => !tw.hasVariant(item))) for (const [property, value] of declarationsOfClass(name, names)) view[property] = value;
+  const important = {};
+  for (const name of tw.split(className).filter(item => !tw.hasVariant(item))) {
+    // `class!` sets the same declarations with !important (`!class` is the older spelling); they win over the rest, box sides included.
+    const strong = /!$/.test(name) || /^!/.test(name);
+    for (const [property, value] of declarationsOfClass(name.replace(/!$/, '').replace(/^!/, ''), names)) (strong ? important : view)[property] = strong ? `${value} !important` : value;
+  }
   for (const kind of ['padding', 'margin', 'inset']) {
     const sides = tw.sides(className, kind);
     for (const [side, token] of Object.entries(sides)) {
@@ -114,7 +119,7 @@ export function classView(className, { tokens = {} } = {}) {
     const part = (name, prefix) => (name ? (/^-?translate-[xy]-(?:1\/2)$/.test(name) ? (name.startsWith('-') ? '-50%' : '50%') : cssOfToken(name.replace(prefix, '')) ?? '0') : '0');
     view.transform = `translate(${part(tx, /^(-?)translate-x-/)}, ${part(ty, /^(-?)translate-y-/)})`;
   }
-  return view;
+  return Object.assign(view, important);
 }
 
 /** Responsive or state classes that set the same CSS property as `property`, so a control can say "also md:flex". */

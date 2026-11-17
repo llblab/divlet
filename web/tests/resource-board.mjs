@@ -22,8 +22,9 @@ source.frames[0].nodes.root.children.push('literal');
 source.frames[0].nodes.literal = { id: 'literal', type: 'element', tag: 'img', attrs: { src: literal }, children: [] };
 files.set('project.divlet', Buffer.from(JSON.stringify(source)));
 files.set('styles.json', Buffer.from(JSON.stringify({ entries: [{ tokens: {}, candidates: [], css: '' }] })));
-const shell = files.get('index.html').toString('utf8'); assert.equal(shell.split('src="./divlet-host.js"').length, 2);
-files.set('index.html', Buffer.from(shell.replace('src="./divlet-host.js"', 'src="./resource-host.js"')));
+const shell = files.get('index.html').toString('utf8'); const hostSrc = /src="\.\/divlet-host\.js\?v=[0-9a-f]{12}"/g;
+assert.equal(shell.match(hostSrc)?.length, 1, 'the shell loads one stamped host bundle');
+files.set('index.html', Buffer.from(shell.replace(hostSrc, 'src="./resource-host.js"')));
 // Test-owned policy controls and runtime handle; no production module or public snapshot is replaced.
 files.set('resource-host.js', Buffer.from(`
 import { startBrowserBoard } from ${JSON.stringify('./resource-board.js')};
@@ -45,7 +46,7 @@ try {
 `));
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.divlet': 'application/octet-stream' };
 const server = http.createServer((req, res) => {
-  const name = req.url?.startsWith(prefix) ? req.url.slice(prefix.length) || 'index.html' : '';
+  const name = req.url?.startsWith(prefix) ? req.url.slice(prefix.length).split('?')[0] || 'index.html' : '';
   const bytes = req.method === 'GET' && files.get(name);
   res.writeHead(bytes ? 200 : 404, { 'Content-Type': types[path.extname(name)] || 'text/plain', 'Cache-Control': 'no-store' }); res.end(bytes || 'missing');
 });
@@ -66,6 +67,8 @@ let browser, connection, page;
 try {
   const url = `http://127.0.0.1:${server.address().port}${prefix}`;
   browser = await chromium.launch({ headless: true, executablePath: process.env.PI_DIVLET_CHROMIUM_EXECUTABLE, args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  // The shell stamps the files of one publication (`?v=<hash>`); the allowlist names the files themselves.
+  const unstamped = target => target.replace(/\?v=[0-9a-f]{12}$/, '');
   const allowed = new Set([...files.keys()].map(name => url + (name === 'index.html' ? '' : name))), requested = [], denied = [], errors = [];
   const guard = async context => {
     context.on('request', request => requested.push(request.url())); context.on('page', p => {
@@ -73,7 +76,7 @@ try {
       p.on('console', message => { if (message.text().startsWith('RESOURCE_STARTUP')) console.error(message.text()); });
     });
     await context.route('**/*', route => {
-      if (route.request().method() === 'GET' && allowed.has(route.request().url())) return route.continue();
+      if (route.request().method() === 'GET' && allowed.has(unstamped(route.request().url()))) return route.continue();
       denied.push(route.request().url()); return route.abort();
     });
   };
@@ -225,7 +228,7 @@ try {
     assert.deepEqual(await fresh.evaluate(() => [!!globalThis[Symbol.for('divlet.board-host/1')], !!globalThis[Symbol.for('browser-mcp/1')], document.querySelectorAll('.artboard').length]), [false, false, 0]);
     assert.equal(await fresh.evaluate(storedRecord), undefined); await freshContext.close();
   }
-  assert.deepEqual(errors, []); assert.deepEqual(denied, []); assert.ok(requested.every(target => target.startsWith('blob:') || target.startsWith('data:') || allowed.has(target)));
+  assert.deepEqual(errors, []); assert.deepEqual(denied, []); assert.ok(requested.every(target => target.startsWith('blob:') || target.startsWith('data:') || allowed.has(unstamped(target))));
   const control = url + 'unrequested'; assert.equal(await page.evaluate(async target => { try { await fetch(target); return false; } catch { return true; } }, control), true); assert.deepEqual(denied, [control]);
   assert.deepEqual(await page.evaluate(() => ['Buffer', 'process', 'require'].filter(key => key in globalThis)), []);
   assert.deepEqual(JSON.parse(files.get('project.divlet').toString('utf8')), source, 'visitor/agent/copied projects never mutate the published master');

@@ -171,10 +171,19 @@ const isLengthValue = rest => { const inner = bracketValue(rest); return inner !
  * the class is not a core utility this writer understands (it is then left alone).
  */
 function ownerOf(name, colourNames) {
+  // `class!` (Tailwind 4) and the older `!class` mark the declarations important; they set the same properties.
+  name = name.replace(/!$/, '').replace(/^!/, '');
   if (!variantFree(name)) return null;
   const own = (...props) => ({ props, split: null });
   const arbitraryProperty = /^\[([a-z-]+):(.+)\]$/.exec(name);
-  if (arbitraryProperty) return own(...longhands(arbitraryProperty[1]));
+  if (arbitraryProperty) {
+    const [, property, value] = arbitraryProperty, parts = longhands(property);
+    if (parts.length === 1) return own(property);
+    // One value for every part (`[border-width:3px]`) splits into the parts an edit leaves; a per-part list
+    // (`[border-width:1px_2px]`) cannot be split faithfully, so it stays and the narrower edit is written after it.
+    if (/(?<!\\)_/.test(value)) return null;
+    return { props: parts, split: left => left.map(part => `[${part}:${value}]`) };
+  }
   // `overflow-hidden` is a keyword of a shorthand: an axis edit must leave the other axis behind.
   let m = /^overflow-(x-|y-)?(.+)$/.exec(name);
   if (m) {
@@ -201,10 +210,12 @@ function ownerOf(name, colourNames) {
   }
   if (/^leading-/.test(bare)) return own('line-height');
   if (/^tracking-/.test(bare)) return own('letter-spacing');
+  // Only real family utilities: an authored class such as `font-lock` is not Tailwind's and must survive a family edit.
   if ((m = /^font-(.+)$/.exec(bare))) {
     if (/^\[\d/.test(m[1])) return own('font-weight');
-    if (m[1].startsWith('stretch-')) return own('font-stretch');
-    return own('font-family');
+    if (/^stretch-/.test(m[1])) return own('font-stretch');
+    if (/^(?:sans|serif|mono|\[.+\])$/.test(m[1])) return own('font-family');
+    return null;
   }
   if (/^whitespace-/.test(bare)) return own('white-space');
   // Backgrounds: only colours (`bg-cover`, `bg-[url(…)]` and gradients are other properties).
@@ -292,8 +303,13 @@ export function applyStyles(className, styles, { colorOf, colourNames } = {}) {
   for (const [property, value] of Object.entries(styles)) {
     if (!SAFE_PROPERTY.test(property)) throw Object.assign(new Error(`Unsupported style property: ${property}.`), { code: 'INVALID_PATCH' });
     if (value !== null && (typeof value !== 'string' && typeof value !== 'number' || /[;{}<>\\]/.test(String(value)) || String(value).length > 512)) throw Object.assign(new Error(`Invalid value for ${property}.`), { code: 'INVALID_PATCH' });
-    const text = value === null ? null : String(value).trim();
-    const box = BOX_PROPERTY.exec(property);
+    let text = value === null ? null : String(value).trim();
+    // `value !important` is the same utility with Tailwind's important modifier (`pr-1!`); it is written as one class per
+    // side, outside the padding/margin merge, so its priority stays on exactly the sides it was given for.
+    const important = text !== null && /\s*!important$/i.test(text);
+    if (important) text = text.replace(/\s*!important$/i, '');
+    const box = important ? null : BOX_PROPERTY.exec(property);
+    if (important && BOX_PROPERTY.test(property) && !text.split(/\s+/).every(part => LENGTH.test(part))) throw Object.assign(new Error(`${property} takes one to four lengths.`), { code: 'INVALID_PATCH' });
     if (box) {
       const kind = box[1];
       if (!boxes[kind]) {
@@ -316,12 +332,13 @@ export function applyStyles(className, styles, { colorOf, colourNames } = {}) {
       if (!owner || !owner.props.some(prop => targets.has(prop))) { next.push(name); continue; }
       const left = owner.props.filter(prop => !targets.has(prop));
       if (left.length && owner.split) next.push(...owner.split(left));
-      else if (owner.drawsLine) lineLost = true;
+      if (owner.drawsLine) lineLost = true;
     }
-    // A width utility that goes took its line with it: keep the line unless another utility still draws or styles it.
-    if (lineLost && !next.some(name => { const owner = ownerOf(name, colourNames); return owner?.drawsLine || owner?.props.includes('border-style'); })) next.push('border-solid');
+    // Tailwind's width utilities also draw the line (`border-style: var(--tw-border-style)`); the edited sides lose that with
+    // them, so keep the line drawn unless a style utility states it.
+    if (lineLost && !next.some(name => ownerOf(name, colourNames)?.props.includes('border-style'))) next.push('border-solid');
     tokens = next;
-    if (text !== null && text !== '') tokens.push(...declarationClass(property, text, colorOf, { scale: true }).split(' '));
+    if (text !== null && text !== '') tokens.push(...declarationClass(property, text, colorOf, { scale: true }).split(' ').map(name => (important ? `${name}!` : name)));
   }
   for (const kind of ['padding', 'margin']) if (boxes[kind]) {
     tokens = tokens.filter(name => !(parseBox(name)?.letter === kind[0]));

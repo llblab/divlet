@@ -11,6 +11,7 @@ import { woffBytes } from '../../core/tests/fixtures/font-woff.js';
 import { woff2Bytes } from '../../core/tests/fixtures/font-woff2.js';
 import { setStyleEngines } from '../../core/lib/engine.ts';
 import { decodeHtml } from '../../core/lib/codec.ts';
+import { classView } from '../../plugins/tailwind/web/view.js';
 
 const playwright = await import('playwright');
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -40,7 +41,9 @@ try {
   const select = id => page.evaluate(async id => { document.activeElement?.blur?.(); const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', [id]); }, id);
   const afterVersion = () => runtime.read({ view: 'document', documentId: 'welcome' }).version;
 
-  const inlineCase = async (owner, documentId, nodeId) => {
+  // With a style engine, More CSS takes the common path: custom properties stay native declarations, other properties become
+  // utilities; without one, everything is a native declaration.
+  const inlineCase = async (owner, documentId, nodeId, { utilities = false } = {}) => {
     const current = () => owner.getEntry(documentId).document;
     const initial = structuredClone(current().nodes[nodeId].style), classes = current().nodes[nodeId].className;
     await owner.patch({ documentId, expectedVersion: current().version, patch: { nodes: { [nodeId]: { style: { '--Ink': '#ff0000', '--ink': '#0000ff', color: 'var(--Ink)', 'background-color': 'var(--ink)' } } } } });
@@ -53,8 +56,9 @@ try {
     if (!await section.locator('details').evaluate(node => node.open)) await section.locator('summary').click();
     await waitUntil(() => section.locator('[data-key="style:--Ink"]').inputValue().then(value => value === '#ff0000'), 'prepared authored variables reach the real inspector');
     const rgb = hex => `rgb(${[1, 3, 5].map(at => parseInt(hex.slice(at, at + 2), 16)).join(', ')})`;
-    const verify = async expected => {
+    const verify = async (expected, classed = {}, baseline = classes) => {
       await waitUntil(() => { assert.deepEqual(current().nodes[nodeId].style, expected); return true; }, 'accepted variable spelling and unrelated declarations');
+      await waitUntil(() => Object.keys(classed).length ? Object.entries(classed).every(([property, value]) => current().nodes[nodeId].className.split(' ').includes(`[${property}:${value}]`)) : current().nodes[nodeId].className === baseline, 'non-variable declarations are utilities, and Undo restores the classes');
       await owner.queue;
       await waitUntil(async () => {
         const actual = await page.locator(`iframe[data-document-id="${documentId}"]`).contentFrame().locator(`[data-divlet-id="${nodeId}"]`).evaluate(node => {
@@ -62,7 +66,6 @@ try {
         });
         return actual[0] === rgb(expected['--Ink']) && actual[1] === rgb(expected['--ink']);
       }, 'case-sensitive variables paint distinct foreground/background colours');
-      assert.equal(current().nodes[nodeId].className, classes);
       const saved = JSON.parse(await readFile(owner.projectPath, 'utf8')).frames.find(frame => frame.id === documentId);
       assert.deepEqual(saved.nodes[nodeId].style, expected, 'the writer saves exact custom-property names');
     };
@@ -71,16 +74,18 @@ try {
       ['BoRdEr-ToP-CoLoR', '#123456', { 'border-top-color': '#123456' }],
       ['--Ink:#ff00ff;--ink:#ffff00;OuTlInE-CoLoR:#654321', '', { '--Ink': '#ff00ff', '--ink': '#ffff00', 'outline-color': '#654321' }],
     ]) {
-      const before = structuredClone(current().nodes[nodeId].style), version = current().version;
+      const before = structuredClone(current().nodes[nodeId].style), version = current().version, beforeClasses = current().nodes[nodeId].className;
       await section.locator('[data-key="style-new-key"]').fill(name);
       if (value) await section.locator('[data-key="style-new-value"]').fill(value);
       await page.keyboard.press('Enter');
       await page.locator('#viewport').focus();
-      const next = { ...before, ...patch };
-      await verify(next);
+      const native = utilities ? Object.fromEntries(Object.entries(patch).filter(([property]) => property.startsWith('--'))) : patch;
+      const classed = utilities ? Object.fromEntries(Object.entries(patch).filter(([property]) => !property.startsWith('--'))) : {};
+      const next = { ...before, ...native };
+      await verify(next, classed);
       assert.equal(current().version, version + 1, 'one submission is one accepted change');
-      await page.keyboard.press('Control+z'); await verify(before);
-      await page.keyboard.press('Control+Shift+z'); await verify(next);
+      await page.keyboard.press('Control+z'); await verify(before, {}, beforeClasses);
+      await page.keyboard.press('Control+Shift+z'); await verify(next, classed);
     }
     // Restore the caller's authored inline data by undoing the three edits and the setup.
     for (let i = 0; i < 4; i++) await owner.undo();
@@ -115,7 +120,9 @@ try {
   checks.push('text alignment has one home in Appearance, edits the actual page and remains independently undoable');
 
   const family = page.locator('#inspector [data-key="font-family"]');
-  const inlineFamily = () => runtime.getEntry('welcome').document.nodes.cta.style['font-family'];
+  // The authored family wherever the common style path put it: a utility class with the Tailwind engine, an inline declaration without.
+  const familyOf = id => { const node = runtime.getEntry('welcome').document.nodes[id]; return node.style['font-family'] ?? classView(node.className)['font-family']; };
+  const inlineFamily = () => familyOf('cta');
   const chooseFamily = async name => { await family.click(); await page.getByRole('menuitemradio', { name, exact: true }).click(); await runtime.queue; };
   assert.equal(await family.count(), 1);
   assert.equal(await family.evaluate(node => node.closest('[data-inspector-slot="typography"]') !== null), true, 'native family is adjacent to size, weight and alignment, not another section');
@@ -124,7 +131,8 @@ try {
     await chooseFamily(name);
     await waitUntil(() => inlineFamily() === name, `native ${name} family`);
     await waitUntil(() => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate((node, name) => getComputedStyle(node).fontFamily === name, name), 'chosen family reaches the real iframe');
-    assert.equal(classesOf('cta').join(' '), classesBeforeFamily, 'family edits do not require utility normalization');
+    assert.equal(runtime.getEntry('welcome').document.nodes.cta.style['font-family'], undefined, 'with the Tailwind engine the family is a utility, not an inline declaration');
+    assert.deepEqual(classesOf('cta').filter(name => !name.startsWith('[font-family:')), classesBeforeFamily.split(' ').filter(Boolean), 'and only the family utility changes');
   }
   await chooseFamily('Default (stylesheet / inherited)');
   await waitUntil(() => inlineFamily() === undefined, 'Default clears the inline override');
@@ -182,9 +190,9 @@ try {
   await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', ['cta', 'hero']));
   await waitUntil(() => family.getAttribute('aria-label').then(value => value.includes('Mixed')), 'mixed selection is explicit');
   await chooseFamily('serif');
-  await waitUntil(() => ['cta', 'hero'].every(id => runtime.getEntry('welcome').document.nodes[id].style['font-family']?.startsWith('serif')), 'one shared native write edits all selected elements');
+  await waitUntil(() => ['cta', 'hero'].every(id => familyOf(id)?.startsWith('serif')), 'one shared write edits all selected elements');
   await runtime.undo();
-  assert.equal(runtime.getEntry('welcome').document.nodes.hero.style['font-family'], undefined);
+  assert.equal(familyOf('hero'), undefined);
   assert.equal(inlineFamily(), '"Local (Variant)", "Old Face", serif !important');
 
   await select('cta');
@@ -270,7 +278,7 @@ try {
   await waitUntil(async () => await page.locator('#inspector [data-key="border-width-t"]').inputValue() === '2', 'a box-model edit updates Border while keyboard focus stays in the diagram');
   assert.equal(await page.evaluate(() => document.activeElement?.dataset.key), 'border-r');
   const borderWidths = () => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => { const cs = getComputedStyle(node); return ['Top', 'Right', 'Bottom', 'Left'].map(side => cs[`border${side}Width`]); });
-  await waitUntil(async () => JSON.stringify(await borderWidths()) === JSON.stringify(['2px', '3px', '3px', '3px']), 'one edge changes without rewriting its peers or the utility');
+  await waitUntil(async () => JSON.stringify(await borderWidths()) === JSON.stringify(['2px', '3px', '3px', '3px']), 'one edge changes without changing its peers');
   await page.locator('#inspector [data-key="border-width-r"]').fill('4'); await page.keyboard.press('Tab');
   await waitUntil(async () => await page.locator('#inspector [data-key="border-r"]').inputValue() === '4', 'a Border edit updates the diagram while focus stays in Border');
   assert.equal(await page.evaluate(() => document.activeElement?.dataset.key), 'border-width-b');
@@ -278,7 +286,8 @@ try {
   const beforeClear = afterVersion();
   for (const [key, other, next] of [['border-width-t', 'border-t', '2'], ['border-r', 'border-width-r', '4']]) {
     await page.locator(`#inspector [data-key="${key}"]`).fill(''); await page.keyboard.press('Tab');
-    await waitUntil(async () => await page.locator(`#inspector [data-key="${key}"]`).inputValue() === '3' && await page.locator(`#inspector [data-key="${other}"]`).inputValue() === '3', 'clearing either copy falls back to the class-authored width in both copies without leaving the inspector');
+    // The side is its own utility, so clearing it removes that side's authored width in both copies; the measured width stays as the placeholder.
+    await waitUntil(async () => await page.locator(`#inspector [data-key="${key}"]`).inputValue() === '' && await page.locator(`#inspector [data-key="${other}"]`).inputValue() === '', 'clearing either copy clears the side in both copies without leaving the inspector');
     await page.locator(`#inspector [data-key="${other}"]`).fill(next); await page.keyboard.press('Tab');
     await waitUntil(async () => await page.locator(`#inspector [data-key="${key}"]`).inputValue() === next, 'the other copy restores the same authored value');
   }
@@ -506,7 +515,7 @@ try {
   await waitUntil(() => classesOf('cta').includes('z-2'), 'z-index scrubbing works at 200% interface size');
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(100));
-  await inlineCase(runtime, 'welcome', 'cta');
+  await inlineCase(runtime, 'welcome', 'cta', { utilities: true });
   await runtime.close();
   setStyleEngines([]);
   native = await openRuntime({ file: path.join(cwd, 'no-engine.divlet'), watch: false, createDemo: false });

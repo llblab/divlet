@@ -411,7 +411,8 @@ const customStyle = node => Object.fromEntries(Object.entries(node.style || {}).
 function kvEditor(documentId, node, field, save) {
   const box = el('div', 'rows');
   const current = field === 'style' ? customStyle(node) : node[field] || {};
-  const patch = save || ((value, label) => refreshed(commit(documentId, { nodes: { [node.id]: { [field]: value } } }, { label: `${label} on ${node.id}` })));
+  // CSS typed here takes the same path as every control: utilities with a style engine, native declarations without one.
+  const patch = save || ((value, label) => refreshed(commit(documentId, { nodes: { [node.id]: { [field === 'style' ? 'styles' : field]: value } } }, { label: `${label} on ${node.id}` })));
   for (const [key, value] of Object.entries(current)) {
     const line = el('div', 'kv');
     line.append(field === 'style' ? swatch(value, key, hex => patch({ [key]: hex }, `set ${key}`), 'none') : el('span', 'swatch none'));
@@ -612,15 +613,15 @@ function panelFolds(kind, doc, nodes, parent) {
   };
   // CSS property edits: each selected element's edits are derived inside the writer queue from its accepted state, and the
   // writer stores them natively or as utilities. Nothing here knows which representation is active.
-  const applyEdits = (edits, label, { group, refresh = true, inline = false } = {}) => {
+  const applyEdits = (edits, label, { group, refresh = true } = {}) => {
     const result = commit(doc.id, async model => {
       const patch = {};
       for (const selected of nodes) {
         const node = model.nodes[selected.id];
         if (node?.type !== 'element') throw new Error(`Element no longer exists: ${selected.id}`);
         const resolved = typeof edits === 'function' ? await edits(viewOf(node, styleReaders(), { tokens: cachedModel(doc.id)?.tokens || {} }), node) : edits;
-        // `inline` is for edits that must stay a plain inline declaration whatever the representation (measured sizes, per-edge widths).
-        if (resolved && Object.keys(resolved).length) patch[node.id] = { [inline ? 'style' : 'styles']: resolved };
+        // Every control edit takes this one path: the active representation decides between utilities and native declarations.
+        if (resolved && Object.keys(resolved).length) patch[node.id] = { styles: resolved };
       }
       return Object.keys(patch).length ? { nodes: patch } : null;
     }, { label, group });
@@ -662,7 +663,7 @@ function panelFolds(kind, doc, nodes, parent) {
     readers: styleReaders(),
   }).map(([name, title, content]) => ({ name, title, content }));
   const sections = [...panelSections(kind, ctx), ...properties];
-  const family = fontFamilyControl(nodes, { css: [store.state?.project?.css, cachedModel(doc.id)?.css], apply: applyClasses, upload: store.state?.project?.capabilities?.fontUpload ? fontUpload : undefined });
+  const family = fontFamilyControl(nodes, { css: [store.state?.project?.css, cachedModel(doc.id)?.css], apply: applyEdits, views: nodes.map(node => viewOf(node, styleReaders(), { tokens: cachedModel(doc.id)?.tokens || {} })), upload: store.state?.project?.capabilities?.fontUpload ? fontUpload : undefined });
   const appearance = sections.find(item => item.name === 'appearance');
   if (appearance) (appearance.content.querySelector('[data-inspector-slot="typography"]') ?? appearance.content).prepend(family);
   else {

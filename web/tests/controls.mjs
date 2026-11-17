@@ -517,12 +517,14 @@ try {
   await waitUntil(() => page.locator('#inspector [data-key="style-new-key"]').isVisible(), 'style rows visible');
   await page.locator('#inspector [data-key="style-new-key"]').fill('color: rgb(255, 0, 0); letter-spacing: 1px');
   await page.keyboard.press('Enter');
-  await waitUntil(() => doc('welcome').nodes.title.style.color === 'rgb(255, 0, 0)' && doc('welcome').nodes.title.style['letter-spacing'] === '1px', 'pasted declarations');
+  // Pasted CSS takes the common path: with the Tailwind engine both declarations become utilities, not inline CSS.
+  await waitUntil(() => { const node = doc('welcome').nodes.title, names = node.className.split(' '); return names.includes('[color:rgb(255,_0,_0)]') && names.includes('tracking-[1px]') && !node.style.color && !node.style['letter-spacing']; }, 'pasted declarations');
   // `color` belongs to the Text color control, so the raw list no longer repeats it; letter-spacing is not owned by any control.
   await waitUntil(() => page.locator('#inspector [data-key="ink"]').inputValue().then(value => value === 'rgb(255, 0, 0)'), 'the Text color control shows the pasted colour');
   assert.equal(await page.locator('#inspector [data-section="style"] button[aria-label="Remove color"]').count(), 0, 'the raw list does not repeat a declaration a control owns');
-  await page.locator('#inspector button[aria-label="Remove letter-spacing"]').click();
-  await waitUntil(() => !doc('welcome').nodes.title.style['letter-spacing'], 'remove style');
+  const tracking = page.locator('#inspector .cls', { hasText: 'tracking-[1px]' });
+  await tracking.hover(); await tracking.locator('.cls-x').click();
+  await waitUntil(() => !doc('welcome').nodes.title.className.split(' ').includes('tracking-[1px]'), 'remove the pasted declaration');
   await page.locator('#inspector [data-key="attr-new-key"]').fill('title');
   await page.locator('#inspector [data-key="attr-new-value"]').fill('Greeting');
   await page.keyboard.press('Enter');

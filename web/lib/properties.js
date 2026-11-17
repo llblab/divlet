@@ -224,6 +224,8 @@ function colorField({ key, label, tip, property, value, run, computed, tokens })
   hex.value = current === MIXED || current == null ? '' : current;
   hex.placeholder = current === MIXED ? '—' : css.hexOf(computed) ?? (computed ? 'inherited' : 'none');
   hex.setAttribute('aria-label', tip);
+  const fitHex = () => hex.style.setProperty('--hex-width', `calc(${Math.max(7, (hex.value || hex.placeholder).length) + 2}ch + 8px)`);
+  hex.addEventListener('input', fitHex);
   const set = (raw, shown) => {
     const next = css.colourInput(raw);
     if (next === undefined) { toast(`“${raw}” is not a color: use #rrggbb, a project color or white, black, transparent`); hex.value = hex.dataset.last ?? ''; return; }
@@ -242,6 +244,7 @@ function colorField({ key, label, tip, property, value, run, computed, tokens })
   clear.hidden = current == null || current === MIXED;
   clear.addEventListener('click', () => run({ [property]: null }, `no ${label.toLowerCase()}`));
   const name = el('span', 'vf-k', label);
+  fitHex();
   wrap.append(name, swatch, hex, clear);
   if (alphaOf(computed) < 1 && current == null) hex.title = 'Semi-transparent in the page';
   if (tokens.length) {
@@ -485,7 +488,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     const commitWidth = next => {
       const sequence = (borderEdits.get(side) ?? 0) + 1;
       borderEdits.set(side, sequence);
-      const result = run({ [property]: next === null ? null : `${next}px` }, `${property} ${next ?? 'default'}`, { inline: true });
+      const result = run({ [property]: next === null ? null : `${next}px` }, `${property} ${next ?? 'default'}`);
       if (!result?.then) return;
       const sync = async result => {
         if (borderEdits.get(side) !== sequence) return;
@@ -571,7 +574,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
         const sides = axis === 'width' ? [1, 3] : [0, 2];
         const extra = box.boxSizing === 'border-box' ? sides.reduce((sum, side) => sum + box.padding[side] + box.border[side], 0) : 0;
         return { [axis]: `${next + extra}px` };
-      }, `content ${axis} ${next ?? 'default'}`, { inline: true });
+      }, `content ${axis} ${next ?? 'default'}`);
     });
     size.classList.add('bm-dimension');
     const input = size.querySelector('input');

@@ -64,9 +64,14 @@ export function familyPatch(node, next, families) {
   return { 'font-family': value + (current.getPropertyPriority('font-family') ? ' !important' : '') };
 }
 
-export function fontFamilyControl(nodes, { css, apply, upload }) {
+/**
+ * `views` are the selected elements' authored declarations (utility classes read through the style engine, then inline CSS);
+ * `apply` commits a `styles` edit, so with Tailwind a family becomes a utility (an important one keeps its priority as
+ * `class!`) and without it a native declaration.
+ */
+export function fontFamilyControl(nodes, { css, apply, upload, views = nodes.map(node => node.style) }) {
   const families = declaredFamilies(css);
-  const values = nodes.map(node => ['font', 'all'].some(name => Object.hasOwn(node.style, name)) ? 'Font shorthand' : node.style['font-family'] ?? null);
+  const values = nodes.map((node, index) => ['font', 'all'].some(name => Object.hasOwn(node.style, name)) ? 'Font shorthand' : views[index]?.['font-family'] ?? null);
   const mixed = !values.every(value => value === values[0]);
   const value = values[0], primary = value ? parts(canonical(value.replace(/\s*!important\s*$/i, '')))[0] : null;
   const shown = mixed ? 'Mixed' : value === 'Font shorthand' ? 'Inline shorthand' : primary || value || 'Default';
@@ -86,7 +91,7 @@ export function fontFamilyControl(nodes, { css, apply, upload }) {
   button.setAttribute('aria-label', `Font family: ${shown}`);
   button.setAttribute('aria-haspopup', 'menu');
   button.append(el('span', 'pick-k', 'Family'), el('span', `pick-v${!value || mixed ? ' faint' : ''}`, shown), icon('chevron', 'icon pick-caret'));
-  const choose = next => apply(classes => classes, next === null ? 'default font family' : `font family ${next}`, { style: node => familyPatch(node, next, families) });
+  const choose = next => apply(view => familyPatch({ style: view }, next, families), next === null ? 'default font family' : `font family ${next}`);
   button.addEventListener('click', () => openMenu([
     { label: 'Default (stylesheet / inherited)', checked: !mixed && value === null, run: () => choose(null) },
     ...GENERICS.map(family => ({ label: family, checked: !mixed && key(primary || '') === family, run: () => choose(family) })),

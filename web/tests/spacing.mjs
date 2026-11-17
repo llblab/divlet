@@ -7,6 +7,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { openRuntime } from '@divlet/core/runtime';
+import { classView } from '../../plugins/tailwind/web/view.js';
 
 const playwright = await import('playwright');
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -410,11 +411,13 @@ try {
   await waitUntil(async () => /80 by 40/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'content height edits reach the page');
   await waitUntil(async () => await page.locator('#inspector [data-key="content-width"]').inputValue() === '80', 'authored content size is a value, not an un-clearable placeholder');
   await page.locator('#inspector [data-key="content-width"]').fill(''); await page.keyboard.press('Tab');
-  await waitUntil(() => !Object.hasOwn(runtime.read({ view: 'document', documentId: probe.id }).nodes['box-probe'].style, 'width'), 'Tab clears authored inline width');
+  // The authored size wherever the common style path put it: a utility with the Tailwind engine, an inline declaration without.
+  const authoredSize = axis => { const node = runtime.read({ view: 'document', documentId: probe.id }).nodes['box-probe']; return node.style[axis] ?? classView(node.className)[axis]; };
+  await waitUntil(() => authoredSize('width') === undefined, 'Tab clears the authored width');
   await page.locator('#inspector [data-key="content-height"]').fill(''); await page.keyboard.press('Enter');
-  await waitUntil(() => !Object.hasOwn(runtime.read({ view: 'document', documentId: probe.id }).nodes['box-probe'].style, 'height'), 'Enter clears authored inline height');
+  await waitUntil(() => authoredSize('height') === undefined, 'Enter clears the authored height');
   await page.locator('#viewport').focus(); await page.keyboard.press('Control+z');
-  await waitUntil(() => runtime.read({ view: 'document', documentId: probe.id }).nodes['box-probe'].style.height === '50px', 'undo restores fixed height after clearing');
+  await waitUntil(() => authoredSize('height') === '50px', 'undo restores fixed height after clearing');
   await page.keyboard.press('Control+z');
   await waitUntil(async () => /80 by 40/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'undo restores fixed width after clearing');
   for (const expected of [/80 by 34/, /62\.328 by 34/, /65\.328 by 34/]) {
