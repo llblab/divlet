@@ -4,11 +4,11 @@
 // `../../lib/<file>`.
 import { registerPanel, registerStyleReader } from '../../lib/panels.js';
 import { classEditor } from './classes.js';
-import { classView, variantClasses } from './view.js';
+import { classView, variantClasses, propertiesOfClass } from './view.js';
 
-registerStyleReader({ id: 'tailwind', view: (className, context) => classView(className, context), variants: variantClasses });
+registerStyleReader({ id: 'tailwind', view: (className, context) => classView(className, context), variants: variantClasses, properties: propertiesOfClass });
 
 registerPanel({
   id: 'tailwind',
-  node: ctx => [{ name: 'classes', content: classEditor(ctx.doc.id, ctx.node, ctx.saveClasses) }],
+  node: ctx => [{ name: 'classes', content: classEditor(ctx.doc.id, ctx.node, ctx.saveClasses, { convert: entries => ctx.applyStyles(Object.fromEntries(entries), 'move inline CSS to classes') }) }],
 });

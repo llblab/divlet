@@ -20,7 +20,8 @@ const readers = [];
 export const registerPanel = panel => { if (!panels.some(item => item.id === panel.id)) panels.push(panel); };
 /**
  * A representation reader lets the core property controls see styling that is not an inline declaration. Tailwind registers one
- * that turns utility classes into the CSS declarations they stand for: { id, view(className) → { property: value }, variants?(className, property) → [class] }.
+ * that turns utility classes into the CSS declarations they stand for: { id, view(className) → { property: value }, variants?(className, property) → [class], properties?(className) → [property] }.
+ * `properties` names what an added class sets, so the inspector can remove inline declarations that would defeat it (one authored meaning).
  * Inline declarations override a reader's view (as they do in the cascade). Readers never write: edits go through `styles` patches.
  */
 export const registerStyleReader = reader => { if (!readers.some(item => item.id === reader.id)) readers.push(reader); };

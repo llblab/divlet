@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classView, declarationsOfClass, variantClasses, cssOfToken } from '../web/view.js';
+import { classView, declarationsOfClass, variantClasses, cssOfToken, propertiesOfClass, convertibleInline } from '../web/view.js';
 import { applyStyles } from '../lib/styles.js';
 import { declaredValues } from '../../../web/lib/css-props.js';
 
@@ -36,4 +36,12 @@ test('what the writer lowers to utilities reads back as the same declarations', 
   const className = applyStyles('', edits, { scale: true });
   const view = classView(className);
   for (const [property, value] of Object.entries(edits)) assert.equal(declaredValues(Object.entries(view))[property], value, `${property} → ${className}`);
+});
+
+test('a class names the properties it sets, and only plain inline declarations are offered for conversion', () => {
+  assert.deepEqual(propertiesOfClass('pr-[37px]'), ['padding-right']);
+  assert.deepEqual(propertiesOfClass('p-4').sort(), ['padding-bottom', 'padding-left', 'padding-right', 'padding-top']);
+  assert.deepEqual(propertiesOfClass('md:p-4'), [], 'a variant never replaces an inline declaration');
+  assert.deepEqual(propertiesOfClass('marker'), []);
+  assert.deepEqual(convertibleInline({ color: 'red', '--x': '1', background: 'url(a.png)', width: '1px !important', padding: '4px' }), [['color', 'red'], ['padding', '4px']]);
 });

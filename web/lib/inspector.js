@@ -6,7 +6,7 @@ import { openMenu, menuAnchor, closeMenu } from './menu.js';
 import { overflowBar } from './toolbar.js';
 import { panelSections, styleReaders } from './panels.js';
 import { propertySections } from './properties.js';
-import { viewOf, expandShorthand } from './css-props.js';
+import { viewOf, expandShorthand, releaseInline } from './css-props.js';
 import { components as componentSource, native } from './host.js';
 import { fontFamilyControl } from './typography.js';
 import { textOverride, textOverridePatch } from './component-text.js';
@@ -629,7 +629,16 @@ function panelFolds(kind, doc, nodes, parent) {
   };
   const ctx = {
     doc, nodes, node: nodes[0], parent, applyClasses, applyStyles: applyEdits,
-    saveClasses: (next, label) => refreshed(commit(doc.id, { nodes: { [nodes[0].id]: { className: next.join(' ') } } }, { label: `${label} on ${nodes[0].id}` })),
+    // An added class replaces the inline declarations it would lose to (inline CSS beats utilities), in the same accepted edit.
+    saveClasses: (next, label) => refreshed(commit(doc.id, async model => {
+      const node = model.nodes[nodes[0].id];
+      if (node?.type !== 'element') throw new Error(`Element no longer exists: ${nodes[0].id}`);
+      const before = new Set(String(node.className || '').split(/\s+/).filter(Boolean));
+      const properties = next.filter(name => !before.has(name)).flatMap(name => styleReaders().flatMap(reader => reader.properties?.(name) ?? []));
+      const change = { className: next.join(' ') };
+      if (properties.length) { const { delta } = releaseInline(node.style, properties); if (Object.keys(delta).length) change.style = delta; }
+      return { nodes: { [node.id]: change } };
+    }, { label: `${label} on ${nodes[0].id}` })),
     spacingFocus: focus => postToFrame(doc.id, { type: 'divlet:spacing-focus', focus }),
     measuredBox: nodeId => measuredBox(doc.id, nodeId),
     freshMeasuredBox: nodeId => {

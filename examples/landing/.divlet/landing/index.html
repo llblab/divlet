@@ -2,9 +2,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>divlet — a layout board for agents</title>
-<meta name="description" content="divlet is a local browser layout board for coding agents: live frames of real HTML and CSS, reusable components, and the same validated tools through Pi, MCP or the board running in your browser."><link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgY29sb3I9IiM1YjViZjAiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj48cGF0aCBkPSJNOCA0LjUgMi41IDEwIDggMTUuNSIgZmlsbD0ibm9uZSIvPjxwYXRoIGQ9Ik0xMC41IDQuNUgxMkwxNy41IDEwIDEyIDE1LjVoLTEuNVoiIGZpbGw9ImN1cnJlbnRDb2xvciIgc3Ryb2tlPSJub25lIi8+PC9zdmc+Cg=="><style>@layer theme, base, components, utilities;
+<meta name="description" content="divlet is a local browser layout board for coding agents: live frames of real HTML and CSS, reusable components, and the same validated tools through Pi, MCP or the board running in your browser."><link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgY29sb3I9IiM1YjViZjAiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj48cGF0aCBkPSJNOCA0LjUgMi41IDEwIDggMTUuNSIgZmlsbD0ibm9uZSIvPjxwYXRoIGQ9Ik0xMC41IDQuNUgxMkwxNy41IDEwIDEyIDE1LjVoLTEuNVoiIGZpbGw9ImN1cnJlbnRDb2xvciIgc3Ryb2tlPSJub25lIi8+PC9zdmc+Cg=="><style>:root{--color-paper:var(--paper);--color-ink:var(--ink);--color-muted:var(--muted);--color-faint:var(--faint);--color-hair:var(--hair);--color-panel:var(--panel);--color-accent:var(--accent);--color-accent-ink:var(--accent-ink);--color-accent-soft:var(--accent-soft);--color-code:var(--code);--color-code-ink:var(--code-ink);}</style>
+<style>@layer theme, base, components, utilities;
 @layer components {
-/* Authored in examples/landing/landing.divlet; this stylesheet travels with its frame. */
+/* Authored in examples/landing/landing.divlet; this stylesheet travels with its frame. The page's own variables back the Tailwind colour tokens, so utilities such as bg-panel follow the colour scheme. */
 :root {
   color-scheme: light dark;
   --paper: #f7f5f1;
@@ -127,7 +128,67 @@ a { color: inherit; }
 
 footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--hair); color: var(--faint); font-size: 12.5px; }
 
+/* ---- the board, as a picture ------------------------------------------------------------------- */
+.stage { margin: 56px 0 0; }
+.stage-canvas { position: relative; display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, .5fr) minmax(0, .8fr); gap: 18px; align-items: start; padding: 22px; border: 1px solid var(--hair); border-radius: 24px; background-color: var(--panel); background-image: radial-gradient(circle at 1px 1px, var(--hair) 1px, transparent 0); background-size: 18px 18px; box-shadow: var(--shadow); overflow: hidden; }
+.stage figcaption { margin-top: 12px; color: var(--faint); font-size: 13px; text-align: center; }
+.artboard { position: relative; display: grid; gap: 8px; align-content: start; }
+.artboard-name { display: flex; gap: 8px; align-items: baseline; white-space: nowrap; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.artboard-name i { color: var(--faint); font-style: normal; font-weight: 500; }
+.page { display: grid; gap: 14px; padding: 12px; border: 1.5px solid var(--accent); border-radius: 8px; background: var(--paper); box-shadow: 0 0 0 4px var(--accent-soft); }
+.page-bar { display: flex; align-items: center; gap: 8px; }
+.page-bar b { width: 14px; height: 14px; margin-right: auto; border-radius: 4px; background: var(--accent); }
+.page-bar span { width: 26px; height: 5px; border-radius: 3px; background: var(--hair); }
+.page-hero { display: grid; gap: 7px; padding: 10px 0 4px; }
+.page-hero em { width: 34%; height: 5px; border-radius: 3px; background: var(--accent); opacity: .7; }
+.page-hero strong { height: 13px; border-radius: 4px; background: var(--ink); }
+.page-hero strong.short { width: 68%; }
+.page-hero u { width: 52%; height: 6px; margin-top: 4px; border-radius: 3px; background: var(--hair); }
+.page-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.page-row.stack { grid-template-columns: 1fr; }
+.page-row i { height: 46px; border: 1px solid var(--hair); border-radius: 7px; background: var(--panel); }
+.phone .page { padding: 10px; }
+.phone .page-row i { height: 32px; }
+.inspector { display: grid; gap: 8px; align-content: start; padding: 12px; border: 1px solid var(--hair); border-radius: 14px; background: var(--paper); box-shadow: var(--shadow); font-size: 11.5px; }
+.inspector p { margin: 0; }
+.inspector-head { display: flex; gap: 6px; align-items: center; color: var(--faint); font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.inspector-head span { padding: 1px 7px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-ink); font-weight: 600; }
+.inspector-title { margin-top: 4px; color: var(--ink); font-weight: 640; }
+.chips-mock { display: flex; flex-wrap: wrap; gap: 4px; }
+.chips-mock span { padding: 2px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-ink); font: 10.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.boxmodel-mock div { display: grid; place-items: center; padding: 9px; border: 1px dashed var(--faint); border-radius: 5px; background: color-mix(in srgb, var(--gold) 28%, transparent); }
+.boxmodel-mock div div { background: color-mix(in srgb, var(--accent) 16%, transparent); border-style: solid; border-color: var(--hair); }
+.boxmodel-mock div div div { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.boxmodel-mock span { padding: 3px 10px; border-radius: 4px; background: var(--paper); color: var(--ink); font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.field-mock { display: grid; grid-template-columns: auto 18px 1fr; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--hair); border-radius: 8px; background: var(--panel); }
+.field-mock span { color: var(--muted); }
+.field-mock i { width: 18px; height: 18px; border-radius: 5px; background: var(--ink); }
+.field-mock code { color: var(--ink); }
+
+/* ---- plain CSS first, Tailwind where it fits ------------------------------------------------------ */
+.styles { margin: 72px 0; }
+.styles h2 { margin-top: 6px; }
+.flow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: stretch; margin-top: 26px; }
+.flow-step { display: grid; gap: 10px; align-content: start; box-shadow: var(--shadow); }
+.flow-label { color: var(--faint); font-size: 11.5px; font-weight: 640; letter-spacing: .08em; text-transform: uppercase; }
+.flow-arrow { align-self: center; color: var(--faint); font-size: 20px; }
+.flow-control { display: flex; align-items: baseline; gap: 8px; padding: 8px 12px; border: 1px solid var(--hair); border-radius: 10px; background: var(--paper); font-size: 13.5px; }
+.flow-control span { margin-right: auto; color: var(--muted); }
+.flow-control b { font: 600 14px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.flow-control i { color: var(--faint); font-size: 12px; font-style: normal; }
+.flow-code { padding: 9px 12px; border-radius: 10px; background: var(--code); color: var(--code-ink); font-size: 13.5px; }
+.points { display: grid; gap: 12px; margin: 26px 0 0; padding: 0; list-style: none; max-width: 46em; }
+.points li { color: var(--muted); font-size: 14.5px; }
+.points b { color: var(--ink); font-weight: 640; }
+.points code { padding: 1px 6px; border-radius: 6px; background: var(--accent-soft); color: var(--accent-ink); }
+.styles .note { margin-top: 18px; }
+
 @media (max-width: 720px) {
+  .stage-canvas { grid-template-columns: minmax(0, 1fr) minmax(0, .5fr); }
+  .inspector { grid-column: 1 / -1; }
+  .artboard-name i { display: none; }
+  .flow { grid-template-columns: 1fr; }
+  .flow-arrow { justify-self: center; transform: rotate(90deg); }
   .board { grid-template-columns: 1fr; }
   .row { grid-template-columns: 6ch minmax(0, 1fr); }
   .row .arg { grid-column: 2; }
@@ -136,6 +197,7 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
 
 }</style>
 <style>/*! tailwindcss v4.3.3 | MIT License | https://tailwindcss.com */
+@layer properties;
 @layer theme, base, components, utilities;
 @layer theme {
   :root, :host {
@@ -144,8 +206,12 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
       "Segoe UI Symbol", "Noto Color Emoji";
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
       "Courier New", monospace;
+    --spacing: 0.25rem;
+    --radius-2xl: 1rem;
     --default-font-family: var(--font-sans);
     --default-mono-font-family: var(--font-mono);
+    --color-hair: var(--hair);
+    --color-panel: var(--panel);
   }
 }
 @layer base {
@@ -296,9 +362,186 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
     display: none !important;
   }
 }
-@layer utilities;
+@layer utilities {
+  .rounded-2xl {
+    border-radius: var(--radius-2xl);
+  }
+  .border {
+    border-style: var(--tw-border-style);
+    border-width: 1px;
+  }
+  .border-hair {
+    border-color: var(--color-hair);
+  }
+  .bg-panel {
+    background-color: var(--color-panel);
+  }
+  .p-5 {
+    padding: calc(var(--spacing) * 5);
+  }
+}
+@property --tw-border-style {
+  syntax: "*";
+  inherits: false;
+  initial-value: solid;
+}
+@layer properties {
+  @supports ((-webkit-hyphens: none) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color:rgb(from red r g b)))) {
+    *, ::before, ::after, ::backdrop {
+      --tw-border-style: solid;
+    }
+  }
+}
 </style>
 </head>
-<body><main data-divlet-id="top" id="top"><header data-divlet-id="node-1" class="top"><a data-divlet-id="node-2" href="#top" aria-label="divlet" class="mark"><svg data-divlet-id="node-3" viewBox="0 0 20 20" aria-hidden="true"><path data-divlet-id="node-4" d="M8 4.5 2.5 10 8 15.5" fill="none"></path><path data-divlet-id="node-5" d="M10.5 4.5H12L17.5 10 12 15.5h-1.5Z" fill="currentColor" stroke="none"></path></svg><span data-divlet-id="node-6">divlet</span></a><nav data-divlet-id="node-8" aria-label="Sections"><a data-divlet-id="node-9" href="#how">How it works</a><a data-divlet-id="node-11" href="#try">Try it</a><a data-divlet-id="node-13" href="#start">Install</a><a data-divlet-id="node-15" href="#agents">For agents</a></nav></header><section data-divlet-id="node-17" class="hero"><p data-divlet-id="node-18" class="eyebrow">A layout board for coding agents</p><h1 data-divlet-id="node-20">Design in the browser.<br data-divlet-id="node-22">Change it in conversation.</h1><p data-divlet-id="node-24" class="lede">divlet gives your agent a board of real web pages. Point at what should change; the agent edits through validated tools, and you watch every accepted change land — versioned, logged and one Undo away.</p><div data-divlet-id="node-26" class="cta"><a data-divlet-id="node-27" href="#start" class="button">Get started</a><a data-divlet-id="node-29" href="#try" class="quiet-link">Try it without installing</a></div><p data-divlet-id="node-31" class="note">This page is a divlet project too: one frame of plain HTML and CSS.</p></section><section data-divlet-id="what" id="what" class="board"><figure data-divlet-id="node-33" aria-label="What one edit looks like" class="exchange"><figcaption data-divlet-id="node-34">One edit, as the agent and the board see it</figcaption><p data-divlet-id="node-36" class="row"><span data-divlet-id="node-37" class="who">agent</span><span data-divlet-id="node-39" class="call">divlet_read</span><span data-divlet-id="node-41" class="arg">frame index · v4</span></p><p data-divlet-id="node-43" class="row"><span data-divlet-id="node-44" class="who">agent</span><span data-divlet-id="node-46" class="call">divlet_patch</span><span data-divlet-id="node-48" class="arg">index@v4 · h1 → “Ship the calm version”</span></p><p data-divlet-id="node-50" class="row ok"><span data-divlet-id="node-51" class="who">board</span><span data-divlet-id="node-53" class="call">accepted</span><span data-divlet-id="node-55" class="arg">v5 · rendered · saved · undoable</span></p><p data-divlet-id="node-57" class="row no"><span data-divlet-id="node-58" class="who">board</span><span data-divlet-id="node-60" class="call">refused</span><span data-divlet-id="node-62" class="arg">REVISION_CONFLICT · read v5 first</span></p></figure><ul data-divlet-id="node-64" class="facts"><li data-divlet-id="node-65"><b data-divlet-id="node-66">Real pages</b><span data-divlet-id="node-68">Every artboard is a live page of HTML, SVG and CSS. Resize it to check the phone layout; what you see is what ships.</span></li><li data-divlet-id="node-70"><b data-divlet-id="node-71">Point, then ask</b><span data-divlet-id="node-73">Select an element and ask. The agent reads the same selection, frame and measured layout you are looking at.</span></li><li data-divlet-id="node-75"><b data-divlet-id="node-76">Validated edits</b><span data-divlet-id="node-78">Each change names the version it was made against. Stale or invalid edits are refused, never half-applied, and History records who changed what.</span></li><li data-divlet-id="node-80"><b data-divlet-id="node-81">One file you own</b><span data-divlet-id="node-83"><code data-divlet-id="node-84">project.divlet</code> holds frames, components, tokens and CSS. Generated pages are plain HTML you can host anywhere.</span></li></ul></section><section data-divlet-id="how" id="how" class="how"><h2 data-divlet-id="node-87">How a change lands</h2><ol data-divlet-id="node-89" class="steps"><li data-divlet-id="node-90"><span data-divlet-id="node-91" class="step">1</span><div data-divlet-id="node-93"><b data-divlet-id="node-94">You point</b><p data-divlet-id="node-96">Select a frame or an element and say what you want: “tighter hero, warmer card”.</p></div></li><li data-divlet-id="node-98"><span data-divlet-id="node-99" class="step">2</span><div data-divlet-id="node-101"><b data-divlet-id="node-102">The agent reads, then edits</b><p data-divlet-id="node-104">It reads the frame and its version, then changes structure, text, styles or components by stable IDs.</p></div></li><li data-divlet-id="node-106"><span data-divlet-id="node-107" class="step">3</span><div data-divlet-id="node-109"><b data-divlet-id="node-110">The board checks and shows it</b><p data-divlet-id="node-112">The change is validated, rendered and saved as one step, or refused with a reason the agent can act on.</p></div></li><li data-divlet-id="node-114"><span data-divlet-id="node-115" class="step">4</span><div data-divlet-id="node-117"><b data-divlet-id="node-118">You keep it or undo it</b><p data-divlet-id="node-120">Undo reverts the whole accepted edit, whether the agent made it or you dragged something a minute ago.</p></div></li></ol></section><section data-divlet-id="try" id="try" class="try"><h2 data-divlet-id="node-122">Try it without installing</h2><p data-divlet-id="node-124" class="prose">On the divlet site this page opens inside the board itself, running entirely in your browser. Nothing is uploaded: your copy lives in this browser, and you can download it as a <code data-divlet-id="node-126">.divlet</code> file at any time.</p><div data-divlet-id="node-129" class="cards"><div data-divlet-id="node-130" class="card"><h3 data-divlet-id="node-131">Edit it on the board</h3><p data-divlet-id="node-133">Choose <b data-divlet-id="node-135">Edit on the board</b> at the top of the page, select anything and change it in the inspector, or add an artboard for a phone layout.</p><pre data-divlet-id="node-138"><code data-divlet-id="node-139">llblab.github.io/divlet</code></pre></div><div data-divlet-id="node-141" class="card"><h3 data-divlet-id="node-142">Let your agent edit it</h3><p data-divlet-id="node-144">The site is its own MCP provider. Register it by URL in Claude Code, an editor or any MCP host: the tools run in a browser page that <code data-divlet-id="node-146">divlet-mcp</code> opens, not on your machine.</p><pre data-divlet-id="node-149"><code data-divlet-id="node-150">npx -y @divlet/mcp --connect https://llblab.github.io/divlet/</code></pre></div></div></section><section data-divlet-id="start" id="start" class="start"><h2 data-divlet-id="node-152">Use it on your own projects</h2><p data-divlet-id="node-154" class="prose">Requires Node.js 22.19 or later. The board binds to loopback and your project stays a file in your folder; nothing is uploaded.</p><div data-divlet-id="node-156" class="cards"><div data-divlet-id="node-157" class="card"><h3 data-divlet-id="node-158">A board on your machine</h3><p data-divlet-id="node-160">Open a folder; an empty one gets a starter project, an existing one opens as it is.</p><pre data-divlet-id="node-162"><code data-divlet-id="node-163">npx -y @divlet/cli ./my-project</code></pre></div><div data-divlet-id="node-165" class="card"><h3 data-divlet-id="node-166">Your MCP agent</h3><p data-divlet-id="node-168">Install the workflow skill once, then register the server. The agent opens the board when it needs one.</p><pre data-divlet-id="node-170"><code data-divlet-id="node-171">npx skills add llblab/divlet --skill divlet --global
-npx -y @divlet/mcp --cwd ./my-project</code></pre></div><div data-divlet-id="node-173" class="card"><h3 data-divlet-id="node-174">Pi</h3><p data-divlet-id="node-176">The extension brings the tools, the skill and the Agent conversation to the board.</p><pre data-divlet-id="node-178"><code data-divlet-id="node-179">pi install npm:@divlet/pi</code></pre><p data-divlet-id="node-181">Then run <code data-divlet-id="node-183">/divlet</code> in your workspace.</p></div></div><p data-divlet-id="node-186" class="prose small">Version 0.0.5. The native project format remains a pre-freeze draft, so keep backups of projects you care about.</p></section><section data-divlet-id="agents" id="agents" class="agents"><h2 data-divlet-id="node-188">Seven tools, one contract</h2><p data-divlet-id="node-190" class="prose">Pi, MCP and the browser board run the same tool definitions, validation and refusal codes. The skill teaches the loop: read, edit with the version you read, verify what rendered.</p><ul data-divlet-id="node-192" class="tools"><li data-divlet-id="node-193"><code data-divlet-id="node-194">divlet_open</code><span data-divlet-id="node-196">Open a project and its local board.</span></li><li data-divlet-id="node-198"><code data-divlet-id="node-199">divlet_read</code><span data-divlet-id="node-201">Frames, nodes, components, the user's selection, measured layout and history.</span></li><li data-divlet-id="node-203"><code data-divlet-id="node-204">divlet_patch</code><span data-divlet-id="node-206">Change a frame or the project by stable IDs, at a known version.</span></li><li data-divlet-id="node-208"><code data-divlet-id="node-209">divlet_edit</code><span data-divlet-id="node-211">Insert, move, wrap, duplicate, rename or remove elements.</span></li><li data-divlet-id="node-213"><code data-divlet-id="node-214">divlet_frame_manage</code><span data-divlet-id="node-216">Create, duplicate or delete frames.</span></li><li data-divlet-id="node-218"><code data-divlet-id="node-219">divlet_undo</code><span data-divlet-id="node-221">Undo or redo the latest change.</span></li><li data-divlet-id="node-223"><code data-divlet-id="node-224">divlet_mark</code><span data-divlet-id="node-226">Show the user where the agent is about to work.</span></li></ul></section><section data-divlet-id="formats" id="formats" class="formats"><h2 data-divlet-id="node-228">Bring pages in, take plain HTML out</h2><p data-divlet-id="node-230" class="prose">Static HTML pages open through the native importer, Pencil files convert through a plugin, and Markdown folders become routed sites. A source is never rewritten: divlet creates a sibling <code data-divlet-id="node-232">.divlet</code> once. What comes out is ordinary HTML and CSS.</p><div data-divlet-id="node-235" class="chips"><span data-divlet-id="node-236"><code data-divlet-id="node-237">.html</code> static pages</span><span data-divlet-id="node-240"><code data-divlet-id="node-241">.pen</code> Pencil</span><span data-divlet-id="node-244">Markdown sites</span><span data-divlet-id="node-246"><code data-divlet-id="node-247">.divlet</code> native</span></div></section><section data-divlet-id="limits" id="limits" class="limits"><h2 data-divlet-id="node-250">Honest boundaries</h2><ul data-divlet-id="node-252"><li data-divlet-id="node-253"><b data-divlet-id="node-254">Layouts, not applications.</b> HTML, SVG and CSS; no scripts or event handlers.</li><li data-divlet-id="node-257"><b data-divlet-id="node-258">Generated pages are output.</b> Hand edits there are reported and preserved, not imported back.</li><li data-divlet-id="node-261"><b data-divlet-id="node-262">The browser board is a copy.</b> It edits this site's project; images, fonts and utility classes need the local board.</li></ul></section><footer data-divlet-id="node-265"><span data-divlet-id="node-266">divlet · MIT · github.com/llblab/divlet</span><span data-divlet-id="node-268">A browser board, not a service.</span></footer></main>
+<body><main data-divlet-id="top" id="top">
+  <header data-divlet-id="node-2" class="top">
+    <a data-divlet-id="node-4" href="#top" aria-label="divlet" class="mark"><svg data-divlet-id="node-5" viewBox="0 0 20 20" aria-hidden="true"><path data-divlet-id="node-6" d="M8 4.5 2.5 10 8 15.5" fill="none"></path><path data-divlet-id="node-7" d="M10.5 4.5H12L17.5 10 12 15.5h-1.5Z" fill="currentColor" stroke="none"></path></svg><span data-divlet-id="node-8">divlet</span></a>
+    <nav data-divlet-id="node-11" aria-label="Sections"><a data-divlet-id="node-12" href="#how">How it works</a><a data-divlet-id="node-14" href="#try">Try it</a><a data-divlet-id="node-16" href="#start">Install</a><a data-divlet-id="node-18" href="#agents">For agents</a></nav>
+  </header>
+
+  <section data-divlet-id="node-22" class="hero">
+    <p data-divlet-id="node-24" class="eyebrow">A layout board for coding agents</p>
+    <h1 data-divlet-id="node-27">Design in the browser.<br data-divlet-id="node-29">Change it in conversation.</h1>
+    <p data-divlet-id="node-32" class="lede">divlet gives your agent a board of real web pages. Point at what should change; the agent edits through validated tools, and you watch every accepted change land — versioned, logged and one Undo away.</p>
+    <div data-divlet-id="node-35" class="cta"><a data-divlet-id="node-36" href="#start" class="button">Get started</a><a data-divlet-id="node-38" href="#try" class="quiet-link">Try it without installing</a></div>
+    <p data-divlet-id="node-41" class="note">This page is a divlet project too: one frame of HTML, CSS and Tailwind utilities. Open it on the board and select anything.</p>
+  </section>
+
+  <figure data-divlet-id="node-45" aria-label="The board: artboards of real pages beside the property inspector" class="stage">
+    <div data-divlet-id="node-47" aria-hidden="true" class="stage-canvas">
+      <div data-divlet-id="node-49" class="artboard wide">
+        <span data-divlet-id="node-51" class="artboard-name">Home <i data-divlet-id="node-53">1280 × 800</i></span>
+        <div data-divlet-id="node-56" class="page">
+          <div data-divlet-id="node-58" class="page-bar"><b data-divlet-id="node-59"></b><span data-divlet-id="node-60"></span><span data-divlet-id="node-61"></span><span data-divlet-id="node-62"></span></div>
+          <div data-divlet-id="node-64" class="page-hero"><em data-divlet-id="node-65"></em><strong data-divlet-id="node-66"></strong><strong data-divlet-id="node-67" class="short"></strong><u data-divlet-id="node-68"></u></div>
+          <div data-divlet-id="node-70" class="page-row"><i data-divlet-id="node-71"></i><i data-divlet-id="node-72"></i><i data-divlet-id="node-73"></i></div>
+        </div>
+      </div>
+      <div data-divlet-id="node-77" class="artboard phone">
+        <span data-divlet-id="node-79" class="artboard-name">Phone <i data-divlet-id="node-81">390 × 844</i></span>
+        <div data-divlet-id="node-84" class="page">
+          <div data-divlet-id="node-86" class="page-bar"><b data-divlet-id="node-87"></b><span data-divlet-id="node-88"></span></div>
+          <div data-divlet-id="node-90" class="page-hero"><em data-divlet-id="node-91"></em><strong data-divlet-id="node-92"></strong><strong data-divlet-id="node-93" class="short"></strong><u data-divlet-id="node-94"></u></div>
+          <div data-divlet-id="node-96" class="page-row stack"><i data-divlet-id="node-97"></i><i data-divlet-id="node-98"></i></div>
+        </div>
+      </div>
+      <div data-divlet-id="node-102" class="inspector">
+        <p data-divlet-id="node-104" class="inspector-head"><span data-divlet-id="node-105">h1</span> #title</p>
+        <div data-divlet-id="node-109" class="chips-mock"><span data-divlet-id="node-110">text-4xl</span><span data-divlet-id="node-112">font-semibold</span><span data-divlet-id="node-114">pr-1</span></div>
+        <p data-divlet-id="node-117" class="inspector-title">Spacing</p>
+        <div data-divlet-id="node-120" class="boxmodel-mock"><div data-divlet-id="node-121"><div data-divlet-id="node-122"><div data-divlet-id="node-123"><span data-divlet-id="node-124">16</span></div></div></div></div>
+        <p data-divlet-id="node-127" class="inspector-title">Appearance</p>
+        <div data-divlet-id="node-130" class="field-mock"><span data-divlet-id="node-131">Text</span><i data-divlet-id="node-133"></i><code data-divlet-id="node-134">ink</code></div>
+      </div>
+    </div>
+    <figcaption data-divlet-id="node-139">Artboards of real pages, one inspector for their CSS. Resize an artboard to check the phone layout; what you see is what ships.</figcaption>
+  </figure>
+
+  <section data-divlet-id="what" id="what" class="board">
+    <figure data-divlet-id="node-144" class="exchange">
+      <figcaption data-divlet-id="node-146">One edit, as the agent and the board see it</figcaption>
+      <p data-divlet-id="node-149" class="row"><span data-divlet-id="node-150" class="who">agent</span><span data-divlet-id="node-152" class="call">divlet_read</span><span data-divlet-id="node-154" class="arg">frame index · v4</span></p>
+      <p data-divlet-id="node-157" class="row"><span data-divlet-id="node-158" class="who">agent</span><span data-divlet-id="node-160" class="call">divlet_patch</span><span data-divlet-id="node-162" class="arg">index@v4 · h1 → “Ship the calm version”</span></p>
+      <p data-divlet-id="node-165" class="row ok"><span data-divlet-id="node-166" class="who">board</span><span data-divlet-id="node-168" class="call">accepted</span><span data-divlet-id="node-170" class="arg">v5 · rendered · saved · undoable</span></p>
+      <p data-divlet-id="node-173" class="row no"><span data-divlet-id="node-174" class="who">board</span><span data-divlet-id="node-176" class="call">refused</span><span data-divlet-id="node-178" class="arg">REVISION_CONFLICT · read v5 first</span></p>
+    </figure>
+    <ul data-divlet-id="node-182" class="facts">
+      <li data-divlet-id="node-184"><b data-divlet-id="node-185">Real pages</b><span data-divlet-id="node-187">Every artboard is a live page of HTML, SVG and CSS. Nothing is redrawn on a canvas; the browser lays it out and paints it.</span></li>
+      <li data-divlet-id="node-190"><b data-divlet-id="node-191">Point, then ask</b><span data-divlet-id="node-193">Select an element and ask. The agent reads the same selection, frame and measured layout you are looking at.</span></li>
+      <li data-divlet-id="node-196"><b data-divlet-id="node-197">Validated edits</b><span data-divlet-id="node-199">Each change names the version it was made against. Stale or invalid edits are refused, never half-applied, and History records who changed what.</span></li>
+      <li data-divlet-id="node-202"><b data-divlet-id="node-203">One file you own</b><span data-divlet-id="node-205"><code data-divlet-id="node-206">project.divlet</code> holds frames, components, tokens and CSS. Generated pages are plain HTML you can host anywhere.</span></li>
+    </ul>
+  </section>
+
+  <section data-divlet-id="styles" id="styles" class="styles">
+    <p data-divlet-id="node-213" class="eyebrow">Styling</p>
+    <h2 data-divlet-id="node-216">Plain CSS first. Tailwind where it fits.</h2>
+    <p data-divlet-id="node-219" class="prose">The inspector edits CSS properties, not class names. Layout, spacing, borders, colour, type and effects are ordinary declarations that work in any project. Enable the Tailwind plugin and the same edit is stored as an atomic class — and typing a class updates the controls.</p>
+    <div data-divlet-id="node-222" class="flow">
+      <div data-divlet-id="node-224" class="rounded-2xl border border-hair bg-panel p-5 flow-step">
+        <p data-divlet-id="node-226" class="flow-label">Inspector</p>
+        <p data-divlet-id="node-229" class="flow-control"><span data-divlet-id="node-230">Padding right</span><b data-divlet-id="node-232">4</b><i data-divlet-id="node-234">px</i></p>
+      </div>
+      <span data-divlet-id="node-238" aria-hidden="true" class="flow-arrow">→</span>
+      <div data-divlet-id="node-241" class="rounded-2xl border border-hair bg-panel p-5 flow-step">
+        <p data-divlet-id="node-243" class="flow-label">CSS</p>
+        <p data-divlet-id="node-246" class="flow-code"><code data-divlet-id="node-247">padding-right: 4px;</code></p>
+      </div>
+      <span data-divlet-id="node-251" aria-hidden="true" class="flow-arrow">→</span>
+      <div data-divlet-id="node-254" class="rounded-2xl border border-hair bg-panel p-5 flow-step">
+        <p data-divlet-id="node-256" class="flow-label">Tailwind</p>
+        <p data-divlet-id="node-259" class="flow-code"><code data-divlet-id="node-260">pr-1</code></p>
+      </div>
+    </div>
+    <ul data-divlet-id="node-265" class="points">
+      <li data-divlet-id="node-267"><b data-divlet-id="node-268">Both ways.</b> <span data-divlet-id="node-271">Type <code data-divlet-id="node-273">pr-[37px]</code> in the class editor and the Padding field reads 37. The utility compiles in your browser — no server, no build step.</span></li>
+      <li data-divlet-id="node-277"><b data-divlet-id="node-278">What cannot be a utility stays CSS.</b> <span data-divlet-id="node-281">A single border edge, a measured content size or a shared stylesheet rule remains plain CSS; nothing is dropped or flattened.</span></li>
+      <li data-divlet-id="node-284"><b data-divlet-id="node-285">Static output, no runtime.</b> <span data-divlet-id="node-288">Generated pages carry your CSS and the compiled utilities. Remove the plugin and the controls keep working on inline CSS.</span></li>
+    </ul>
+    <p data-divlet-id="node-292" class="note">Open this page on the board, select any card above and change its padding.</p>
+  </section>
+
+  <section data-divlet-id="how" id="how" class="how">
+    <h2 data-divlet-id="node-297">How a change lands</h2>
+    <ol data-divlet-id="node-300" class="steps">
+      <li data-divlet-id="node-302"><span data-divlet-id="node-303" class="step">1</span><div data-divlet-id="node-305"><b data-divlet-id="node-306">You point</b><p data-divlet-id="node-308">Select a frame or an element and say what you want: “tighter hero, warmer card”.</p></div></li>
+      <li data-divlet-id="node-311"><span data-divlet-id="node-312" class="step">2</span><div data-divlet-id="node-314"><b data-divlet-id="node-315">The agent reads, then edits</b><p data-divlet-id="node-317">It reads the frame and its version, then changes structure, text, styles or components by stable IDs.</p></div></li>
+      <li data-divlet-id="node-320"><span data-divlet-id="node-321" class="step">3</span><div data-divlet-id="node-323"><b data-divlet-id="node-324">The board checks and shows it</b><p data-divlet-id="node-326">The change is validated, rendered and saved as one step, or refused with a reason the agent can act on.</p></div></li>
+      <li data-divlet-id="node-329"><span data-divlet-id="node-330" class="step">4</span><div data-divlet-id="node-332"><b data-divlet-id="node-333">You keep it or undo it</b><p data-divlet-id="node-335">Undo reverts the whole accepted edit, whether the agent made it or you dragged something a minute ago.</p></div></li>
+    </ol>
+  </section>
+
+  <section data-divlet-id="try" id="try" class="try">
+    <h2 data-divlet-id="node-341">Try it without installing</h2>
+    <p data-divlet-id="node-344" class="prose">On the divlet site this page opens inside the board itself, running entirely in your browser. Nothing is uploaded: your copy lives in this browser, and you can download it as a <code data-divlet-id="node-346">.divlet</code> file at any time.</p>
+    <div data-divlet-id="node-350" class="cards">
+      <div data-divlet-id="node-352" class="card"><h3 data-divlet-id="node-353">Edit it on the board</h3><p data-divlet-id="node-355">Choose <b data-divlet-id="node-357">Edit on the board</b> at the top of the page, select anything and change it with the inspector, or type Tailwind classes — new utilities compile right there.</p><pre data-divlet-id="node-360">llblab.github.io/divlet</pre></div>
+      <div data-divlet-id="node-363" class="card"><h3 data-divlet-id="node-364">Let your agent edit it</h3><p data-divlet-id="node-366">The site is its own MCP provider. Register it by URL in Claude Code, an editor or any MCP host: the tools run in a browser page that divlet-mcp opens, not on your machine.</p><pre data-divlet-id="node-368">npx -y @divlet/mcp --connect https://llblab.github.io/divlet/</pre></div>
+    </div>
+  </section>
+
+  <section data-divlet-id="start" id="start" class="start">
+    <h2 data-divlet-id="node-374">Use it on your own projects</h2>
+    <p data-divlet-id="node-377" class="prose">Requires Node.js 22.19 or later. The board binds to loopback and your project stays a file in your folder; nothing is uploaded.</p>
+    <div data-divlet-id="node-380" class="cards">
+      <div data-divlet-id="node-382" class="card"><h3 data-divlet-id="node-383">A board on your machine</h3><p data-divlet-id="node-385">Open a folder; an empty one gets a starter project, an existing one opens as it is.</p><pre data-divlet-id="node-387">npx -y @divlet/cli ./my-project</pre></div>
+      <div data-divlet-id="node-390" class="card"><h3 data-divlet-id="node-391">Your MCP agent</h3><p data-divlet-id="node-393">Install the workflow skill once, then register the server. The agent opens the board when it needs one.</p><pre data-divlet-id="node-395">npx skills add llblab/divlet --skill divlet --global
+npx -y @divlet/mcp --cwd ./my-project</pre></div>
+      <div data-divlet-id="node-398" class="card"><h3 data-divlet-id="node-399">Pi</h3><p data-divlet-id="node-401">The extension brings the tools, the skill and the Agent conversation to the board.</p><pre data-divlet-id="node-403">pi install npm:@divlet/pi</pre><p data-divlet-id="node-405">Then run <code data-divlet-id="node-407">/divlet</code> in your workspace.</p></div>
+    </div>
+    <p data-divlet-id="node-412" class="prose small">Version 0.1.0. The native project format remains a pre-freeze draft, so keep backups of projects you care about.</p>
+  </section>
+
+  <section data-divlet-id="agents" id="agents" class="agents">
+    <h2 data-divlet-id="node-417">Seven tools, one contract</h2>
+    <p data-divlet-id="node-420" class="prose">Pi, MCP and the browser board run the same tool definitions, validation and refusal codes. The skill teaches the loop: read, edit with the version you read, verify what rendered.</p>
+    <ul data-divlet-id="node-423" class="tools">
+      <li data-divlet-id="node-425"><code data-divlet-id="node-426">divlet_open</code><span data-divlet-id="node-428">Open a project and its local board.</span></li>
+      <li data-divlet-id="node-431"><code data-divlet-id="node-432">divlet_read</code><span data-divlet-id="node-434">Frames, nodes, components, the user's selection, measured layout and history.</span></li>
+      <li data-divlet-id="node-437"><code data-divlet-id="node-438">divlet_patch</code><span data-divlet-id="node-440">Change a frame or the project by stable IDs, at a known version. Styles are plain CSS declarations.</span></li>
+      <li data-divlet-id="node-443"><code data-divlet-id="node-444">divlet_edit</code><span data-divlet-id="node-446">Insert, move, wrap, duplicate, rename or remove elements.</span></li>
+      <li data-divlet-id="node-449"><code data-divlet-id="node-450">divlet_frame_manage</code><span data-divlet-id="node-452">Create, duplicate or delete frames.</span></li>
+      <li data-divlet-id="node-455"><code data-divlet-id="node-456">divlet_undo</code><span data-divlet-id="node-458">Undo or redo the latest change.</span></li>
+      <li data-divlet-id="node-461"><code data-divlet-id="node-462">divlet_mark</code><span data-divlet-id="node-464">Show the user where the agent is about to work.</span></li>
+    </ul>
+  </section>
+
+  <section data-divlet-id="formats" id="formats" class="formats">
+    <h2 data-divlet-id="node-470">Bring pages in, take plain HTML out</h2>
+    <p data-divlet-id="node-473" class="prose">Static HTML pages open through the native importer, Pencil files convert through a plugin, and Markdown folders become routed sites. A source is never rewritten: divlet creates a sibling <code data-divlet-id="node-475">.divlet</code> once. What comes out is ordinary HTML and CSS.</p>
+    <div data-divlet-id="node-479" class="chips"><span data-divlet-id="node-480"><code data-divlet-id="node-481">.html</code> static pages</span><span data-divlet-id="node-484"><code data-divlet-id="node-485">.pen</code> Pencil</span><span data-divlet-id="node-488">Markdown sites</span><span data-divlet-id="node-490"><code data-divlet-id="node-491">.divlet</code> native</span></div>
+  </section>
+
+  <section data-divlet-id="limits" id="limits" class="limits">
+    <h2 data-divlet-id="node-497">Honest boundaries</h2>
+    <ul data-divlet-id="node-500">
+      <li data-divlet-id="node-502"><b data-divlet-id="node-503">Layouts, not applications.</b> HTML, SVG and CSS; no scripts or event handlers.</li>
+      <li data-divlet-id="node-507"><b data-divlet-id="node-508">Generated pages are output.</b> Hand edits there are reported and preserved, not imported back.</li>
+      <li data-divlet-id="node-512"><b data-divlet-id="node-513">The browser board is a copy.</b> It edits this site's project; images, fonts, build output and opening other projects need the local board.</li>
+    </ul>
+  </section>
+
+  <footer data-divlet-id="node-519"><span data-divlet-id="node-520">divlet · MIT · github.com/llblab/divlet</span><span data-divlet-id="node-522">A browser board, not a service.</span></footer>
+</main>
 </body></html>

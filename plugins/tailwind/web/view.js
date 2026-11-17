@@ -123,3 +123,13 @@ export function variantClasses(className, property) {
   const base = item => { let depth = 0, cut = -1; for (let i = 0; i < item.length; i++) { const ch = item[i]; if (ch === '[' || ch === '(') depth++; else if (ch === ']' || ch === ')') depth = Math.max(0, depth - 1); else if (ch === ':' && !depth) cut = i; } return item.slice(cut + 1); };
   return names.filter(item => declarationsOfClass(base(item)).some(([name]) => name === property));
 }
+
+/** The CSS properties a class list sets unconditionally (variant classes set none: they never replace an inline declaration). */
+export function propertiesOfClass(name) {
+  return tw.hasVariant(name) ? [] : Object.keys(classView(name));
+}
+
+/** Inline declarations a one-click conversion may hand to the utility writer: plain values only (no priorities, URLs or custom properties). */
+export function convertibleInline(style) {
+  return Object.entries(style || {}).filter(([property, value]) => !property.startsWith('--') && !/!important|url\(|image-set\(/i.test(String(value)));
+}

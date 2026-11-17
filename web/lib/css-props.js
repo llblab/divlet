@@ -77,6 +77,42 @@ export function declaredValues(declarations) {
   return out;
 }
 
+/* ---- reconciling inline declarations with utilities ---------------------------------------------------- */
+const COVERING = ['padding', 'margin', 'inset', 'border-width', 'border-style', 'border-color', 'border-radius', 'gap', 'overflow', 'border'];
+const keyOf = property => (property.startsWith('--') ? property : property.toLowerCase());
+const coversOf = (decls, property) => {
+  const wanted = new Set();
+  const queue = [property];
+  for (let index = 0; index < queue.length; index++) for (const name of COVERING.filter(item => covered(item).includes(queue[index]))) if (!wanted.has(name)) { wanted.add(name); queue.push(name); }
+  return decls.flatMap(([name], index) => (wanted.has(keyOf(name)) ? [index] : []));
+};
+
+/**
+ * Inline declarations after a utility takes over `properties`: the declarations that would defeat it (the property, what it covers
+ * and any shorthand that covers it, expanded first so its siblings survive) are removed. Mirrors core's `releaseForUtilities`.
+ * Returns the new declaration map and the patch that turns the old map into it (null removes a key).
+ */
+export function releaseInline(style, properties) {
+  const decls = Object.entries(style || {});
+  for (const raw of properties) {
+    const property = keyOf(raw);
+    for (let guard = 0; guard < 16; guard++) {
+      const at = coversOf(decls, property);
+      if (!at.length) break;
+      const expanded = expandShorthand(keyOf(decls[at[0]][0]), decls[at[0]][1]);
+      if (!expanded) break; // a shorthand we cannot read stays; the utility may then be defeated, which the caller can report
+      decls.splice(at[0], 1, ...expanded);
+    }
+    const drop = new Set([property, ...longhandsOf(property)]);
+    for (let index = decls.length - 1; index >= 0; index--) if (drop.has(keyOf(decls[index][0]))) decls.splice(index, 1);
+  }
+  const next = Object.fromEntries(decls);
+  const delta = {};
+  for (const key of Object.keys(style || {})) if (!(key in next)) delta[key] = null;
+  for (const [key, value] of Object.entries(next)) if (style?.[key] !== value) delta[key] = value;
+  return { style: next, delta };
+}
+
 /**
  * The view of one element: representation `readers` (applied first) underneath its inline declarations. A reader is
  * `{ view(className, context) → { property: value } }`; `context` carries what a representation needs from the project

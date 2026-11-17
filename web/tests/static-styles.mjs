@@ -89,14 +89,31 @@ test('with the Tailwind provider, controls and the class editor are linked views
     await until(async () => (await page.locator('#inspector [data-key="fill"]').inputValue()) === 'var(--color-fuchsia-600)', 'the Fill control reads the colour back');
     // The class editor explains utilities with the in-page design system (no route).
     await page.locator('#inspector .classes [data-kind="utility"]').first().hover();
+    // One meaning: a typed utility replaces the inline declaration it would otherwise lose to (inline CSS beats utilities).
+    await page.locator('#inspector [data-section="style"] summary').click();
+    const rawKey = page.locator('#inspector [data-key="style-new-key"]');
+    await rawKey.fill('padding: 10px'); await rawKey.press('Enter');
+    await until(async () => (await computed(page, 'paddingTop')) === '10px', 'an inline shorthand renders');
+    await until(async () => (await page.locator('#inspector [data-key="p-r"]').inputValue()) === '10', 'the control reads the inline shorthand');
+    await input.fill('pr-[55px]'); await input.press('Enter');
+    await until(async () => (await computed(page, 'paddingRight')) === '55px', 'the utility wins over the inline shorthand it replaced');
+    assert.ok(!/padding-right|padding:/.test(await attr(page, 'style') ?? ''), 'the shorthand was expanded and the overridden side removed');
+    assert.equal(await computed(page, 'paddingTop'), '10px', 'its other sides survive');
+    // Moving existing inline CSS into classes is explicit, one accepted edit, and keeps the rendering.
+    await rawKey.fill('letter-spacing: 1px'); await rawKey.press('Enter');
+    await until(async () => (await computed(page, 'letterSpacing')) === '1px', 'plain inline CSS renders');
+    await until(async () => (await page.locator('#inspector [data-key="class-convert"]').count()) === 1, 'the class editor offers to move inline declarations');
+    await page.locator('#inspector [data-key="class-convert"]').click();
+    await until(async () => /\[letter-spacing:1px\]/.test(await attr(page, 'class') ?? '') && !/letter-spacing/.test(await attr(page, 'style') ?? ''), 'the declaration became a class');
+    assert.equal(await computed(page, 'letterSpacing'), '1px', 'the rendering is unchanged');
     // What a utility cannot express stays plain CSS: a single border edge is a deliberate inline declaration.
     await setField(page, 'border-width-t', '3');
     await until(async () => /border-top-width:\s*3px/.test(await attr(page, 'style') ?? ''), 'an unconvertible edit stays an inline declaration');
     // The copy persists across a reload.
-    await until(async () => (await computed(page, 'paddingRight')) === '37px', 'edits are rendered before reload');
+    await until(async () => (await computed(page, 'paddingRight')) === '55px', 'edits are rendered before reload');
     await page.reload();
     await page.getByRole('button', { name: 'Collapse to the board', exact: true }).click({ timeout: 1500 }).catch(() => {});
-    await until(async () => (await computed(page, 'paddingRight')) === '37px', 'the browser-local copy keeps the edits');
+    await until(async () => (await computed(page, 'paddingRight')) === '55px', 'the browser-local copy keeps the edits');
     assert.deepEqual(errors, []);
     const outside = site.requests.filter(line => !line.startsWith('GET '));
     assert.deepEqual(outside, [], 'only static GETs');

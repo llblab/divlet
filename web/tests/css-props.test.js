@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as css from '../lib/css-props.js';
-import { declaredValues as coreDeclaredValues, expandShorthand as coreExpand } from '../../core/lib/native-styles.ts';
+import { declaredValues as coreDeclaredValues, expandShorthand as coreExpand, releaseForUtilities } from '../../core/lib/native-styles.ts';
 
 test('the authored view expands shorthands in order and agrees with the core editor', () => {
   const cases = [
@@ -56,4 +56,23 @@ test('alignment and pinning round-trip through declarations', () => {
   assert.equal(css.blurEdit({}, 0), null);
   assert.equal(css.gridColumns({ 'grid-template-columns': css.gridColumnsEdit(3) }), 3);
   assert.equal(css.gapOf({ gap: '8px' }), '8'); assert.equal(css.gapOf({ 'row-gap': '4px', 'column-gap': '8px' }), '4 8');
+});
+
+test('inline declarations a utility would lose to are released exactly as the core writer releases them', () => {
+  const cases = [
+    [{ padding: '12px', color: 'red' }, ['padding-right']],
+    [{ border: '1px solid #ccc', color: 'red' }, ['border-top-width']],
+    [{ 'padding-right': '4px', padding: '10px' }, ['padding-right']],
+    [{ margin: '0 auto' }, ['margin-left', 'margin-right']],
+    [{ padding: '8px', margin: '4px' }, ['padding']],
+    [{ color: 'red' }, ['padding-right']],
+  ];
+  for (const [style, properties] of cases) {
+    const client = css.releaseInline(style, properties);
+    assert.deepEqual(client.style, releaseForUtilities(style, properties).style, JSON.stringify([style, properties]));
+    // The delta replays onto the old map to give the new one (what a merge patch does).
+    const replay = { ...style };
+    for (const [key, value] of Object.entries(client.delta)) { if (value === null) delete replay[key]; else replay[key] = value; }
+    assert.deepEqual(replay, client.style, 'the patch reproduces the released declarations');
+  }
 });

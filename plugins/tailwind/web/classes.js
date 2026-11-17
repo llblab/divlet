@@ -4,6 +4,7 @@ import { el, icon } from '../../lib/util.js';
 import { descriptor, undo, redo } from '../../lib/store.js';
 import { classes as classPort } from '../../lib/host.js';
 import { attachSuggest } from '../../lib/suggest.js';
+import { convertibleInline } from './view.js';
 
 /** Class names: split on whitespace, and on commas only outside [] and () — `text-[clamp(40px,3.5vw,58px)]` is one class. */
 function split(value) {
@@ -72,9 +73,10 @@ function attach(input, documentId, onAccept) {
 
 /**
  * Chips for the classes of `node` plus an input to add more. `save(next, label)` commits the
- * new class list (an array).
+ * new class list (an array). `convert(entries)` (optional) moves plain inline declarations into utilities in one accepted edit; it is
+ * offered only while the element has some, and never runs by itself.
  */
-export function classEditor(documentId, node, save) {
+export function classEditor(documentId, node, save, { convert } = {}) {
   const box = el('div', 'classes');
   const list = split(node.className);
   const known = explained.get(documentId)?.classes;
@@ -157,6 +159,15 @@ export function classEditor(documentId, node, save) {
   input.addEventListener('blur', add);
   box.append(input);
   box.addEventListener('click', event => { if (event.target === box) input.focus(); });
+  const inline = convertibleInline(node.style);
+  if (convert && inline.length) {
+    const move = el('button', 'link-button cls-convert', inline.length === 1 ? 'Move 1 inline declaration to classes' : `Move ${inline.length} inline declarations to classes`);
+    move.type = 'button';
+    move.dataset.key = 'class-convert';
+    move.dataset.tip = `Rewrite ${inline.map(([property]) => property).join(', ')} as utilities. What no utility can express becomes an arbitrary-property class.`;
+    move.addEventListener('click', () => convert(inline));
+    box.append(move);
+  }
 
   if (list.length) {
     explain(documentId, list).then(map => {
