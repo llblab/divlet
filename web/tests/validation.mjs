@@ -319,8 +319,8 @@ try {
     const defaultResourceOpenBefore = await resourceCode(() => BrowserRuntime.open(defaultOptions));
     const browserResources = [];
     for (const { name, run, expected } of browserResourceCases) browserResources.push({ name, actual: await run({ BrowserRuntime, projectClosedPreview }), expected });
-    const defaultResourceOpenAfter = await resourceCode(() => BrowserRuntime.open({ ...defaultOptions, capabilities: { assets: true }, projectPreview: () => { defaultProjections++; return ''; } }));
-    const defaultResourceRuntime = await BrowserRuntime.open({ ...defaultOptions, source: { schemaVersion: 1, frames: [] }, capabilities: { assets: true } });
+    const defaultResourceOpenAfter = await resourceCode(() => BrowserRuntime.open({ ...defaultOptions, capabilities: { assets: true, sourceAssets: true }, projectPreview: () => { defaultProjections++; return ''; } }));
+    const defaultResourceRuntime = await BrowserRuntime.open({ ...defaultOptions, source: { schemaVersion: 1, frames: [] }, capabilities: { assets: true, sourceAssets: true } });
     const defaultResourcePatch = await resourceCode(() => defaultResourceRuntime.patchProject({ expectedVersion: 1, patch: { assets: browserResourceSource().assets } }));
     await defaultResourceRuntime.close();
     const [historyApi, { historyTraversalCases, captureHistoryTraversal }] = await Promise.all(['history.ts', 'history-traversal-cases.js'].map(file => import(new URL(file, location.href).href)));

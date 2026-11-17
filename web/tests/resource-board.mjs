@@ -115,7 +115,35 @@ try {
   assert.deepEqual(await frame.locator('[data-divlet-id="literal"]').evaluate(async img => { await img.decode(); return [img.naturalWidth, img.naturalHeight]; }), [7, 9]);
   const project = parse(await connection.callTool('divlet_read', { view: 'project' }));
   assert.deepEqual(project.project.resources, summaries(originalImage, originalFont)); assert.ok(!JSON.stringify(project).includes(';base64,'));
-  assert.equal(project.project.capabilities.assets, true); assert.ok(!('fontUpload' in project.project.capabilities)); assert.equal(project.site, null);
+  const beforeDevicePaste = await state(), deviceRecord = await page.evaluate(storedRecord);
+  await page.evaluate(async () => {
+    const store = await import('./lib/store.js'), clip = await import('./lib/clip.js');
+    store.selectArtboards(['index']); await store.loadModel('index');
+    await clip.paste({ files: [new File(['<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'], 'device.svg', { type: 'image/svg+xml' })] });
+    await store.idle('index');
+  });
+  assert.deepEqual(denied, [], 'declared source-byte admission must not dispatch clipboard/device files to native assets HTTP');
+  assert.equal(await state(), beforeDevicePaste); assert.deepEqual(await page.evaluate(storedRecord), deviceRecord);
+  assert.equal(project.project.capabilities.assets, false); assert.equal(project.project.capabilities.sourceAssets, true);
+  assert.ok(!('fontUpload' in project.project.capabilities)); assert.equal(project.site, null);
+  await page.evaluate(async () => { const store = await import('./lib/store.js'); store.selectNodes('index', ['image']); });
+  await page.waitForSelector('#inspector .image-box');
+  assert.equal(await page.locator('#inspector .image-buttons button').count(), 0, 'native picker/upload controls are absent');
+  assert.deepEqual(await page.locator('#inspector .image-box .thumb img').evaluateAll(images => images.map(img => img.getAttribute('src'))), [], 'unavailable declared thumbnail resolution does not guess a native build URL');
+  assert.equal(await page.locator('#inspector [data-key="font-upload"]').count(), 0);
+  const forged = await page.evaluate(async () => {
+    const store = await import('./lib/store.js'), inspector = await import('./lib/inspector.js');
+    const caps = store.store.state.project.capabilities, previous = caps.assets;
+    try {
+      caps.assets = true; await inspector.render({ force: true });
+      return { buttons: document.querySelectorAll('#inspector .image-buttons button').length, images: [...document.querySelectorAll('#inspector .image-box .thumb img')].map(img => img.getAttribute('src')) };
+    } finally { caps.assets = previous; await inspector.render({ force: true }); }
+  });
+  assert.deepEqual(forged, { buttons: 0, images: [] }, 'capability data alone cannot authorize absent native picker/thumbnail routes');
+  assert.deepEqual(denied, [], 'selection/inspector also avoids native image routes');
+  await page.evaluate(async () => { const store = await import('./lib/store.js'); store.selectNodes('index', ['literal']); });
+  await page.waitForFunction(() => { const img = document.querySelector('#inspector .image-box .thumb img'); return img?.complete && img.naturalWidth === 7; });
+  assert.equal(await page.locator('#inspector .image-box .thumb img').getAttribute('src'), literal, 'literal URLs retain ordinary inspector thumbnails without a resource-host route');
   assert.equal(await page.evaluate(() => typeof globalThis[Symbol.for('divlet.board-host/1')].exports.nodes), 'undefined');
   const src = await page.locator('iframe[data-document-id="index"]').getAttribute('src');
   await frame.locator('input').evaluate(input => { window.heldRoot = document.querySelector('main'); window.heldInput = input; input.focus(); input.value = 'retained draft'; });

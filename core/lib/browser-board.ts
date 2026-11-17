@@ -111,7 +111,7 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
   const stored = await store.get(options.storageKey);
   const compiler = snapshotCompiler(styles);
   const persist = (text: string) => store.put(options.storageKey, { base, text, savedAt: new Date().toISOString() });
-  const open = (source: string) => BrowserRuntime.open({ source, file: options.file, projectId: `browser-${base.slice(0, 16)}`, compiler, persist, projectPreview: options.projectPreview, resourcePolicy: options.resourcePolicy, capabilities: { browser: true, assets: options.resourcePolicy !== undefined, export: false } });
+  const open = (source: string) => BrowserRuntime.open({ source, file: options.file, projectId: `browser-${base.slice(0, 16)}`, compiler, persist, projectPreview: options.projectPreview, resourcePolicy: options.resourcePolicy, capabilities: { browser: true, assets: false, export: false, ...(options.resourcePolicy !== undefined ? { sourceAssets: true } : {}) } });
   let runtime: BrowserRuntime;
   let restored = false;
   if (stored?.base === base) {

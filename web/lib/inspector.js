@@ -5,7 +5,7 @@ import * as actions from './actions.js';
 import { openMenu, menuAnchor, closeMenu } from './menu.js';
 import { overflowBar } from './toolbar.js';
 import { panelSections } from './panels.js';
-import { components as componentSource } from './host.js';
+import { components as componentSource, native } from './host.js';
 import { fontFamilyControl } from './typography.js';
 import { textOverride, textOverridePatch } from './component-text.js';
 import { attributesEditor } from './attrs.js';
@@ -423,6 +423,7 @@ function textEditor(model, node) {
 /** URL the board can load for an image source written relative to the project source. */
 function imageUrl(doc, src) {
   if (!src) return '';
+  if (!native && !/^(https?:|data:)/i.test(src)) return '';
   if (src.startsWith('asset:')) {
     const at = src.indexOf('#'), before = at < 0 ? src : src.slice(0, at);
     return apiUrl(`build/assets/${before.slice(6)}${before.includes('?') ? '&' : '?'}divlet-resource=${store.state?.project?.version || 0}${at < 0 ? '' : src.slice(at)}`);
@@ -482,8 +483,8 @@ function imageEditor(doc, node) {
   upload.dataset.tip = 'Add an image file to divlet/assets — or drop it onto the artboard';
   upload.addEventListener('click', () => uploadInto(doc, node));
   const buttons = el('div', 'image-buttons');
-  // Choosing or uploading project images needs a host that stores asset bytes; elsewhere the source stays a plain field.
-  if (capable('assets')) buttons.append(replace, upload);
+  // These picker/upload actions use native HTTP routes, not the separate source-byte admission capability.
+  if (native && capable('assets')) buttons.append(replace, upload);
   const alt = textField('image-alt', node.attrs.alt ?? '', value => refreshed(commit(doc.id, { nodes: { [node.id]: { attrs: { alt: value } } } }, { label: `alt text of ${node.id}` })), { placeholder: 'Alt text (describe the image)', label: 'Alt text' });
   side.append(el('span', 'image-src', node.attrs.src || 'No source yet'), buttons);
   box.append(preview, side);

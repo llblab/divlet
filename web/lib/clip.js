@@ -1,5 +1,5 @@
 import { store, capable, documents, descriptor, edit, toast, cachedModel, loadModel, selectNodes, parentOf, canContain, apiUrl } from './store.js';
-import { exports as exportService } from './host.js';
+import { exports as exportService, native } from './host.js';
 import * as canvas from './canvas.js';
 import { duplicateArtboards } from './artboards.js';
 
@@ -201,7 +201,7 @@ async function upload(file, documentId, group) {
 
 /** Store images in the project and add an <img> for each at the paste/drop target. */
 export async function addImages(files, documentId) {
-  if (!capable('assets')) { toast('Images need the local divlet host: this browser copy stores no image files.'); return; }
+  if (!native || !capable('assets')) { toast('Image upload needs the local divlet host; device and clipboard image files cannot be added here.'); return; }
   if (documentId && !(store.selected.size === 1 && store.selected.has(documentId))) {
     const { selectArtboards } = await import('./store.js');
     selectArtboards([documentId]);

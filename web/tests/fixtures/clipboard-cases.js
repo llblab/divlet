@@ -75,6 +75,12 @@ export async function clipboardCases() {
       const priorCalls = calls.length;
       clip.copySelection({ event: currentEvent });
       record(`${mode}: resource-free copy keeps the synchronous clipboard path`, { types: currentEvent.values.map(([type]) => type), prevented: currentEvent.prevented, hostCalls: calls.length - priorCalls }, { types: ['text/plain', 'text/html'], prevented: 1, hostCalls: 0 });
+      if (mode === 'nodes') for (const capabilities of [{ sourceAssets: true }, { sourceAssets: true, assets: true }]) {
+        store.store.state.project.capabilities = capabilities;
+        const beforeRaw = raw.length;
+        await clip.paste({ files: [new File(['<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'], 'device.svg', { type: 'image/svg+xml' })] });
+        record(`source assets with upload flag ${capabilities.assets ?? 'omitted'} cannot authorize native image paste`, raw.slice(beforeRaw), []);
+      }
     }
     record('all alternative hosts avoid native HTTP entirely', raw, []);
   } finally {
