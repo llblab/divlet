@@ -6,11 +6,12 @@ A local layout board for coding agents. Work with real HTML in live artboards, r
 
 [Quick start](#quick-start) · [Connect an agent](#connect-an-agent) · [Board guide](docs/board.md) · [Documentation](docs/README.md)
 
-> **0.0.5.** The native project format remains a pre-freeze draft; keep backups because future versions may require explicit conversion. A versioned source tree is not proof of npm publication; see the [release workflow](docs/publishing.md#github-actions-publishing) for registry verification.
+> **0.1.0.** The native project format remains a pre-freeze draft; keep backups because future versions may require explicit conversion. A versioned source tree is not proof of npm publication; see the [release workflow](docs/publishing.md#github-actions-publishing) for registry verification.
 
 ## Real pages, not pictures of pages
 
 - **See the actual layout.** Each artboard is an iframe with real HTML, locally compiled Tailwind and CSS. Resize it to check responsive behavior.
+- **Plain CSS first, Tailwind where it fits.** The inspector edits CSS properties, not class names: layout, spacing, border, colour, type and effects work in any project with no plugin. The optional Tailwind plugin stores the same edit as an atomic class, reads typed classes back into the controls, and keeps anything no utility can express as plain CSS.
 - **Point, then ask.** Select an element and ask your connected agent to change it. Pi and MCP use the same seven validated tools.
 - **Build once, reuse.** Components, instance overrides, shared tokens and project CSS keep related pages connected.
 - **Keep your work local.** The board binds to loopback. Projects are files in your workspace, with autosave, history and undo—not a hosted design service.
@@ -22,7 +23,7 @@ Requires **Node.js 22.19 or later**. Pi is optional.
 Open a standalone board:
 
 ```bash
-npx -y @divlet/cli@0.0.5 /absolute/path/to/workspace
+npx -y @divlet/cli@0.1.0 /absolute/path/to/workspace
 ```
 
 Or run from a source checkout:
@@ -46,7 +47,7 @@ Open the URL printed in the terminal. An empty workspace gets `project.divlet` w
 Install the Pi adapter:
 
 ```bash
-pi install npm:@divlet/pi@0.0.5
+pi install npm:@divlet/pi@0.1.0
 ```
 
 For checkout development, load the source adapter for a one-off session instead (no build needed):
@@ -84,7 +85,7 @@ Drop `--global` to install into the current project only. Skip this step under P
   "mcpServers": {
     "divlet": {
       "command": "npx",
-      "args": ["-y", "@divlet/mcp@0.0.5", "--cwd", "/absolute/path/to/workspace"]
+      "args": ["-y", "@divlet/mcp@0.1.0", "--cwd", "/absolute/path/to/workspace"]
     }
   }
 }
@@ -97,10 +98,10 @@ Call `divlet_open` and open its returned URL. No Pi installation is needed. Clie
 The [Pages board](https://llblab.github.io/divlet/) is a static site that is its own MCP provider: register it by URL and the tools run in a browser page, on that site's project, with no server deployed for it. From a checkout: `node scripts/source.mjs mcp/index.js --connect <url>`.
 
 ```bash
-npx -y @divlet/mcp@0.0.5 --connect https://llblab.github.io/divlet/
+npx -y @divlet/mcp@0.1.0 --connect https://llblab.github.io/divlet/
 ```
 
-The page opens in a managed browser window (headless without a display). Edits persist in that browser profile until the publication changes; utility compilation, images, fonts and opening other projects stay with the local server. Website descriptions and results are treated as website text, and redirects to other origins are refused. See [browser-hosted MCP](docs/browser-mcp.md) for the protocol, security boundaries and how to make another static app a provider.
+The page opens in a managed browser window (headless without a display). Edits persist in that browser profile until the publication changes; Tailwind utilities compile inside the page, while images, fonts and opening other projects stay with the local server. Website descriptions and results are treated as website text, and redirects to other origins are refused. See [browser-hosted MCP](docs/browser-mcp.md) for the protocol, security boundaries and how to make another static app a provider.
 
 [Agent integration guide](docs/agents.md) → Alternative Pi installation, MCP options, the workflow skill and JavaScript entry points.
 
@@ -120,9 +121,9 @@ npx -y @divlet/mcp --cwd ./workspace
 npm install -g @divlet/cli @divlet/mcp
 ```
 
-For Pi, run `pi install npm:@divlet/pi@0.0.5`. Shared setups should pin `@divlet/cli@0.0.5`, `@divlet/mcp@0.0.5` and `npm:@divlet/pi@0.0.5`. The root package has no commands or Pi manifest; there is no wrapper layer.
+For Pi, run `pi install npm:@divlet/pi@0.1.0`. Shared setups should pin `@divlet/cli@0.1.0`, `@divlet/mcp@0.1.0` and `npm:@divlet/pi@0.1.0`. The root package has no commands or Pi manifest; there is no wrapper layer.
 
-Unreleased source/local builds also provide a [provider-free Node host entry](docs/agents.md#provider-free-node-host); this is not part of the published 0.0.5 or an adapter/browser-mode switch.
+Source and local builds, and the 0.1.0 packages once published, also provide a [provider-free Node host entry](docs/agents.md#provider-free-node-host); it is not an adapter/browser-mode switch.
 
 See [npm publication](docs/publishing.md) for version pinning, package identity and release gates.
 
