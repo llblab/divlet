@@ -39,9 +39,8 @@ export function close() {
 const inspector = $('#inspector');
 
 /**
- * The pinned chrome has two looks, chosen by the panels themselves: with every panel folded it floats over the canvas (frosted,
- * translucent); as soon as a panel is open the chrome belongs to one opaque body, so the pills and the dock turn solid. `none`,
- * `left`, `right` or `both` says which side is open.
+ * Which side panels are open, published for layout rules: `none`, `left`, `right` or `both`. The chrome is opaque in every
+ * state; the value only decides how the pills join an open panel.
  */
 function paintPanels() {
   const left = !panel.hidden, right = !!inspector && !inspector.hidden;

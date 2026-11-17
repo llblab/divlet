@@ -289,7 +289,8 @@ export function render() {
     feedback.setAttribute('role', 'status'); feedback.setAttribute('aria-live', 'polite');
     feedback.classList.toggle('is-error', !!(navigationError || readError));
     const counters = el('div', 'history-counters'); counters.append(revision, frames);
-    foot.append(feedback, counters);
+    // The counters are one line; a refusal or progress note appears under them only while it has something to say.
+    foot.append(counters, feedback);
   } else foot.append(revision, frames);
   const scroll = panel.querySelector('.panel-body')?.scrollTop ?? 0;
   const focused = panel.contains(document.activeElement) ? document.activeElement : null;

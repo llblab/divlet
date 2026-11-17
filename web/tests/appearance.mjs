@@ -210,8 +210,6 @@ try {
   await waitUntil(() => actualFamily().then(value => value === 'serif'), 'important stylesheet family is effective');
   await chooseFamily('monospace'); await waitUntil(() => inlineFamily() === 'monospace', 'the authored inline value is saved without silent priority escalation');
   assert.equal(await actualFamily(), 'serif', 'the explicit important stylesheet still wins');
-  assert.match(await page.locator('.font-family-note').innerText(), /inline CSS.*stylesheet priority/);
-  assert.equal(await family.getAttribute('aria-describedby'), 'font-family-cascade-note', 'the always-visible cascade disclosure describes this authored-value control');
   await waitUntil(() => family.locator('.pick-v').innerText().then(text => text === 'monospace'), 'reader-driven family redraw settles before the keyboard menu gesture');
   const acceptedContext = { version: afterVersion(), render: runtime.getEntry('welcome').render };
   await waitUntil(() => page.evaluate(async expected => {
@@ -323,7 +321,7 @@ try {
   }
   assert.deepEqual(await borderWidths(), ['2px', '4px', '3px', '3px'], 'hiding and showing the border preserves authored widths');
   await page.locator('#inspector [data-key="stroke"]').fill('#cc3344'); await page.keyboard.press('Enter');
-  await waitUntil(async () => await page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => getComputedStyle(node).borderTopColor === 'rgb(204, 51, 68)'), 'Border colour reaches the actual page');
+  await waitUntil(async () => await page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => getComputedStyle(node).borderTopColor === 'rgb(204, 51, 68)'), 'Border color reaches the actual page');
   checks.push('Border styles change all four sides without dropping widths; its colour field changes the actual border');
   await page.locator('#inspector [data-key="pick:Weight"]').click();
   await page.locator('.menu .menu-item', { hasText: 'Extra bold 800' }).click();

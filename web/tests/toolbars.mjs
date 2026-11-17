@@ -221,8 +221,8 @@ try {
   }
   checks.push('the chrome shares one frame and one radius (search pill included)');
 
-  // One chrome language, chosen by the panels: folded panels leave the pinned chrome frosted over the canvas; an open panel
-  // makes the same pills part of one solid body. The search pill used to be fully transparent (a `.tool` reset).
+  // Chrome is opaque whether panels are folded or open: the canvas never shows through a pill. The search pill used to be fully
+  // transparent (a `.tool` reset).
   {
     const pills = ['#status', '#palette-open', '#side-tabs .tab', '#dock'];
     const readPills = async () => {
@@ -240,8 +240,8 @@ try {
     const frosted = await readPills();
     for (const pill of frosted) {
       assert.equal(pill.hovered, false, `${pill.selector} is not hovered while measured`);
-      assert.ok(pill.alpha < 1 && pill.alpha > 0.5, `${pill.selector} is translucent while no panel is open (${pill.alpha})`);
-      assert.match(pill.blur, /blur/, `${pill.selector} is frosted (${pill.blur})`);
+      assert.equal(pill.alpha, 1, `${pill.selector} is opaque over the canvas too, never see-through (${pill.alpha})`);
+      assert.equal(pill.blur, 'none', `${pill.selector} has no backdrop blur (${pill.blur})`);
     }
     await page.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); });
     await waitUntil(() => page.evaluate(() => !document.querySelector('#inspector').hidden), 'the inspector is open for the selected artboard');

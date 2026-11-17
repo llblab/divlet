@@ -215,7 +215,7 @@ function colorField({ key, label, tip, property, value, run, computed, tokens })
   swatch.type = 'color';
   swatch.value = /^#[0-9a-f]{6}$/i.test(shownHex || '') ? shownHex : '#000000';
   swatch.dataset.key = `${key}-swatch`;
-  swatch.setAttribute('aria-label', `${label} colour picker`);
+  swatch.setAttribute('aria-label', `${label} color picker`);
   const hex = el('input', 'vf-input color-hex');
   hex.type = 'text';
   hex.spellcheck = false;
@@ -226,7 +226,7 @@ function colorField({ key, label, tip, property, value, run, computed, tokens })
   hex.setAttribute('aria-label', tip);
   const set = (raw, shown) => {
     const next = css.colourInput(raw);
-    if (next === undefined) { toast(`“${raw}” is not a colour: use #rrggbb, a project colour or white, black, transparent`); hex.value = hex.dataset.last ?? ''; return; }
+    if (next === undefined) { toast(`“${raw}” is not a color: use #rrggbb, a project color or white, black, transparent`); hex.value = hex.dataset.last ?? ''; return; }
     hex.dataset.last = hex.value = shown ?? raw;
     run({ [property]: next }, `${label.toLowerCase()} ${shown ?? raw}`);
   };
@@ -247,7 +247,7 @@ function colorField({ key, label, tip, property, value, run, computed, tokens })
   if (tokens.length) {
     const row = el('div', 'token-swatches');
     row.setAttribute('role', 'group');
-    row.setAttribute('aria-label', `${label} from the project colours`);
+    row.setAttribute('aria-label', `${label} from the project colors`);
     for (const [token, tokenValue] of tokens.slice(0, 12)) {
       const dot = el('button', 'token-swatch');
       dot.type = 'button';
@@ -305,7 +305,7 @@ function borderFold(views, { value, run, measured, tokens, widthField }) {
       'border-style': next,
     }, `border style ${next ?? 'default'}`)),
     widths,
-    colorField({ key: 'stroke', label: 'Colour', tip: 'Border colour', property: 'border-color', value, run, computed: measured?.colors?.borderColor, tokens }),
+    colorField({ key: 'stroke', label: 'Color', tip: 'Border color', property: 'border-color', value, run, computed: measured?.colors?.borderColor, tokens }),
     geometry,
   );
   return box;
@@ -333,8 +333,8 @@ function appearanceFold({ value, run, measured, tokens }) {
   typography.dataset.inspectorSlot = 'typography';
   typography.append(type, textRow);
   box.append(
-    colorField({ key: 'fill', label: 'Fill', tip: 'Background colour', property: 'background-color', value, run, computed: measured?.colors?.background, tokens }),
-    colorField({ key: 'ink', label: 'Text', tip: 'Text colour', property: 'color', value, run, computed: measured?.colors?.color, tokens }),
+    colorField({ key: 'fill', label: 'Fill', tip: 'Background color', property: 'background-color', value, run, computed: measured?.colors?.background, tokens }),
+    colorField({ key: 'ink', label: 'Text', tip: 'Text color', property: 'color', value, run, computed: measured?.colors?.color, tokens }),
     typography,
   );
   return box;

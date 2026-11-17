@@ -94,9 +94,6 @@ export function fontFamilyControl(nodes, { css, apply, upload }) {
   ], { anchor: button, label: 'Font family' }));
   scroll.append(button);
   const control = el('div', 'font-family-control');
-  const note = el('small', 'caption font-family-note', 'Edits set inline CSS; stylesheet priority still applies.');
-  note.id = 'font-family-cascade-note';
-  button.setAttribute('aria-describedby', note.id);
   const row = el('div', 'font-family-row');
   row.append(scroll);
   if (upload) {
@@ -116,6 +113,6 @@ export function fontFamilyControl(nodes, { css, apply, upload }) {
     });
     row.append(add, picker);
   }
-  control.append(row, note);
+  control.append(row);
   return control;
 }
