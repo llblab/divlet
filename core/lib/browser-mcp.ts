@@ -125,19 +125,29 @@ export interface BrowserMcpConnection {
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const originOf = (href: string): string => { try { return new URL(href).origin; } catch { return 'null'; } };
 
+/**
+ * How a connection's own browser is started. Isolation: a fresh context per connection — no ordinary profile, cookies,
+ * permissions or downloads. A visible window opens maximized and the page follows the window's real size (no emulated
+ * viewport, so resizing the window resizes the board); a hidden browser has no window and gets a fixed desktop viewport.
+ */
+export function browserLaunchSettings({ headless }: { headless: boolean }): { args: string[]; context: Record<string, unknown> } {
+  const isolation = { acceptDownloads: false, permissions: [], serviceWorkers: 'allow' };
+  return headless ? { args: [], context: { ...isolation, viewport: { width: 1440, height: 900 } } } : { args: ['--start-maximized'], context: { ...isolation, viewport: null } };
+}
+
 async function launchBrowser(options: BrowserMcpOptions): Promise<{ browser?: BrowserLike; context: ContextLike; owned: () => Promise<void> }> {
   if (options.context) return { context: options.context, owned: async () => {} };
-  // Isolation: a fresh context per connection — no ordinary profile, cookies, permissions or downloads.
-  const contextOptions = { acceptDownloads: false, permissions: [], serviceWorkers: 'allow', viewport: { width: 1440, height: 900 } };
+  const headless = options.headless ?? true;
+  const { args, context: contextOptions } = browserLaunchSettings({ headless });
   if (options.browser) {
-    const context = await options.browser.newContext(contextOptions);
+    // A caller-supplied browser (tests, an embedding host) keeps a fixed viewport: its window size is not ours to follow.
+    const context = await options.browser.newContext(browserLaunchSettings({ headless: true }).context);
     return { context, owned: () => context.close().catch(() => {}) };
   }
   let playwright: any;
   try { playwright = await import('playwright-core'); }
   catch { throw new BrowserMcpError('BROWSER_UNAVAILABLE', 'Connecting to a website needs playwright-core (npm install playwright-core) and a Chromium-based browser.'); }
   const chromium = playwright.chromium ?? playwright.default?.chromium;
-  const headless = options.headless ?? true;
   const attempts: Array<Record<string, unknown>> = options.executablePath ? [{ executablePath: options.executablePath }]
     : options.channel ? [{ channel: options.channel }]
     : [{ channel: 'chrome' }, {}, { channel: 'msedge' }];
@@ -145,10 +155,10 @@ async function launchBrowser(options: BrowserMcpOptions): Promise<{ browser?: Br
   for (const attempt of attempts) {
     try {
       if (options.userDataDir) {
-        const context = await chromium.launchPersistentContext(options.userDataDir, { ...attempt, headless, ...contextOptions });
+        const context = await chromium.launchPersistentContext(options.userDataDir, { ...attempt, headless, args, ...contextOptions });
         return { context, owned: () => context.close().catch(() => {}) };
       }
-      const browser: BrowserLike = await chromium.launch({ ...attempt, headless });
+      const browser: BrowserLike = await chromium.launch({ ...attempt, headless, args });
       const context = await browser.newContext(contextOptions);
       return { browser, context, owned: () => browser.close().catch(() => {}) };
     } catch (error) { failures.push(String((error as Error)?.message || error).split('\n')[0] ?? ''); }
