@@ -22,16 +22,16 @@ npm refused the original unscoped `divlet` name as too similar to `figlet`. The 
 
 Core's HTTP composition imports web's public asset locator; generic model/format modules do not import web. Web's portable contracts own opaque host payloads, not project validation/writes, and have no type/JSDoc back-edge to core. Browser modules use host HTTP/SSE and preview ports, not imports of the Node runtime. Backend plugins consume core contracts; client plugins use the served web module graph. See [architecture](architecture.md).
 
-The root owns `@divlet/core`, `web/` owns `@divlet/web`, and `cli/`, `mcp/` and `pi/` own the adapters, without wrappers. All five versions match. The 0.1.0 adapters pin `@divlet/core@0.1.0`; core pins `@divlet/web@0.1.0`. Core has no bins, Pi manifest/peer requirements or `./pi` export. Its tarball excludes the web and adapter implementations. Web owns its only client copy and portable declarations. Built-in plugins remain bundled in core, not separately published.
+The root owns `@divlet/core`, `web/` owns `@divlet/web`, and `cli/`, `mcp/` and `pi/` own the adapters, without wrappers. All five versions match. The 0.1.1 adapters pin `@divlet/core@0.1.1`; core pins `@divlet/web@0.1.1`. Core has no bins, Pi manifest/peer requirements or `./pi` export. Its tarball excludes the web and adapter implementations. Web owns its only client copy and portable declarations. Built-in plugins remain bundled in core, not separately published.
 
-Node.js 22.19 or later is required. Pi is not required for CLI/MCP. Shared configurations should pin adapter versions, including `npm:@divlet/pi@0.1.0` after verifying that version is published. For MCP:
+Node.js 22.19 or later is required. Pi is not required for CLI/MCP. Shared configurations should pin adapter versions, including `npm:@divlet/pi@0.1.1` after verifying that version is published. For MCP:
 
 ```json
 {
   "mcpServers": {
     "divlet": {
       "command": "npx",
-      "args": ["-y", "@divlet/mcp@0.1.0", "--cwd", "/absolute/path/to/workspace"]
+      "args": ["-y", "@divlet/mcp@0.1.1", "--cwd", "/absolute/path/to/workspace"]
     }
   }
 }
@@ -67,7 +67,7 @@ Align the five manifests, exact pins, lockfile and candidate notes, then create 
 Select Actions → **Release** → Run workflow, branch `main`, and supply the tag. The equivalent explicit publication action is:
 
 ```bash
-gh workflow run release.yml --ref main -f release_tag=v0.1.0
+gh workflow run release.yml --ref main -f release_tag=v0.1.1
 ```
 
 The workflow has three boundaries:

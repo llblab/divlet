@@ -95,7 +95,7 @@ workspace/
 
 The `.divlet` JSON file is the source; edit it through the board, an agent or your editor. Valid external changes appear on the board, invalid ones leave the last working state visible. The generated HTML can be served as a static site. Opening a Pencil `.pen` or static `.html` file imports it into a sibling `.divlet` and leaves the original untouched.
 
-> The project format is a pre-freeze draft in 0.1.0: keep backups, since a later version may need an explicit conversion.
+> The project format is a pre-freeze draft in 0.1: keep backups, since a later version may need an explicit conversion.
 
 [Project format](docs/format.md) · [Files, imports and output](docs/board.md#where-projects-live) · [Markdown sites](docs/site.md)
 
