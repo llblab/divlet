@@ -270,7 +270,15 @@ try {
     const again = await readPills();
     for (const pill of again) assert.equal(pill.alpha, 1, `${pill.selector} stays opaque after folding (${pill.alpha})`);
   }
-  checks.push('the pinned chrome is opaque whether panels are folded or open');
+  // Hovering a pill never makes it see-through (the search pill is also a .tool, whose generic hover is translucent).
+  for (const selector of ['#palette-open', '#status']) {
+    await page.locator(selector).hover();
+    await sleep(200);
+    const alpha = await page.locator(selector).evaluate(node => { const c = getComputedStyle(node); const value = c.backgroundColor.match(/rgba?\(([^)]+)\)/)?.[1] || ''; const parts = value.split(',').map(part => part.trim()); return { alpha: parts[3] === undefined ? 1 : Number(parts[3]), image: c.backgroundImage }; });
+    assert.ok(alpha.alpha === 1, `${selector} keeps an opaque surface on hover (${JSON.stringify(alpha)})`);
+  }
+  await page.mouse.move(760, 320);
+  checks.push('the pinned chrome is opaque whether panels are folded, open or hovered');
 
   // One design contract: two inner radii plus the outer pill radius, one focus ring, one disabled step, and one height per
   // control family. The same element used differently in two places is the drift this guards against.

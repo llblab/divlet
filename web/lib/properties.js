@@ -531,16 +531,20 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     const centre = el('div', 'bm-centre');
     centre.append(inner);
     sq.append(centre);
+    // Long values widen their own cell; long left/right values widen both side bands alike, so the band stays symmetric.
+    // Only values too long for a side band (or any long side in a narrow inspector, board.css) move to rows.
     const fitValues = () => {
-      let expanded = false;
+      let side = 0;
       for (const cell of sq.querySelectorAll(':scope > .bm-cell')) {
         const input = cell.querySelector('input');
         const text = input ? input.value || input.placeholder : cell.textContent;
         const length = text.length;
         cell.style.setProperty('--bm-value-width', `calc(${length}ch + 2px)`);
-        if (length > 4) expanded = true;
+        if (cell.classList.contains('bm-l') || cell.classList.contains('bm-r')) side = Math.max(side, length);
       }
-      sq.classList.toggle('bm-expanded-values', expanded);
+      sq.style.setProperty('--bm-side-width', `calc(${side}ch + 4px)`);
+      sq.classList.toggle('bm-wide-sides', side > 4);
+      sq.classList.toggle('bm-stacked-sides', side > 6);
     };
     for (const input of sq.querySelectorAll(':scope > .bm-cell input')) {
       input.addEventListener('input', fitValues);
