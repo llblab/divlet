@@ -57,7 +57,6 @@ try {
   await import(new URL('./board.js', import.meta.url).href);
 } catch (error) {
   // Without its composition the board must not start: it would fall back to native routes that a static host does not have.
-  document.getElementById('boot-cover')?.remove();
   const loading = document.getElementById('loading');
   if (loading) loading.replaceChildren(Object.assign(document.createElement('p'), { className: 'host-error', textContent: 'The board could not start in this browser: ' + (error?.message || error) }));
   throw error;

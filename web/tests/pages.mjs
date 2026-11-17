@@ -222,6 +222,7 @@ test('an agent connects by URL, edits the project and the visitor sees it; the c
     assert.equal(connection.tools.length, 12, 'browser allowlisting retains six explicitly described compatibility aliases');
     assert.match(connection.tools.find(tool => tool.name === 'read_divlet').description, /Compatibility alias for divlet_read/);
     assert.match(String(connection.discovery.instructions), /browser-local copy/);
+    assert.match(String(connection.discovery.instructions), /Utility classes compile in this page/, 'agents are told what the composed engine does, not the provider-free fallback');
     const page = connection.page;
     await page.waitForSelector('.artboard[data-artboard-id="index"] iframe');
     const project = parse(await connection.callTool('read_divlet', {}));

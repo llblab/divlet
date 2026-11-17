@@ -88,6 +88,8 @@ Its transformations must:
 - Run at an explicit boundary such as an import, edit or conversion operation, not silently rewrite a project merely because it was read.
 - Expose the actual persisted representation in the inspector rather than maintaining hidden authoritative styling state.
 
+The Tailwind writer (`plugins/tailwind/lib/styles.js`) reconciles by longhand: it knows which properties each core utility sets, removes every unconditional utility that sets part of an edited property (named ones such as `leading-tight`, `max-w-md` and `border-red-500` included) and rewrites a utility that also sets other parts as narrower utilities (`gap-4` → `gap-y-4`, `inset-0` → the remaining offsets, `rounded-t-lg` → `rounded-tr-lg`, `text-sm/6` → `leading-6`). A removed width utility that was also drawing the line leaves `border-solid` unless another utility styles it. Variant classes and classes it does not understand stay untouched.
+
 Disabling a plugin for a dependent project is an explicit, validated conversion: materialize the necessary styling as ordinary CSS without losing appearance, or refuse with an explanation. Merely hiding the panel or returning an empty compiled stylesheet is not a successful disable operation. A missing required plugin must be diagnosed; preserved cache output must not disguise an incomplete rebuild as a valid one.
 
 ### Composition

@@ -126,3 +126,61 @@ test('declarations become Tailwind utilities, and anything without a utility an 
   assert.equal(c('box-shadow', '0 1px 2px rgba(0,0,0,.2)'), '[box-shadow:0_1px_2px_rgba(0,0,0,.2)]');
   assert.equal(c('content', '"a_b"'), '[content:"a\\_b"]', 'a literal underscore is escaped');
 });
+
+test('an edit replaces every named utility that set the property, so the old class can never win the cascade', () => {
+  const set = (cls, styles) => applyStyles(cls, styles).split(' ').sort().join(' ');
+  const cases = [
+    ['leading-tight', { 'line-height': '1.4' }, 'leading-[1.4]'],
+    ['tracking-wide', { 'letter-spacing': '0.02em' }, 'tracking-[0.02em]'],
+    ['text-xl font-bold', { 'font-size': '18px' }, 'font-bold text-[length:18px]'],
+    ['border border-dashed', { 'border-style': 'dotted' }, 'border border-dotted'],
+    ['border border-red-500', { 'border-color': '#0000ff' }, 'border border-[#0000ff]'],
+    ['shadow-md p-2', { 'box-shadow': '0 0 0 3px red' }, '[box-shadow:0_0_0_3px_red] p-2'],
+    ['uppercase', { 'text-transform': 'none' }, 'normal-case'],
+    ['italic', { 'font-style': 'normal' }, 'not-italic'],
+    ['underline', { 'text-decoration-line': 'none' }, 'no-underline'],
+    ['font-mono', { 'font-family': 'serif' }, '[font-family:serif]'],
+    ['flex gap-x-4', { 'column-gap': '6px' }, 'flex gap-x-[6px]'],
+    ['overflow-y-scroll', { 'overflow-y': 'auto' }, 'overflow-y-auto'],
+    ['grid justify-items-start', { 'justify-items': 'center' }, 'grid justify-items-center'],
+    ['max-w-md', { 'max-width': '100px' }, 'max-w-25'],
+    ['text-[#ff0000]', { color: '#00ff00' }, 'text-[color:#00ff00]'],
+    ['whitespace-pre-line', { 'white-space': 'nowrap' }, 'whitespace-nowrap'],
+    ['self-auto', { 'align-self': 'center' }, 'self-center'],
+    ['-mt-2', { 'margin-top': '8px' }, 'mt-2'],
+    ['text-[20px]', { 'font-size': '22px' }, 'text-[length:22px]'],
+  ];
+  for (const [cls, styles, expected] of cases) assert.equal(set(cls, styles), expected, `${cls} + ${JSON.stringify(styles)}`);
+});
+
+test('a utility that sets more than the edit keeps its other parts as narrower utilities', () => {
+  const set = (cls, styles) => applyStyles(cls, styles).split(' ').sort().join(' ');
+  assert.equal(set('flex gap-4', { 'column-gap': '6px' }), 'flex gap-x-[6px] gap-y-4', 'gap keeps its row gap');
+  assert.equal(set('flex gap-x-4 gap-y-2', { gap: '12px' }), 'flex gap-3', 'a gap edit replaces both axes');
+  assert.equal(set('size-4', { width: '100px' }), 'h-4 w-25');
+  assert.equal(set('relative inset-0', { top: '10px' }), 'bottom-0 left-0 relative right-0 top-[10px]');
+  assert.equal(set('-inset-2', { left: '0px' }), '-bottom-2 -right-2 -top-2 left-0');
+  assert.equal(set('rounded-t-lg', { 'border-top-left-radius': '2px' }), 'rounded-tl-xs rounded-tr-lg');
+  assert.equal(set('overflow-hidden', { 'overflow-y': 'auto' }), 'overflow-x-hidden overflow-y-auto');
+  assert.equal(set('text-sm/6', { 'font-size': '15px' }), 'leading-6 text-[length:15px]', 'a slash line height outlives the size');
+  assert.equal(set('place-items-center', { 'align-items': 'start' }), 'items-start justify-items-center');
+  assert.equal(set('border-x-2', { 'border-left-width': '1px' }), '[border-left-width:1px] border-r-2');
+  // Tailwind's width utilities also draw the line; replacing the width keeps it drawn unless a style utility does that.
+  assert.equal(set('border-2', { 'border-width': '3px' }), '[border-width:3px] border-solid');
+  assert.equal(set('border-2 border-dashed', { 'border-width': '3px' }), '[border-width:3px] border-dashed');
+  assert.equal(set('border-2', { 'border-width': null }), 'border-solid');
+});
+
+test('interactive edits write idiomatic utilities where one says exactly the same thing', () => {
+  const set = (cls, styles) => applyStyles(cls, styles).split(' ').sort().join(' ');
+  assert.equal(set('', { 'margin-top': '-8px' }), '-mt-2');
+  assert.equal(set('', { width: '50%', height: 'fit-content' }), 'h-fit w-1/2');
+  assert.equal(set('', { color: 'white', 'background-color': 'transparent', 'border-color': 'currentcolor' }), 'bg-transparent border-current text-white');
+  assert.equal(set('', { 'border-color': 'var(--accent)' }), 'border-[color:var(--accent)]');
+  assert.equal(set('', { 'row-gap': '4px', 'line-height': '24px' }), 'gap-y-1 leading-6');
+  assert.equal(set('', { 'text-transform': 'uppercase', 'font-style': 'italic', 'text-decoration-line': 'underline' }), 'italic underline uppercase');
+  assert.equal(propertyOfClass('gap-4'), 'gap');
+  assert.equal(propertyOfClass('rounded-lg'), 'border-radius');
+  assert.equal(propertyOfClass('max-w-md'), 'max-width');
+  assert.equal(propertyOfClass('hover:max-w-md'), null, 'a variant is never a base owner');
+});

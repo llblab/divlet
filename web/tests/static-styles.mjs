@@ -105,7 +105,7 @@ test('with the Tailwind provider, controls and the class editor are linked views
     await until(async () => (await computed(page, 'letterSpacing')) === '1px', 'plain inline CSS renders');
     await until(async () => (await page.locator('#inspector [data-key="class-convert"]').count()) === 1, 'the class editor offers to move inline declarations');
     await page.locator('#inspector [data-key="class-convert"]').click();
-    await until(async () => /\[letter-spacing:1px\]/.test(await attr(page, 'class') ?? '') && !/letter-spacing/.test(await attr(page, 'style') ?? ''), 'the declaration became a class');
+    await until(async () => /(?:^|\s)tracking-\[1px\](?:\s|$)/.test(await attr(page, 'class') ?? '') && !/letter-spacing/.test(await attr(page, 'style') ?? ''), 'the declaration became a class');
     assert.equal(await computed(page, 'letterSpacing'), '1px', 'the rendering is unchanged');
     // What a utility cannot express stays plain CSS: a single border edge is a deliberate inline declaration.
     await setField(page, 'border-width-t', '3');
