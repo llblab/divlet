@@ -929,6 +929,7 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 
 /* Border owns its line, edge widths, colour and radius; Appearance keeps fill and typography. */
 .appearance-box, .border-box { display: grid; gap: 8px; }
+.appearance-colors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .border-widths { --control-min: max(106px, calc(50% - 3px)); }
 .appearance-box > .grid2, .typography-controls > .grid2 { align-items: center; }
 .typography-controls { display: grid; gap: 8px; min-width: 0; }

@@ -4,8 +4,9 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased
 
-## 0.1.1 — Hotfix: a connected website fills its window
+## 0.1.1 — Hotfix: compact color controls and a full-window connection
 
+- **Fill and Text share one row.** Appearance keeps the background and text color controls side by side, including project swatches and narrow panels at 200% interface size; color edits and removal keep their existing behavior.
 - **A connected website fills its window.** `--connect` opens its browser window maximized and no longer emulates a fixed 1440×900 viewport there, so the board follows the window as it is resized; a headless connection keeps the fixed desktop size (`core/tests/browser-mcp-launch.test.js`).
 - **The release's registry verification no longer needs a local build.** The renderer identity audit compares source and installation directly in `--registry` mode; it compared against a checkout build that the registry job never makes, which failed the 0.1.0 run after a successful publication (re-run locally against the frozen 0.1.0 manifest: passed).
 

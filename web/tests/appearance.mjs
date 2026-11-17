@@ -40,6 +40,21 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.artboard').length > 0);
   const select = id => page.evaluate(async id => { document.activeElement?.blur?.(); const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', [id]); }, id);
   const afterVersion = () => runtime.read({ view: 'document', documentId: 'welcome' }).version;
+  const colorRow = async label => {
+    const layout = await page.locator('#inspector [data-section="appearance"]').evaluate(section => {
+      const fields = ['fill', 'ink'].map(key => section.querySelector(`[data-key="${key}"]`).closest('.color-field'));
+      const [fill, ink] = fields.map(field => field.getBoundingClientRect());
+      const bounds = section.getBoundingClientRect();
+      return {
+        paired: Math.abs(fill.top - ink.top) < 1 && fill.right < ink.left,
+        contained: fields.every(field => {
+          const rect = field.getBoundingClientRect();
+          return rect.left >= bounds.left && rect.right <= bounds.right + 1 && field.scrollWidth <= field.clientWidth + 1;
+        }),
+      };
+    });
+    assert.deepEqual(layout, { paired: true, contained: true }, `Fill and Text share one row without overflow (${label})`);
+  };
 
   // With a style engine, More CSS takes the common path: custom properties stay native declarations, other properties become
   // utilities; without one, everything is a native declaration.
@@ -97,6 +112,7 @@ try {
   await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), actor: 'user', patch: { tokens: { '--color-brand': '#5b5bf0' } } });
   await select('cta');
   await page.waitForSelector('#inspector [data-section="appearance"] [data-key="fill"]');
+  await colorRow('project color swatches');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="radius"]').count(), 1, 'radius belongs to Border');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="stroke"]').count(), 1, 'border colour belongs to Border');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key^="border-width-"]').count(), 4, 'Border has four independent edge widths');
@@ -500,6 +516,8 @@ try {
       return bad;
     });
     assert.deepEqual(layoutErrors, [], `Border controls at ${width}px/${size}%`);
+    await colorRow(`${width}px/${size}%, authored colors and project swatches`);
+    await page.locator('#inspector .appearance-colors').screenshot({ path: `artifacts/appearance-colors-${width}-${size}.png` });
     assert.equal(await textAlign.evaluate(group => group.scrollWidth <= group.clientWidth + 1 && group.closest('.appearance-box') !== null), true, `typography alignment remains together at ${width}px/${size}%`);
     if (size === 200) {
       await textAlign.getByRole('button', { name: 'Justify', exact: true }).click({ trial: true });
@@ -507,7 +525,7 @@ try {
     }
     if (size === 100) await page.locator('#inspector [data-section="border"]').screenshot({ path: `artifacts/border-section-${width}-${size}.png` });
   }
-  checks.push('Border stays readable without horizontal overflow on desktop, phone and phone/200%');
+  checks.push('Border stays readable and Fill/Text share one row without horizontal overflow on desktop, phone and phone/200%');
 
   await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(200));
   await select('cta'); await effect('z').waitFor();
@@ -527,6 +545,7 @@ try {
   await page.evaluate(async () => { const store = await import('./lib/store.js'); store.selectArtboards(['plain']); store.selectNodes('plain', ['first']); });
   await family.waitFor();
   assert.equal(await page.locator('#inspector [data-section="appearance"]').count(), 1, 'core supplies one minimal Appearance without a provider');
+  await colorRow('no style engine or project swatches');
   assert.equal(await page.locator('#inspector [data-section="classes"]').count(), 0);
   await family.click(); await page.getByRole('menuitemradio', { name: '"No Engine Face"', exact: true }).click();
   await waitUntil(() => native.getEntry('plain').document.nodes.first.style['font-family'] === '"No Engine Face"', 'family edits have no engine requirement');
@@ -628,6 +647,7 @@ try {
   const uploadBox = await page.getByRole('button', { name: 'Upload font', exact: true }).boundingBox(), inspectorBox = await page.locator('#inspector').boundingBox();
   assert.ok(uploadBox.width >= 48 && uploadBox.height >= 48 && uploadBox.x >= inspectorBox.x && uploadBox.x + uploadBox.width <= inspectorBox.x + inspectorBox.width + 1, 'small upload target remains whole and usable at phone/200%');
   await page.getByRole('button', { name: 'Upload font', exact: true }).click({ trial: true });
+  await colorRow('no style engine, phone/200%');
   await page.locator('#inspector').screenshot({ path: 'artifacts/font-family-no-engine-phone-200.png' });
   checks.push('provider-free native family choice and real embedded face loading, narrow/200% whole-value keyboard panning');
   await page.setViewportSize({ width: 1280, height: 900 });

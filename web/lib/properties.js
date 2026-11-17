@@ -335,11 +335,12 @@ function appearanceFold({ value, run, measured, tokens }) {
   const typography = el('div', 'typography-controls');
   typography.dataset.inspectorSlot = 'typography';
   typography.append(type, textRow);
-  box.append(
+  const colors = el('div', 'appearance-colors');
+  colors.append(
     colorField({ key: 'fill', label: 'Fill', tip: 'Background color', property: 'background-color', value, run, computed: measured?.colors?.background, tokens }),
     colorField({ key: 'ink', label: 'Text', tip: 'Text color', property: 'color', value, run, computed: measured?.colors?.color, tokens }),
-    typography,
   );
+  box.append(colors, typography);
   return box;
 }
 
