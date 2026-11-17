@@ -50,6 +50,12 @@ export interface BoardExports {
 /** The project's reusable components, for insertion menus. Absent hosts offer no component insertion list. */
 export interface BoardComponents { readonly list: () => Promise<unknown> }
 
+/** Utility-class knowledge of a style provider: what classes do, and what to suggest while typing. Absent: no class assistance. */
+export interface BoardClasses {
+  readonly explain: (documentId: string, names: readonly string[]) => Promise<unknown>;
+  readonly suggest: (documentId: string, query: string, limit: number) => Promise<unknown>;
+}
+
 /**
  * A complete alternative composition, published before the board starts at `globalThis[Symbol.for('divlet.board-host/1')]`.
  * Absent members are absent capabilities; nothing falls back to the native HTTP routes. `label` names the host in the chrome.
@@ -60,6 +66,7 @@ export interface BoardHostComposition {
   readonly writer: BoardWriter;
   readonly previews: BoardPreviews;
   readonly components?: BoardComponents;
+  readonly classes?: BoardClasses;
   readonly exports?: BoardExports;
   readonly historyService?: BoardHistoryService;
   readonly shareSelection?: import('./board-session.ts').BoardSelectionPublisher;

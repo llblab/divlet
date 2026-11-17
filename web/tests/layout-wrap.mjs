@@ -17,13 +17,15 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(runtime.url);
   await page.evaluate(async () => {
-    const { layoutSections } = await import('./plugins/tailwind/layout.js');
+    const { propertySections: layoutSections } = await import('./lib/properties.js');
+    const { classView } = await import('./plugins/tailwind/view.js');
+    const readers = [{ id: 'tailwind', view: classView }];
     const host = document.createElement('section');
     host.id = 'wrap-fixture';
     host.style.cssText = 'position:absolute;left:10px;top:80px;padding:12px;box-sizing:content-box;background:var(--panel);border:1px solid var(--hair);border-radius:12px';
     const sections = layoutSections([{ id: 'item', className: '' }], {
-      parent: { className: 'flex' },
-      apply: transform => { window.wrapClasses = transform(window.wrapClasses || ''); },
+      parent: { className: '', style: { display: 'flex' } },
+      apply: edits => { window.wrapEdits = { ...window.wrapEdits, ...edits }; },
     });
     host.append(sections.find(([name]) => name === 'layout')[2], sections.find(([name]) => name === 'appearance')[2]);
     document.querySelector('#ui').append(host);
@@ -43,7 +45,7 @@ try {
     fields.style.cssText = host.style.cssText;
     fields.style.top = '600px';
     const className = 'absolute top-[123456px] right-[654321px] bottom-[123456px] left-[654321px] opacity-100 z-[999999] blur-[12px] text-[length:24px] font-extrabold';
-    for (const [name, , content] of layoutSections([{ id: 'positioned', className }], { parent: null, apply() {} })) {
+    for (const [name, , content] of layoutSections([{ id: 'positioned', className }], { parent: null, apply() {}, readers })) {
       if (name !== 'spacing') fields.append(content);
     }
     document.querySelector('#ui').append(fields);
@@ -106,10 +108,10 @@ try {
   const controls = page.getByRole('group', { name: 'Align self in the parent', exact: true });
   await controls.getByRole('button', { name: 'Self: center', exact: true }).focus();
   await page.keyboard.press('Enter');
-  assert.equal(await page.evaluate(() => window.wrapClasses), 'self-center');
+  assert.deepEqual(await page.evaluate(() => window.wrapEdits), { 'align-self': 'center' });
   const text = page.locator('#wrap-fixture .appearance-box').getByRole('group', { name: 'Text align', exact: true });
   await text.getByRole('button', { name: 'Align center', exact: true }).focus(); await page.keyboard.press('Enter');
-  assert.deepEqual(await page.evaluate(() => window.wrapClasses.split(' ')), ['self-center', 'text-center'], 'text and item alignment retain independent keyboard edits');
+  assert.deepEqual(await page.evaluate(() => window.wrapEdits), { 'align-self': 'center', 'text-align': 'center' }, 'text and item alignment retain independent keyboard edits');
   const aligned = await page.locator('#wrap-fixture .labeled-segs').evaluateAll(groups => groups.every(group => {
     const label = group.querySelector('.caption').getBoundingClientRect(), buttons = group.querySelector('.segs').getBoundingClientRect();
     return Math.abs(label.y + label.height / 2 - buttons.y - buttons.height / 2) < 1;

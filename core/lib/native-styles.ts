@@ -146,10 +146,24 @@ function release(decls: Pair[], property: string): boolean {
   return false;
 }
 
+/** Index of the first declaration of a property, or -1. */
+const firstOf = (decls: Pair[], property: string): number => decls.findIndex(([name]) => keyOf(name) === property);
+/** Remove declarations of `names`, keeping the first of `keep` (when given) at its slot. */
+function removeAll(decls: Pair[], names: ReadonlySet<string>, keep?: string): void {
+  let kept = false;
+  for (let index = 0; index < decls.length; index++) {
+    const name = keyOf((decls[index] as Pair)[0]);
+    if (!names.has(name)) continue;
+    if (keep !== undefined && name === keep && !kept) { kept = true; continue; }
+    decls.splice(index--, 1);
+  }
+}
+
 /**
- * Apply property edits to inline declarations in order: a value is written as the last declaration (so it wins over an earlier
- * shorthand that covers it) after removing the property's previous declarations and, for a shorthand, the longhands it covers.
- * `null` removes the property, first expanding any shorthand that would otherwise lose its siblings.
+ * Apply property edits to inline declarations. An existing declaration keeps its slot (so Undo/Redo, which replay changed keys
+ * over the stored order, reproduce it), a new one is appended, and a longhand that a LATER shorthand would override first has
+ * that shorthand expanded in place. A shorthand edit removes the longhands it now covers. `null` removes the property, first
+ * expanding any shorthand that would otherwise lose its siblings.
  */
 export function applyNativeStyles(style: Readonly<Record<string, string>>, edits: StyleEdits): Record<string, string> {
   if (!edits || typeof edits !== 'object' || Array.isArray(edits)) fail('styles must be an object of CSS declarations.');
@@ -157,12 +171,22 @@ export function applyNativeStyles(style: Readonly<Record<string, string>>, edits
   for (const [raw, input] of Object.entries(edits)) {
     const value = checkEdit(raw, input);
     const property = keyOf(raw);
-    if (value === null || value === '') {
-      if (!release(decls, property)) fail(`${raw} cannot be removed: a shorthand that sets it is not understood. Replace the shorthand instead.`);
+    const removal = value === null || value === '';
+    if (removal && !release(decls, property)) fail(`${raw} cannot be removed: a shorthand that sets it is not understood. Replace the shorthand instead.`);
+    const below = new Set(longhandsOf(property));
+    if (!removal) {
+      // A shorthand declared after this property would defeat it: expand those so the existing slot stays authoritative.
+      for (let guard = 0; guard < 16; guard++) {
+        const first = firstOf(decls, property);
+        const later = first < 0 ? [] : coversOf(decls, property).filter(index => index > first);
+        if (!later.length) break;
+        if (!expandAt(decls, later[0] as number)) { removeAll(decls, new Set([property])); break; }
+      }
     }
-    const drop = new Set([property, ...longhandsOf(property)]);
-    for (let index = decls.length - 1; index >= 0; index--) if (drop.has(keyOf((decls[index] as Pair)[0]))) decls.splice(index, 1);
-    if (value !== null && value !== '') decls.push([property, value]);
+    removeAll(decls, new Set([property, ...below]), removal ? undefined : property);
+    if (removal) { removeAll(decls, new Set([property])); continue; }
+    const slot = firstOf(decls, property);
+    if (slot >= 0) (decls[slot] as Pair)[1] = value as string; else decls.push([property, value as string]);
   }
   return Object.fromEntries(decls);
 }

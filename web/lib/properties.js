@@ -1,19 +1,21 @@
-// Layout, spacing, border and appearance for selected elements — controls write Tailwind classes
-// or explicit native CSS. With several elements selected, a change applies
+// Layout, spacing, border, effects and appearance for selected elements: the core property controls.
+// They read the element's authored CSS (inline declarations, plus whatever a registered representation reader contributes) and
+// write `styles` edits: `{ property: value | null }`. The writer stores them as native inline declarations, or as utility classes
+// when a style engine is active, so these controls never depend on a plugin. With several elements selected, a change applies
 // to all of them and differing values show as "Mixed".
-import { el, icon, clamp } from '../../lib/util.js';
-import { toast, newGroup } from '../../lib/store.js';
-import { openMenu } from '../../lib/menu.js';
-import * as tw from './tw.js';
+import { el, icon, clamp } from './util.js';
+import { toast, newGroup } from './store.js';
+import { openMenu } from './menu.js';
+import * as css from './css-props.js';
 
 const MIXED = Symbol('mixed');
 const same = values => (values.every(value => value === values[0]) ? values[0] : MIXED);
 
-const DISPLAY = [['block', 'Block'], ['flex', 'Flex'], ['grid', 'Grid'], ['inline', 'Inline'], ['inline-block', 'Inline block'], ['inline-flex', 'Inline flex'], ['inline-grid', 'Inline grid'], ['hidden', 'Hidden']];
+const DISPLAY = [['block', 'Block'], ['flex', 'Flex'], ['grid', 'Grid'], ['inline', 'Inline'], ['inline-block', 'Inline block'], ['inline-flex', 'Inline flex'], ['inline-grid', 'Inline grid'], ['none', 'Hidden']];
 const POSITION = [['static', 'Static'], ['relative', 'Relative'], ['absolute', 'Absolute'], ['fixed', 'Fixed'], ['sticky', 'Sticky']];
 const AXIS = ['start', 'center', 'end'];
 // How children are spread along the main axis (justify-content) and placed across it (align-items).
-const JUSTIFY = [['start', 'Start'], ['center', 'Center'], ['end', 'End'], ['between', 'Between'], ['around', 'Around'], ['evenly', 'Evenly'], ['stretch', 'Stretch']];
+const JUSTIFY = [['start', 'Start'], ['center', 'Center'], ['end', 'End'], ['space-between', 'Between'], ['space-around', 'Around'], ['space-evenly', 'Evenly'], ['stretch', 'Stretch']];
 const ALIGN = [['start', 'Start'], ['center', 'Center'], ['end', 'End'], ['stretch', 'Stretch'], ['baseline', 'Baseline']];
 const ITEMS_X = [['start', 'Start'], ['center', 'Center'], ['end', 'End'], ['stretch', 'Stretch']];
 
@@ -25,7 +27,7 @@ let typingLive = false;
 
 /* ---- small controls ---------------------------------------------------------- */
 
-/** A labelled button that opens a menu of choices (with "Default" to remove the class). */
+/** A labelled button that opens a menu of choices (with "Default" to remove the declaration). */
 function pick(label, value, choices, onPick, { tip, variants = [] } = {}) {
   const node = el('button', 'pick');
   node.type = 'button';
@@ -194,36 +196,21 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
 }
 
 /** 3×3 cells: which one is on, and what a click on a cell does. */
+
 /* ---- appearance: corner radius, fill and text colour --------------------------------------------- */
-const RADIUS_PRESETS = [['0', 'rounded-none'], ['4', 'rounded-sm'], ['8', 'rounded-lg'], ['12', 'rounded-xl'], ['16', 'rounded-2xl'], ['Full', 'rounded-full']];
-const RADIUS_PX = { 'rounded-none': 0, 'rounded-xs': 2, 'rounded-sm': 4, rounded: 4, 'rounded-md': 6, 'rounded-lg': 8, 'rounded-xl': 12, 'rounded-2xl': 16, 'rounded-3xl': 24, 'rounded-4xl': 32 };
+const RADIUS_PRESETS = [['0', '0px'], ['4', '4px'], ['8', '8px'], ['12', '12px'], ['16', '16px'], ['Full', '9999px']];
 const KEYWORD_COLORS = { transparent: 'transparent', white: '#ffffff', black: '#000000' };
+const SIDE_NAMES = { t: 'top', r: 'right', b: 'bottom', l: 'left' };
+const CORNER_NAMES = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
+const alphaOf = value => { const m = /^rgba\([^)]*,\s*([\d.]+)\s*\)$/.exec(String(value || '')); return m ? Number(m[1]) : 1; };
 
-/** `rgb(12, 34, 56)` / `rgba(...)` from the page → `#0c2238` (alpha dropped); null when not a colour. */
-const hexOf = css => {
-  const m = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(String(css || ''));
-  return m ? `#${[m[1], m[2], m[3]].map(n => Number(n).toString(16).padStart(2, '0')).join('')}` : /^#[0-9a-f]{6}$/i.test(css || '') ? css.toLowerCase() : null;
-};
-const alphaOf = css => { const m = /^rgba\([^)]*,\s*([\d.]+)\s*\)$/.exec(String(css || '')); return m ? Number(m[1]) : 1; };
+/** The colour a value stands for, as something to show: `#112233`, `var(--color-brand)` or the keyword. */
+const colourShown = value => (value == null ? null : String(value));
 
-/** What a person typed (hex, a project token, white/black/transparent) → a class for `prefix` (bg or text), or undefined. */
-function colorClass(prefix, raw) {
-  const text = String(raw || '').trim();
-  if (/^(transparent|white|black)$/i.test(text)) return `${prefix}-${text.toLowerCase()}`;
-  if (/^current(color)?$/i.test(text)) return `${prefix}-current`;
-  const hex = /^#?([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(text);
-  const inner = hex ? `#${hex[1].toLowerCase()}` : /^var\(--color-[a-z0-9-]+\)$/i.test(text) ? text : null;
-  if (!inner) return undefined;
-  return prefix === 'text' ? `text-[color:${inner}]` : `${prefix}-[${inner}]`;
-}
-
-/** The colour a class stands for, as something to show: `#112233`, `var(--color-brand)` or the class name for a palette colour. */
-const classColor = name => (name ? (/^(?:bg|text|border)-\[(?:color:)?(.+)\]$/.exec(name)?.[1] ?? name.replace(/^(?:bg|text|border)-/, '')) : null);
-
-function colorField({ key, label, tip, group, prefix, value, run, computed, tokens }) {
+function colorField({ key, label, tip, property, value, run, computed, tokens }) {
   const wrap = el('div', 'color-field');
-  const current = value(cls => classColor(tw.get(cls, group)));
-  const shownHex = current === MIXED ? null : hexOf(current) || KEYWORD_COLORS[current] || hexOf(computed);
+  const current = value(view => colourShown(view[property]));
+  const shownHex = current === MIXED ? null : css.hexOf(current) || KEYWORD_COLORS[current] || css.hexOf(computed);
   const swatch = el('input', 'swatch color-pick');
   swatch.type = 'color';
   swatch.value = /^#[0-9a-f]{6}$/i.test(shownHex || '') ? shownHex : '#000000';
@@ -235,13 +222,13 @@ function colorField({ key, label, tip, group, prefix, value, run, computed, toke
   hex.autocomplete = 'off';
   hex.dataset.key = key;
   hex.value = current === MIXED || current == null ? '' : current;
-  hex.placeholder = current === MIXED ? '—' : hexOf(computed) ?? (computed ? 'inherited' : 'none');
+  hex.placeholder = current === MIXED ? '—' : css.hexOf(computed) ?? (computed ? 'inherited' : 'none');
   hex.setAttribute('aria-label', tip);
   const set = (raw, shown) => {
-    const next = colorClass(prefix, raw);
+    const next = css.colourInput(raw);
     if (next === undefined) { toast(`“${raw}” is not a colour: use #rrggbb, a project colour or white, black, transparent`); hex.value = hex.dataset.last ?? ''; return; }
     hex.dataset.last = hex.value = shown ?? raw;
-    run(cls => tw.set(cls, group, next), `${label.toLowerCase()} ${shown ?? raw}`);
+    run({ [property]: next }, `${label.toLowerCase()} ${shown ?? raw}`);
   };
   swatch.addEventListener('change', () => set(swatch.value));
   hex.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Enter') { event.preventDefault(); if (hex.value.trim()) set(hex.value); hex.blur(); } else if (event.key === 'Escape') { hex.value = hex.dataset.last ?? hex.defaultValue; hex.blur(); } });
@@ -251,9 +238,9 @@ function colorField({ key, label, tip, group, prefix, value, run, computed, toke
   clear.type = 'button';
   clear.append(icon('close'));
   clear.setAttribute('aria-label', `Remove ${label.toLowerCase()}`);
-  clear.dataset.tip = `Remove the ${label.toLowerCase()} class`;
+  clear.dataset.tip = `Remove the ${label.toLowerCase()}`;
   clear.hidden = current == null || current === MIXED;
-  clear.addEventListener('click', () => run(cls => tw.set(cls, group, null), `no ${label.toLowerCase()}`));
+  clear.addEventListener('click', () => run({ [property]: null }, `no ${label.toLowerCase()}`));
   const name = el('span', 'vf-k', label);
   wrap.append(name, swatch, hex, clear);
   if (alphaOf(computed) < 1 && current == null) hex.title = 'Semi-transparent in the page';
@@ -280,220 +267,197 @@ function colorField({ key, label, tip, group, prefix, value, run, computed, toke
 
 const BORDER_STYLES = ['solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset', 'none', 'hidden'].map(name => [name, name[0].toUpperCase() + name.slice(1)]);
 
-function borderFold(nodes, { value, run, measured, tokens, widthField }) {
+function borderFold(views, { value, run, measured, tokens, widthField }) {
   const box = el('div', 'border-box');
-  const radiusClass = value(cls => tw.get(cls, 'radius'));
-  const radiusPx = radiusClass === MIXED ? MIXED : radiusClass == null ? null : radiusClass === 'rounded-full' ? 'Full' : RADIUS_PX[radiusClass] ?? (/^rounded-\[(\d+(?:\.\d+)?)px\]$/.exec(radiusClass)?.[1] ?? radiusClass);
+  const radiusValue = value(view => { const radius = css.radiusOf(view); return radius === undefined ? MIXED : radius; });
   const computedRadius = measured?.colors?.radius ? String(Math.round(parseFloat(measured.colors.radius) || 0)) : '0';
-  const radius = field('radius', 'R', radiusPx, (next, text) => run(cls => tw.set(cls, 'radius', next), `radius ${text || 'default'}`), {
-    tip: 'Corner radius, px · type Full for a pill', unit: 'px', placeholder: computedRadius, min: 0, max: 1000,
-    parse: raw => (/^full$/i.test(raw.trim()) ? 'rounded-full' : raw.trim() === '' ? null : /^\d+(?:\.\d+)?$/.test(raw.trim()) ? (Object.entries(RADIUS_PX).find(([, px]) => px === Number(raw.trim()))?.[0] ?? `rounded-[${Number(raw.trim())}px]`) : undefined),
+  // All corners are one value; the longhands are cleared first so the shorthand does not have to expand them again.
+  const radiusEdits = next => ({ ...Object.fromEntries(CORNER_NAMES.map(corner => [`border-${corner}-radius`, null])), 'border-radius': next });
+  const radius = field('radius', 'R', radiusValue, (next, text) => run(radiusEdits(next), `radius ${text || 'default'}`), {
+    tip: 'Corner radius, px · type Full for a pill', unit: 'px', placeholder: computedRadius, min: 0, max: 1000, parse: css.radiusInput,
   });
   const presets = el('div', 'radius-presets');
   presets.setAttribute('role', 'group');
   presets.setAttribute('aria-label', 'Corner radius presets');
-  for (const [text, name] of RADIUS_PRESETS) {
-    const chip = el('button', `chip${radiusClass === name ? ' on' : ''}`, text);
+  for (const [text, px] of RADIUS_PRESETS) {
+    const chip = el('button', `chip${radiusValue === text ? ' on' : ''}`, text);
     chip.type = 'button';
-    chip.dataset.tip = name === 'rounded-full' ? 'Fully rounded' : `${text}px corners`;
-    chip.addEventListener('click', () => run(cls => tw.set(cls, 'radius', name), `radius ${text}`));
+    chip.dataset.tip = px === '9999px' ? 'Fully rounded' : `${text}px corners`;
+    chip.addEventListener('click', () => run(radiusEdits(px), `radius ${text}`));
     presets.append(chip);
   }
   const widths = el('div', 'grid2 border-widths');
   for (const side of ['t', 'r', 'b', 'l']) widths.append(widthField(side));
-  const authoredStyle = same(nodes.map(node => {
-    if (Object.keys(node.style ?? {}).some(property => /^border-(top|right|bottom|left)-style$/.test(property))) return MIXED;
-    const styleClass = tw.get(node.className, 'borderStyle');
-    return node.style?.['border-style'] ?? styleClass?.replace(/^border-|^\[border-style:|\]$/g, '') ?? null;
-  }));
-  const effectiveStyle = measured?.colors?.borderStyle ?? authoredStyle;
-  const style = effectiveStyle === MIXED || effectiveStyle && !BORDER_STYLES.some(([key]) => key === effectiveStyle) ? MIXED : effectiveStyle;
+  const style = value(view => {
+    const sides = ['top', 'right', 'bottom', 'left'].map(side => view[`border-${side}-style`] ?? view['border-style'] ?? null);
+    const first = sides[0];
+    if (!sides.every(item => item === first)) return MIXED;
+    return first === null || BORDER_STYLES.some(([key]) => key === first) ? first : MIXED;
+  });
+  const measuredStyle = measured?.colors?.borderStyle;
+  const effectiveStyle = measuredStyle !== undefined && measuredStyle !== null ? (style === MIXED || !BORDER_STYLES.some(([key]) => key === measuredStyle) ? MIXED : measuredStyle) : style;
   const geometry = el('div', 'border-geometry');
   geometry.append(radius, presets);
   box.append(
-    pick('Style', style, BORDER_STYLES, next => run(cls => cls, `border style ${next ?? 'default'}`, { style: {
+    pick('Style', effectiveStyle, BORDER_STYLES, next => run({
+      // Per-side styles go first: the shorthand that follows then replaces them without expanding.
+      ...Object.fromEntries(['top', 'right', 'bottom', 'left'].map(side => [`border-${side}-style`, null])),
       'border-style': next,
-      ...(next === null ? {} : Object.fromEntries(['top', 'right', 'bottom', 'left'].map(side => [`border-${side}-style`, null]))),
-    } })),
+    }, `border style ${next ?? 'default'}`)),
     widths,
-    colorField({ key: 'stroke', label: 'Colour', tip: 'Border colour', group: 'borderColor', prefix: 'border', value, run, computed: measured?.colors?.borderColor, tokens }),
+    colorField({ key: 'stroke', label: 'Colour', tip: 'Border colour', property: 'border-color', value, run, computed: measured?.colors?.borderColor, tokens }),
     geometry,
   );
   return box;
 }
 
+const WEIGHTS = [['100', 'Thin 100'], ['200', 'Extra light 200'], ['300', 'Light 300'], ['400', 'Regular 400'], ['500', 'Medium 500'], ['600', 'Semibold 600'], ['700', 'Bold 700'], ['800', 'Extra bold 800'], ['900', 'Black 900']];
+
 function appearanceFold({ value, run, measured, tokens }) {
   const box = el('div', 'appearance-box');
-  // Typography: size (Tailwind steps or any px) and weight.
-  const FONT_STEPS = { 'text-xs': 12, 'text-sm': 14, 'text-base': 16, 'text-lg': 18, 'text-xl': 20, 'text-2xl': 24, 'text-3xl': 30, 'text-4xl': 36, 'text-5xl': 48, 'text-6xl': 60, 'text-7xl': 72, 'text-8xl': 96, 'text-9xl': 128 };
-  const sizeClass = value(cls => tw.get(cls, 'fontSize'));
-  const sizePx = sizeClass === MIXED ? MIXED : sizeClass == null ? null : FONT_STEPS[sizeClass] ?? /^text-\[length:(\d+(?:\.\d+)?)px\]$/.exec(sizeClass)?.[1] ?? sizeClass;
-  const WEIGHTS = [['thin', 'Thin 100'], ['extralight', 'Extra light 200'], ['light', 'Light 300'], ['normal', 'Regular 400'], ['medium', 'Medium 500'], ['semibold', 'Semibold 600'], ['bold', 'Bold 700'], ['extrabold', 'Extra bold 800'], ['black', 'Black 900']];
-  const weight = value(cls => tw.get(cls, 'fontWeight')?.slice(5) ?? null);
+  // Typography: size (any px) and weight.
+  const sizePx = value(view => css.fontSizeOf(view));
+  const weight = value(view => css.weightOf(view));
   const type = el('div', 'grid2');
   type.append(
-    field('font-size', 'Aa', sizePx, next => run(cls => tw.set(cls, 'fontSize', next), `font size ${next ? sizePx === next ? '' : next.replace(/^text-/, '') : 'default'}`), {
+    field('font-size', 'Aa', sizePx, next => run({ 'font-size': next }, `font size ${next ?? 'default'}`), {
       tip: 'Font size, px', unit: 'px', placeholder: measured?.colors?.fontSize ? String(Math.round(parseFloat(measured.colors.fontSize) || 16)) : '16', min: 1, max: 400,
-      parse: raw => { const t = raw.trim(); if (!t) return null; if (!/^\d+(?:\.\d+)?$/.test(t)) return undefined; const hit = Object.entries(FONT_STEPS).find(([, px]) => px === Number(t)); return hit ? hit[0] : `text-[length:${Number(t)}px]`; },
+      parse: raw => css.lengthInput(raw, { keywords: [], negative: false }),
     }),
-    pick('Weight', weight, WEIGHTS, next => run(cls => tw.set(cls, 'fontWeight', next ? `font-${next}` : null), next ? `weight ${next}` : 'default weight'), { tip: 'Font weight' }),
+    pick('Weight', weight, WEIGHTS, next => run({ 'font-weight': next }, next ? `weight ${next}` : 'default weight'), { tip: 'Font weight' }),
   );
-  const text = value(cls => tw.get(cls, 'textAlign')?.slice(5) ?? null);
+  const text = value(view => view['text-align'] ?? null);
   const textRow = el('div', 'segs-row align-controls');
-  textRow.append(labeledSegments('Text', segmented('Text align', text === MIXED ? null : text, [['left', 'textL', 'Align left'], ['center', 'textC', 'Align center'], ['right', 'textR', 'Align right'], ['justify', 'textJ', 'Justify']], next => run(cls => tw.set(cls, 'textAlign', next ? `text-${next}` : null), next ? `text ${next}` : 'default text align'))));
+  textRow.append(labeledSegments('Text', segmented('Text align', text === MIXED ? null : text, [['left', 'textL', 'Align left'], ['center', 'textC', 'Align center'], ['right', 'textR', 'Align right'], ['justify', 'textJ', 'Justify']], next => run({ 'text-align': next }, next ? `text ${next}` : 'default text align'))));
   const typography = el('div', 'typography-controls');
   typography.dataset.inspectorSlot = 'typography';
   typography.append(type, textRow);
   box.append(
-    colorField({ key: 'fill', label: 'Fill', tip: 'Background colour', group: 'bgColor', prefix: 'bg', value, run, computed: measured?.colors?.background, tokens }),
-    colorField({ key: 'ink', label: 'Text', tip: 'Text colour', group: 'textColor', prefix: 'text', value, run, computed: measured?.colors?.color, tokens }),
+    colorField({ key: 'fill', label: 'Fill', tip: 'Background colour', property: 'background-color', value, run, computed: measured?.colors?.background, tokens }),
+    colorField({ key: 'ink', label: 'Text', tip: 'Text colour', property: 'color', value, run, computed: measured?.colors?.color, tokens }),
     typography,
   );
   return box;
 }
 
-function alignGrid(label, x, y, onPick) {
-  const grid = el('div', 'align-grid');
-  grid.setAttribute('role', 'group');
-  grid.setAttribute('aria-label', label);
-  for (const row of AXIS) for (const col of AXIS) {
-    const cell = el('button', `align-cell${col === x && row === y ? ' on' : col === x || row === y ? ' half' : ''}`);
-    cell.type = 'button';
-    const name = row === 'center' && col === 'center' ? 'center' : `${row === 'start' ? 'top' : row === 'end' ? 'bottom' : 'middle'} ${col === 'start' ? 'left' : col === 'end' ? 'right' : 'center'}`;
-    cell.dataset.tip = `${label}: ${name}`;
-    cell.setAttribute('aria-label', `${label} ${name}`);
-    cell.setAttribute('aria-pressed', String(col === x && row === y));
-    cell.append(el('i'));
-    cell.addEventListener('click', () => onPick(col, row));
-    grid.append(cell);
-  }
-  return grid;
-}
-
-const caption = text => el('span', 'caption', text);
-
-function labeledSegments(label, control) {
-  const group = el('div', 'labeled-segs');
-  group.append(caption(label), control);
-  return group;
-}
-
 /* ---- sections ------------------------------------------------------------------- */
 
 /**
- * `nodes` are the selected elements (one or more), `parent` the single selection's parent (or
- * null), `apply(transform, label)` rewrites each element's className and commits once.
+ * `nodes` are the selected elements (one or more), `parent` the single selection's parent (or null).
+ * `apply(edits, label, options)` commits `styles` edits for every selected element once; `edits` is an object, or a function
+ * `(view, node) → object` evaluated against the accepted element inside the writer queue. `readers` are representation readers
+ * (see panels.js): `{ view(className) → declarations, variants?(className, property) → [names] }`.
  */
-export function layoutSections(nodes, { parent, apply, spacingFocus, measured = null, readMeasured = () => measured, readNodes = () => nodes, tokens = [] }) {
-  tw.setColorNames(tokens.map(([name]) => name.replace(/^--color-/, '')));
-  const classes = nodes.map(node => node.className || '');
-  const value = fn => same(classes.map(fn));
-  const variants = test => [...new Set(classes.flatMap(cls => tw.variantsOf(cls, test)))].slice(0, 4);
+export function propertySections(nodes, { parent, apply, spacingFocus, measured = null, readMeasured = () => measured, readNodes = () => nodes, tokens = [], readers = [] }) {
+  const context = { tokens: Object.fromEntries(tokens) };
+  const views = nodes.map(node => css.viewOf(node, readers, context));
+  const value = fn => same(views.map(fn));
+  const variants = property => [...new Set(nodes.flatMap(node => readers.flatMap(reader => reader.variants?.(node.className || '', property) ?? [])))].slice(0, 4);
   const subject = nodes.length === 1 ? `#${nodes[0].id}` : `${nodes.length} elements`;
-  const run = (fn, label, options = {}) => apply(fn, `${label} on ${subject}`, { ...options, group: sessionGroup, refresh: !typingLive });
+  const run = (edits, label, options = {}) => apply(edits, `${label} on ${subject}`, { ...options, group: sessionGroup, refresh: !typingLive });
 
   /* layout */
-  const display = value(cls => tw.get(cls, 'display'));
-  const position = value(cls => tw.get(cls, 'position'));
+  const display = value(view => view.display ?? null);
+  const position = value(view => view.position ?? null);
   const layout = el('div', 'layout-box');
   const top = el('div', 'grid2');
   top.append(
-    pick('Display', display, DISPLAY, next => run(cls => tw.set(cls, 'display', next), next ? `display ${next}` : 'default display'), { variants: variants('display') }),
+    pick('Display', display, DISPLAY, next => run({ display: next }, next ? `display ${next === 'none' ? 'hidden' : next}` : 'default display'), { variants: variants('display') }),
   );
   layout.append(top);
 
-  const isFlex = display === 'flex' || display === 'inline-flex';
-  const isGrid = display === 'grid' || display === 'inline-grid';
-  if (isFlex || isGrid) {
-    const align = value(cls => JSON.stringify(tw.alignment(cls)));
+  const flex = css.isFlex(display);
+  const grid = css.isGrid(display);
+  const edge = (next, isFlexContext) => (next ? css.edgeValue(next, isFlexContext) : null);
+  if (flex || grid) {
+    const align = value(view => JSON.stringify(css.alignment(view)));
     const current = align === MIXED ? { x: null, y: null, between: false } : JSON.parse(align);
     const row = el('div', 'flow-row');
-    row.append(alignGrid('Align children', current.x, current.y, (x, y) => run(cls => tw.setAlignment(cls, x, y), `align ${y} ${x}`)));
+    row.append(alignGrid('Align children', current.x, current.y, (x, y) => run(view => css.alignmentEdits(view, x, y), `align ${y} ${x}`)));
     const side = el('div', 'flow-side');
-    if (isFlex) {
-      const direction = value(cls => (/^flex-col/.test(tw.get(cls, 'direction') || '') ? 'col' : 'row'));
-      const wrap = value(cls => tw.get(cls, 'wrap') === 'flex-wrap');
+    if (flex) {
+      const direction = value(view => (/^column/.test(view['flex-direction'] || '') ? 'col' : 'row'));
+      const wrap = value(view => view['flex-wrap'] === 'wrap');
       const tools = el('div', 'segs-row');
       tools.append(
-        segmented('Direction', direction === MIXED ? null : direction, [['row', 'arrowRight', 'Row (flex-row)'], ['col', 'arrowDown', 'Column (flex-col)']], next => run(cls => tw.set(cls, 'direction', next === 'col' ? 'flex-col' : null), next === 'col' ? 'column' : 'row')),
-        toggle('wrapLines', 'Wrap (flex-wrap)', wrap === true, () => run(cls => tw.set(cls, 'wrap', wrap === true ? null : 'flex-wrap'), wrap === true ? 'no wrap' : 'wrap')),
+        segmented('Direction', direction === MIXED ? null : direction, [['row', 'arrowRight', 'Row (flex-direction: row)'], ['col', 'arrowDown', 'Column (flex-direction: column)']], next => run({ 'flex-direction': next === 'col' ? 'column' : null }, next === 'col' ? 'column' : 'row')),
+        toggle('wrapLines', 'Wrap (flex-wrap)', wrap === true, () => run({ 'flex-wrap': wrap === true ? null : 'wrap' }, wrap === true ? 'no wrap' : 'wrap')),
       );
       side.append(tools);
     } else {
-      const cols = value(cls => tw.split(cls).filter(name => !tw.hasVariant(name) && /^grid-cols-\d+$/.test(name)).map(name => Number(name.slice(10))).at(-1) ?? null);
-      side.append(field('grid-cols', 'Cols', cols, n => run(cls => {
-        const without = tw.split(cls).filter(name => tw.hasVariant(name) || !/^grid-cols-/.test(name));
-        return [...without, ...(n ? [`grid-cols-${n}`] : [])].join(' ');
-      }, n ? `${n} columns` : 'default columns'), { tip: 'Columns (grid-cols-N)', placeholder: '1', min: 1, max: 12, parse: raw => (raw === '' ? null : /^\d+$/.test(raw) && Number(raw) >= 1 && Number(raw) <= 12 ? Number(raw) : undefined) }));
+      const cols = value(view => css.gridColumns(view));
+      side.append(field('grid-cols', 'Cols', cols, n => run({ 'grid-template-columns': css.gridColumnsEdit(n) }, n ? `${n} columns` : 'default columns'), { tip: 'Equal columns (grid-template-columns)', placeholder: '1', min: 1, max: 12, parse: raw => (raw === '' ? null : /^\d+$/.test(raw) && Number(raw) >= 1 && Number(raw) <= 12 ? Number(raw) : undefined) }));
     }
-    const gap = value(cls => tw.valueOf(cls, 'gap'));
-    side.append(field('gap', 'Gap', gap, next => run(cls => tw.set(cls, 'gap', next), `gap ${next ?? 'none'}`), { tip: 'Gap between children, px', unit: 'px', placeholder: '0', min: 0, parse: raw => tw.classFor('gap', raw) }));
+    const gap = value(view => css.gapOf(view));
+    side.append(field('gap', 'Gap', gap, next => run({ 'row-gap': null, 'column-gap': null, gap: next }, `gap ${next ?? 'none'}`), { tip: 'Gap between children, px', unit: 'px', placeholder: '0', min: 0, parse: raw => css.lengthInput(raw, { keywords: [], negative: false }) }));
     row.append(side);
     layout.append(row);
     // Beyond the 3×3 pad: spread (between / around / evenly), stretch and baseline.
-    const justify = value(cls => tw.get(cls, 'justify')?.slice('justify-'.length) ?? null);
-    const alignItems = value(cls => tw.get(cls, 'items')?.slice('items-'.length) ?? null);
+    const justify = value(view => css.edgeOf(view['justify-content']));
+    const alignItems = value(view => css.edgeOf(view['align-items']));
     const spread = el('div', 'grid2');
     spread.append(
-      pick(isFlex ? 'Justify' : 'Spread', justify, JUSTIFY, next => run(cls => tw.set(cls, 'justify', next ? `justify-${next}` : null), next ? `justify ${next}` : 'default justify'), { tip: isFlex ? 'Along the main axis (justify-content)' : 'Spread the columns (justify-content)', variants: variants('justify') }),
-      pick('Align', alignItems, ALIGN, next => run(cls => tw.set(cls, 'items', next ? `items-${next}` : null), next ? `align ${next}` : 'default align'), { tip: 'Across the main axis (align-items)', variants: variants('items') }),
+      pick(flex ? 'Justify' : 'Spread', justify, JUSTIFY, next => run({ 'justify-content': edge(next, flex) }, next ? `justify ${next}` : 'default justify'), { tip: flex ? 'Along the main axis (justify-content)' : 'Spread the columns (justify-content)', variants: variants('justify-content') }),
+      pick('Align', alignItems, ALIGN, next => run({ 'align-items': edge(next, flex) }, next ? `align ${next}` : 'default align'), { tip: 'Across the main axis (align-items)', variants: variants('align-items') }),
     );
-    if (isGrid) {
-      const itemsX = value(cls => tw.get(cls, 'justifyItems')?.slice('justify-items-'.length) ?? null);
-      spread.append(pick('Items', itemsX, ITEMS_X, next => run(cls => tw.set(cls, 'justifyItems', next ? `justify-items-${next}` : null), next ? `items ${next}` : 'default items'), { tip: 'Inside each cell, horizontally (justify-items)', variants: variants('justifyItems') }));
+    if (grid) {
+      const itemsX = value(view => css.edgeOf(view['justify-items']));
+      spread.append(pick('Items', itemsX, ITEMS_X, next => run({ 'justify-items': next }, next ? `items ${next}` : 'default items'), { tip: 'Inside each cell, horizontally (justify-items)', variants: variants('justify-items') }));
     }
     layout.append(spread);
   }
 
   // Not a flex or grid container yet: one click centres what is inside it, or the element itself in its parent.
-  if (!isFlex && !isGrid) {
+  if (!flex && !grid) {
     const centre = el('div', 'centre-row');
     centre.append(el('span', 'vf-k', 'Center'));
     const inside = el('button', 'link-button', 'Content');
     inside.type = 'button';
     inside.dataset.key = 'center-content';
-    inside.dataset.tip = 'Centre the children horizontally and vertically (flex, items-center, justify-center)';
-    inside.addEventListener('click', () => run(cls => tw.set(tw.set(tw.set(cls, 'display', 'flex'), 'items', 'items-center'), 'justify', 'justify-center'), 'center content'));
+    inside.dataset.tip = 'Centre the children horizontally and vertically (display: flex, align-items and justify-content: center)';
+    inside.addEventListener('click', () => run({ display: 'flex', 'align-items': 'center', 'justify-content': 'center' }, 'center content'));
     const itself = el('button', 'link-button', 'Element');
     itself.type = 'button';
     itself.dataset.key = 'center-element';
     itself.dataset.tip = 'Centre this element horizontally in its parent (auto side margins)';
-    itself.addEventListener('click', () => run(cls => tw.setSide(tw.setSide(cls, 'margin', 'l', 'auto'), 'margin', 'r', 'auto'), 'center element'));
+    itself.addEventListener('click', () => run({ 'margin-left': 'auto', 'margin-right': 'auto' }, 'center element'));
     centre.append(inside, itself);
     layout.append(centre);
   }
 
   const pinned = position === 'absolute' || position === 'fixed' || position === 'sticky';
   if (pinned) {
-    const where = value(cls => JSON.stringify(tw.pin(cls)));
+    const where = value(view => JSON.stringify(css.pin(view)));
     const current = where === MIXED ? { x: null, y: null } : JSON.parse(where);
     const row = el('div', 'flow-row');
-    row.append(alignGrid('Pin to', current.x, current.y, (x, y) => run(cls => tw.setPin(cls, x, y), `pin ${y} ${x}`)));
+    row.append(alignGrid('Pin to', current.x, current.y, (x, y) => run(view => css.pinEdits(view, x, y), `pin ${y} ${x}`)));
     layout.append(row);
   }
 
-  const parentFlow = parent ? tw.get(parent.className || '', 'display') : null;
-  if (parentFlow && /flex|grid/.test(parentFlow) && !pinned) {
-    const self = value(cls => tw.get(cls, 'self')?.slice(5) ?? null);
+  const parentDisplay = parent ? css.viewOf(parent, readers, context).display ?? null : null;
+  if (parentDisplay && /flex|grid/.test(parentDisplay) && !pinned) {
+    const parentFlex = css.isFlex(parentDisplay);
+    const self = value(view => css.edgeOf(view['align-self']));
     const selfRow = el('div', 'segs-row align-controls');
-    selfRow.append(labeledSegments('Self', segmented('Align self in the parent', self === MIXED ? null : self, [['start', 'alignT', 'Self: start'], ['center', 'alignCV', 'Self: center'], ['end', 'alignB', 'Self: end'], ['stretch', 'distV', 'Self: stretch']], next => run(cls => tw.set(cls, 'self', next ? `self-${next}` : null), next ? `self ${next}` : 'default self'))));
+    selfRow.append(labeledSegments('Self', segmented('Align self in the parent', self === MIXED ? null : self, [['start', 'alignT', 'Self: start'], ['center', 'alignCV', 'Self: center'], ['end', 'alignB', 'Self: end'], ['stretch', 'distV', 'Self: stretch']], next => run({ 'align-self': edge(next, parentFlex) }, next ? `self ${next}` : 'default self'))));
     layout.append(selfRow);
   }
 
   /* One developer-tools-style box model; the existing margin/padding and offset editors live on their actual edges. */
   const spacing = el('div', 'spacing-box');
-  spacing.append(pick('Position', position, POSITION, next => run(cls => tw.set(cls, 'position', next), next ? next : 'default position'), { variants: variants('position') }));
+  spacing.append(pick('Position', position, POSITION, next => run({ position: next }, next ? next : 'default position'), { variants: variants('position') }));
   const model = el('div', 'boxmodel');
   model.setAttribute('role', 'group');
   model.setAttribute('aria-label', 'CSS box model in pixels');
-  const sideNames = { t: 'top', r: 'right', b: 'bottom', l: 'left' };
+  const propertyOf = (kind, side) => (kind === 'inset' ? SIDE_NAMES[side] : `${kind}-${SIDE_NAMES[side]}`);
   const spaceField = (kind, short, side) => {
-    const token = value(cls => tw.sides(cls, kind)[side]);
-    const node = field(`${short}-${side}`, '', token === MIXED ? MIXED : tw.display(token), next => {
-      run(cls => tw.setSide(cls, kind, side, next), `${kind} ${sideNames[side]} ${next == null ? 'none' : tw.display(next)}`);
-    }, { tip: '', placeholder: measured?.[kind] ? String(measured[kind]['trbl'.indexOf(side)]) : '—', min: kind === 'padding' ? 0 : -1e4, parse: tw.fromInput });
+    const property = propertyOf(kind, side);
+    const authored = value(view => view[property] ?? null);
+    const node = field(`${short}-${side}`, '', authored === MIXED ? MIXED : css.show(authored), next => {
+      run({ [property]: next }, `${kind} ${SIDE_NAMES[side]} ${next == null ? 'none' : css.show(next)}`);
+    }, { tip: '', placeholder: measured?.[kind] ? String(measured[kind]['trbl'.indexOf(side)]) : '—', min: kind === 'padding' ? 0 : -1e4, parse: raw => css.lengthInput(raw, { negative: kind !== 'padding' }) });
     node.classList.add('bm-field');
-    const label = `${kind[0].toUpperCase()}${kind.slice(1)} ${sideNames[side]}, px`;
+    const label = `${kind[0].toUpperCase()}${kind.slice(1)} ${SIDE_NAMES[side]}, px`;
     node.setAttribute('aria-label', label);
     node.querySelector('input').setAttribute('aria-label', label);
     node.querySelector('.vf-k')?.remove();
@@ -514,38 +478,38 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
   };
   const borderFields = new Map(), borderEdits = new Map();
   const widthField = (side, { diagram = false } = {}) => {
-    const property = `border-${sideNames[side]}-width`, index = 'trbl'.indexOf(side);
-    const authored = same(nodes.map(node => node.style?.[property] ?? null));
-    const shown = authored === MIXED ? MIXED : authored?.replace(/px$/, '');
+    const property = `border-${SIDE_NAMES[side]}-width`, index = 'trbl'.indexOf(side);
+    const authored = value(view => view[property] ?? null);
+    const shown = authored === MIXED ? MIXED : authored == null ? null : css.show(authored);
     const placeholder = number(measured?.border?.[index]);
     const commitWidth = next => {
       const sequence = (borderEdits.get(side) ?? 0) + 1;
       borderEdits.set(side, sequence);
-      const result = run(cls => cls, `${property} ${next ?? 'default'}`, { style: { [property]: next === null ? null : `${next}px` } });
+      const result = run({ [property]: next === null ? null : `${next}px` }, `${property} ${next ?? 'default'}`, { inline: true });
       if (!result?.then) return;
       const sync = async result => {
         if (borderEdits.get(side) !== sequence) return;
         const current = await readNodes(result?.version ?? result?.details?.actualVersion);
-        const raw = same(current.map(node => node.style?.[property] ?? null));
+        const raw = same(current.map(node => css.viewOf(node, readers, context)[property] ?? null));
         const box = raw === null ? await readMeasured() : null;
         if (borderEdits.get(side) !== sequence) return;
         for (const input of borderFields.get(side) ?? []) if (input.isConnected) input.dispatchEvent(new CustomEvent('divlet:field-value', { detail: {
-          value: raw === MIXED ? MIXED : raw?.replace(/px$/, ''), placeholder: number(box?.border?.[index]),
+          value: raw === MIXED ? MIXED : raw == null ? null : css.show(raw), placeholder: number(box?.border?.[index]),
         } }));
       };
       result.then(sync, sync).catch(() => {}); // The writer reports refusals; restore inactive peers from accepted state too.
     };
     const node = diagram
-      ? bareField(`border-${side}`, `Border ${sideNames[side]}, px`, shown, placeholder, commitWidth)
-      : field(`border-width-${side}`, sideNames[side][0].toUpperCase() + sideNames[side].slice(1), shown, commitWidth, { tip: `Border ${sideNames[side]}, px`, placeholder, unit: 'px', min: 0, parse: nonnegative });
+      ? bareField(`border-${side}`, `Border ${SIDE_NAMES[side]}, px`, shown, placeholder, commitWidth)
+      : field(`border-width-${side}`, SIDE_NAMES[side][0].toUpperCase() + SIDE_NAMES[side].slice(1), shown, commitWidth, { tip: `Border ${SIDE_NAMES[side]}, px`, placeholder, unit: 'px', min: 0, parse: nonnegative });
     borderFields.set(side, [...(borderFields.get(side) ?? []), node.querySelector('input')]);
     return node;
   };
-  const edge = (kind, side, index) => {
+  const edgeField = (kind, side, index) => {
     if (kind === 'margin' || kind === 'padding') return spaceField(kind, kind === 'margin' ? 'm' : 'p', side);
     if (kind === 'position') {
-      const token = value(cls => tw.sides(cls, 'inset')[side]);
-      const node = field(`inset-${side}`, '', token === MIXED ? MIXED : tw.display(token), next => run(cls => tw.setSide(cls, 'inset', side, next), `${sideNames[side]} ${next ?? 'auto'}`), { tip: `${sideNames[side][0].toUpperCase()}${sideNames[side].slice(1)} offset, px`, placeholder: measured?.inset?.[index]?.replace(/px$/, '') ?? 'auto', parse: tw.fromInput });
+      const authored = value(view => view[SIDE_NAMES[side]] ?? null);
+      const node = field(`inset-${side}`, '', authored === MIXED ? MIXED : css.show(authored), next => run({ [SIDE_NAMES[side]]: next }, `${SIDE_NAMES[side]} ${next ?? 'auto'}`), { tip: `${SIDE_NAMES[side][0].toUpperCase()}${SIDE_NAMES[side].slice(1)} offset, px`, placeholder: measured?.inset?.[index]?.replace(/px$/, '') ?? 'auto', parse: raw => css.lengthInput(raw) });
       node.querySelector('.vf-k')?.remove();
       node.classList.add('bm-offset');
       return node;
@@ -560,8 +524,8 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
     for (const [index, side] of ['t', 'r', 'b', 'l'].entries()) {
       const cell = el('div', `bm-cell bm-${side}`);
       cell.setAttribute('role', 'group');
-      cell.setAttribute('aria-label', `${kind} ${sideNames[side]}`);
-      cell.append(edge(kind, side, index));
+      cell.setAttribute('aria-label', `${kind} ${SIDE_NAMES[side]}`);
+      cell.append(edgeField(kind, side, index));
       sq.append(cell);
     }
     const centre = el('div', 'bm-centre');
@@ -594,16 +558,16 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
   for (const [index, axis] of ['width', 'height'].entries()) {
     if (index) core.append(el('span', 'bm-times', '×'));
     const dimension = axis === 'width' ? width : height;
-    const authored = nodes.length === 1 && Object.hasOwn(nodes[0].style ?? {}, axis);
+    const authored = nodes.length === 1 && views[0][axis] != null;
     const size = bareField(`content-${axis}`, `Content ${axis}, px`, authored ? dimension : null, dimension, next => {
-      run(cls => cls, `content ${axis} ${next ?? 'default'}`, { style: async () => {
+      run(async () => {
         if (next === null) return { [axis]: null };
         const box = await readMeasured();
         if (nodes.length !== 1 || !Number.isFinite(box?.content?.[axis])) throw new Error('Select one visible element to edit its content size.');
         const sides = axis === 'width' ? [1, 3] : [0, 2];
         const extra = box.boxSizing === 'border-box' ? sides.reduce((sum, side) => sum + box.padding[side] + box.border[side], 0) : 0;
         return { [axis]: `${next + extra}px` };
-      } });
+      }, `content ${axis} ${next ?? 'default'}`, { inline: true });
     });
     size.classList.add('bm-dimension');
     const input = size.querySelector('input');
@@ -619,14 +583,40 @@ export function layoutSections(nodes, { parent, apply, spacingFocus, measured = 
 
   /* effects */
   const effects = el('div', 'box3');
-  const opacity = value(cls => tw.valueOf(cls, 'opacity'));
-  const z = value(cls => tw.valueOf(cls, 'z'));
-  const blur = value(cls => tw.valueOf(cls, 'blur'));
+  const opacity = value(view => css.opacityOf(view));
+  const z = value(view => view['z-index'] ?? null);
+  const blur = value(view => css.blurOf(view));
   effects.append(
-    field('opacity', 'Opacity', opacity, next => run(cls => tw.set(cls, 'opacity', next), `opacity ${next ? next.slice(8) : 100}%`), { tip: 'Opacity, %', unit: '%', placeholder: '100', min: 0, max: 100, parse: raw => tw.classFor('opacity', raw) }),
-    field('z', 'Z-index', z, next => run(cls => tw.set(cls, 'z', next), `z-index ${next ?? 'auto'}`), { tip: 'Stacking order (z-index)', placeholder: 'auto', stepFrom: raw => raw.trim().toLowerCase() === 'auto' ? 0 : Number.parseInt(raw, 10), parse: raw => tw.classFor('z', raw) }),
-    field('blur', 'Blur', blur, next => run(cls => tw.set(cls, 'blur', next), `blur ${next ?? 'none'}`), { tip: 'Blur, px', unit: 'px', placeholder: '0', min: 0, max: 200, parse: raw => tw.classFor('blur', raw) }),
+    field('opacity', 'Opacity', opacity, next => run({ opacity: next }, `opacity ${next == null ? 100 : Math.round(next * 100)}%`), { tip: 'Opacity, %', unit: '%', placeholder: '100', min: 0, max: 100, parse: css.opacityInput }),
+    field('z', 'Z-index', z, next => run({ 'z-index': next }, `z-index ${next ?? 'auto'}`), { tip: 'Stacking order (z-index)', placeholder: 'auto', stepFrom: raw => raw.trim().toLowerCase() === 'auto' ? 0 : Number.parseInt(raw, 10), parse: css.zInput }),
+    field('blur', 'Blur', blur, next => run(view => ({ filter: css.blurEdit(view, next === null ? 0 : next) }), `blur ${next ?? 'none'}`), { tip: 'Blur, px', unit: 'px', placeholder: '0', min: 0, max: 200, parse: raw => (raw.trim() === '' ? null : /^\d+(?:\.\d+)?$/.test(raw.trim()) ? Number(raw.trim()) : undefined) }),
   );
 
-  return [['layout', 'Layout', layout], ['spacing', 'Spacing', spacing], ['border', 'Border', borderFold(nodes, { value, run, measured, tokens, widthField })], ['effects', 'Effects', effects], ['appearance', 'Appearance', appearanceFold({ value, run, measured, tokens })]];
+  return [['layout', 'Layout', layout], ['spacing', 'Spacing', spacing], ['border', 'Border', borderFold(views, { value, run, measured, tokens, widthField })], ['effects', 'Effects', effects], ['appearance', 'Appearance', appearanceFold({ value, run, measured, tokens })]];
 }
+function alignGrid(label, x, y, onPick) {
+  const grid = el('div', 'align-grid');
+  grid.setAttribute('role', 'group');
+  grid.setAttribute('aria-label', label);
+  for (const row of AXIS) for (const col of AXIS) {
+    const cell = el('button', `align-cell${col === x && row === y ? ' on' : col === x || row === y ? ' half' : ''}`);
+    cell.type = 'button';
+    const name = row === 'center' && col === 'center' ? 'center' : `${row === 'start' ? 'top' : row === 'end' ? 'bottom' : 'middle'} ${col === 'start' ? 'left' : col === 'end' ? 'right' : 'center'}`;
+    cell.dataset.tip = `${label}: ${name}`;
+    cell.setAttribute('aria-label', `${label} ${name}`);
+    cell.setAttribute('aria-pressed', String(col === x && row === y));
+    cell.append(el('i'));
+    cell.addEventListener('click', () => onPick(col, row));
+    grid.append(cell);
+  }
+  return grid;
+}
+
+const caption = text => el('span', 'caption', text);
+
+function labeledSegments(label, control) {
+  const group = el('div', 'labeled-segs');
+  group.append(caption(label), control);
+  return group;
+}
+

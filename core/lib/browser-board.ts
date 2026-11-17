@@ -13,6 +13,8 @@
 import { BrowserRuntime } from './browser-runtime.ts';
 import type { BrowserPreviewProjector, BrowserResourcePolicy } from './browser-runtime.ts';
 import { previewDocument } from './browser-preview.ts';
+import { installBrowserStyleEngine } from './browser-style-engine.ts';
+import type { StyleEngine } from './style-engines.ts';
 export { previewDocument, previewBridgeScript } from './browser-preview.ts';
 import { inputSchema, forAgent, toolByName } from './tools.ts';
 import { DivletError, sameJson } from './validation.ts';
@@ -36,6 +38,14 @@ export interface BrowserBoardOptions {
   readonly projectPreview?: BrowserPreviewProjector;
   /** Trusted opt-in source-byte admission/projection for published/restored copies; exclusive with projectPreview, not upload/node-export authority. */
   readonly resourcePolicy?: BrowserResourcePolicy;
+  /**
+   * A portable style provider the composition bundles (for example Tailwind). It compiles utilities in the page, lowers property
+   * edits to its classes, and answers class explanations/suggestions. Absent: the board edits and renders native CSS, and utility
+   * classes come from the build-time snapshot or nowhere. Supplied by trusted composition code, never by project data.
+   */
+  readonly styleEngine?: StyleEngine;
+  /** Browser modules (`{ id, module }`) the page serves for the board, such as the engine's class editor. */
+  readonly clientPlugins?: ReadonlyArray<{ readonly id: string; readonly module: string }>;
   /** The frame a first visit opens as a readable page (absent: the board fits all frames). */
   readonly entryFrame?: string;
   readonly target?: object;
@@ -61,6 +71,16 @@ export function snapshotCompiler(snapshot: StyleSnapshot): FrameCompiler {
       }
       return out;
     },
+  };
+}
+
+/** A frame compiler over a portable provider: it compiles exactly the classes a frame uses, in the page. */
+export function engineCompiler(engine: StyleEngine): FrameCompiler {
+  const compile = engine.compileClasses;
+  if (typeof compile !== 'function') throw new TypeError('A browser style engine must be able to compile classes.');
+  return {
+    compile: (tokens, candidates) => compile.call(engine, tokens, candidates),
+    unknown: async input => (engine.unknownClasses ? engine.unknownClasses.call(engine, input) : {}),
   };
 }
 
@@ -109,9 +129,10 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
   const base = await fingerprint(published);
   const store = browserStore();
   const stored = await store.get(options.storageKey);
-  const compiler = snapshotCompiler(styles);
+  if (options.styleEngine) installBrowserStyleEngine(options.styleEngine);
+  const compiler = options.styleEngine ? engineCompiler(options.styleEngine) : snapshotCompiler(styles);
   const persist = (text: string) => store.put(options.storageKey, { base, text, savedAt: new Date().toISOString() });
-  const open = (source: string) => BrowserRuntime.open({ source, file: options.file, projectId: `browser-${base.slice(0, 16)}`, compiler, persist, projectPreview: options.projectPreview, resourcePolicy: options.resourcePolicy, capabilities: { browser: true, assets: false, export: false, ...(options.resourcePolicy !== undefined ? { sourceAssets: true } : {}) } });
+  const open = (source: string) => BrowserRuntime.open({ source, file: options.file, projectId: `browser-${base.slice(0, 16)}`, compiler, styleEngine: options.styleEngine, clientPlugins: options.clientPlugins, persist, projectPreview: options.projectPreview, resourcePolicy: options.resourcePolicy, capabilities: { browser: true, assets: false, export: false, ...(options.resourcePolicy !== undefined ? { sourceAssets: true } : {}) } });
   let runtime: BrowserRuntime;
   let restored = false;
   if (stored?.base === base) {
@@ -163,6 +184,10 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
       release(id: string, url: string) { if (previews.get(id)?.delete(url)) URL.revokeObjectURL(url); },
     }),
     components: Object.freeze({ list: async () => ({ components: copy(runtime.components()) }) }),
+    ...(options.styleEngine ? { classes: Object.freeze({
+      explain: async (documentId: string, names: readonly string[]) => copy(await runtime.explainClasses({ documentId, names: [...names] })),
+      suggest: async (documentId: string, query: string, limit: number) => copy(await runtime.suggestClasses({ documentId, query, limit })),
+    }) } : {}),
     exports: Object.freeze({
       page: async (id: string) => copy(await runtime.exportDocument(id)),
       project: async () => ({ text: runtime.source(), fileName: options.file }),

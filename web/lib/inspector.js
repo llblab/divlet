@@ -1,10 +1,12 @@
 import { $, el, icon, button, clamp, round, debounce, keys, pressGuard } from './util.js';
-import { store, capable, on, documents, descriptor, loadModel, cachedModel, commit, edit, toast, newGroup, selectNodes, parentOf, textChild, whenVersion, request, apiUrl, receiveState } from './store.js';
+import { store, capable, on, documents, descriptor, loadModel, cachedModel, commit, edit, toast, newGroup, selectNodes, parentOf, textChild, whenVersion, request, apiUrl, receiveState, freshModel } from './store.js';
 import { fit, rectOf, postToFrame, measuredBox } from './canvas.js';
 import * as actions from './actions.js';
 import { openMenu, menuAnchor, closeMenu } from './menu.js';
 import { overflowBar } from './toolbar.js';
-import { panelSections } from './panels.js';
+import { panelSections, styleReaders } from './panels.js';
+import { propertySections } from './properties.js';
+import { viewOf, expandShorthand } from './css-props.js';
 import { components as componentSource, native } from './host.js';
 import { fontFamilyControl } from './typography.js';
 import { textOverride, textOverridePatch } from './component-text.js';
@@ -391,9 +393,24 @@ function parseDeclarations(text) {
   return out;
 }
 
+/**
+ * Inline declarations the property controls already own are not listed again in the raw CSS list: Layout, Spacing, Border,
+ * Effects, Appearance and Family show and edit them. What stays is what no control reads (transitions, shadows, width, …), and any
+ * shorthand whose syntax the controls cannot expand, so nothing authored is ever hidden from every editor.
+ */
+const CONTROLLED = new Set(['display', 'position', 'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'justify-items', 'align-self', 'gap', 'row-gap', 'column-gap', 'grid-template-columns', 'padding', 'margin', 'inset', 'top', 'right', 'bottom', 'left', 'border', 'border-width', 'border-style', 'border-color', 'border-radius', 'opacity', 'z-index', 'background-color', 'color', 'font-size', 'font-weight', 'font-family', 'text-align']);
+const controlled = (property, value) => {
+  const name = property.toLowerCase();
+  if (/^(?:padding|margin)-(?:top|right|bottom|left)$/.test(name) || /^border-(?:top|right|bottom|left)-(?:width|style|color)$/.test(name) || /^border-(?:top|bottom)-(?:left|right)-radius$/.test(name)) return true;
+  if (name === 'filter') return /^\s*blur\(\s*[\d.]+px\s*\)\s*$/.test(value);
+  if (!CONTROLLED.has(name)) return false;
+  return ['padding', 'margin', 'inset', 'border', 'border-width', 'border-style', 'border-color', 'border-radius', 'gap'].includes(name) ? !!expandShorthand(name, value) : true;
+};
+const customStyle = node => Object.fromEntries(Object.entries(node.style || {}).filter(([property, value]) => !controlled(property, String(value))));
+
 function kvEditor(documentId, node, field, save) {
   const box = el('div', 'rows');
-  const current = node[field] || {};
+  const current = field === 'style' ? customStyle(node) : node[field] || {};
   const patch = save || ((value, label) => refreshed(commit(documentId, { nodes: { [node.id]: { [field]: value } } }, { label: `${label} on ${node.id}` })));
   for (const [key, value] of Object.entries(current)) {
     const line = el('div', 'kv');
@@ -593,8 +610,25 @@ function panelFolds(kind, doc, nodes, parent) {
     if (refresh) refreshed(result); else quiet(result);
     return result;
   };
+  // CSS property edits: each selected element's edits are derived inside the writer queue from its accepted state, and the
+  // writer stores them natively or as utilities. Nothing here knows which representation is active.
+  const applyEdits = (edits, label, { group, refresh = true, inline = false } = {}) => {
+    const result = commit(doc.id, async model => {
+      const patch = {};
+      for (const selected of nodes) {
+        const node = model.nodes[selected.id];
+        if (node?.type !== 'element') throw new Error(`Element no longer exists: ${selected.id}`);
+        const resolved = typeof edits === 'function' ? await edits(viewOf(node, styleReaders(), { tokens: cachedModel(doc.id)?.tokens || {} }), node) : edits;
+        // `inline` is for edits that must stay a plain inline declaration whatever the representation (measured sizes, per-edge widths).
+        if (resolved && Object.keys(resolved).length) patch[node.id] = { [inline ? 'style' : 'styles']: resolved };
+      }
+      return Object.keys(patch).length ? { nodes: patch } : null;
+    }, { label, group });
+    if (refresh) refreshed(result); else quiet(result);
+    return result;
+  };
   const ctx = {
-    doc, nodes, node: nodes[0], parent, applyClasses,
+    doc, nodes, node: nodes[0], parent, applyClasses, applyStyles: applyEdits,
     saveClasses: (next, label) => refreshed(commit(doc.id, { nodes: { [nodes[0].id]: { className: next.join(' ') } } }, { label: `${label} on ${nodes[0].id}` })),
     spacingFocus: focus => postToFrame(doc.id, { type: 'divlet:spacing-focus', focus }),
     measuredBox: nodeId => measuredBox(doc.id, nodeId),
@@ -608,7 +642,17 @@ function panelFolds(kind, doc, nodes, parent) {
       });
     },
   };
-  const sections = panelSections(kind, ctx);
+  const properties = propertySections(nodes, {
+    parent: nodes.length === 1 ? parent : null,
+    apply: applyEdits,
+    spacingFocus: ctx.spacingFocus,
+    readNodes: async minimumVersion => { const model = await freshModel(doc.id); if (model.version < (minimumVersion ?? 0)) throw new Error('The accepted frame has not reached the reader yet.'); return nodes.map(node => model.nodes[node.id]); },
+    readMeasured: () => nodes.length === 1 ? ctx.freshMeasuredBox(nodes[0].id) : null,
+    measured: nodes.length === 1 ? ctx.measuredBox(nodes[0].id) ?? null : null,
+    tokens: Object.entries(cachedModel(doc.id)?.tokens || {}).filter(([name]) => /^--color-[a-z0-9-]+$/i.test(name)),
+    readers: styleReaders(),
+  }).map(([name, title, content]) => ({ name, title, content }));
+  const sections = [...panelSections(kind, ctx), ...properties];
   const family = fontFamilyControl(nodes, { css: [store.state?.project?.css, cachedModel(doc.id)?.css], apply: applyClasses, upload: store.state?.project?.capabilities?.fontUpload ? fontUpload : undefined });
   const appearance = sections.find(item => item.name === 'appearance');
   if (appearance) (appearance.content.querySelector('[data-inspector-slot="typography"]') ?? appearance.content).prepend(family);
@@ -704,7 +748,7 @@ function nodeView(doc, model, nodeIds) {
     if (node.tag === 'img') view.push(section('image', imageEditor(doc, node)));
     view.push(...panelFolds('node', doc, [node], parentOf(model, node.id)));
     view.push(section('attrs', details('Attributes', attributesEditor(node, (attrs, label) => refreshed(commit(doc.id, { nodes: { [node.id]: { attrs } } }, { label: `${label} on ${node.id}` }))), true, Object.keys(node.attrs).length)));
-    view.push(section('style', details('Inline style', kvEditor(doc.id, node, 'style'), Object.keys(node.style).length > 0, Object.keys(node.style).length)));
+    view.push(section('style', details('More CSS', kvEditor(doc.id, node, 'style'), Object.keys(customStyle(node)).length > 0, Object.keys(customStyle(node)).length)));
   }
   view.push(section('node-meta', details('Metadata', metadataField('node-metadata', node.metadata, next => quiet(commit(doc.id, { nodes: { [node.id]: { metadata: next } } }, { label: `edit metadata of ${node.id}` }))), false, Object.keys(node.metadata || {}).length)));
   const observed = store.observations.get(doc.id);

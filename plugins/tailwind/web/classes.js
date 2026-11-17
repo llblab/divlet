@@ -1,10 +1,10 @@
 // Tailwind classes in the inspector: each chip says what it does (hover for its CSS), a click
 // edits it in place, × removes it, and typing suggests utilities with their effect.
 import { el, icon } from '../../lib/util.js';
-import { request, descriptor, undo, redo } from '../../lib/store.js';
+import { descriptor, undo, redo } from '../../lib/store.js';
+import { classes as classPort } from '../../lib/host.js';
 import { attachSuggest } from '../../lib/suggest.js';
 
-const enc = encodeURIComponent;
 /** Class names: split on whitespace, and on commas only outside [] and () — `text-[clamp(40px,3.5vw,58px)]` is one class. */
 function split(value) {
   const out = [];
@@ -32,7 +32,8 @@ async function explain(documentId, names) {
   }
   const missing = names.filter(name => !entry.fresh.has(name));
   if (missing.length) {
-    const result = await request(`api/classes?documentId=${enc(documentId)}&names=${enc(missing.join(' '))}`);
+    // A host without class knowledge (no provider port) explains nothing; the chips then stay plain.
+    const result = classPort ? await classPort.explain(documentId, missing) : { classes: {} };
     for (const [name, info] of Object.entries(result.classes)) { entry.classes.set(name, info); entry.fresh.add(name); }
   }
   return entry.classes;
@@ -59,7 +60,7 @@ function attach(input, documentId, onAccept) {
   attachSuggest(input, {
     words: true,
     onAccept,
-    fetch: async word => (await request(`api/classes?documentId=${enc(documentId)}&q=${enc(word)}&limit=8`)).items.map(item => ({
+    fetch: async word => (classPort ? await classPort.suggest(documentId, word, 8) : { items: [] }).items.map(item => ({
       ...item,
       partial: item.kind === 'variant',
       hint: item.kind === 'variant' ? 'variant' : item.kind === 'used' && !item.hint ? 'in this project' : item.hint,

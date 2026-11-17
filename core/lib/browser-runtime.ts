@@ -28,6 +28,7 @@ import { readAssets } from './asset-data.ts';
 import type { AssetByteAccess } from './asset-data.ts';
 import { assetReference } from './asset-reference.ts';
 import { runOnRuntime, toolByName, toolList } from './tools.ts';
+import type { StyleEngine } from './style-engines.ts';
 
 const HISTORY_LIMIT = 500;
 const UNDO_LIMIT = 200;
@@ -60,6 +61,10 @@ export interface BrowserRuntimeOptions {
   /** A stable identifier for this browser copy of the project. */
   readonly projectId: string;
   readonly compiler: FrameCompiler;
+  /** The portable style provider behind `compiler`, when the composition has one: class explanations and suggestions come from it. */
+  readonly styleEngine?: StyleEngine;
+  /** Browser modules the composition serves for the board (`{ id, module }`, the module a path under the page). */
+  readonly clientPlugins?: ReadonlyArray<{ readonly id: string; readonly module: string }>;
   /** Runs inside candidate preparation before persistence/acceptance. Not selected by project data or permission to admit bytes. */
   readonly projectPreview?: BrowserPreviewProjector;
   /** Private resource integration seam. Mutually exclusive with standalone projectPreview; omission retains both default byte gates. */
@@ -76,6 +81,8 @@ export class BrowserRuntime {
   #queue: Promise<unknown> = Promise.resolve();
   #persist: BrowserRuntimeOptions['persist'];
   #compiler: FrameCompiler;
+  #engine: StyleEngine | undefined;
+  #clientPlugins: Array<{ id: string; module: string }>;
   #projectPreview: BrowserPreviewProjector | undefined;
   #assetAccess: AssetByteAccess | undefined;
   #resources: ResourceDescription[] = [];
@@ -106,6 +113,8 @@ export class BrowserRuntime {
     this.file = options.file;
     this.projectId = options.projectId;
     this.#compiler = options.compiler;
+    this.#engine = options.styleEngine;
+    this.#clientPlugins = (options.clientPlugins ?? []).map(item => ({ id: item.id, module: item.module }));
     this.#projectPreview = options.projectPreview;
     const policy = options.resourcePolicy;
     if (policy !== undefined) {
@@ -168,6 +177,32 @@ export class BrowserRuntime {
     return { seq: this.seq, pointId: this.#historyLine.currentId, navigation: true, canUndo: this.undoStack.length > 0, canRedo: this.redoStack.length > 0, undoLabel: this.undoStack.at(-1)?.label ?? null, redoLabel: this.redoStack.at(-1)?.label ?? null };
   }
 
+  /** The tokens and CSS a frame's classes resolve against: project settings under the frame's own. */
+  private styleContext(documentId: unknown) {
+    const { document } = this.getEntry(documentId);
+    return { tokens: { ...this.settings.tokens, ...document.tokens }, css: [this.settings.css, document.css].filter(Boolean).join('\n') };
+  }
+
+  /** What each class does in a frame: utility CSS, the custom rule behind it, or nothing. Empty without a style provider. */
+  async explainClasses({ documentId, names }: { documentId: string; names: string | string[] }) {
+    const list = (Array.isArray(names) ? names : String(names || '').split(/\s+/)).filter(Boolean).slice(0, 200);
+    const context = this.styleContext(documentId);
+    const engine = this.#engine;
+    if (!engine?.explainClasses) return { documentId, classes: {} };
+    engine.warmSuggestions?.(context.tokens);
+    return { documentId, classes: await engine.explainClasses({ ...context, names: list }) };
+  }
+
+  /** Classes to offer while typing in a frame; ones the project already uses come first. Empty without a style provider. */
+  async suggestClasses({ documentId, query, limit = 10 }: { documentId: string; query: unknown; limit?: unknown }) {
+    const engine = this.#engine;
+    if (!engine?.suggestClasses) return { documentId, query, items: [] };
+    const counts = new Map<string, number>();
+    for (const entry of this.documents.values()) for (const node of Object.values(entry.document.nodes) as Array<{ className?: string }>) for (const name of (node.className || '').split(/\s+/)) if (name) counts.set(name, (counts.get(name) || 0) + 1);
+    const used = [...counts].sort((a, b) => b[1] - a[1]).map(([name]) => name);
+    return { documentId, query, items: await engine.suggestClasses({ ...this.styleContext(documentId), query: String(query || '').slice(0, 120), used, limit: Math.min(20, Math.max(1, Number(limit) || 10)) }) };
+  }
+
   info() {
     const state = {
       projectId: this.projectId,
@@ -186,7 +221,7 @@ export class BrowserRuntime {
       agent: { ...this.agent },
       work: clone(this.work),
       site: null,
-      clientPlugins: [],
+      clientPlugins: this.#clientPlugins.map(item => ({ ...item })),
     };
     const key = JSON.stringify(state);
     if (key !== this.#stateKey) { this.#stateKey = key; this.stateVersion++; }

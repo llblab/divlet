@@ -712,9 +712,11 @@ try {
   // Spacing the panel cannot read from a class (a custom property class) still shows the page's real numbers.
   await sleep(600);
   const navClass = runtime.read({ view: 'document', documentId: 'welcome' }).nodes.nav.className;
-  await runtime.patch({ documentId: 'welcome', expectedVersion: runtime.read({ view: 'document', documentId: 'welcome' }).version, actor: 'user', patch: { nodes: { nav: { className: `${navClass} [padding:12px_6px]` } } } });
+  const cssBefore = runtime.read({ view: 'document', documentId: 'welcome' }).css ?? '';
+  // A stylesheet rule is not something the property controls read (utility classes and inline declarations are).
+  await runtime.patch({ documentId: 'welcome', expectedVersion: runtime.read({ view: 'document', documentId: 'welcome' }).version, actor: 'user', patch: { css: `${cssBefore}\n.measured-pad{padding:12px 6px}`, nodes: { nav: { className: `${navClass} measured-pad` } } } });
   await page.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav']); });
-  await waitUntil(async () => (await page.locator('#inspector [data-key="p-t"]').getAttribute('placeholder')) === '12', 'the padding fields show the measured 12px from an unreadable class');
+  await waitUntil(async () => (await page.locator('#inspector [data-key="p-t"]').getAttribute('placeholder')) === '12', 'the padding fields show the measured 12px from a stylesheet rule');
   assert.equal(await page.locator('#inspector [data-key="p-l"]').getAttribute('placeholder'), '6');
   assert.equal(await page.locator('#inspector [data-key="p-t"]').inputValue(), '', 'the field itself stays empty: no class of its own');
   // The arrow keys step from the number the page reports, not from zero.
@@ -732,7 +734,7 @@ try {
   await waitUntil(() => runtime.read({ view: 'document', documentId: 'welcome' }).version >= startVersion + 2, 'both arrow presses reach the project');
   checks.push('the arrow keys step from the measured placeholder rather than from zero');
   const current = runtime.read({ view: 'document', documentId: 'welcome' });
-  await runtime.patch({ documentId: 'welcome', expectedVersion: current.version, actor: 'user', patch: { nodes: { nav: { className: navClass } } } });
+  await runtime.patch({ documentId: 'welcome', expectedVersion: current.version, actor: 'user', patch: { css: cssBefore, nodes: { nav: { className: navClass } } } });
   checks.push('padding and margin the panel cannot read from a class still show the page\'s real numbers');
 
   // A named layer shows its name in the inspector (imported designs name their layers; the ids are hashes).

@@ -15,6 +15,7 @@ import { compileClasses } from '../core/lib/engine.ts';
 import { safeDirectory } from '../core/lib/output.ts';
 import { previewBridge } from '../core/lib/bridge.js';
 import { previewBridgeScript } from '../core/lib/browser-preview.ts';
+import { rendererSource } from '../plugins/tailwind/lib/identity.ts';
 import { landingEntries, landingSource } from './landing-hash.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -42,12 +43,17 @@ export async function styleSnapshot(source) {
 }
 
 /** The composition bundle: the browser writer, the board ports and the MCP provider. No Node module may reach it. */
-async function hostBundle(version) {
+async function hostBundle(version, { tailwind = true } = {}) {
+  // `tailwind: false` composes the board without the provider: native CSS editing only, for the omitted-provider acceptance run.
   const entry = `
 import { startBrowserBoard } from ${JSON.stringify(path.join(root, 'core/lib/browser-board.ts'))};
+${tailwind ? `import { createBrowserProvider } from ${JSON.stringify(path.join(root, 'plugins/tailwind/lib/browser.ts'))};` : ''}
 const here = new URL('./', import.meta.url);
+${tailwind ? `// The Tailwind provider is composed here, from the renderer source captured at build time: its compiler, stylesheets and identity
+// travel together, so the page needs no network, Node backend or remote compiler.
+const tailwind = createBrowserProvider(${JSON.stringify(rendererSource())});` : ''}
 try {
-  await startBrowserBoard({ projectUrl: new URL('project.divlet', here), stylesUrl: new URL('styles.json', here), bridgeUrl: new URL('preview-bridge.js', here), entryFrame: 'index', storageKey: location.pathname + '#landing', file: 'landing.divlet', version: ${JSON.stringify(version)} });
+  await startBrowserBoard({ ${tailwind ? `styleEngine: tailwind, clientPlugins: [{ id: 'tailwind', module: 'plugins/tailwind/panel.js' }], ` : ''}projectUrl: new URL('project.divlet', here), stylesUrl: new URL('styles.json', here), bridgeUrl: new URL('preview-bridge.js', here), entryFrame: 'index', storageKey: location.pathname + '#landing', file: 'landing.divlet', version: ${JSON.stringify(version)} });
   await import(new URL('./board.js', import.meta.url).href);
 } catch (error) {
   // Without its composition the board must not start: it would fall back to native routes that a static host does not have.
@@ -62,7 +68,10 @@ try {
     define: { 'process.env.NODE_ENV': '"production"' },
   });
   const inputs = Object.keys(result.metafile.inputs);
-  const host = inputs.filter(file => /(?:^|\/)core\/lib\/(?:engine|model-styles|media-type|runtime|server|boards|render|output|static)\.(?:js|ts)$|(?:^|\/)(?:plugins\/tailwind|@tailwindcss|tailwindcss)\//.test(file));
+  // Only the portable provider modules and the compiler package itself may come from the Tailwind side; the Node wrapper, identity
+  // discovery and `@tailwindcss/node` may not.
+  const portable = /(?:^|\/)plugins\/tailwind\/lib\/(?:browser|compiler|theme|renderer-source|design-tools|styles)\.(?:js|ts)$/;
+  const host = inputs.filter(file => /(?:^|\/)core\/lib\/(?:engine|model-styles|media-type|runtime|server|boards|render|output|static)\.(?:js|ts)$|(?:^|\/)@tailwindcss\//.test(file) || (/(?:^|\/)plugins\/tailwind\//.test(file) && !portable.test(file)));
   if (host.length) throw new Error(`The browser host reached Node/provider modules: ${host.join(', ')}`);
   const external = Object.values(result.metafile.outputs).flatMap(output => output.imports.map(item => item.path));
   if (external.length) throw new Error(`The browser host retained imports: ${external.join(', ')}`);
@@ -70,9 +79,12 @@ try {
 }
 
 /** The board's own client files, as the local host serves them: native ES modules and the stylesheet. */
-async function clientEntries() {
+async function clientEntries({ tailwind = true } = {}) {
   const entries = [['board.js', await readFile(path.join(web, 'board.js'))], ['board.css', await readFile(path.join(web, 'board.css'))]];
   for (const name of (await readdir(path.join(web, 'lib'))).sort()) if (name.endsWith('.js')) entries.push([`lib/${name}`, await readFile(path.join(web, 'lib', name))]);
+  // The Tailwind plugin's browser modules, served where the board resolves them: `plugins/tailwind/<file>` (they import `../../lib/…`).
+  const plugin = path.join(root, 'plugins/tailwind/web');
+  if (tailwind) for (const name of (await readdir(plugin)).sort()) if (name.endsWith('.js')) entries.push([`plugins/tailwind/${name}`, await readFile(path.join(plugin, name))]);
   return entries;
 }
 
@@ -89,17 +101,17 @@ async function shell() {
   return text(html);
 }
 
-export async function pagesEntries() {
+export async function pagesEntries(options = {}) {
   const product = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
   const source = await readFile(landingSource, 'utf8');
   const entries = [
     ['.nojekyll', Buffer.alloc(0)],
     ['index.html', await shell()],
-    ['divlet-host.js', Buffer.from(await hostBundle(product.version))],
+    ['divlet-host.js', Buffer.from(await hostBundle(product.version, options))],
     ['project.divlet', text(source)],
     ['styles.json', text(JSON.stringify(await styleSnapshot(source)))],
     ['preview-bridge.js', text(previewBridgeScript(previewBridge.toString()))],
-    ...await clientEntries(),
+    ...await clientEntries(options),
     // The prepared landing as a plain page: readable without the board, and the source of truth for search engines.
     ...(await landingEntries()).filter(([name]) => name !== '.nojekyll').map(([name, bytes]) => [`page/${name}`, bytes]),
   ];

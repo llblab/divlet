@@ -21,7 +21,7 @@ test('transient property maps retain string, numeric and removal semantics witho
   const { applyDocumentPatch, createDemoDocument } = await import('@divlet/core/model');
   const input = Object.freeze({ display: 'grid', opacity: 0.5, 'flex-grow': 1, width: null });
   const original = 'block opacity-[1] grow-0 w-4 hover:w-8 marker';
-  const expected = 'grid opacity-[0.5] grow hover:w-8 marker';
+  const expected = 'grid opacity-50 grow hover:w-8 marker';
   eq(norm(applyStyles(original, input)), expected);
   const doc = createDemoDocument(), id = doc.rootId;
   doc.nodes[id].className = original;

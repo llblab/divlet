@@ -278,7 +278,7 @@ try {
   const beforeClear = afterVersion();
   for (const [key, other, next] of [['border-width-t', 'border-t', '2'], ['border-r', 'border-width-r', '4']]) {
     await page.locator(`#inspector [data-key="${key}"]`).fill(''); await page.keyboard.press('Tab');
-    await waitUntil(async () => await page.locator(`#inspector [data-key="${key}"]`).inputValue() === '' && await page.locator(`#inspector [data-key="${other}"]`).inputValue() === '' && await page.locator(`#inspector [data-key="${key}"]`).getAttribute('placeholder') === '3' && await page.locator(`#inspector [data-key="${other}"]`).getAttribute('placeholder') === '3', 'clearing either copy synchronizes the fresh computed fallback without leaving the inspector');
+    await waitUntil(async () => await page.locator(`#inspector [data-key="${key}"]`).inputValue() === '3' && await page.locator(`#inspector [data-key="${other}"]`).inputValue() === '3', 'clearing either copy falls back to the class-authored width in both copies without leaving the inspector');
     await page.locator(`#inspector [data-key="${other}"]`).fill(next); await page.keyboard.press('Tab');
     await waitUntil(async () => await page.locator(`#inspector [data-key="${key}"]`).inputValue() === next, 'the other copy restores the same authored value');
   }
@@ -302,13 +302,13 @@ try {
   await page.locator('#viewport').focus(); await page.keyboard.press('Control+z');
   await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '5' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '5', 'one Undo restores both copies');
   await page.keyboard.press('Control+z');
-  await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').getAttribute('placeholder') === '3' && await page.locator('#inspector [data-key="border-width-l"]').getAttribute('placeholder') === '3', 'Undo returns both copies to the same computed fallback');
+  await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '3' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '3', 'Undo returns both copies to the same class-authored width');
   const beforeRefusal = afterVersion();
   await page.route('**/api/patch', route => route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'REVISION_CONFLICT', message: 'Linked border write refused', details: { actualVersion: beforeRefusal } }) }));
   try {
     await page.locator('#inspector [data-key="border-l"]').fill('9'); await page.keyboard.press('Tab');
     await waitUntil(async () => /Linked border write refused/.test(await page.locator('#toast').innerText()), 'a refused linked edit reports the writer refusal');
-    await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '', 'a refused edit restores inactive copies from accepted state');
+    await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '3' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '3', 'a refused edit restores inactive copies from accepted state');
     assert.equal(afterVersion(), beforeRefusal, 'the refusal does not advance content');
   } finally { await page.unroute('**/api/patch'); }
   await page.locator('#viewport').focus(); await page.mouse.move(5, 5);

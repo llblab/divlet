@@ -157,8 +157,9 @@ A project is `{ frames }` plus shared `tokens` and `css`. A frame is one artboar
 - Text: `{ id, type: "text", content }` — a text node is always a child, never a sibling with markup.
 - Instance: `{ id, type: "ref", ref: "frameId/nodeId", descendants }`.
 
-Declarative styles: a node patch may carry `styles: { "padding-top": "16px", color: "#fff" }`. Each declaration becomes the
-Tailwind utility for that property (arbitrary when none exists) and replaces the class that set it; `null` removes it; padding
+Declarative styles: a node patch may carry `styles: { "padding-top": "16px", color: "#fff" }`. Each declaration is plain CSS.
+With the Tailwind engine it becomes the utility for that property (arbitrary when none exists) and replaces the class that set
+it; without one it is written as an inline declaration (a longhand wins over an earlier shorthand). `null` removes it; padding
 and margin sides merge. Tokens named `--color-*`, `--font-*`, `--breakpoint-*` become theme classes (`--color-brand` gives
 `bg-brand`), and a `bg-<name>`/`text-<name>` class counts as that colour when the project declares it.
 
@@ -232,7 +233,7 @@ assume a failed save was accepted.
 | `INVALID_*` / `UNSUPPORTED_*` | the model or CSS would break the format | fix the shape (nesting, attribute, css directive) — the message names it |
 | `OUTPUT_CONFLICT` / `OUTPUT_BUSY` | the build directory belongs to another project or is locked | do not delete the lock or manifest; report it |
 | `NO_AGENT` / `NO_PROJECT` / `UNKNOWN_PROJECT` | nothing open, or the id is from another session | `divlet_open` for this directory first |
-| `NO_STYLE_ENGINE` | the host runs plain CSS without the Tailwind engine | use `style`/`css`, not utilities |
+| `NO_STYLE_ENGINE` | a utility-only capability was asked of a host that runs plain CSS | use `styles`, `style` or `css`, not utilities |
 
 ## 10. Going deeper
 

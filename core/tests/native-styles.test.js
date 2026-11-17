@@ -6,7 +6,8 @@ import { setStyleEngines, styleEngine } from '../lib/engine.ts';
 
 test('a longhand edit is written after a covering shorthand so it wins, and siblings are untouched', () => {
   assert.deepEqual(Object.entries(applyNativeStyles({ padding: '10px' }, { 'padding-right': '4px' })), [['padding', '10px'], ['padding-right', '4px']]);
-  assert.deepEqual(Object.entries(applyNativeStyles({ 'padding-right': '4px', padding: '10px' }, { 'padding-right': '6px' })), [['padding', '10px'], ['padding-right', '6px']]);
+  assert.deepEqual(applyNativeStyles({ 'padding-right': '4px', padding: '10px' }, { 'padding-right': '6px' }), { 'padding-top': '10px', 'padding-right': '6px', 'padding-bottom': '10px', 'padding-left': '10px' }, 'a later covering shorthand is expanded rather than letting it defeat the edit');
+  assert.deepEqual(Object.entries(applyNativeStyles({ color: 'red', 'padding-right': '4px' }, { 'padding-right': '6px' })), [['color', 'red'], ['padding-right', '6px']], 'an existing declaration keeps its slot');
   assert.deepEqual(Object.entries(applyNativeStyles({ color: 'red', 'padding-top': '1px' }, { padding: '8px' })), [['color', 'red'], ['padding', '8px']]);
 });
 

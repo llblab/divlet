@@ -20,8 +20,8 @@ function checkStylesheet(css: string, compiled: boolean): void {
   });
 }
 
-/** Capture trusted installed CSS once; callers choose the profile/host and admit tokens/candidates. */
-export function createCompiler(stylesheets: RendererStylesheets): ClassCompiler {
+/** Check and capture the trusted installed stylesheets once; the returned loader serves only that graph. */
+export function captureStylesheets(stylesheets: RendererStylesheets): { base: string; loadStylesheet: (id: string, base: string) => Promise<{ path: string; base: string; content: string }> } {
   const files = new Map<string, string>();
   for (const name of STYLESHEETS) {
     const content = stylesheets[name];
@@ -29,18 +29,24 @@ export function createCompiler(stylesheets: RendererStylesheets): ClassCompiler 
     checkStylesheet(content, false);
     files.set(name, content);
   }
+  return {
+    base: BASE,
+    loadStylesheet: async (id, base) => {
+      const name = id === 'tailwindcss' ? 'index.css' : id.startsWith('./') ? id.slice(2) : '';
+      const content = files.get(name);
+      if (base !== BASE || content === undefined) fail('TAILWIND_COMPILER_STYLESHEET_UNAVAILABLE', 'Tailwind compilation only loads its bundled stylesheet graph.');
+      return { path: `${BASE}/${name}`, base: BASE, content: content as string };
+    },
+  };
+}
+export const refuseModule = async (): Promise<never> => fail('TAILWIND_COMPILER_MODULE_UNAVAILABLE', 'Tailwind compilation does not load JavaScript plugins or config modules.');
+
+/** Capture trusted installed CSS once; callers choose the profile/host and admit tokens/candidates. */
+export function createCompiler(stylesheets: RendererStylesheets): ClassCompiler {
+  const captured = captureStylesheets(stylesheets);
   return async (tokens, candidates) => {
     // build() is incremental: a fresh compiler prevents one frame/candidate set leaking utilities into another.
-    const compiler = await compile(`@import "tailwindcss";\n${themeOf(tokens)}`, {
-      base: BASE,
-      loadModule: async () => fail('TAILWIND_COMPILER_MODULE_UNAVAILABLE', 'Tailwind compilation does not load JavaScript plugins or config modules.'),
-      loadStylesheet: async (id, base) => {
-        const name = id === 'tailwindcss' ? 'index.css' : id.startsWith('./') ? id.slice(2) : '';
-        const content = files.get(name);
-        if (base !== BASE || content === undefined) fail('TAILWIND_COMPILER_STYLESHEET_UNAVAILABLE', 'Tailwind compilation only loads its bundled stylesheet graph.');
-        return { path: `${BASE}/${name}`, base: BASE, content };
-      },
-    });
+    const compiler = await compile(`@import "tailwindcss";\n${themeOf(tokens)}`, { base: captured.base, loadModule: refuseModule, loadStylesheet: captured.loadStylesheet });
     if (compiler.sources.length || (compiler.root !== null && compiler.root !== 'none')) fail('TAILWIND_COMPILER_SOURCE_UNSUPPORTED', 'Tailwind compilation requires explicit candidates, not source scanning.');
     const css = compiler.build([...new Set(candidates)].sort());
     // Tailwind leaves remote imports in output instead of calling its loader; never turn them into browser fetches.

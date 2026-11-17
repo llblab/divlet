@@ -17,8 +17,11 @@ const KEYWORD = {
   overflow: { hidden: 'overflow-hidden', auto: 'overflow-auto', visible: 'overflow-visible' },
   'white-space': { 'pre-wrap': 'whitespace-pre-wrap', nowrap: 'whitespace-nowrap', normal: 'whitespace-normal', pre: 'whitespace-pre' },
   'text-align': { left: 'text-left', right: 'text-right', center: 'text-center', justify: 'text-justify' },
+  'font-weight': { 100: 'font-thin', 200: 'font-extralight', 300: 'font-light', 400: 'font-normal', 500: 'font-medium', 600: 'font-semibold', 700: 'font-bold', 800: 'font-extrabold', 900: 'font-black', normal: 'font-normal', bold: 'font-bold' },
 };
 const PREFIX = { width: 'w', height: 'h', 'min-width': 'min-w', 'min-height': 'min-h', 'max-width': 'max-w', 'max-height': 'max-h', gap: 'gap', left: 'left', top: 'top', right: 'right', bottom: 'bottom', 'border-radius': 'rounded', 'line-height': 'leading', 'font-weight': 'font', opacity: 'opacity' };
+const BLUR_STEPS = { 4: 'xs', 8: 'sm', 12: 'md', 16: 'lg', 24: 'xl', 40: '2xl', 64: '3xl' };
+const INSET = new Set(['top', 'right', 'bottom', 'left']);
 const KEYWORD_OWNER = new Map(Object.entries(KEYWORD).flatMap(([property, values]) => Object.values(values).map(name => [name, property])));
 const PREFIX_OWNER = Object.entries(PREFIX).sort((a, b) => b[1].length - a[1].length).map(([property, prefix]) => [`${prefix}-`, property]);
 
@@ -48,6 +51,13 @@ export function declarationClass(property, value, colorOf = () => null, { scale 
   if ((property === 'padding' || property === 'margin') && value.split(' ').every(part => LENGTH.test(part)) && value.split(' ').length <= 4) return boxClasses(property === 'padding' ? 'p' : 'm', sidesOf(value.split(' ')), scale);
   if (scale && property === 'border-radius' && RADIUS_SCALE[value]) return RADIUS_SCALE[value];
   if (scale && (property === 'gap' || property === 'width' || property === 'height') && scaleToken(value)) return `${PREFIX[property]}-${scaleToken(value)}`;
+  // Whole-number steps have their own utilities (`opacity-40`, `z-10`, `blur-sm`, `grid-cols-3`); anything else stays arbitrary.
+  if (scale && property === 'opacity') { const n = Number(value); const percent = Math.round(n * 100); if (value !== '' && Number.isFinite(n) && n >= 0 && n <= 1 && Math.abs(n * 100 - percent) < 1e-9) return `opacity-${percent}`; }
+  if (scale && property === 'z-index') { if (/^-?\d+$/.test(value)) return value.startsWith('-') ? `-z-${value.slice(1)}` : `z-${value}`; if (value === 'auto') return 'z-auto'; }
+  if (scale && property === 'filter') { const blur = /^blur\(\s*(\d+(?:\.\d+)?)px\s*\)$/.exec(value); if (blur) { const step = BLUR_STEPS[blur[1]]; return step ? `blur-${step}` : `blur-[${blur[1]}px]`; } }
+  if (scale && property === 'grid-template-columns') { const columns = /^repeat\(\s*(\d+)\s*,\s*minmax\(\s*0(?:px)?\s*,\s*1fr\s*\)\s*\)$/.exec(value); if (columns && Number(columns[1]) >= 1 && Number(columns[1]) <= 12) return `grid-cols-${columns[1]}`; }
+  // Offsets use the spacing scale too (`top-2`), with a leading minus for negative steps.
+  if (scale && INSET.has(property)) { const negative = value.startsWith('-'); const token = scaleToken(negative ? value.slice(1) : value); if (token && !(negative && token === '0')) return `${negative ? '-' : ''}${property}-${token}`; }
   if (PREFIX[property] && !/[\s,]/.test(value)) return `${PREFIX[property]}-[${arbitrary(value)}]`;
   return `[${property}:${arbitrary(value)}]`;
 }
@@ -60,19 +70,23 @@ function sidesOf(parts) {
 }
 function boxClasses(letter, sides, scale = false) {
   const present = SIDE_KEYS.filter(key => sides[key] !== undefined);
-  const token = value => (scale ? scaleToken(value) : null) ?? `[${value}]`;
+  const token = value => (value === 'auto' ? 'auto' : (scale ? scaleToken(value) : null) ?? `[${value}]`);
   if (present.length === 4 && SIDE_KEYS.every(key => sides[key] === sides.t)) return `${letter}-${token(sides.t)}`;
   const out = [];
-  if (sides.t !== undefined && sides.t === sides.b && sides.l !== undefined && sides.l === sides.r) return `${letter}y-${token(sides.t)} ${letter}x-${token(sides.l)}`;
-  for (const key of present) out.push(`${letter}${key}-${token(sides[key])}`);
+  const x = sides.l !== undefined && sides.l === sides.r, y = sides.t !== undefined && sides.t === sides.b;
+  // A pair of equal opposite sides is one axis utility (`mx-auto`, `py-4`) when it is the whole edit or both pairs agree.
+  if (x && y) return `${letter}y-${token(sides.t)} ${letter}x-${token(sides.l)}`;
+  if (x && sides.t === undefined && sides.b === undefined) return `${letter}x-${token(sides.l)}`;
+  if (y && sides.l === undefined && sides.r === undefined) return `${letter}y-${token(sides.t)}`;
+  for (const key of SIDE_KEYS) if (sides[key] !== undefined) out.push(`${letter}${key}-${token(sides[key])}`);
   return out.join(' ');
 }
 /** Parse one existing padding/margin class into `{ letter, sides }`, or null when it is not understood (it then stays untouched). */
 function parseBox(name) {
-  const match = /^(p|m)(t|r|b|l|x|y)?-(?:\[([^\]]+)\]|(\d+(?:\.\d+)?)|(px))$/.exec(name);
+  const match = /^(p|m)(t|r|b|l|x|y)?-(?:\[([^\]]+)\]|(\d+(?:\.\d+)?)|(px)|(auto))$/.exec(name);
   if (!match) return null;
-  const [, letter, axis, arbitraryValue, scale, px] = match;
-  const value = arbitraryValue ?? (px ? '1px' : Number(scale) === 0 ? '0' : `${Number(scale) * 4}px`);
+  const [, letter, axis, arbitraryValue, scale, px, auto] = match;
+  const value = auto ? 'auto' : arbitraryValue ?? (px ? '1px' : Number(scale) === 0 ? '0' : `${Number(scale) * 4}px`);
   const which = !axis ? SIDE_KEYS : axis === 'x' ? ['l', 'r'] : axis === 'y' ? ['t', 'b'] : [axis];
   return { letter, sides: Object.fromEntries(which.map(key => [key, value])) };
 }
@@ -90,12 +104,16 @@ export function propertyOfClass(name, colourNames) {
     if (name.startsWith('bg-') && colourNames.has(name.slice(3))) return 'background-color';
     if (name.startsWith('text-') && colourNames.has(name.slice(5))) return 'color';
   }
+  if (/^-?z-(?:\d+|auto)$/.test(name)) return 'z-index';
+  if (/^blur(?:-(?:none|xs|sm|md|lg|xl|2xl|3xl|\[[^\]]+\]))?$/.test(name)) return 'filter';
+  if (/^grid-cols-\d+$/.test(name)) return 'grid-template-columns';
   if (/^rounded(?:-(?:none|xs|sm|md|lg|xl|2xl|3xl|4xl|full))?$/.test(name)) return 'border-radius';
   if (/^bg-(?:transparent|current|inherit|white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}(?:\/\d+)?)$/.test(name)) return 'background-color';
   if (/^text-(?:transparent|current|inherit|white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}(?:\/\d+)?)$/.test(name)) return 'color';
   if (/^bg-\[(?!url)/.test(name)) return 'background-color';
   if (/^font-\[\d/.test(name)) return 'font-weight';
-  for (const [prefix, property] of PREFIX_OWNER) if (name.startsWith(prefix) && /^(?:\[|\d|(?:full|px|auto|screen|fit|min|max)$)/.test(name.slice(prefix.length))) return property;
+  const bare = name.startsWith('-') ? name.slice(1) : name;
+  for (const [prefix, property] of PREFIX_OWNER) if (bare.startsWith(prefix) && /^(?:\[|\d|(?:full|px|auto|screen|fit|min|max)$)/.test(bare.slice(prefix.length))) return property;
   return null;
 }
 

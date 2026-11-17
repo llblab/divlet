@@ -66,3 +66,11 @@ export function createHttpExports(request) {
 
 /** @param {Request} request @returns {import('@divlet/web/host').BoardComponents} */
 export const createHttpComponents = request => Object.freeze({ list: () => request('api/components') });
+
+/** @param {Request} request @returns {import('@divlet/web/host').BoardClasses} */
+export const createHttpClasses = request => Object.freeze({
+  /** @param {string} documentId @param {readonly string[]} names */
+  explain: (documentId, names) => request(`api/classes?documentId=${encodeURIComponent(documentId)}&names=${encodeURIComponent(names.join(' '))}`),
+  /** @param {string} documentId @param {string} query @param {number} limit */
+  suggest: (documentId, query, limit) => request(`api/classes?documentId=${encodeURIComponent(documentId)}&q=${encodeURIComponent(query)}&limit=${limit}`),
+});

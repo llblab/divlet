@@ -518,7 +518,9 @@ try {
   await page.locator('#inspector [data-key="style-new-key"]').fill('color: rgb(255, 0, 0); letter-spacing: 1px');
   await page.keyboard.press('Enter');
   await waitUntil(() => doc('welcome').nodes.title.style.color === 'rgb(255, 0, 0)' && doc('welcome').nodes.title.style['letter-spacing'] === '1px', 'pasted declarations');
-  await waitUntil(() => page.locator('#inspector [data-section="style"] input[type="color"]').count().then(n => n > 0), 'color swatch for a color value');
+  // `color` belongs to the Text colour control, so the raw list no longer repeats it; letter-spacing is not owned by any control.
+  await waitUntil(() => page.locator('#inspector [data-key="ink"]').inputValue().then(value => value === 'rgb(255, 0, 0)'), 'the Text colour control shows the pasted colour');
+  assert.equal(await page.locator('#inspector [data-section="style"] button[aria-label="Remove color"]').count(), 0, 'the raw list does not repeat a declaration a control owns');
   await page.locator('#inspector button[aria-label="Remove letter-spacing"]').click();
   await waitUntil(() => !doc('welcome').nodes.title.style['letter-spacing'], 'remove style');
   await page.locator('#inspector [data-key="attr-new-key"]').fill('title');
