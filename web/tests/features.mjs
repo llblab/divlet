@@ -528,7 +528,6 @@ try {
   for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
   await waitUntil(() => runtime.readHistory().changes.filter(change => change.label === 'nudge artboard').length === 3, 'three nudges');
   await page.keyboard.press('h');
-  await page.locator('#activity .history-log summary').click();
   await page.locator('#activity .change .times', { hasText: '×3' }).waitFor();
   await page.keyboard.press('h');
   check('History folds one gesture into one row (×3)');

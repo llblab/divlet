@@ -666,7 +666,7 @@ try {
   assert.ok(await page.locator('#activity .change.actor-user').count() > 0);
   for (const [kind, badge] of [['undo', 'Undo'], ['redo', 'Redo'], ['create', 'New'], ['delete', 'Removed'], ['external', 'File edit'], ['host-event', null], ['constructor', null], ['__proto__', null]]) {
     const change = runtime.record({ actor: 'user', kind, documentId: 'mobile', text: `Audit kind ${kind}` });
-    const row = page.locator(`#activity .history-log .change[data-seq="${change.seq}"]`);
+    const row = page.locator(`#activity .change[data-seq="${change.seq}"]`);
     await row.waitFor({ state: 'attached' });
     assert.equal(await row.locator('.kind').count(), badge ? 1 : 0, `only registered kinds get badges: ${kind}`);
     if (badge) assert.equal(await row.locator('.kind').textContent(), badge);
@@ -674,7 +674,7 @@ try {
   }
   for (const [actor, who] of [['agent', 'Pi'], ['user', 'You'], ['file', 'File'], ['system', 'divlet'], ['external-tool', 'divlet'], ['constructor', 'divlet'], ['__proto__', 'divlet']]) {
     await runtime.patch({ documentId: 'mobile', expectedVersion: doc('mobile').version, patch: { metadata: { historyActorProbe: actor } }, actor });
-    const row = page.locator(`#activity .history-log .change[data-seq="${last().seq}"]`);
+    const row = page.locator(`#activity .change[data-seq="${last().seq}"]`);
     await row.waitFor({ state: 'attached' });
     assert.ok((await row.locator('.sub').textContent()).includes(` · ${who}`), `actor label uses the registered value or system fallback: ${actor}`);
   }
@@ -684,7 +684,7 @@ try {
   const historyFuture = runtime.historyHead().pointId;
   const stateRow = point => page.locator(`#activity [data-history-point="${point}"]`);
   await waitUntil(async () => (await stateRow(historyFuture).getAttribute('aria-current').catch(() => null)) === 'step', 'the state row follows the owner point');
-  assert.equal(await page.locator('#activity .history-log button.change').count(), 0, 'activity rows are not disguised historical addresses');
+  assert.equal(await page.locator('#activity .history-audit').evaluateAll(rows => rows.filter(row => row.tagName === 'BUTTON' || row.dataset.historyPoint).length), 0, 'a line that is not a retained state is not disguised as a historical address');
   await stateRow(historyBase).click();
   await waitUntil(() => doc('mobile').name === mobileBeforeHistory && runtime.historyHead().pointId === historyBase, 'a row restores the project after that grouped state');
   await waitUntil(async () => await stateRow(historyFuture).count() === 1, 'the retained forward state remains visible');
@@ -707,7 +707,6 @@ try {
   await stateRow(equalBase).click();
   await waitUntil(async () => (await stateRow(equalBase).getAttribute('aria-current').catch(() => null)) === 'step', 'UI refreshes the point without a new audit seq');
   assert.equal(runtime.seq, equalSeq);
-  await page.locator('#activity .history-log summary').click();
   assert.ok(await page.locator('#activity .change.actor-agent', { hasText: 'rename mobile' }).count() > 0, 'original and replay activity remains readable');
   await page.setViewportSize({ width: 390, height: 900 });
   await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(200));

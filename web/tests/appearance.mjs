@@ -599,6 +599,8 @@ try {
   await family.click(); await page.getByRole('menuitemradio', { name: longFamily, exact: true }).click();
   await waitUntil(() => native.getEntry('plain').document.nodes.first.style['font-family']?.startsWith(longFamily), 'a long comma-bearing family is one literal choice');
   await waitUntil(() => family.locator('.pick-v').innerText().then(text => text === longFamily), 'accepted family reaches the inspector before measuring its whole label');
+  // A selected element's accepted edit is followed by a burst of measurement-driven inspector redraws; measure and focus after they settle.
+  await page.evaluate(() => new Promise(resolve => { let timer; const done = () => { observer.disconnect(); resolve(); }; const observer = new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(done, 500); }); observer.observe(document.querySelector('#inspector'), { childList: true, subtree: true }); timer = setTimeout(done, 500); }));
   const geometry = await family.evaluate(button => { const box = button.parentElement; return { fieldWidth: box.clientWidth, contentsWidth: box.scrollWidth, inspectorWidth: document.querySelector('#inspector').clientWidth, text: button.querySelector('.pick-v').textContent, nowrap: getComputedStyle(button.querySelector('.pick-v')).whiteSpace }; });
   assert.equal(geometry.text, longFamily);
   assert.equal(geometry.nowrap, 'nowrap');

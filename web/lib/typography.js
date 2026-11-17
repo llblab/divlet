@@ -72,6 +72,7 @@ export function fontFamilyControl(nodes, { css, apply, upload }) {
   const shown = mixed ? 'Mixed' : value === 'Font shorthand' ? 'Inline shorthand' : primary || value || 'Default';
   // A rare family longer than the viewport is scrollable as one whole control, never ellipsized or squashed.
   const scroll = el('div', 'font-family-scroll');
+  scroll.dataset.key = 'font-family-scroll'; // a measurement-driven redraw restores focus to a keyed control
   scroll.tabIndex = 0;
   scroll.setAttribute('role', 'group');
   scroll.setAttribute('aria-label', 'Font family control');

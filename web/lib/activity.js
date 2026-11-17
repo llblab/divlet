@@ -18,7 +18,7 @@ let unread = 0;
 let timelineRead = null;
 // Server point IDs may recur after Undo; each observed transition invalidates in-flight snapshots, including A → B → A.
 let observedHead = '', stateGeneration = 0, requestedGeneration = -1;
-let reading = false, readAgain = false, navigating = null, readError = '', navigationError = '', auditOpen = false, restorePoint = null;
+let reading = false, readAgain = false, navigating = null, readError = '', navigationError = '', restorePoint = null;
 const supportsNavigation = () => !!historyService?.navigate && store.state?.history?.navigation === true;
 const timelineReady = () => supportsNavigation() && timelineRead?.generation === stateGeneration && timelineRead.projectId === store.state?.projectId && timelineRead.timeline?.current === store.state?.history?.pointId;
 
@@ -141,11 +141,14 @@ function collapse(changes) {
   return rows;
 }
 
-function changeRow(row, readOnly = false) {
+/** One line of the linear history. With `point` the line is also the project state after that edit and restores it when activated. */
+function changeRow(row, readOnly = false, point = null, timeline = null) {
   const { change, count } = row;
   const [iconName, who] = ACTOR[change.actor] || ACTOR.system;
-  const line = el(readOnly ? 'div' : 'button', `change actor-${change.actor} kind-${change.kind}${readOnly ? ' history-audit' : ''}`);
-  if (!readOnly) line.type = 'button';
+  const current = !!point && point.id === timeline.current;
+  const future = !!point && timeline.points.findIndex(item => item.id === point.id) > timeline.index;
+  const line = el(readOnly && !point ? 'div' : 'button', `change actor-${change.actor} kind-${change.kind}${readOnly && !point ? ' history-audit' : ''}${point ? ` history-state${current ? ' is-current' : ''}${future ? ' is-future' : ''}` : ''}`);
+  if (!readOnly || point) line.type = 'button';
   const kind = KIND[change.kind];
   const title = change.label && change.label !== change.summary ? change.label : change.summary;
   const text = el('div', 'text');
@@ -160,9 +163,20 @@ function changeRow(row, readOnly = false) {
   when.dateTime = change.at;
   when.title = new Date(change.at).toLocaleString();
   line.append(icon(change.kind === 'undo' || change.kind === 'redo' ? change.kind : iconName), text, when);
+  if (point) line.append(el('span', 'history-tag', current ? 'Current' : future ? 'Ahead' : 'Restore'));
   line.dataset.tip = count > 1 ? `${count} steps undone together · #${row.seqs[0]}–#${change.seq}` : `#${change.seq} · v${change.fromVersion ?? '—'} → v${change.toVersion ?? '—'}${change.touched?.length ? ` · ${change.touched.length} node${change.touched.length === 1 ? '' : 's'}` : ''}`;
   line.dataset.seq = String(change.seq);
-  if (!readOnly) {
+  if (point) {
+    line.dataset.historyPoint = point.id;
+    line.setAttribute('aria-label', `${current ? 'Current' : 'Restore'} project state: ${point.label}`);
+    line.setAttribute('aria-disabled', String(current || !!navigating || store.connection !== 'connected'));
+    if (current) line.setAttribute('aria-current', 'step');
+    if (navigating === point.id) line.setAttribute('aria-busy', 'true');
+    line.dataset.tip = current ? 'The project is at this state' : 'Restore the whole project after this edit, including frame placement and project settings';
+    const expectedPoint = timeline.current;
+    line.addEventListener('click', () => navigate(point.id, expectedPoint));
+    line.addEventListener('keydown', pointKeys(line));
+  } else if (!readOnly) {
     line.disabled = ![...row.documents].some(id => descriptor(id));
     line.dataset.tip += ' · Show affected elements in their current state';
     line.addEventListener('click', () => focusChange({ ...change, touched: row.touched }, [...row.documents]));
@@ -198,15 +212,18 @@ function stateRow(point, index, timeline) {
   line.dataset.tip = current ? 'The project is at this state' : 'Restore the whole project after this grouped edit, including frame placement and project settings';
   const expectedPoint = timeline.current;
   line.addEventListener('click', () => navigate(point.id, expectedPoint));
-  line.addEventListener('keydown', event => {
-    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
-    event.preventDefault(); event.stopPropagation();
-    const rows = [...panel.querySelectorAll('[data-history-point]')], at = rows.indexOf(line);
-    const target = event.key === 'Home' ? rows[0] : event.key === 'End' ? rows.at(-1) : rows[Math.max(0, Math.min(rows.length - 1, at + (event.key === 'ArrowDown' ? 1 : -1)))];
-    target?.focus();
-  });
+  line.addEventListener('keydown', pointKeys(line));
   return line;
 }
+
+/** Arrow/Home/End move between the lines that are restorable states. */
+const pointKeys = line => event => {
+  if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault(); event.stopPropagation();
+  const rows = [...panel.querySelectorAll('[data-history-point]')], at = rows.indexOf(line);
+  const target = event.key === 'Home' ? rows[0] : event.key === 'End' ? rows.at(-1) : rows[Math.max(0, Math.min(rows.length - 1, at + (event.key === 'ArrowDown' ? 1 : -1)))];
+  target?.focus();
+};
 
 const BOUNDARY = {
   opened: 'Session history starts here. Restarting the board clears these state addresses.',
@@ -236,24 +253,25 @@ export function render() {
   const rows = collapse(changes).reverse();
   const supported = supportsNavigation();
   if (supported) {
+    // One linear history: every change newest first, and each line that is also a retained project state restores it.
     const states = el('div', 'history-states');
-    states.setAttribute('role', 'group'); states.setAttribute('aria-label', 'Project states'); states.tabIndex = -1;
-    states.append(el('div', 'caption history-caption', 'Project states'));
+    states.setAttribute('role', 'group'); states.setAttribute('aria-label', 'Project history'); states.tabIndex = -1;
     if (timelineReady()) {
       const timeline = timelineRead.timeline;
-      for (let i = timeline.points.length - 1; i >= 0; i--) states.append(stateRow(timeline.points[i], i, timeline));
+      const byLastSeq = new Map(rows.map(row => [row.change.seq, row]));
+      const pointOf = new Map();
+      const orphans = [];
+      for (const point of timeline.points) {
+        const row = point.seq == null ? null : byLastSeq.get(point.seq);
+        if (row && !pointOf.has(row)) pointOf.set(row, point); else orphans.push(point);
+      }
+      const entries = [...rows.map(row => ({ seq: row.change.seq, row })), ...orphans.map(point => ({ seq: point.seq ?? -1, point }))].sort((a, b) => b.seq - a.seq);
+      for (const entry of entries) states.append(entry.row ? changeRow(entry.row, true, pointOf.get(entry.row) ?? null, timeline) : stateRow(entry.point, timeline.points.indexOf(entry.point), timeline));
+      if (!entries.length) states.append(el('div', 'quiet', 'No changes yet. Every edit by you, an agent or an external file appears here; the conversation is in the Agent tab.'));
       const limited = timeline.pastLimited || timeline.futureLimited ? ' Some legacy Undo/Redo entries lie outside this connected timeline.' : '';
       states.append(el('p', 'history-boundary', (BOUNDARY[timeline.boundary] || BOUNDARY.retained) + limited));
-    } else states.append(el('div', 'quiet', readError ? 'Project states are unavailable.' : 'Reading the current project states…'));
+    } else states.append(el('div', 'quiet', readError ? 'The project history is unavailable.' : 'Reading the project history…'));
     body.append(states);
-    const audit = el('details', 'history-log');
-    audit.open = auditOpen;
-    audit.dataset.historyAudit = 'true';
-    audit.addEventListener('toggle', () => { if (audit.isConnected) auditOpen = audit.open; });
-    const summary = el('summary'); summary.append(icon('chevron'), el('span', 'text', 'Activity log'), el('span', 'value', String(rows.length)));
-    audit.append(summary, el('p', 'history-boundary', 'Read-only activity, not state addresses. The conversation is in Agent.'));
-    for (const row of rows) audit.append(changeRow(row, true));
-    body.append(audit);
   } else {
     body.append(el('p', 'history-boundary', historyService ? 'This board does not advertise state navigation. Rows only show affected elements in their current state.' : 'This host does not provide change history.'));
     if (historyService && !rows.length && !issues.length) body.append(el('div', 'quiet', 'No changes yet. Every edit by you, Pi or external files appears here; the conversation with Pi is in the Agent tab.'));
@@ -279,14 +297,13 @@ export function render() {
   if (focusedPoint) restorePoint = focusedPoint;
   const mayRestorePoint = !!focusedPoint || restorePoint && (document.activeElement === document.body || document.activeElement?.matches('.history-states'));
   if (!mayRestorePoint) restorePoint = null;
-  const focusedAudit = focused?.parentElement?.matches('.history-log');
   panel.replaceChildren(body, foot);
   body.scrollTop = scroll;
   if (restorePoint && mayRestorePoint) {
     const target = [...body.querySelectorAll('[data-history-point]')].find(node => node.dataset.historyPoint === restorePoint) ?? body.querySelector('[aria-current="step"]');
     if (target) { target.focus({ preventScroll: true }); restorePoint = null; }
     else body.querySelector('.history-states')?.focus({ preventScroll: true });
-  } else if (focusedAudit) body.querySelector('.history-log summary')?.focus({ preventScroll: true });
+  }
   if (focusSeq !== null) {
     const target = [...body.querySelectorAll('[data-seq]')].find(node => node.dataset.seq === String(focusSeq));
     focusSeq = null;

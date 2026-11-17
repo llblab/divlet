@@ -25,7 +25,10 @@
         <button id="empty-new" class="cta" type="button">New artboard <kbd>N</kbd></button>
         <span class="hint">or ask Pi to design something</span>
       </div>
-      <div id="loading" class="loading"><i></i></div>
+      <div id="loading" class="loading" role="status" aria-live="polite">
+        <div class="boot" aria-hidden="true"><span class="boot-art wide"></span><span class="boot-art tablet"></span><span class="boot-art phone"></span></div>
+        <p class="boot-text">Setting up the board</p>
+      </div>
     </main>
 
     <div id="ui">

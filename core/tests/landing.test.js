@@ -188,3 +188,11 @@ test('CI verifies then copies the built Pages set without compiling a different 
   const ignores = await fs.readFile(path.join(root, 'examples/.npmignore'), 'utf8');
   assert.match(ignores, /^\.divlet\/$/m, 'npm keeps source and authored assets, not the tracked repository cache');
 });
+
+test('the landing source has no empty or whitespace-only text nodes', async () => {
+  const project = JSON.parse(await fs.readFile(path.join(root, 'examples/landing/landing.divlet'), 'utf8'));
+  for (const frame of project.frames) {
+    const blank = Object.values(frame.nodes).filter(node => node.type === 'text' && !node.content.trim()).map(node => node.id);
+    assert.deepEqual(blank, [], 'indentation or stray spacing must not become selectable empty text layers');
+  }
+});

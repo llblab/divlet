@@ -164,9 +164,21 @@ kbd { flex: none; white-space: nowrap; font: 600 11px var(--mono); color: var(--
 .cta:hover { background: var(--accent-ink); }
 .cta:active { transform: scale(.97); }
 .cta kbd { color: inherit; border-color: rgba(255, 255, 255, .35); }
-.loading { position: absolute; inset: 0; display: grid; place-items: center; }
-.loading i { width: 56px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent) 0 0 / 200% 100%; animation: shimmer 1s linear infinite; }
-
+.loading { position: absolute; inset: 0; display: grid; grid-auto-flow: row; align-content: center; justify-items: center; gap: 18px; }
+/* A small board assembling itself: three artboards settle onto a dotted canvas, and the selection hops between them. */
+.boot { position: relative; display: flex; align-items: flex-end; gap: 10px; width: 176px; height: 108px; padding: 14px; border: 1px solid var(--hair); border-radius: 16px; background-color: var(--panel); background-image: radial-gradient(circle at 1px 1px, var(--hair) 1px, transparent 0); background-size: 12px 12px; box-shadow: var(--shadow); }
+.boot-art { position: relative; flex: none; border: 1px solid var(--hair); border-radius: 5px; background: var(--solid, #fff) linear-gradient(var(--hair), var(--hair)) 6px 7px / 38% 3px no-repeat; opacity: 0; transform: translateY(6px) scale(.9); animation: boot-in 2.7s cubic-bezier(.2, .7, .2, 1) infinite; }
+.boot-art::before { content: ""; position: absolute; left: 6px; right: 6px; top: 14px; height: 7px; border-radius: 2px; background: var(--ink); opacity: .75; }
+.boot-art::after { content: ""; position: absolute; inset: -4px; border: 1.5px solid var(--accent); border-radius: 7px; opacity: 0; animation: boot-select 2.7s ease-in-out infinite; }
+.boot-art.wide { width: 82px; height: 56px; }
+.boot-art.tablet { width: 34px; height: 46px; animation-delay: .25s; }
+.boot-art.tablet::after { animation-delay: .25s; }
+.boot-art.phone { width: 22px; height: 40px; animation-delay: .5s; }
+.boot-art.phone::after { animation-delay: .5s; }
+.boot-text { margin: 0; color: var(--muted); font-size: 12.5px; letter-spacing: .01em; }
+@keyframes boot-in { 0% { opacity: 0; transform: translateY(6px) scale(.9); } 22%, 88% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-2px) scale(.98); } }
+@keyframes boot-select { 0%, 24% { opacity: 0; } 34%, 52% { opacity: 1; } 62%, 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .boot-art { animation: none; opacity: 1; transform: none; } .boot-art::after { animation: none; } .boot-art.wide::after { opacity: 1; } }
 /* ---- chrome --------------------------------------------------------------- */
 /* Left column: logo + search on top, the sidebar, its tabs below. Folded, the top and bottom pieces stay as two separate pills. */
 :root { --chrome-h: 44px; --edge: 10px; }
@@ -211,7 +223,7 @@ body.has-sidebar .tab { border-color: transparent; border-radius: var(--radius-i
 .status .project { font-weight: 700; letter-spacing: .12em; }
 .status:hover { cursor: pointer; }
 .tab { position: relative; display: inline-flex; flex: 1 1 auto; align-items: center; justify-content: center; gap: 6px; min-width: 0; height: var(--brand-h); padding: 0 4px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--panel); backdrop-filter: blur(18px) saturate(1.4); box-shadow: var(--shadow); color: var(--muted); font-size: 12.5px; white-space: nowrap; transition: background .12s, color .12s; }
-.tab:hover { background: var(--field-hover); color: var(--ink); }
+.tab:hover { background: linear-gradient(var(--field-hover), var(--field-hover)), var(--solid); color: var(--ink); } /* opaque: the frosted tab must not turn see-through on hover */
 .tab.on { background: var(--accent-soft); color: var(--accent); }
 .tab .icon { width: 15px; height: 15px; }
 .tab-mark { display: inline-flex; flex: none; align-items: center; }
@@ -358,11 +370,8 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .history-state .icon { flex: none; }
 .history-tag { flex: none; min-width: calc(7ch + 8px); padding: 2px 4px; border-radius: var(--radius-small); background: var(--field); color: var(--muted); font: 10px/16px var(--mono); text-align: center; white-space: nowrap; }
 .history-state.is-current .history-tag { color: var(--accent-ink); }
-.history-caption { padding: 7px 8px; }
-.history-boundary { margin: 6px 8px 10px; color: var(--muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
-.history-log { margin-top: 8px; border-radius: var(--radius-inner); background: var(--field); }
-.history-log > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px; cursor: pointer; color: var(--muted); }
-.history-log[open] > summary .icon { transform: rotate(90deg); }
+.history-states { padding-bottom: 8px; }
+.history-boundary { margin: 8px 8px 12px; color: var(--muted); font-size: 11px; line-height: 1.45; overflow-wrap: anywhere; }
 #activity .sub { overflow: visible; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
 .history-foot { display: grid; gap: 4px; }
 .history-counters { display: flex; gap: 12px; flex-wrap: wrap; }
@@ -419,7 +428,7 @@ button.change:hover:not(:disabled) { background: var(--field); }
 /* Developer-tools box model: nested, non-proportional CSS bands with the actual values on each edge. */
 .boxmodel { --bm-edge: 24px; --bm-field: 24px; position: relative; min-width: 0; container: boxmodel / inline-size; }
 .bm-sq { position: relative; padding: 20px var(--bm-edge); min-width: 0; border: 1px solid #4c4b40; color: #202621; }
-.bm-position { border: 0; color: var(--ink); }
+.bm-position { border: 0; color: var(--ink); padding-left: calc(var(--bm-edge) + 1px); padding-right: calc(var(--bm-edge) + 1px); } /* one clear pixel between a side offset and the dashed margin edge beside it */
 .bm-margin { background: #bc8c61; border-style: dashed; }
 .bm-border { background: #e3c78f; }
 .bm-padding { background: #c6d7a7; border-style: dashed; }
