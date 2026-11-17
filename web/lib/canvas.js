@@ -1,6 +1,6 @@
 import { $, $$, el, icon, clamp, round } from './util.js';
 import { publishObservations, previews, initialView } from './host.js';
-import { store, emit, on, documents, descriptor, request, post, apiUrl, commit, edit, idle, undo, newGroup, selectArtboards, selectNodes, toast, viewState, saveViewState } from './store.js';
+import { store, emit, on, documents, descriptor, request, post, apiUrl, commit, edit, idle, undo, newGroup, selectArtboards, selectNodes, toast, viewState, saveViewState, entryView } from './store.js';
 
 const PREFETCH_TARGET = 8;
 const OVERSCAN = 550;
@@ -461,13 +461,11 @@ export function reconcileArtboards() {
   if (!initialFit && documents().length && viewport.clientWidth) {
     initialFit = true;
     const saved = viewState(store.state.projectId);
-    if (saved && Number.isFinite(saved.k) && Number.isFinite(saved.x) && Number.isFinite(saved.y)) { setCamera(saved); emit('initial-view', null); }
-    else {
-      fit(null, { animate: false });
-      // A first visit to a published board reads the page itself; the board is one step back.
-      if (initialView?.expand && descriptor(initialView.expand)) requestAnimationFrame(() => { openExpanded(initialView.expand, undefined, { title: initialView.title }); emit('initial-view', store.expanded?.entry.doc.id ?? null); });
-      else emit('initial-view', null);
-    }
+    if (saved && Number.isFinite(saved.k) && Number.isFinite(saved.x) && Number.isFinite(saved.y)) setCamera(saved);
+    else fit(null, { animate: false });
+    // A published board opens in the view it was last left in: its page (the first visit's default) or the board itself.
+    if (initialView?.expand && descriptor(initialView.expand) && entryView() !== 'board') requestAnimationFrame(() => { openExpanded(initialView.expand, undefined, { title: initialView.title }); emit('initial-view', store.expanded?.entry.doc.id ?? null); });
+    else emit('initial-view', null);
   }
   updateHandles();
   applyCamera();

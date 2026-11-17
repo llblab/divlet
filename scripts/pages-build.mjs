@@ -88,20 +88,28 @@ async function clientEntries({ tailwind = true } = {}) {
   return entries;
 }
 
+/** The localStorage key the board writes on leaving its entry page or board view (web/lib/store.js `entryView`). */
+const ENTRY_VIEW_KEY = "'divlet:entry-view:' + location.pathname";
+
 /** The board shell with the browser host in front of it, an MCP provider hint and a meta CSP (Pages cannot send headers). */
 async function shell() {
   let html = await readFile(path.join(web, 'index.html'), 'utf8');
+  if (!html.includes('<script type="module" src="./board.js"></script>')) throw new Error('web/index.html no longer loads ./board.js as expected.');
+  if (!html.includes('<body>')) throw new Error('web/index.html no longer has a plain <body> to put the landing cover in.');
+  html = html.replace('<script type="module" src="./board.js"></script>', '<script type="module" src="./divlet-host.js"></script>');
+  html = html.replace('<title>divlet</title>', '<title>divlet — a layout board for agents</title>');
+  // The first paint is the view the visitor last left: the prepared landing as a plain same-site page in front of the board
+  // (readable before any module has loaded; board.js removes it once the board shows something else), or, for a visitor who
+  // left the board, no cover at all so the board's spinner shows while it starts.
+  const cover = '<iframe id="boot-cover" class="boot-cover" src="./page/index.html" title="divlet" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"></iframe>';
+  const choose = `<script>try { if (localStorage.getItem(${ENTRY_VIEW_KEY}) === 'board') document.getElementById('boot-cover').remove(); } catch {}</script>`;
+  html = html.replace('<body>', `<body>\n    ${cover}\n    ${choose}`);
+  // Hashes of every inline script, including the cover choice, so the meta CSP admits exactly these.
   const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(match => `'sha256-${createHash('sha256').update(match[1]).digest('base64')}'`);
-    // Previews are blob documents that inherit this policy, so it also admits what project pages may load (https images/fonts).
+  // Previews are blob documents that inherit this policy, so it also admits what project pages may load (https images/fonts).
   const csp = `default-src 'self'; script-src 'self' ${inline.join(' ')}; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' data: https:; font-src 'self' data: https:; frame-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'`;
   const head = `<meta http-equiv="Content-Security-Policy" content="${csp}">\n    <meta name="browser-mcp" content="browser-mcp/1">\n    <meta name="description" content="divlet, a layout board for agents, running in your browser. Agents connect to this page as an MCP provider: npx -y @divlet/mcp --connect <this page>.">`;
-  if (!html.includes('<script type="module" src="./board.js"></script>')) throw new Error('web/index.html no longer loads ./board.js as expected.');
-  html = html.replace('<meta charset="utf-8">', `<meta charset="utf-8">\n    ${head}`).replace('<script type="module" src="./board.js"></script>', '<script type="module" src="./divlet-host.js"></script>');
-  html = html.replace('<title>divlet</title>', '<title>divlet — a layout board for agents</title>');
-  // The prepared landing is the first paint: a plain same-site page in front of the board, readable before any script has loaded.
-  // board.js removes it once the board shows something other than that unchanged page (web/board.js, `#boot-cover`).
-  if (!html.includes('<body>')) throw new Error('web/index.html no longer has a plain <body> to put the landing cover in.');
-  html = html.replace('<body>', '<body>\n    <iframe id="boot-cover" class="boot-cover" src="./page/index.html" title="divlet" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"></iframe>');
+  html = html.replace('<meta charset="utf-8">', `<meta charset="utf-8">\n    ${head}`);
   return text(html);
 }
 

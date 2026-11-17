@@ -179,6 +179,47 @@ test('the prepared landing is the first paint and stays until the visitor leaves
   await page.close();
 });
 
+test('the site opens in the view it was last left in: the landing first, or the board behind a spinner', async () => {
+  const context = await browser.newContext({ viewport: { width: 1200, height: 800 } });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  // Each load holds the board's script, so the first paint is observable before any module runs.
+  let release = () => {};
+  await page.route(base + 'divlet-host.js', async route => { await new Promise(resolve => { release = resolve; }); await route.continue(); });
+  const firstPaint = async () => {
+    await page.waitForFunction(() => document.readyState !== 'loading');
+    return page.evaluate(() => ({ cover: !!document.querySelector('#boot-cover'), spinner: getComputedStyle(document.querySelector('#loading')).display !== 'none', host: !!globalThis[Symbol.for('divlet.board-host/1')] }));
+  };
+  const started = async () => { release(); await page.waitForFunction(() => !!globalThis[Symbol.for('divlet.board-host/1')]); await page.waitForSelector('#loading', { state: 'hidden' }); await page.waitForTimeout(300); };
+  await page.goto(base, { waitUntil: 'commit' });
+  assert.deepEqual(await firstPaint(), { cover: true, spinner: false, host: false }, 'a first visit paints the landing');
+  await started();
+  await page.waitForSelector('#expanded-preview:not([hidden])');
+  // Reloading while still reading keeps the landing (the camera the first visit fitted is not a choice to leave it).
+  await page.reload({ waitUntil: 'commit' });
+  assert.deepEqual(await firstPaint(), { cover: true, spinner: false, host: false }, 'a reader who stayed on the landing gets it again');
+  await started();
+  await page.waitForSelector('#expanded-preview:not([hidden])');
+  await page.click('#expanded-back');
+  await page.waitForSelector('#expanded-preview', { state: 'hidden' });
+  // A visitor who left for the board comes back to the board, with only the spinner while it starts.
+  await page.reload({ waitUntil: 'commit' });
+  assert.deepEqual(await firstPaint(), { cover: false, spinner: true, host: false }, 'a board visitor sees the spinner, never the landing first');
+  await started();
+  assert.equal(await page.locator('#expanded-preview').isHidden(), true, 'and lands on the board itself');
+  assert.equal(await page.locator('#brand').isVisible(), true);
+  // Expanding the landing again makes it the next first paint.
+  await page.locator('.artboard[data-artboard-id="index"] .ab-body').click();
+  await page.keyboard.press('e');
+  await page.waitForSelector('#expanded-preview:not([hidden])');
+  await page.reload({ waitUntil: 'commit' });
+  assert.deepEqual(await firstPaint(), { cover: true, spinner: false, host: false }, 'returning to the page makes it the first paint again');
+  release();
+  assert.deepEqual(errors, []);
+  await context.close();
+});
+
 test('a first visit on a phone reads the landing as a phone page', async () => {
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await phone.goto(base);

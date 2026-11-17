@@ -249,4 +249,16 @@ export function viewState(projectId) {
 export function saveViewState(projectId, value) {
   try { localStorage.setItem(`divlet:${projectId}`, JSON.stringify(value)); } catch {}
 }
+/**
+ * Which view a board with an entry page (the website's landing) was last left in: 'page' (the entry page expanded) or 'board'.
+ * Keyed by the page path, not the project, because the static shell reads it before any script or project has loaded
+ * (scripts/pages-build.mjs, ENTRY_VIEW_KEY) to choose its first paint: the landing itself or the board's spinner.
+ */
+const entryViewKey = () => `divlet:entry-view:${location.pathname}`;
+export function entryView() {
+  try { const value = localStorage.getItem(entryViewKey()); return value === 'board' || value === 'page' ? value : null; } catch { return null; }
+}
+export function saveEntryView(value) {
+  try { localStorage.setItem(entryViewKey(), value); } catch {}
+}
 export { clamp };

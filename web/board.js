@@ -1,5 +1,5 @@
 import { $, el, icon, button, clamp, keys, shortcutKey, uiScale } from './lib/util.js';
-import { store, on, emit, documents, descriptor, apiUrl, request, receiveState, setConnection, selectArtboards, selectNodes, undo, redo, toast } from './lib/store.js';
+import { store, on, emit, documents, descriptor, apiUrl, request, receiveState, setConnection, selectArtboards, selectNodes, undo, redo, toast, saveEntryView } from './lib/store.js';
 import * as canvas from './lib/canvas.js';
 import { readSession, native, initialView } from './lib/host.js';
 import './lib/inspector.js';
@@ -378,6 +378,8 @@ const stopWatching = readSession.subscribe(event => {
  * a page that never swaps; it goes as soon as the board shows anything else: the board itself, a restored or edited copy
  * (once its live page has painted), any change, or a failed start whose message must be seen.
  */
+// Remember the view a board with an entry page was left in, so the next visit paints it first (store.js `entryView`).
+if (initialView?.expand) on('expanded', open => saveEntryView(open && store.expanded?.entry.doc.id === initialView.expand ? 'page' : 'board'));
 const bootCover = document.getElementById('boot-cover');
 if (bootCover) {
   const drop = () => { if (bootCover.isConnected) bootCover.remove(); };
