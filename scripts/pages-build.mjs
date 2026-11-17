@@ -49,11 +49,15 @@ async function hostBundle(version, { tailwind = true } = {}) {
 import { startBrowserBoard } from ${JSON.stringify(path.join(root, 'core/lib/browser-board.ts'))};
 ${tailwind ? `import { createBrowserProvider } from ${JSON.stringify(path.join(root, 'plugins/tailwind/lib/browser.ts'))};` : ''}
 const here = new URL('./', import.meta.url);
+// The shell loads this bundle as divlet-host.js?v=<publication stamp>, and the project and styles it reads carry the same stamp:
+// a shell from the HTTP cache opens the project it was published with, and a new publication gets new URLs. The bridge stays
+// unstamped because it is a CSP script source, where a query is ignored.
+const stamp = new URL(import.meta.url).search;
 ${tailwind ? `// The Tailwind provider is composed here, from the renderer source captured at build time: its compiler, stylesheets and identity
 // travel together, so the page needs no network, Node backend or remote compiler.
 const tailwind = createBrowserProvider(${JSON.stringify(rendererSource())});` : ''}
 try {
-  await startBrowserBoard({ ${tailwind ? `styleEngine: tailwind, clientPlugins: [{ id: 'tailwind', module: 'plugins/tailwind/panel.js' }], ` : ''}projectUrl: new URL('project.divlet', here), stylesUrl: new URL('styles.json', here), bridgeUrl: new URL('preview-bridge.js', here), entryFrame: 'index', storageKey: location.pathname + '#landing', file: 'landing.divlet', version: ${JSON.stringify(version)} });
+  await startBrowserBoard({ ${tailwind ? `styleEngine: tailwind, clientPlugins: [{ id: 'tailwind', module: 'plugins/tailwind/panel.js' }], ` : ''}projectUrl: new URL('project.divlet' + stamp, here), stylesUrl: new URL('styles.json' + stamp, here), bridgeUrl: new URL('preview-bridge.js', here), entryFrame: 'index', storageKey: location.pathname + '#landing', file: 'landing.divlet', version: ${JSON.stringify(version)} });
   await import(new URL('./board.js', import.meta.url).href);
 } catch (error) {
   // Without its composition the board must not start: it would fall back to native routes that a static host does not have.
@@ -92,16 +96,16 @@ async function clientEntries({ tailwind = true } = {}) {
 const ENTRY_VIEW_KEY = "'divlet:entry-view:' + location.pathname";
 
 /** The board shell with the browser host in front of it, an MCP provider hint and a meta CSP (Pages cannot send headers). */
-async function shell() {
+async function shell(stamp) {
   let html = await readFile(path.join(web, 'index.html'), 'utf8');
   if (!html.includes('<script type="module" src="./board.js"></script>')) throw new Error('web/index.html no longer loads ./board.js as expected.');
   if (!html.includes('<body>')) throw new Error('web/index.html no longer has a plain <body> to put the landing cover in.');
-  html = html.replace('<script type="module" src="./board.js"></script>', '<script type="module" src="./divlet-host.js"></script>');
+  html = html.replace('<script type="module" src="./board.js"></script>', `<script type="module" src="./divlet-host.js?v=${stamp}"></script>`);
   html = html.replace('<title>divlet</title>', '<title>divlet — a layout board for agents</title>');
   // The first paint is the view the visitor last left: the prepared landing as a plain same-site page in front of the board
   // (readable before any module has loaded; board.js removes it once the board shows something else), or, for a visitor who
   // left the board, no cover at all so the board's spinner shows while it starts.
-  const cover = '<iframe id="boot-cover" class="boot-cover" src="./page/index.html" title="divlet" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"></iframe>';
+  const cover = `<iframe id="boot-cover" class="boot-cover" src="./page/index.html?v=${stamp}" title="divlet" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"></iframe>`;
   const choose = `<script>try { if (localStorage.getItem(${ENTRY_VIEW_KEY}) === 'board') document.getElementById('boot-cover').remove(); } catch {}</script>`;
   html = html.replace('<body>', `<body>\n    ${cover}\n    ${choose}`);
   // Hashes of every inline script, including the cover choice, so the meta CSP admits exactly these.
@@ -116,16 +120,23 @@ async function shell() {
 export async function pagesEntries(options = {}) {
   const product = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
   const source = await readFile(landingSource, 'utf8');
+  const styles = text(JSON.stringify(await styleSnapshot(source)));
+  const page = (await landingEntries()).filter(([name]) => name !== '.nojekyll').map(([name, bytes]) => [`page/${name}`, bytes]);
+  const bridge = text(previewBridgeScript(previewBridge.toString()));
+  const host = Buffer.from(await hostBundle(product.version, options));
+  const client = await clientEntries(options);
+  // One stamp per publication: what the cached shell refers to must come from the same publication.
+  const stamp = pagesHash([['project.divlet', text(source)], ['styles.json', styles], ['preview-bridge.js', bridge], ['divlet-host.js', host], ...client, ...page]).slice(0, 12);
   const entries = [
     ['.nojekyll', Buffer.alloc(0)],
-    ['index.html', await shell()],
-    ['divlet-host.js', Buffer.from(await hostBundle(product.version, options))],
+    ['index.html', await shell(stamp)],
+    ['divlet-host.js', host],
     ['project.divlet', text(source)],
-    ['styles.json', text(JSON.stringify(await styleSnapshot(source)))],
-    ['preview-bridge.js', text(previewBridgeScript(previewBridge.toString()))],
-    ...await clientEntries(options),
+    ['styles.json', styles],
+    ['preview-bridge.js', bridge],
+    ...client,
     // The prepared landing as a plain page: readable without the board, and the source of truth for search engines.
-    ...(await landingEntries()).filter(([name]) => name !== '.nojekyll').map(([name, bytes]) => [`page/${name}`, bytes]),
+    ...page,
   ];
   return entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 }

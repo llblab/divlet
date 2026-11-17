@@ -145,6 +145,15 @@ test('the static board opens the landing project with no backend', async () => {
   await page.close();
 });
 
+test('every file the shell refers to carries one publication stamp, so a cached page never mixes publications', () => {
+  const html = files.get('index.html').toString('utf8');
+  const stamp = /divlet-host\.js\?v=([0-9a-f]{12})"/.exec(html)?.[1];
+  assert.ok(stamp, 'the host bundle is stamped');
+  assert.ok(html.includes(`page/index.html?v=${stamp}`), 'the landing cover carries the same stamp');
+  const host = files.get('divlet-host.js').toString('utf8');
+  assert.match(host, /import\.meta\.url\)\.search/, 'the bundle reads its own stamp and passes it to the project and styles URLs');
+});
+
 test('the prepared landing is the first paint and stays until the visitor leaves it', async () => {
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
   const errors = [];
@@ -152,7 +161,7 @@ test('the prepared landing is the first paint and stays until the visitor leaves
   // Hold the board back: whatever the visitor sees meanwhile is what a slow connection shows first.
   let release;
   const held = new Promise(resolve => { release = resolve; });
-  await page.route(base + 'divlet-host.js', async route => { await held; await route.continue(); });
+  await page.route(url => url.href.startsWith(base) && url.pathname.endsWith('/divlet-host.js'), async route => { await held; await route.continue(); });
   await page.goto(base, { waitUntil: 'commit' });
   const cover = page.frameLocator('#boot-cover');
   await cover.locator('h1').first().waitFor();
@@ -186,7 +195,7 @@ test('the site opens in the view it was last left in: the landing first, or the 
   page.on('pageerror', error => errors.push(error.message));
   // Each load holds the board's script, so the first paint is observable before any module runs.
   let release = () => {};
-  await page.route(base + 'divlet-host.js', async route => { await new Promise(resolve => { release = resolve; }); await route.continue(); });
+  await page.route(url => url.href.startsWith(base) && url.pathname.endsWith('/divlet-host.js'), async route => { await new Promise(resolve => { release = resolve; }); await route.continue(); });
   const firstPaint = async () => {
     await page.waitForFunction(() => document.readyState !== 'loading');
     return page.evaluate(() => ({ cover: !!document.querySelector('#boot-cover'), spinner: getComputedStyle(document.querySelector('#loading')).display !== 'none', host: !!globalThis[Symbol.for('divlet.board-host/1')] }));
@@ -382,7 +391,7 @@ for (const row of [
     await page.goto(base); await page.waitForSelector('#loading', { state: 'hidden' });
     const record = { base: publishedBase, text: '\n' + publishedText + '\n', savedAt: 'older-copy', opaque: true };
     await page.evaluate(browserRecord, { write: true, value: record });
-    await page.route(base + 'project.divlet', route => route.fulfill({ contentType: 'application/octet-stream', body: row.text }));
+    await page.route(url => url.href.startsWith(base) && url.pathname.endsWith('/project.divlet'), route => route.fulfill({ contentType: 'application/octet-stream', body: row.text }));
     restoreRequests.length = 0;
     await page.reload(); await startupSettled(page);
     assert.deepEqual(await page.evaluate(browserRecord), record, 'replacement source must prepare before any old-copy cleanup');
@@ -400,7 +409,7 @@ test('a valid new publication still replaces the old baseline and persists its o
   try {
     await page.goto(base); await page.waitForSelector('#loading', { state: 'hidden' });
     await page.evaluate(browserRecord, { write: true, value: { base: publishedBase, text: publishedText, savedAt: 'old' } });
-    await page.route(base + 'project.divlet', route => route.fulfill({ contentType: 'application/octet-stream', body: text }));
+    await page.route(url => url.href.startsWith(base) && url.pathname.endsWith('/project.divlet'), route => route.fulfill({ contentType: 'application/octet-stream', body: text }));
     await page.reload(); await page.waitForSelector('#loading', { state: 'hidden' });
     assert.equal(await page.evaluate(browserRecord), undefined, 'admitted changed publication retires the old baseline');
     const state = await page.evaluate(() => globalThis[Symbol.for('divlet.board-host/1')].readSession.readState());
