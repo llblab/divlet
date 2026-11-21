@@ -394,7 +394,9 @@ try {
     await chooseSide('Left');
     await page.locator('#inspector [data-key="stroke"]').fill('#ff0000'); await page.keyboard.press('Enter');
     await waitUntil(async () => JSON.stringify(await sideColours()) === JSON.stringify(['rgb(17, 34, 51)', 'rgb(17, 34, 51)', 'rgb(17, 34, 51)', 'rgb(255, 0, 0)']), `only the chosen side takes the new colour (${(await sideColours()).join(' ')})`);
-    assert.deepEqual(await surface(), ['rgb(227, 199, 143)', 'rgb(76, 75, 64)', 'rgb(76, 75, 64)'], 'while the block that edits it keeps the band surface');
+    const bandSurface = ['rgb(227, 199, 143)', 'rgb(76, 75, 64)', 'rgb(76, 75, 64)'];
+    // One read, repeated until the panel has settled: a re-render can hand back a detached block, whose computed style is empty.
+    await waitUntil(async () => JSON.stringify(await surface()) === JSON.stringify(bandSurface), 'the block that edits the colour keeps the band surface');
     // The side remembers itself while it is selected, and returns to the shared colour on request.
     await page.evaluate(async () => { const st = await import('./lib/store.js'); st.selectNodes('welcome', ['hero']); st.selectNodes('welcome', ['cta']); });
     await waitUntil(async () => (await sideControl.innerText()).includes('Left'), 'the chosen side survives a reselect of the same element');

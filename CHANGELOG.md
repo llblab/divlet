@@ -4,6 +4,9 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased
 
+- **Box-model side values keep their distance.** The left and right values sat flush against their band's frame and read as part of the line; they
+  now keep one pixel of air from it, and the row they take on a narrow panel keeps the width that air would have cost (`web/board.css`,
+  `web/tests/spacing.mjs`).
 - **The history marker leans to its text.** In the history list the marker and its badge are right-aligned in their narrow column instead of
   centred, so the marker sits next to the change it belongs to and the column reads as one edge against the text (`web/board.css`,
   `web/tests/history.mjs`).

@@ -485,8 +485,9 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .bm-cell.bm-b { bottom: 1px; left: 50%; transform: translateX(-50%); }
 /* A side value owns its whole side strip, so it is centred in that strip instead of sitting against the band's inner corner. */
 .bm-cell.bm-l, .bm-cell.bm-r { top: 50%; transform: translateY(-50%); width: var(--bm-side-cell); }
-.bm-cell.bm-l { left: 0; }
-.bm-cell.bm-r { right: 0; }
+/* One pixel in from the band's frame: a side value that touched the line read as part of it. */
+.bm-cell.bm-l { left: 1px; }
+.bm-cell.bm-r { right: 1px; }
 .bm-cell { width: max(var(--bm-field), var(--bm-value-width, 0px)); max-width: calc(100% - 4px); }
 .bm-sq > .bm-cell > .vf { width: 100%; }
 .bm-centre { min-width: 0; }
@@ -509,6 +510,9 @@ button.change:hover:not(:disabled) { background: var(--field); }
   .bm-cell.bm-l, .bm-cell.bm-r { width: max(var(--bm-field), var(--bm-value-width, 0px)); }
   .bm-padding { --bm-edge: 24px; }
   .bm-cell.bm-l, .bm-cell.bm-r { top: auto; bottom: 4px; transform: none; }
+  /* On a row of their own the values take the whole width they can get; the one-pixel air belongs to the strip above. */
+  .bm-cell.bm-l { left: 0; }
+  .bm-cell.bm-r { right: 0; }
   .bm-cell, .bm-field .vf-input, .bm-offset .vf-input, .bm-core { font-size: 9px; }
 }
 /* Side values too long for a side band earn a row, not clipping or tiny type: left and right share the row under the top
