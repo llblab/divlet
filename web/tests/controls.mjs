@@ -53,10 +53,21 @@ try {
     const direct = page.locator(`#inspector .smart-bar button[aria-label^="${label}"]`);
     const more = page.locator('#inspector button[aria-label="More"]');
     await waitUntil(async () => await direct.isVisible() || await more.isVisible(), `inspector ${label} is rendered in the row or overflow`);
-    if (await direct.isVisible()) return direct.click();
-    await more.click();
-    assert.deepEqual(await page.locator('.menu .menu-label').allTextContents().then(labels => labels.filter(item => ['Rename', 'Select root element'].includes(item))), [], 'frame overflow excludes rename and root entry');
-    return menuItem(label).click();
+    // The row re-fits itself whenever the panel's width changes, so an action can leave the row between being seen and being
+    // clicked. A person takes it from the overflow menu then; this does the same instead of insisting on the first plan.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      if (await direct.isVisible()) {
+        if (await direct.click({ timeout: 1500 }).then(() => true, () => false)) return;
+        continue;
+      }
+      if (!await more.isVisible()) continue;
+      await more.click();
+      assert.deepEqual(await page.locator('.menu .menu-label').allTextContents().then(labels => labels.filter(item => ['Rename', 'Select root element'].includes(item))), [], 'frame overflow excludes rename and root entry');
+      const entry = menuItem(label);
+      if (await entry.count()) return entry.click();
+      await page.keyboard.press('Escape');
+    }
+    throw new Error(`inspector action ${label} never became clickable`);
   };
   /** Screen point of a node inside an artboard iframe (the iframe is scaled with the canvas). */
   const nodePoint = async (documentId, nodeId) => {
