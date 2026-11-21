@@ -10,6 +10,9 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
   `transform: scale(--ui)`, so a painted width is a layout width times the scale: the toolbar's fit and the label column now
   measure with `offsetWidth` (`web/lib/toolbar.js`, `web/lib/properties.js`, `web/tests/chrome.mjs`,
   `web/tests/appearance.mjs`).
+- **A version is read once the runtime's queue has drained.** The appearance witnesses took the frame's version while
+  the board's own accepted edit was still queued and were refused as stale; they now drain the queue first, which is what
+  "the current version" means for a shared writer (`web/tests/appearance.mjs`).
 - **Two more witnesses wait for the state they assert.** The action bar's count is read only after the board restores its
   selection, and an inspector action whose row re-fits under the pointer is taken from the overflow menu the way a person
   would (`web/tests/toolbars.mjs`, `web/tests/controls.mjs`).

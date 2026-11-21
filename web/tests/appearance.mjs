@@ -39,7 +39,9 @@ try {
   await page.goto(runtime.info().url);
   await page.waitForFunction(() => document.querySelectorAll('.artboard').length > 0);
   const select = id => page.evaluate(async id => { document.activeElement?.blur?.(); const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', [id]); }, id);
-  const afterVersion = () => runtime.read({ view: 'document', documentId: 'welcome' }).version;
+  // The board's own POSTs share this runtime's queue, so a version is only the current one once the queue has drained:
+  // reading it in the middle of somebody else's accepted edit produced a patch that was refused as stale.
+  const afterVersion = async () => { await runtime.queue; return runtime.read({ view: 'document', documentId: 'welcome' }).version; };
   const colorRow = async label => {
     // Resolve and measure in one browser task: a preview measurement may replace a previously resolved section.
     const layout = await page.evaluate(() => {
@@ -154,7 +156,7 @@ try {
   };
 
   // A project colour exists: it shows up as a swatch.
-  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), actor: 'user', patch: { tokens: { '--color-brand': '#5b5bf0' } } });
+  await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), actor: 'user', patch: { tokens: { '--color-brand': '#5b5bf0' } } });
   await select('cta');
   await page.waitForSelector('#inspector [data-section="appearance"] [data-key="fill"]');
   await colorRow('project color swatches');
@@ -273,7 +275,7 @@ try {
   checks.push('actual device chooser with provider, one family for regular/bold/italic companions, 120/180/240px matching, overlap refusal and separate selection/registration Undo');
 
   await runtime.patchProject({ expectedVersion: runtime.settings.version, patch: { assets: { fonts: { 'proof.ttf': fontDataUrl() } }, css: runtime.settings.css + '\n@font-face{font-family:"Project Face";src:url(asset:fonts/proof.ttf)}' } });
-  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { css: runtime.getEntry('welcome').document.css + '\n@font-face{font-family:"Local (Variant)";src:url(asset:fonts/proof.ttf)}', nodes: { cta: { style: { 'font-family': '"Old Face", serif !important' } } } } });
+  await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), patch: { css: runtime.getEntry('welcome').document.css + '\n@font-face{font-family:"Local (Variant)";src:url(asset:fonts/proof.ttf)}', nodes: { cta: { style: { 'font-family': '"Old Face", serif !important' } } } } });
   await select('cta');
   await waitUntil(() => family.getAttribute('aria-label').then(value => value.includes('Old Face')), 'the authored family is shown');
   await chooseFamily('"Project Face"');
@@ -290,14 +292,14 @@ try {
   assert.equal(inlineFamily(), '"Local (Variant)", "Old Face", serif !important');
 
   await select('cta');
-  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { nodes: { cta: { style: { 'font-family': null, font: 'italic 600 16px serif' } } } } });
+  await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), patch: { nodes: { cta: { style: { 'font-family': null, font: 'italic 600 16px serif' } } } } });
   await waitUntil(() => family.getAttribute('aria-label').then(value => value.includes('Inline shorthand')), 'ambiguous shorthand is named instead of guessed');
-  const shorthandVersion = afterVersion();
+  const shorthandVersion = await afterVersion();
   await chooseFamily('monospace'); await sleep(150);
-  assert.equal(afterVersion(), shorthandVersion, 'refused shorthand edit changes neither source content nor version');
+  assert.equal(await afterVersion(), shorthandVersion, 'refused shorthand edit changes neither source content nor version');
   assert.equal(runtime.getEntry('welcome').document.nodes.cta.style.font, 'italic 600 16px serif');
-  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { nodes: { cta: { style: { font: null } } } } });
-  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { nodes: { cta: { style: { all: 'initial !important' } } } } });
+  await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), patch: { nodes: { cta: { style: { font: null } } } } });
+  await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), patch: { nodes: { cta: { style: { all: 'initial !important' } } } } });
   await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', ['hero', 'cta']));
   await waitUntil(() => page.locator('#inspector .count').innerText().then(value => value.includes('2')), 'both reset-conflict targets reach the inspector');
   const beforeReset = runtime.read({ view: 'frame', documentId: 'welcome' }), resetSource = await readFile(runtime.projectPath), resetHistory = runtime.readHistory();
@@ -308,12 +310,12 @@ try {
   assert.deepEqual(await readFile(runtime.projectPath), resetSource); assert.deepEqual(runtime.readHistory(), resetHistory);
   assert.equal(await actualFamily(), resetFamily, 'the all !important witness refuses without changing effective family');
   await select('cta');
-  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { css: runtime.getEntry('welcome').document.css + '\n.font-lock{font-family:serif!important}', nodes: { cta: { className: classesBeforeFamily + ' font-lock', style: { all: null } } } } });
+  await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), patch: { css: runtime.getEntry('welcome').document.css + '\n.font-lock{font-family:serif!important}', nodes: { cta: { className: classesBeforeFamily + ' font-lock', style: { all: null } } } } });
   await waitUntil(() => actualFamily().then(value => value === 'serif'), 'important stylesheet family is effective');
   await chooseFamily('monospace'); await waitUntil(() => inlineFamily() === 'monospace', 'the authored inline value is saved without silent priority escalation');
   assert.equal(await actualFamily(), 'serif', 'the explicit important stylesheet still wins');
   await waitUntil(() => family.locator('.pick-v').innerText().then(text => text === 'monospace'), 'reader-driven family redraw settles before the keyboard menu gesture');
-  const acceptedContext = { version: afterVersion(), render: runtime.getEntry('welcome').render };
+  const acceptedContext = { version: await afterVersion(), render: runtime.getEntry('welcome').render };
   await waitUntil(() => page.evaluate(async expected => {
     const current = (await import('./lib/store.js')).descriptor('welcome');
     return current?.version === expected.version && current.render === expected.render && document.querySelector('.artboard[data-artboard-id="welcome"]')?.dataset.renderedVersion === String(expected.render);
@@ -340,7 +342,7 @@ try {
   assert.equal(previousIdentity.connected, previousIdentity.focused, 'a retained field stays focused; a retired handle is not active');
   assert.equal(await familyFocused(), true, 'inspector repaint preserves focus on the live font field');
   await previousFamily.dispose();
-  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), patch: { nodes: { cta: { className: classesBeforeFamily } } } });
+  await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), patch: { nodes: { cta: { className: classesBeforeFamily } } } });
   const semanticChecks = await page.evaluate(async () => {
     const { familyPatch } = await import('./lib/typography.js');
     const named = '"Project Face"';
@@ -426,7 +428,7 @@ try {
   }
 
   // A compiler-lowered border width remains visible as the measured fallback, then one edge can override it.
-  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-width': '3px' } } } } });
+  await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-width': '3px' } } } } });
   await page.evaluate(() => document.activeElement?.blur()); await page.mouse.move(5, 5);
   await waitUntil(async () => await page.locator('#inspector [data-key="border-t"]').getAttribute('placeholder') === '3', 'the box model reads a declarative width back from the actual page');
   await page.locator('#inspector [data-key="border-t"]').fill('2'); await page.keyboard.press('Tab');
@@ -440,7 +442,7 @@ try {
   // colour and the side it belongs to), the right edge and so on — so the stop after the right edge is the bottom-left corner.
   assert.equal(await page.evaluate(() => document.activeElement?.dataset.key), 'radius-bl');
 
-  const beforeClear = afterVersion();
+  const beforeClear = await afterVersion();
   for (const [key, other, next] of [['border-width-t', 'border-t', '2'], ['border-r', 'border-width-r', '4']]) {
     await page.locator(`#inspector [data-key="${key}"]`).fill(''); await page.keyboard.press('Tab');
     // The side is its own utility, so clearing it removes that side's authored width in both copies; the measured width stays as the placeholder.
@@ -448,7 +450,7 @@ try {
     await page.locator(`#inspector [data-key="${other}"]`).fill(next); await page.keyboard.press('Tab');
     await waitUntil(async () => await page.locator(`#inspector [data-key="${key}"]`).inputValue() === next, 'the other copy restores the same authored value');
   }
-  assert.equal(afterVersion() - beforeClear, 4, 'two clears and two restores make exactly four content commits');
+  assert.equal(await afterVersion() - beforeClear, 4, 'two clears and two restores make exactly four content commits');
   assert.deepEqual(await borderWidths(), ['2px', '4px', '3px', '3px'], 'clearing does not change unrelated border sides');
 
   // Two copies of one property share writer intent; an older completion cannot overwrite a later draft.
@@ -469,13 +471,13 @@ try {
   await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '5' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '5', 'one Undo restores both copies');
   await page.keyboard.press('Control+z');
   await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '3' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '3', 'Undo returns both copies to the same class-authored width');
-  const beforeRefusal = afterVersion();
+  const beforeRefusal = await afterVersion();
   await page.route('**/api/patch', route => route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'REVISION_CONFLICT', message: 'Linked border write refused', details: { actualVersion: beforeRefusal } }) }));
   try {
     await page.locator('#inspector [data-key="border-l"]').fill('9'); await page.keyboard.press('Tab');
     await waitUntil(async () => /Linked border write refused/.test(await page.locator('#toast').innerText()), 'a refused linked edit reports the writer refusal');
     await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '3' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '3', 'a refused edit restores inactive copies from accepted state');
-    assert.equal(afterVersion(), beforeRefusal, 'the refusal does not advance content');
+    assert.equal(await afterVersion(), beforeRefusal, 'the refusal does not advance content');
   } finally { await page.unroute('**/api/patch'); }
   await page.locator('#viewport').focus(); await page.mouse.move(5, 5);
   checks.push('widths synchronize both ways without replacing focused fields; held writes, Undo and refusals preserve one shared property');
@@ -543,14 +545,14 @@ try {
   const colourLabel = page.locator('#inspector .appearance-colors .color-field').first().locator('.vf-k');
   // A re-render can detach the label between resolution and read, where a detached node reports no computed style.
   await waitUntil(async () => await colourLabel.evaluate(node => getComputedStyle(node).cursor).catch(() => '') === 'pointer', 'the colour name advertises a click, not a scrub');
-  const labelVersion = afterVersion();
+  const labelVersion = await afterVersion();
   const labelBox = await waitUntil(async () => await colourLabel.boundingBox(), 'the colour label is attached and visible');
   await page.mouse.move(labelBox.x + labelBox.width / 2, labelBox.y + labelBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(labelBox.x + labelBox.width / 2 + 60, labelBox.y + labelBox.height / 2, { steps: 6 });
   await page.mouse.up();
   await sleep(300);
-  assert.equal(afterVersion(), labelVersion, 'dragging the colour name writes nothing');
+  assert.equal(await afterVersion(), labelVersion, 'dragging the colour name writes nothing');
   await page.evaluate(() => { document.querySelector('#inspector [data-key="fill-swatch"]').showPicker = () => { window.__pickerOpened = true; }; });
   await colourLabel.click();
   assert.equal(await page.evaluate(() => window.__pickerOpened === true), true, 'clicking the colour name opens the same picker as its swatch');
@@ -582,7 +584,7 @@ try {
 
   // A hand-authored `text-[12.5px]` is a size, not a colour: the size field reads it and the colour field stays empty.
   await select('cta');
-  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), actor: 'user', patch: { nodes: { cta: { className: `${classesOf('cta').filter(name => !/^text-/.test(name)).join(' ')} text-[12.5px]` } } } });
+  await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), actor: 'user', patch: { nodes: { cta: { className: `${classesOf('cta').filter(name => !/^text-/.test(name)).join(' ')} text-[12.5px]` } } } });
   await waitUntil(async () => (await page.locator('#inspector [data-key="font-size"]').inputValue()) === '12.5', 'an unhinted text bracket reads as the font size');
   assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key="ink"]').inputValue(), '', 'and never as the text colour');
   checks.push('a size is chosen once: `text-[12.5px]` reads into the size control, not into the colour control');
@@ -675,9 +677,9 @@ try {
     await waitUntil(() => text === '' ? !classesOf('cta').some(name => /^-?z-/.test(name)) : classesOf('cta').includes(text === 'auto' ? 'z-auto' : Number(text) < 0 ? `-z-${-Number(text)}` : `z-${text}`), `z-index ${text || 'default'} reaches the model`);
   };
   await select('cta'); await effect('z').waitFor();
-  const untouched = afterVersion();
+  const untouched = await afterVersion();
   await scrub('z', 0);
-  assert.equal(afterVersion(), untouched, 'a label click preserves implicit auto without an edit');
+  assert.equal(await afterVersion(), untouched, 'a label click preserves implicit auto without an edit');
   await scrub('z', 30);
   await waitUntil(() => classesOf('cta').includes('z-10'), 'dragging implicit auto starts from zero');
   assert.equal(await effect('z').locator('..').locator('.vf-unit').count(), 0, 'z-index has no px or percentage unit');
@@ -692,8 +694,8 @@ try {
   await waitUntil(() => classesOf('cta').includes('-z-1'), 'the same integer origin works for keyboard stepping from auto');
   await typeZ('auto');
   for (const cancel of ['escape', 'pointer', 'capture']) {
-    const before = afterVersion(); await scrub('z', 30, { cancel }); await sleep(180);
-    assert.equal(afterVersion(), before, `${cancel} cancels without writing or adding an undo step`);
+    const before = await afterVersion(); await scrub('z', 30, { cancel }); await sleep(180);
+    assert.equal(await afterVersion(), before, `${cancel} cancels without writing or adding an undo step`);
     assert.equal(await effect('z').inputValue(), 'auto');
     assert.ok(classesOf('cta').includes('z-auto'));
     assert.equal(await page.locator('#inspector .scrubbing').count(), 0, 'pointer/keyboard listeners finish the gesture');
