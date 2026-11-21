@@ -406,9 +406,9 @@ function borderDiagram({ views, value, run, measured, tokens, widthField, nodeId
   const box = el('div', 'br-box');
   box.setAttribute('role', 'group');
   box.setAttribute('aria-label', 'Border ring: corner radii, edge widths and colour');
-  // The band itself, copied: its own fill, its one-pixel frame, square corners and its caption, so this block reads as the
-  // border layer of the widget above rather than as a picture of the element's painted border.
-  box.append(el('span', 'bm-caption', 'border'));
+  // The band itself, copied: its own fill, its one-pixel frame and square corners, at its own size, with the middle cut out so the
+  // panel's own surface shows through where the content sits — the hole the widget above puts a green padding band in.
+  box.append(el('div', 'br-hole'));
   const cell = (node, className) => { const wrap = el('div', `br-cell ${className}`); wrap.append(node); return wrap; };
   const corner = key => {
     const named = { tl: 'top-left', tr: 'top-right', bl: 'bottom-left', br: 'bottom-right' }[key];

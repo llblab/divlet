@@ -21,11 +21,10 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 - **History rows read again.** A row's document, actor and change detail no longer sit in the 44–80px marker column, where a long document
   name became a paragraph squeezed into a strip; the marker keeps its own narrow column and those details read under the change in the reading
   column, wrapping only where there is width for it (`web/lib/activity.js`, `web/board.css`, `web/tests/history.mjs`).
-- **The border block is the band itself.** Border's diagram no longer draws the element's painted border, which read as a style of its own: it is a
-  copy of the box model's border band — same fill, one-pixel frame, square corners, `border` caption, and the same width and height — with a radius
-  in each corner, the width at each edge's centre and the colour in the middle. The side a colour belongs to reads as a control under the band,
-  where its word has room; a band too narrow for its middle steps the colour out under it, and every target keeps 24px (`web/lib/properties.js`,
-  `web/board.css`, `web/tests/appearance.mjs`, `web/tests/toolbars.mjs`, `web/tests/fluid.mjs`).
+- **The Border block is the band, cut open.** The copy of the box model's border band lost its caption, is centred in its section so it sits on the
+  same axis as the band it copies, and has its middle cut away to the panel's own surface where the widget above shows a content band; a radius sits
+  in each corner, a width at each edge's centre and the colour inside the opening (`web/lib/properties.js`, `web/board.css`,
+  `web/tests/appearance.mjs`, `web/tests/fluid.mjs`).
 - **A link is editable and clickable.** The inspector gives an anchor its own **Link** section beside the element's name — the address, and a
   **New tab** control that writes `target="_blank"` with `rel="noreferrer noopener"` and takes back exactly what it wrote, while an emptied address
   removes `href` rather than keeping a link to nowhere; double-clicking a link with no words of its own lands in that field. In Play, a link that

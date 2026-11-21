@@ -166,20 +166,33 @@ try {
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key^="border-width-"]').count(), 4, 'Border has four independent edge widths, in the ring');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="border-side"]').count(), 1, 'one control says which side the colour belongs to');
   {
-    // The band is copied one-to-one: its own fill, its one-pixel frame, its square corners, its caption and its size — not a
-    // painting of the element's authored border.
+    // The band is copied: its own fill, its one-pixel frame, its square corners and its size, centred in the section — with the
+    // middle cut out so the panel's own surface shows where the widget above puts its content band.
     const copy = await waitUntil(() => page.evaluate(() => {
       const ring = document.querySelector('#inspector .br-box'), band = document.querySelector('#inspector .boxmodel .bm-border');
+      const section = document.querySelector('#inspector [data-section="border"]'), hole = ring.querySelector('.br-hole');
       const a = getComputedStyle(ring), c = getComputedStyle(band);
-      const size = node => { const r = node.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height) }; };
+      const box = node => { const r = node.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), left: Math.round(r.left), right: Math.round(r.right) }; };
       const surface = style => [style.backgroundColor, style.borderTopWidth, style.borderTopStyle, style.borderTopColor, style.borderRadius].join(' ');
-      const report = { size: size(ring), source: size(band), surface: surface(a), sourceSurface: surface(c), caption: ring.querySelector(':scope > .bm-caption')?.textContent };
+      const middle = box(ring), frame = box(section), cut = box(hole);
+      const panel = getComputedStyle(document.body);
+      const report = {
+        size: middle, source: box(band), surface: surface(a), sourceSurface: surface(c),
+        captions: ring.querySelectorAll(':scope > .bm-caption').length,
+        hole: [Math.round(cut.left - middle.left), Math.round(cut.w), Math.round(cut.h)], holeColour: getComputedStyle(hole).backgroundColor,
+        centred: Math.abs((middle.left + middle.right) / 2 - (frame.left + frame.right) / 2) <= 1,
+        surfaceOfPanel: getComputedStyle(document.querySelector('#inspector')).backgroundColor,
+        body: panel.backgroundColor,
+      };
       return report.surface === report.sourceSurface && Math.abs(report.size.w - report.source.w) <= 1 ? report : null;
     }), 'the border band is copied into Border');
     assert.equal(copy.surface, copy.sourceSurface, 'the copy shares the band\'s fill, frame and square corners');
     assert.equal(copy.size.w, copy.source.w, `and its width (${copy.size.w} vs ${copy.source.w})`);
     assert.ok(Math.abs(copy.size.h - copy.source.h) <= 4, `and its height (${copy.size.h} vs ${copy.source.h})`);
-    assert.equal(copy.caption, 'border', 'with the band\'s own caption');
+    assert.equal(copy.captions, 0, 'and carries no caption of its own');
+    assert.equal(copy.centred, true, 'it is centred in the section, on the same axis as the band it copies');
+    assert.ok(copy.hole[0] > 20 && copy.hole[0] < 60, `the middle is cut out (${copy.hole[0]}px of rim)`);
+    assert.equal(copy.holeColour, copy.surfaceOfPanel, 'showing the panel\'s own surface through the cut');
   }
   assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key="radius"], #inspector [data-section="appearance"] [data-key="stroke"]').count(), 0, 'no third home in Appearance');
   const sectionOrder = await page.locator('#inspector [data-section]').evaluateAll(nodes => nodes.map(node => node.dataset.section));
@@ -491,8 +504,10 @@ try {
   assert.equal(weightSize.scrollWidth <= weightSize.clientWidth + 1 && weightSize.clientHeight <= weightSize.lineHeight + 1, true, 'long selector values stay whole on one line');
   await page.evaluate(async () => (await import('./lib/store.js')).selectNodes('welcome', []));
   await page.locator('#inspector [data-key="width"]').waitFor();
-  const dimensions = await page.locator('#inspector .geometry-grid').evaluate(node => {
+  // The panel redraws from the node view to the artboard view: measure the grid once it has settled there.
+  const dimensions = await waitUntil(() => page.locator('#inspector .geometry-grid').evaluate(node => {
     const boxes = [...node.querySelectorAll('.num')].map(field => field.getBoundingClientRect());
+    if (boxes.length < 4) return null;
     const context = document.createElement('canvas').getContext('2d');
     const readable = [...node.querySelectorAll('input')].every(input => {
       const style = getComputedStyle(input);
@@ -500,8 +515,9 @@ try {
       const sample = ['x', 'y'].includes(input.dataset.key) ? '-10000000' : '16384';
       return context.measureText(sample).width <= input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1;
     });
-    return { paired: Math.abs(boxes[0].top - boxes[1].top) < 1 && Math.abs(boxes[2].top - boxes[3].top) < 1 && boxes[2].top > boxes[0].top, readable };
-  });
+    const paired = Math.abs(boxes[0].top - boxes[1].top) < 1 && Math.abs(boxes[2].top - boxes[3].top) < 1 && boxes[2].top > boxes[0].top;
+    return paired && readable ? { paired, readable } : null;
+  }).catch(() => null), 'the artboard geometry grid settles into two readable columns');
   assert.deepEqual(dimensions, { paired: true, readable: true }, 'artboard dimensions use two readable columns at minimum panel width');
   await select('cta');
   await page.locator('#inspector [data-key="radius-tl"]').waitFor();
@@ -744,11 +760,18 @@ try {
     const layoutErrors = await page.locator('#inspector [data-section="border"]').evaluate(section => {
       const bad = [], context = document.createElement('canvas').getContext('2d');
       if (section.scrollWidth > section.clientWidth + 1) bad.push('horizontal overflow');
-      // The ring is three columns wide at every size, and each cell keeps its own value whole; a ring too narrow for the
-      // middle gives the colour a row of its own inside it rather than losing a column.
+      // The band copy keeps its eight values inside its own frame at every size, and its cut middle never swallows one of them.
       const ring = section.querySelector('.br-box');
-      if (!ring) bad.push('the ring is missing');
-      else if (getComputedStyle(ring).gridTemplateColumns.split(' ').length !== 3) bad.push('the ring loses a column');
+      if (!ring) bad.push('the copy is missing');
+      else {
+        const frame = ring.getBoundingClientRect(), hole = ring.querySelector('.br-hole').getBoundingClientRect();
+        for (const field of ring.querySelectorAll('.br-cell')) {
+          const box = field.getBoundingClientRect();
+          if (box.left < frame.left - 1 || box.right > frame.right + 1 || box.top < frame.top - 1 || box.bottom > frame.bottom + 1) bad.push(`${field.className.slice(-8)} leaves the copy`);
+          const inside = box.left >= hole.left - 1 && box.right <= hole.right + 1 && box.top >= hole.top - 1 && box.bottom <= hole.bottom + 1;
+          if (inside) bad.push(`${field.className.slice(-8)} sits in the cut middle`);
+        }
+      }
       for (const input of section.querySelectorAll('.vf-input')) {
         const style = getComputedStyle(input); context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
         if (context.measureText(input.value || input.placeholder).width > input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1) bad.push(`${input.dataset.key} clips`);

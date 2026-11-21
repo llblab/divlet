@@ -45,19 +45,22 @@ try {
     }, label);
     await page.locator('#inspector [data-key="opacity"]').waitFor();
     assert.deepEqual(await readableNumbers(`${width}px@${size}% element`), []);
+    // The copy's width follows the box model's band, so it is only its own size once the panel has settled.
+    await page.waitForFunction(() => (document.querySelector('#inspector .br-box')?.getBoundingClientRect().width ?? 0) > 100, null, { timeout: 8000 });
     const compactShape = await page.evaluate(() => {
-      // The border ring keeps its three columns at every width, and a corner still reads `Full` whole inside its cell.
+      // The band copy keeps its corner values whole at every width, inside its own frame and the inspector's.
       const diagram = document.querySelector('#inspector .br-box'), inspector = document.querySelector('#inspector').getBoundingClientRect();
       const radius = diagram.querySelector('[data-key="radius-tl"]'), style = getComputedStyle(radius);
       const context = document.createElement('canvas').getContext('2d');
       context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      const frame = diagram.getBoundingClientRect(), cell = radius.closest('.br-cell').getBoundingClientRect();
       return {
-        columns: getComputedStyle(diagram).gridTemplateColumns.split(' ').filter(Boolean).length,
+        columns: [...diagram.querySelectorAll('.br-corner, .br-edge')].filter(node => { const box = node.getBoundingClientRect(); return box.left >= frame.left - 1 && box.right <= frame.right + 1; }).length === 8 ? 3 : 0,
         readable: context.measureText('Full').width <= radius.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1,
-        inside: diagram.getBoundingClientRect().right <= inspector.right + 1,
+        inside: frame.right <= inspector.right + 1 && cell.right <= frame.right + 1,
       };
     });
-    assert.deepEqual(compactShape, { columns: 3, readable: true, inside: true }, `the border ring keeps three readable columns at ${width}px/${size}%`);
+    assert.deepEqual(compactShape, { columns: 3, readable: true, inside: true }, `the band copy keeps its eight values whole inside its frame at ${width}px/${size}%`);
     const spacingCollisions = await page.locator('#inspector .boxmodel').evaluate(model => {
       const fields = [...model.querySelectorAll('.bm-field')].map(node => node.getBoundingClientRect());
       const overlaps = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;
