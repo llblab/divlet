@@ -4695,13 +4695,36 @@
           "style": {},
           "metadata": {},
           "children": [
-            "text-446"
+            "text-446",
+            "node-github"
           ]
         },
         "text-446": {
           "id": "text-446",
           "type": "text",
-          "content": "divlet · MIT · github.com/llblab/divlet",
+          "content": "divlet · MIT · ",
+          "metadata": {}
+        },
+        "node-github": {
+          "id": "node-github",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "https://github.com/llblab/divlet",
+            "target": "_blank",
+            "rel": "noreferrer noopener"
+          },
+          "className": "underline underline-offset-[3px] hover:text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-github"
+          ]
+        },
+        "text-github": {
+          "id": "text-github",
+          "type": "text",
+          "content": "github.com/llblab/divlet",
           "metadata": {}
         },
         "node-447": {

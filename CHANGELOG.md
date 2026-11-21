@@ -4,6 +4,13 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased
 
+- **A link is editable and clickable.** The inspector gives an anchor its own **Link** section beside the element's name — the address, and a
+  **New tab** control that writes `target="_blank"` with `rel="noreferrer noopener"` and takes back exactly what it wrote, while an emptied address
+  removes `href` rather than keeping a link to nowhere; double-clicking a link with no words of its own lands in that field. In Play, a link that
+  leaves the project (`https:`, `mailto:`) is now followed: the frame stays sandboxed without popups or top navigation, so the board opens the
+  authored address from the visitor's own click, resolved in full and with its opener cut (`core/lib/bridge.js`, `web/lib/canvas.js`,
+  `web/lib/inspector.js`, `web/tests/features.mjs`, `web/tests/preview-links.mjs`). The landing's footer names the GitHub repository as a real link
+  instead of plain text that reads like one (`examples/landing/landing.divlet`, regenerated cache).
 - **The board names its release.** Settings carries one quiet caption beside its title — `v0.1.2` in the faint tone, with the full release in its tooltip — read from the board state rather than from a second copy of the number: the local host reads its own package manifest and the static site passes the version its bundle was built with, so a published page can never claim a release it is not (`core/lib/version.ts`, `core/tests/runtime.test.js`, `web/tests/settings.mjs`, `web/tests/pages.mjs`).
 - **The geometry block keeps no swap button.** Rotating an artboard already lives in its own ⋯ menu and in the palette's Rotate, so the extra icon at the end of the width chips — whose tooltip read “Swap width and height” — is gone, and the size chips end where the width presets end (`web/tests/controls.mjs`).
 - **Every icon paints at one size.** The glyphs had drifted apart — `parent`, `play`, `send`, `trash`, `copy` and others sat around 11 units while `tidy`, `keyboard` and `component` reached 15, so a row of them read as a decreasing series; four glyphs (`gear`, `pencil`, `layers`, `child`) drew outside their own box and were clipped. Every glyph now paints at the same optical extent (~13.8 of the 20-unit box) with its own shape repaired, the brand mark keeps its authored geometry, and a caret, tick, close cross and stop square stay deliberately lighter. Chromium checks the painted extent of every glyph in the chrome, not its box (`web/tests/chrome.mjs`, `web/tests/icons.test.js`).

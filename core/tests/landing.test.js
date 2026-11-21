@@ -104,7 +104,7 @@ test('private and unowned output is never published; hand-edited owned output is
   await assert.rejects(() => landingHash(output), /hand-edited/);
 });
 
-test('the generated page keeps crawler metadata, real section links and a self-contained resource graph', async () => {
+test('the generated page keeps crawler metadata, real section links and a self-contained resource graph, with only anchors leaving', async () => {
   const html = await read('index.html'), nodes = elements(parse(html));
   assert.match(html, /^<!doctype html>/i);
   assert.equal(attr(nodes.find(node => node.tagName === 'html'), 'lang'), 'en');
@@ -122,7 +122,11 @@ test('the generated page keeps crawler metadata, real section links and a self-c
       assert.match(item.value, /^data:image\/svg\+xml;base64,/);
       continue;
     }
-    assert.ok(!/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(item.value), `no external request: ${item.value}`);
+    // The page is a self-contained resource graph, not an island: an anchor may name a destination elsewhere (the repository), while
+    // every attribute that makes the browser *fetch* something stays local to the published set.
+    const leaving = /^(?:https?:|mailto:)/i.test(item.value) && (node.tagName === 'a' || node.tagName === 'area');
+    assert.ok(leaving || !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(item.value), `no external request: ${item.value}`);
+    if (leaving) continue;
     if (item.value.startsWith('#')) assert.equal(nodes.filter(target => attr(target, 'id') === item.value.slice(1)).length, 1, `unique target for ${item.value}`);
     else assert.ok(files.has(item.value.split(/[?#]/)[0]), `published file backs ${item.value}`);
   }

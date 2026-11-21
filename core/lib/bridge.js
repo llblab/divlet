@@ -800,11 +800,20 @@ export function previewBridge(documentId, initialVersion, bridgeToken, readOnly 
     if (mode === 'inspect' || event.defaultPrevented || event.button !== 0 || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return;
     const link = event.target.closest?.('a[href], area[href]');
     const href = link?.getAttribute('href');
-    if (!href || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
+    if (!href || href.length > 2048 || link.hasAttribute('download')) return;
     if (href[0] === '#') { event.preventDefault(); scrollToFragment(href); return; }
-    // The accepted projection can spell local links as absolute build URLs; other schemes/origins stay with the browser/CSP.
-    if (href.length > 2048) return;
-    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href) && !href.startsWith(new URL('../build/', window.location.href).href)) return;
+    // The accepted projection can spell local links as absolute build URLs; those stay in the board's own hands.
+    const local = href.startsWith(new URL('../build/', window.location.href).href);
+    if (!local && /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(href)) {
+      // Anything else leaves this page, and this frame is sandboxed without popups or top navigation: the board opens it from its
+      // own window instead, which keeps the frame's sandbox strict and still makes the link a link.
+      event.preventDefault();
+      let absolute = href;
+      try { absolute = new URL(href, document.baseURI).href; } catch { /* an unreadable href is reported as written */ }
+      send({ type: 'divlet:external', href: absolute });
+      return;
+    }
+    if (link.target && link.target !== '_self') return;
     event.preventDefault();
     send({ type: 'divlet:link', href });
   });

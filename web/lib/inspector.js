@@ -510,6 +510,34 @@ function imageEditor(doc, node) {
   return wrap;
 }
 
+/**
+ * Where a link goes. An anchor's destination is the one thing it is for, so it sits with the element's own name rather than two
+ * folds down in Attributes (which still lists every attribute, including this one). An emptied address removes `href`: an anchor
+ * without one is not a link, which is what an unfinished link should be rather than a link to nowhere.
+ */
+function linkEditor(doc, node) {
+  // A patch attribute that is `null` is removed; the rest of the attributes ride along untouched.
+  const write = (delta, label) => refreshed(commit(doc.id, { nodes: { [node.id]: { attrs: { ...node.attrs, ...delta } } } }, { label }));
+  const href = textField('href', node.attrs.href ?? '', value => write({ href: value.trim() || null }, `link of ${node.id}`), { placeholder: 'https://…, #section or page.html', label: 'Link address', mono: true });
+  const blank = node.attrs.target === '_blank';
+  const tab = el('button', `chip${blank ? ' on' : ''}`, 'New tab');
+  tab.type = 'button';
+  tab.dataset.key = 'link-new-tab';
+  tab.dataset.tip = 'Open in a new tab instead of this one';
+  tab.setAttribute('aria-pressed', String(blank));
+  tab.addEventListener('click', () => {
+    // A new tab without `noopener` hands the opened page a live `window.opener`, so the guard is written with the tab it belongs to
+    // and removed with it — never an authored `rel` the link had for another reason.
+    if (blank) write({ target: null, ...(node.attrs.rel === 'noreferrer noopener' ? { rel: null } : {}) }, `open ${node.id} in the same tab`);
+    else write({ target: '_blank', rel: node.attrs.rel || 'noreferrer noopener' }, `open ${node.id} in a new tab`);
+  });
+  const chips = el('div', 'chips');
+  chips.append(tab);
+  const wrap = el('div', 'rows');
+  wrap.append(href, chips);
+  return wrap;
+}
+
 /* ---- components ---------------------------------------------------------- */
 let componentsCache = { revision: -1, list: [], loading: false };
 function componentList() {
@@ -750,6 +778,7 @@ function nodeView(doc, model, nodeIds) {
     label.dataset.tip = 'Layer name';
     view.push(section('node-name', label));
   }
+  if (node.type === 'element' && (node.tag === 'a' || node.tag === 'area')) view.push(section('link', linkEditor(doc, node)));
   const text = textEditor(model, node);
   if (text) view.push(section('text', text));
   if (node.type === 'ref') view.push(section('instance', instanceEditor(doc, node)));
@@ -854,7 +883,8 @@ function focusWanted() {
   const attribute = PRIMARY[tag];
   let target = null;
   if (attribute) {
-    target = panel.querySelector(`[data-key="attr:${attribute}"]`);
+    // A link's destination has a home of its own; the attribute row is where every other one is edited.
+    target = (attribute === 'href' ? panel.querySelector('[data-key="href"]') : null) ?? panel.querySelector(`[data-key="attr:${attribute}"]`);
     if (!target) {
       const name = panel.querySelector('[data-key="attr-new-key"]');
       target = panel.querySelector('[data-key="attr-new-value"]');

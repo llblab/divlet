@@ -462,6 +462,44 @@ try {
   assert.deepEqual(doc('plain-css'), beforeForeign, 'foreign inline CSS cannot borrow a receiving project declaration');
   check('native image upload/replace, grouped history, portable clipboard, literal image paste and foreign namespace refusal');
 
+  /* ---- links -------------------------------------------------------------- */
+  {
+    // A link's destination sits with the element's own name, so it is one field away instead of two folds down in Attributes.
+    const model = doc('welcome');
+    await runtime.edit({ documentId: 'welcome', expectedVersion: model.version, actor: 'user', label: 'Add a link', op: { type: 'insert', parentId: model.rootId, spec: [
+      { id: 'repo-link', tag: 'a', attrs: { href: '#top' }, text: 'Repo' },
+      // An anchor with no text of its own: double-clicking it cannot mean "edit the words", so it means "edit the destination".
+      { id: 'icon-link', tag: 'a', attrs: { href: '#top' }, style: { display: 'block', width: '18px', height: '18px' } },
+    ] } });
+    await pickNode('welcome', 'repo-link');
+    const field = page.locator('#inspector [data-key="href"]');
+    await field.waitFor();
+    assert.equal(await field.inputValue(), '#top', 'the Link section shows the authored destination');
+    await field.fill('https://github.com/llblab/divlet');
+    await page.keyboard.press('Enter');
+    await waitUntil(() => doc('welcome').nodes['repo-link']?.attrs.href === 'https://github.com/llblab/divlet', 'typing an address rewrites the link');
+    await page.locator('#inspector [data-key="link-new-tab"]').click();
+    await waitUntil(() => doc('welcome').nodes['repo-link']?.attrs.target === '_blank' && doc('welcome').nodes['repo-link']?.attrs.rel === 'noreferrer noopener', 'a new tab is written together with its noopener guard');
+    await waitUntil(async () => await page.locator('#inspector [data-key="link-new-tab"]').getAttribute('aria-pressed') === 'true', 'the control says so');
+    await page.locator('#inspector [data-key="link-new-tab"]').click();
+    await waitUntil(() => !doc('welcome').nodes['repo-link']?.attrs.target && !doc('welcome').nodes['repo-link']?.attrs.rel, 'turning it off removes what it wrote, and nothing else');
+    assert.equal(doc('welcome').nodes['repo-link'].attrs.href, 'https://github.com/llblab/divlet', 'the destination survives');
+    await field.fill('');
+    await page.keyboard.press('Enter');
+    await waitUntil(() => !('href' in doc('welcome').nodes['repo-link'].attrs), 'an emptied address leaves an anchor without a destination, not a link to nowhere');
+    await focusCanvas(); await page.keyboard.press('Control+z');
+    await waitUntil(() => doc('welcome').nodes['repo-link']?.attrs.href === 'https://github.com/llblab/divlet', 'and one Undo brings the address back');
+    // Double-clicking a link that has no words of its own goes straight to its destination, not to the general attribute list.
+    await pickNode('welcome', 'icon-link');
+    const point = await nodePoint('welcome', 'icon-link');
+    await page.mouse.dblclick(point.x, point.y);
+    await waitUntil(async () => await page.evaluate(() => document.activeElement?.dataset?.key) === 'href', 'double-click focuses the destination field');
+    // The general attribute list still holds the same destination: one authored value, two views of it.
+    await pickNode('welcome', 'icon-link');
+    await waitUntil(async () => await page.locator('#inspector [data-key="attr:href"]').inputValue() === '#top', 'the Attributes section reads the same href');
+    check('link destination field, new-tab guard, emptied href and Undo');
+  }
+
   /* ---- components --------------------------------------------------------- */
   await pickNode('pricing', 'pro');
   await page.locator('#inspector .instance-head').waitFor();

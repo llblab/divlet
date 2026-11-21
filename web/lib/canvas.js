@@ -874,6 +874,18 @@ window.addEventListener('message', event => {
  * take its page to the fragment (a plain page link lands at the top, like a navigation would). The frames stay loaded; nothing
  * is swapped, and a link to no artboard says so rather than leave for a missing file.
  */
+/**
+ * A link that leaves this project — `https:`, `mailto:` — cannot be followed inside a preview frame, which is sandboxed without
+ * popups or top navigation. The board opens it from its own window instead, under the visitor's own click, so an authored link
+ * behaves like a link and the frame keeps its strict sandbox. Only those two schemes are opened; anything else is dropped.
+ */
+function openExternal(href) {
+  let url;
+  try { url = new URL(href); } catch { return; }
+  if (!/^(?:https?|mailto):$/.test(url.protocol)) return;
+  window.open(url.href, '_blank', 'noopener,noreferrer');
+}
+
 function followLink(entry, href) {
   const base = entry.doc.viewUrl;
   if (!base) return;
@@ -902,6 +914,7 @@ function handlePreviewMessage(entry, data) {
     return;
   }
   if (data.type === 'divlet:link' && typeof data.href === 'string' && data.href.length <= 2048) { followLink(entry, data.href); return; }
+  if (data.type === 'divlet:external' && typeof data.href === 'string' && data.href.length <= 2048) { openExternal(data.href); return; }
   if (data.type === 'divlet:wheel' && Number.isFinite(data.deltaY)) {
     const frame = entry.iframe.getBoundingClientRect();
     const px = frame.left + (Number(data.clientX) || 0) * camera.k;
