@@ -170,6 +170,7 @@ test('the prepared landing is the first paint and stays until the visitor leaves
     return { covers: box.left <= 0 && box.top <= 0 && box.right >= innerWidth && box.bottom >= innerHeight, top: hit === node, spinner: getComputedStyle(document.querySelector('#loading')).display, chrome: ['#brand', '#dock', '#sidebar-foot'].map(selector => getComputedStyle(document.querySelector(selector)).display), host: !!globalThis[Symbol.for('divlet.board-host/1')] };
   });
   assert.deepEqual(first, { covers: true, top: true, spinner: 'none', chrome: ['none', 'none', 'none'], host: false }, 'before any board script runs the visitor reads the landing, with no preloader or editor chrome');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('#ui')).opacity), '0', 'and the chrome stays out of sight until the board is ready to show it whole');
   release();
   // The board starts behind the landing and only adds the way to it.
   await page.waitForSelector('#expanded-preview:not([hidden])');
@@ -180,6 +181,7 @@ test('the prepared landing is the first paint and stays until the visitor leaves
     return { cover: !!document.querySelector('#boot-cover'), control: document.elementFromPoint(control.left + control.width / 2, control.top + control.height / 2)?.closest('#expanded-back') !== null, tip: document.querySelector('.tip')?.classList.contains('show') ?? false };
   });
   assert.deepEqual(ready, { cover: true, control: true, tip: false }, 'the unchanged landing never swaps under the reader; Edit on the board sits above it with no tip over the page');
+  assert.equal(await page.evaluate(() => document.documentElement.classList.contains('booting')), false, 'the board leaves its boot state as soon as it shows itself');
   await page.click('#expanded-back');
   await page.waitForSelector('#expanded-preview', { state: 'hidden' });
   assert.equal(await page.locator('#boot-cover').count(), 0, 'collapsing reveals the board itself');
@@ -218,6 +220,7 @@ test('the site opens in the view it was last left in: the landing first, or the 
   await started();
   assert.equal(await page.locator('#expanded-preview').isHidden(), true, 'and lands on the board itself');
   assert.equal(await page.locator('#brand').isVisible(), true);
+  assert.deepEqual(await page.evaluate(() => ({ booting: document.documentElement.classList.contains('booting'), chrome: getComputedStyle(document.querySelector('#ui')).opacity, artboards: document.querySelectorAll('.artboard').length })), { booting: false, chrome: '1', artboards: 1 }, 'a board visitor reads the spinner, then the whole board — chrome and artboards together, never the chrome alone');
   // Expanding the landing again makes it the next first paint.
   await page.locator('.artboard[data-artboard-id="index"] .ab-body').click();
   await page.keyboard.press('e');

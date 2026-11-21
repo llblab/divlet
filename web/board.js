@@ -116,8 +116,28 @@ $('#empty-new').addEventListener('click', () => actions.newArtboard());
 /* ---- site link ------------------------------------------------------------ */
 siteLink.append(icon('site'));
 
+/*
+ * The start is one spinner. This module builds the chrome — every icon, label and tool — so a shell shown before it runs is the
+ * board without its parts, which is what a visitor sees as a flash of unfinished interface. The chrome therefore stays out of
+ * sight (and the spinner up) until the board can show itself whole: the first state, plus its first artboard preview painted.
+ * The cap keeps one slow frame from holding the whole interface back, and an expanded page or an empty board reveals at once,
+ * because neither waits on a canvas preview.
+ */
+let booted = false;
+const boot = () => {
+  if (booted) return;
+  booted = true;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    $('#loading').hidden = true;
+    document.documentElement.classList.remove('booting');
+  }));
+};
+on('frames', frames => { if (frames.live > 0) boot(); });
+on('expanded', () => boot());
+setTimeout(boot, 2000);
+
 on('state', state => {
-  $('#loading').hidden = true;
+  if (!state.documents.length || store.expanded) boot();
   $('#status').setAttribute('aria-label', 'Project status');
   $('#empty').hidden = state.documents.length !== 0;
   siteLink.hidden = !state.site;
@@ -396,7 +416,7 @@ if (bootCover) {
   bootstrap.catch(drop);
 }
 bootstrap.then(info => { receiveState(info); project.checkImport(); }).catch(error => {
-  $('#loading').hidden = true;
+  boot(); // A board that cannot start still hands the screen to its chrome, which says so.
   setConnection('offline');
   toast(error.message);
 });

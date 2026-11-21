@@ -170,6 +170,9 @@ kbd { flex: none; white-space: nowrap; font: 600 11px var(--mono); color: var(--
 .cta:active { transform: scale(.97); }
 .cta kbd { color: inherit; border-color: rgba(255, 255, 255, .35); }
 .loading { position: absolute; inset: 0; display: grid; place-items: center; }
+/* The client builds every icon and label in the chrome, so a shell painted before it runs is the interface without its parts.
+   While the board boots the chrome stays out of sight and the spinner is the whole screen; both flip in one frame. */
+html.booting #ui { opacity: 0; }
 /* One quiet spinner, shown only if starting takes long enough to notice. */
 .boot-spinner { width: 26px; height: 26px; border: 2.5px solid var(--hair); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite, fade .2s .25s ease-out backwards; }
 @media (prefers-reduced-motion: reduce) { .boot-spinner { animation-duration: 2.4s, .2s; } }

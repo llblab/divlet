@@ -239,6 +239,42 @@ try {
   await phone.locator('.menu').screenshot({ path: 'artifacts/root-crumb-phone-menu.png' });
   await phone.keyboard.press('Escape');
   checks.push('the real phone/200% frame-inspector overflow omits Rename and Select root element');
+
+  // The start is one spinner: the chrome is this client's own work, so it stays out of sight until the board can show itself
+  // whole — and the spinner waits for the first artboard preview rather than for the first state alone.
+  {
+    const booting = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
+    let releasePreview;
+    const previewHeld = new Promise(resolve => { releasePreview = resolve; });
+    let previews = 0;
+    await booting.route(url => /\/preview\//.test(url.pathname), async route => { previews++; await previewHeld; await route.continue(); });
+    const navigated = booting.goto(runtime.info().url);
+    await waitUntil(async () => previews > 0, 'the board asks for its first preview');
+    const held = await booting.evaluate(() => ({
+      spinner: !document.querySelector('#loading').hidden,
+      booting: document.documentElement.classList.contains('booting'),
+      chrome: getComputedStyle(document.querySelector('#ui')).opacity,
+      tools: document.querySelectorAll('#dock .tool').length,
+      icons: document.querySelectorAll('#ui .icon').length,
+    }));
+    assert.equal(held.spinner, true, 'the spinner stays while the first preview is still on its way');
+    assert.deepEqual({ booting: held.booting, chrome: held.chrome }, { booting: true, chrome: '0' }, 'and the chrome stays out of sight instead of appearing without its parts');
+    assert.ok(held.tools > 4 && held.icons > 8, `the chrome is already whole behind it (${held.tools} tools, ${held.icons} icons), so nothing half-drawn is ever revealed`);
+    releasePreview();
+    await navigated;
+    await waitUntil(async () => await booting.evaluate(() => document.querySelector('#loading').hidden), 'the board reveals itself once the preview has painted');
+    const shown = await booting.evaluate(() => ({
+      booting: document.documentElement.classList.contains('booting'),
+      chrome: getComputedStyle(document.querySelector('#ui')).opacity,
+      spinner: getComputedStyle(document.querySelector('#loading')).display,
+      artboards: document.querySelectorAll('.artboard').length,
+    }));
+    assert.deepEqual({ booting: shown.booting, chrome: shown.chrome, spinner: shown.spinner }, { booting: false, chrome: '1', spinner: 'none' }, 'the spinner and the chrome flip together');
+    assert.ok(shown.artboards > 0, 'and the board behind them already has its artboards');
+    await booting.context().close();
+    checks.push('the boot is one spinner: the chrome is built behind it and both appear only when the first preview has painted');
+  }
+
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'passed', checks }, null, 2));
 } finally { await browser?.close(); await runtime.close(); await rm(cwd, { recursive: true, force: true }); }
