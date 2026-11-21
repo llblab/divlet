@@ -929,7 +929,8 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 
 /* Border owns its line, edge widths, colour and radius; Appearance keeps fill and typography. */
 .appearance-box, .border-box { display: grid; gap: 8px; }
-.appearance-colors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+/* Fill and Text share a row while a field can still hold its label, swatch, value and clear on one line (≈144px). */
+.appearance-colors { --control-min: 148px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--control-min)), 1fr)); gap: 8px; }
 .border-widths { --control-min: max(106px, calc(50% - 3px)); }
 .appearance-box > .grid2, .typography-controls > .grid2 { align-items: center; }
 .typography-controls { display: grid; gap: 8px; min-width: 0; }
@@ -946,13 +947,14 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .border-geometry > .radius-presets { flex: 1 1 130px; }
 .radius-presets { display: flex; flex-wrap: wrap; gap: 4px; }
 .radius-presets .chip.on { background: var(--accent-soft); color: var(--accent-ink); }
-.color-field { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; min-width: 0; min-height: 28px; padding: 0 4px 0 0; border-radius: var(--radius-inner); background: var(--field); }
+.color-field { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; min-width: 0; min-height: 28px; padding: 0 2px 0 0; border-radius: var(--radius-inner); background: var(--field); }
 .color-field:focus-within { outline-offset: 1px; outline: var(--focus-ring) solid var(--accent); }
 .color-field .vf-k { min-width: 30px; }
 .color-field .swatch { flex: none; width: 20px; height: 20px; border-radius: var(--radius-small); }
 /* One row while the value fits; a value wider than what is left wraps whole onto its own line instead of clipping. */
 .color-field .color-hex { flex: 1 1 var(--hex-width, 9ch); min-width: min(100%, var(--hex-width, 9ch)); min-height: 28px; }
-@supports (field-sizing: content) { .color-field .color-hex { field-sizing: content; flex: 1 0 auto; min-width: 0; max-width: 100%; } }
+/* A content-sized field must not inherit the wrapper's `width: 100%` as its flex base, or it takes a whole line by itself. */
+@supports (field-sizing: content) { .color-field .color-hex { field-sizing: content; flex: 1 0 auto; width: auto; min-width: 0; max-width: 100%; } }
 .color-block { display: grid; gap: 4px; }
 .token-swatches { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 36px; }
 .token-swatch { width: 18px; height: 18px; padding: 0; border: 1px solid var(--hair); border-radius: 50%; cursor: pointer; }

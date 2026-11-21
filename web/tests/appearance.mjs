@@ -49,15 +49,54 @@ try {
       const bounds = section.getBoundingClientRect();
       return {
         rects: [fill.toJSON(), ink.toJSON()],
+        bounds: bounds.toJSON(),
+        // offsetWidth is the unscaled CSS width, which is what the grid lays out in (200% interface size zooms it).
+        cssWidth: section.offsetWidth,
         paired: fill.width > 0 && ink.width > 0 && Math.abs(fill.top - ink.top) < 1 && fill.right < ink.left,
+        stacked: ink.top >= fill.bottom - 1 && Math.abs(fill.left - ink.left) < 1,
         contained: fields.every(field => {
           const rect = field.getBoundingClientRect();
           return rect.left >= bounds.left && rect.right <= bounds.right + 1 && field.scrollWidth <= field.clientWidth + 1;
         }),
       };
     });
-    const { rects, ...result } = layout;
-    assert.deepEqual(result, { paired: true, contained: true }, `Fill and Text share one row without overflow (${label}): ${JSON.stringify(rects)}`);
+    const { rects, bounds, stacked, cssWidth, ...result } = layout;
+    // Two fields of at least 148px plus their gap: below that the pair gives way, and each field keeps its own one row.
+    const fits = cssWidth >= 2 * 148 + 8;
+    assert.deepEqual({ ...result, arranged: fits ? result.paired : stacked }, { paired: fits, contained: true, arranged: true }, `Fill and Text share a row while two one-row fields fit and stack whole below that (${label}): ${JSON.stringify({ rects, bounds, cssWidth })}`);
+  };
+  // A colour control is one line: label, swatch, value and clear sit side by side, and only a value too long for what is
+  // left takes a line of its own. Measured with the canonical seven-character value, whatever the element authors.
+  const colorFieldRows = async label => {
+    const audit = await page.evaluate(() => {
+      const fields = [...document.querySelectorAll('#inspector [data-section="border"] .color-field, #inspector [data-section="appearance"] .color-field')];
+      const row = field => {
+        const box = field.getBoundingClientRect();
+        const parts = [...field.children].filter(node => getComputedStyle(node).display !== 'none');
+        const centres = parts.map(node => { const rect = node.getBoundingClientRect(); return Math.round(rect.top + rect.height / 2); });
+        return {
+          label: field.querySelector('.vf-k').textContent,
+          spread: Math.max(...centres) - Math.min(...centres),
+          inside: parts.every(node => { const rect = node.getBoundingClientRect(); return rect.left >= box.left - 1 && rect.right <= box.right + 1; }),
+          order: parts.map(node => Math.round(node.getBoundingClientRect().left)),
+          authored: field.querySelector('.color-hex').value,
+        };
+      };
+      const hexes = fields.map(field => field.querySelector('.color-hex'));
+      const authored = hexes.map(hex => hex.value);
+      hexes.forEach(hex => { hex.value = '#332460'; });
+      const canonical = fields.map(row);
+      hexes.forEach((hex, at) => { hex.value = authored[at]; });
+      return { canonical, authored: fields.map(row) };
+    });
+    const problems = audit.canonical
+      .filter(field => field.spread > 1 || !field.inside)
+      .map(field => ({ kind: 'colour value left the one row', ...field }));
+    // A long authored value may wrap whole onto its own line, but the label, swatch and clear stay together above it.
+    problems.push(...audit.authored
+      .filter(field => field.spread > 1 && field.authored.length <= 9)
+      .map(field => ({ kind: 'short authored value left the one row', ...field })));
+    assert.deepEqual(problems, [], `colour controls keep label, swatch, value and clear on one line (${label}): ${JSON.stringify(audit.canonical)}`);
   };
 
   // With a style engine, More CSS takes the common path: custom properties stay native declarations, other properties become
@@ -521,6 +560,7 @@ try {
     });
     assert.deepEqual(layoutErrors, [], `Border controls at ${width}px/${size}%`);
     await colorRow(`${width}px/${size}%, authored colors and project swatches`);
+    await colorFieldRows(`${width}px/${size}%, border and appearance colours`);
     await page.locator('#inspector .appearance-colors').screenshot({ path: `artifacts/appearance-colors-${width}-${size}.png` });
     assert.equal(await textAlign.evaluate(group => group.scrollWidth <= group.clientWidth + 1 && group.closest('.appearance-box') !== null), true, `typography alignment remains together at ${width}px/${size}%`);
     if (size === 200) {
@@ -529,7 +569,7 @@ try {
     }
     if (size === 100) await page.locator('#inspector [data-section="border"]').screenshot({ path: `artifacts/border-section-${width}-${size}.png` });
   }
-  checks.push('Border stays readable and Fill/Text share one row without horizontal overflow on desktop, phone and phone/200%');
+  checks.push('Border stays readable; every colour control keeps label, swatch, value and clear on one line, Fill/Text pair while two such fields fit and no control overflows on desktop, phone and phone/200%');
 
   await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(200));
   await select('cta'); await effect('z').waitFor();
