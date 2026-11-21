@@ -42,7 +42,17 @@ try {
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error' && !/409|400|404/.test(message.text())) errors.push(message.text()); });
-  page.on('response', response => { if (response.status() === 404) errors.push(`404 ${new URL(response.url()).pathname.replace(/^\/[0-9a-f]+\//, '')}`); });
+  // A far-zoom font capture races a delete: the frame it asked about can be gone before the answer, and the host answers
+  // 404 for a request the board has already aborted. Only that case is silent — every other 404 stays an error, and each
+  // tolerated one is checked below against the frames that really exist.
+  const goneCaptures = new Set();
+  page.on('response', response => {
+    if (response.status() !== 404) return;
+    const pathname = new URL(response.url()).pathname.replace(/^\/[0-9a-f]+\//, '');
+    const capture = /^api\/capture-fonts\/([^/]+)$/.exec(pathname);
+    if (capture) goneCaptures.add(decodeURIComponent(capture[1]));
+    else errors.push(`404 ${pathname}`);
+  });
   await page.goto(runtime.info().url);
   await page.waitForFunction(() => document.querySelectorAll('.artboard').length === 5 && [...document.querySelectorAll('.artboard')].every(node => node.dataset.status === 'live'));
 
@@ -1069,6 +1079,7 @@ try {
   await page.keyboard.press('Escape');
   check('interface size 100–200%: the chrome scales, the canvas does not; menus stay on screen; layouts follow the effective width; remembered');
 
+  for (const id of goneCaptures) assert.equal(runtime.documents.get(id), undefined, `a silent 404 belongs to a frame that was really deleted, not a live one: ${id}`);
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({ status: 'passed', count: checks.length, checks }, null, 2));
 } catch (error) {

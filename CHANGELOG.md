@@ -10,6 +10,10 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
   `transform: scale(--ui)`, so a painted width is a layout width times the scale: the toolbar's fit and the label column now
   measure with `offsetWidth` (`web/lib/toolbar.js`, `web/lib/properties.js`, `web/tests/chrome.mjs`,
   `web/tests/appearance.mjs`).
+- **The browser battery checks the contracts that exist now.** The Play witness expected a leaving link to navigate the
+  preview frame; it now proves the board's own window opens it while the frame stays on its page. And a far-zoom font capture
+  whose frame is deleted mid-flight answers 404 — the board has already aborted it — so only that exact case stays silent,
+  with each tolerated id checked against the frames that still exist (`web/tests/security.mjs`, `web/tests/features.mjs`).
 - **The token row explains itself.** The `--color-brand → bg-brand, text-brand` caption under the Tokens add row is gone: the placeholders say what
   the two fields take, and the row no longer repeats it (`web/lib/inspector.js`).
 - **Box-model side values keep their distance.** The left and right values sat flush against their band's frame and read as part of the line; they

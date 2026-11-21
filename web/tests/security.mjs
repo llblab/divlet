@@ -62,19 +62,29 @@ try {
   assert.ok(previousCapability);
   await page.locator('#viewport').focus();
   await page.keyboard.press('p');
-  const navigation = page.waitForEvent('framenavigated', { predicate: frame => frame.url() === externalUrl });
-  await page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').click();
-  const foreign = await navigation;
-  assert.ok(foreign, 'the page can still navigate in Play mode');
-  await foreign.waitForFunction(() => Array.isArray(window.received));
-  await page.waitForTimeout(250);
-  assert.equal(runtime.read({ view: 'frame', documentId: 'welcome' }).nodes['title-text'].content, before, 'window messages cannot edit the project');
-  assert.equal(await foreign.evaluate(() => document.referrer), '', 'the preview capability is not sent as a referrer');
+  // A link that leaves the project is opened by the board's own window: the frame stays sandboxed (no popups, no top
+  // navigation) and keeps showing its own page instead of becoming an unbounded browser.
+  const opened = page.context().waitForEvent('page');
+  const playPage = page.locator('iframe[data-document-id="welcome"]').contentFrame();
+  const playUrl = playPage.url;
+  await playPage.locator('[data-divlet-id="cta"]').click();
+  const leaving = await opened; await leaving.waitForLoadState();
+  assert.equal(leaving.url(), externalUrl, 'the board window opens the link, not the preview frame');
+  assert.equal(await leaving.evaluate(() => document.referrer), '', 'the preview capability is not sent as a referrer');
+  assert.equal(playPage.url, playUrl, 'the preview frame stays on its own page in Play mode');
+  assert.equal(runtime.read({ view: 'frame', documentId: 'welcome' }).nodes['title-text'].content, before, 'the external page cannot edit the project');
+  await leaving.close();
+  // The expanded view is the real browsing surface: it follows the page's own navigation, and everything the page can then
+  // reach (a forged handshake, an old capability, a site-ready claim) still cannot address the project.
+  const navigated = page.waitForEvent('framenavigated', { predicate: frame => frame.url() === runtime.info().site.url });
   await page.evaluate(async () => (await import('./lib/canvas.js')).openExpanded('welcome'));
-  await foreign.waitForURL(runtime.info().site.url);
+  const foreign = await navigated;
   await foreign.locator('[data-divlet-id="cta"]').click();
   await foreign.waitForURL(externalUrl);
   await foreign.waitForFunction(() => Array.isArray(window.received));
+  await page.waitForTimeout(250);
+  assert.equal(runtime.read({ view: 'frame', documentId: 'welcome' }).nodes['title-text'].content, before, 'window messages cannot edit the project');
+  assert.equal(await foreign.evaluate(() => document.referrer), '', 'the browsing page carries no preview capability as a referrer');
   await foreign.evaluate(token => {
     const channel = new MessageChannel();
     channel.port1.onmessage = event => received.push(event.data);
@@ -96,7 +106,7 @@ try {
     const doc = await fetch('api/documents/welcome').then(response => response.json());
     return doc.nodes['title-text'].content === 'Trusted edit after reset';
   });
-  console.log(JSON.stringify({ status: 'passed', checks: ['data SVG images load under preview CSP without executing their scripts', 'forged window edits and fake channel handshakes rejected', 'pre-view capability replay rejected after navigation', 'preview capability not leaked in referrers', 'model, selection and site capabilities not delivered to a navigated page', 'trusted editing works after remount'] }, null, 2));
+  console.log(JSON.stringify({ status: 'passed', checks: ['data SVG images load under preview CSP without executing their scripts', 'forged window edits and fake channel handshakes rejected', 'a leaving link opens in the board window and the preview frame stays put', 'pre-view capability replay rejected after navigation', 'preview capability not leaked in referrers', 'model, selection and site capabilities not delivered to a navigated page', 'trusted editing works after remount'] }, null, 2));
 } finally {
   await browser?.close();
   await runtime?.close();
