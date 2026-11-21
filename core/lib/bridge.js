@@ -146,6 +146,7 @@ export function previewBridge(documentId, initialVersion, bridgeToken, readOnly 
           position: cs.position, boxSizing: cs.boxSizing, inset: edges.map(edge => cs.getPropertyValue(edge)),
           content: { width: contentSize('width', p.l + p.r, b.l + b.r), height: contentSize('height', p.t + p.b, b.t + b.b) },
           colors: { background: cs.backgroundColor, color: cs.color, radius: cs.borderTopLeftRadius, fontSize: cs.fontSize, borderColor: cs.borderTopColor, borderStyle: cs.borderStyle,
+            borderTopColor: cs.borderTopColor, borderRightColor: cs.borderRightColor, borderBottomColor: cs.borderBottomColor, borderLeftColor: cs.borderLeftColor,
             radiusTopLeft: cs.borderTopLeftRadius, radiusTopRight: cs.borderTopRightRadius, radiusBottomRight: cs.borderBottomRightRadius, radiusBottomLeft: cs.borderBottomLeftRadius } };
       }
       band('margin', 't', r.left - m.l, r.top - m.t, r.width + m.l + m.r, m.t, m.t);

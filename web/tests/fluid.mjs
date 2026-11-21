@@ -64,11 +64,11 @@ try {
       const context = document.createElement('canvas').getContext('2d');
       context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
       const frame = diagram.getBoundingClientRect(), cell = radius.closest('.br-cell').getBoundingClientRect();
-      const below = document.querySelector('#inspector .br-below');
+      const middle = document.querySelector('#inspector .br-centre');
       return {
         columns: [...diagram.querySelectorAll('.br-corner')].filter(node => { const box = node.getBoundingClientRect(); return box.left >= frame.left - 1 && box.right <= frame.right + 1; }).length === 4 ? 3 : 0,
         readable: context.measureText('Full').width <= radius.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1,
-        inside: frame.right <= inspector.right + 1 && cell.right <= frame.right + 1 && !!below && below.scrollWidth <= below.clientWidth + 1,
+        inside: frame.right <= inspector.right + 1 && cell.right <= frame.right + 1 && !!middle && middle.scrollWidth <= middle.clientWidth + 1,
       };
     });
     assert.deepEqual(compactShape, { columns: 3, readable: true, inside: true }, `the ring keeps its four corner values whole inside its frame at ${width}px/${size}%`);

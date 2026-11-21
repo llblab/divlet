@@ -246,7 +246,7 @@ const alphaOf = value => { const m = /^rgba\([^)]*,\s*([\d.]+)\s*\)$/.exec(Strin
 /** The colour a value stands for, as something to show: `#112233`, `var(--color-brand)` or the keyword. */
 const colourShown = value => (value == null ? null : String(value));
 
-function colorField({ key, label, tip, property, value, run, computed, tokens }) {
+function colorField({ key, label, tip, property, value, run, computed, tokens, compact = false }) {
   const wrap = el('div', 'color-field');
   const current = value(view => colourShown(view[property]));
   const shownHex = current === MIXED ? null : css.hexOf(current) || KEYWORD_COLORS[current] || css.hexOf(computed);
@@ -336,9 +336,22 @@ function colorField({ key, label, tip, property, value, run, computed, tokens })
     swatch.click();
   });
   fitHex();
-  wrap.append(name, swatch, hex, clear);
+  wrap.append(name, swatch, ...(compact ? [] : [hex, clear]));
   if (alphaOf(computed) < 1 && current == null) hex.title = 'Semi-transparent in the page';
-  if (tokens.length) {
+  // A swatch-only field is the selector and nothing else: the native picker holds the value, its tip says which side it paints,
+  // and Delete or Backspace removes that side's own colour.
+  if (compact) {
+    wrap.classList.add('color-swatch-only');
+    name.remove();
+    swatch.setAttribute('aria-label', label);
+    swatch.dataset.tip = `${label} · ${hex.placeholder || hex.value || 'open the colour picker'}`;
+    swatch.addEventListener('keydown', event => {
+      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+      event.preventDefault();
+      run({ [property]: null }, `no ${label.toLowerCase()}`);
+    });
+  }
+  if (tokens.length && !compact) {
     const row = el('div', 'token-swatches');
     row.setAttribute('role', 'group');
     row.setAttribute('aria-label', `${label} from the project colors`);
@@ -362,11 +375,9 @@ function colorField({ key, label, tip, property, value, run, computed, tokens })
 const BORDER_STYLES = ['solid', 'dashed', 'dotted', 'double', 'groove', 'ridge', 'inset', 'outset', 'none', 'hidden'].map(name => [name, name[0].toUpperCase() + name.slice(1)]);
 
 const BORDER_SIDES = ['top', 'right', 'bottom', 'left'];
-const BORDER_SIDES_MENU = [['', 'All sides'], ['top', 'Top'], ['right', 'Right'], ['bottom', 'Bottom'], ['left', 'Left']];
-/** Which edge the centre colour edits: one side at a time, remembered across the re-render choosing one causes. */
-let borderSide = null;
+const BORDER_SIDES_MENU = [['top', 'Top'], ['right', 'Right'], ['bottom', 'Bottom'], ['left', 'Left']];
 
-function borderFold(views, { value, run, measured, tokens, nodeId, rerender }) {
+function borderFold(views, { value, run, measured, tokens }) {
   const box = el('div', 'border-box');
   const style = value(view => {
     const sides = BORDER_SIDES.map(side => view[`border-${side}-style`] ?? view['border-style'] ?? null);
@@ -382,7 +393,7 @@ function borderFold(views, { value, run, measured, tokens, nodeId, rerender }) {
       ...Object.fromEntries(BORDER_SIDES.map(side => [`border-${side}-style`, null])),
       'border-style': next,
     }, `border style ${next ?? 'default'}`)),
-    borderDiagram({ value, run, measured, tokens, nodeId, rerender }),
+    borderDiagram({ value, run, measured, tokens }),
   );
   return box;
 }
@@ -396,16 +407,16 @@ const pxOf = raw => {
 };
 
 /**
- * The border as a ring: the band copied from the box model, with a corner radius in each corner, one radius for all four of them
- * and the border's colour in the middle. Edge widths are not repeated here — they have their own home on the four sides of the
- * box model's border band, so a width has exactly one place to be written.
+ * The border as a ring: the band copied from the box model, painted in the element's own border colours. A radius sits in each
+ * corner, a colour selector at each edge's centre for that side, and one radius for all four corners in the middle. Edge widths
+ * are not repeated here — they have their own home on the four sides of the box model's border band.
  */
-function borderDiagram({ value, run, measured, tokens, nodeId, rerender }) {
+function borderDiagram({ value, run, measured, tokens }) {
   const box = el('div', 'br-box');
   box.setAttribute('role', 'group');
-  box.setAttribute('aria-label', 'Border ring: corner radii and colour');
+  box.setAttribute('aria-label', 'Border ring: corner radii and the colour of each side');
   // The band itself, copied: its own fill, its one-pixel frame and square corners, at its own size, with the middle cut out so the
-  // panel's own surface shows through where the content sits — the hole the widget above puts a green padding band in.
+  // panel's own surface shows through where the content sits. Its frame is painted in the border colours themselves.
   box.append(el('div', 'br-hole'));
   const cell = (node, className) => { const wrap = el('div', `br-cell ${className}`); wrap.append(node); return wrap; };
   const CORNERS = [['tl', 'top-left'], ['tr', 'top-right'], ['bl', 'bottom-left'], ['br', 'bottom-right']];
@@ -424,40 +435,34 @@ function borderDiagram({ value, run, measured, tokens, nodeId, rerender }) {
     node.setAttribute('aria-label', `${named} corner radius`);
     return cell(node, `br-corner br-${key}`);
   };
-  // The middle of the ring is hollow: the colour is a sibling laid over it, so it can step outside a ring too narrow to hold
-  // a swatch, a value and a clear button on one line.
+  // One colour selector per side, at that side's own edge: it paints the ring's frame as soon as a colour is picked, so the
+  // preview answers to the control without waiting for the write to come back.
+  const painted = () => {
+    for (const side of BORDER_SIDES) {
+      const shown = colourShown(value(view => view[`border-${side}-color`] ?? view['border-color'] ?? null));
+      const real = measured?.colors?.[`border${side[0].toUpperCase()}${side.slice(1)}Color`];
+      const colour = shown && shown !== MIXED ? shown : real;
+      if (colour) box.style.setProperty(`border-${side}-color`, colour);
+    }
+  };
+  const sideColour = side => {
+    const label = `${BORDER_SIDES_MENU.find(([key]) => key === side)[1]} border`;
+    const property = `border-${side}-color`;
+    const node = colorField({
+      key: `stroke-${side}`, label, tip: `Border ${side} color`, property, value,
+      // The pick writes the colour and the ring's own frame at the same moment; the field's tip keeps quoting the page.
+      run: (patch, label) => {
+        for (const [name, next] of Object.entries(patch)) if (name === property && next) box.style.setProperty(`border-${side}-color`, /^#|^rgb|^var\(/i.test(String(next)) ? next : String(next));
+        return run(patch, label);
+      },
+      computed: measured?.colors?.[`border${side[0].toUpperCase()}${side.slice(1)}Color`], tokens, compact: true,
+    });
+    node.classList.add('br-colour');
+    node.setAttribute('aria-label', `${label} colour`);
+    return cell(node, `br-colour-cell br-${side[0]}`);
+  };
   const shell = el('div', 'br-shell');
   const centre = el('div', 'br-centre');
-  centre.setAttribute('role', 'group');
-  centre.setAttribute('aria-label', 'Border colour');
-  const target = borderSide?.nodeId === nodeId ? borderSide.side : '';
-  // A menu button labelled by its own value, not the caption+value selector component: it says which side the colour is for.
-  const sides = el('button', 'side-pick br-sides');
-  sides.type = 'button';
-  sides.dataset.key = 'border-side';
-  sides.setAttribute('aria-haspopup', 'menu');
-  sides.dataset.tip = 'Which side the colour belongs to';
-  const chosen = () => (borderSide?.nodeId === nodeId ? borderSide.side : '');
-  const name = side => BORDER_SIDES_MENU.find(([key]) => key === side)?.[1] ?? 'All sides';
-  const shown = name(chosen());
-  sides.setAttribute('aria-label', `Border colour side: ${shown}`);
-  sides.append(el('span', `pick-v${chosen() ? '' : ' faint'}`, shown), icon('chevron', 'icon pick-caret'));
-  const chooseSide = next => { borderSide = next ? { nodeId, side: next } : null; rerender?.(); };
-  sides.addEventListener('click', () => openMenu([
-    { label: 'All sides', checked: !chosen(), run: () => chooseSide('') },
-    '-',
-    ...BORDER_SIDES.map(side => ({ label: name(side), checked: chosen() === side, run: () => chooseSide(side) })),
-  ], { anchor: sides, label: 'Border colour side' }));
-  // The colour of the chosen side: the shared `border-color`, or one side's own longhand. Mixed sides read as nothing authored.
-  const property = target ? `border-${target}-color` : 'border-color';
-  const colour = colorField({
-    key: 'stroke', label: target ? BORDER_SIDES_MENU.find(([key]) => key === target)[1] : 'Color',
-    tip: `Border ${target || 'color'}`, property, value, run,
-    computed: measured?.colors?.borderColor, tokens,
-  });
-  colour.querySelector('.vf-k')?.remove();
-  colour.classList.add('br-colour');
-  centre.append(colour);
   // One radius for all four corners: it reads as one value only while they agree, and writing it replaces every corner at once,
   // so a value authored per corner cannot survive behind it and contradict what the field says.
   const every = value(view => {
@@ -474,11 +479,11 @@ function borderDiagram({ value, run, measured, tokens, nodeId, rerender }) {
     tip: 'Radius of all four corners', placeholder: quotedAll, min: 0, max: 1e4, parse: css.radiusInput,
   });
   allCorners.classList.add('br-all');
-  // Under the ring: what applies to the whole border — its shared radius and the side its colour belongs to.
-  const below = el('div', 'br-below');
-  below.append(allCorners, sides);
-  box.append(corner('tl'), corner('tr'), corner('bl'), corner('br'));
-  shell.append(box, centre, below);
+  centre.append(allCorners);
+  box.append(corner('tl'), corner('tr'), corner('bl'), corner('br'),
+    sideColour('top'), sideColour('right'), sideColour('bottom'), sideColour('left'));
+  painted();
+  shell.append(box, centre);
   followBandWidth(box, shell);
   return shell;
 }
@@ -799,7 +804,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     field('blur', 'Blur', blur, next => run(view => ({ filter: css.blurEdit(view, next === null ? 0 : next) }), `blur ${next ?? 'none'}`), { tip: 'Blur, px', unit: 'px', placeholder: '0', min: 0, max: 200, parse: raw => (raw.trim() === '' ? null : /^\d+(?:\.\d+)?$/.test(raw.trim()) ? Number(raw.trim()) : undefined) }),
   );
 
-  return [['layout', 'Layout', layout], ['spacing', 'Spacing', spacing], ['border', 'Border', borderFold(views, { value, run, measured, tokens, nodeId: nodes.length === 1 ? nodes[0].id : null, rerender })], ['appearance', 'Appearance', appearanceFold({ value, run, measured, tokens })], ['effects', 'Effects', effects]];
+  return [['layout', 'Layout', layout], ['spacing', 'Spacing', spacing], ['border', 'Border', borderFold(views, { value, run, measured, tokens })], ['appearance', 'Appearance', appearanceFold({ value, run, measured, tokens })], ['effects', 'Effects', effects]];
 }
 function alignGrid(label, x, y, onPick) {
   const grid = el('div', 'align-grid');

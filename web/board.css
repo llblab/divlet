@@ -1019,13 +1019,18 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .br-cell { position: absolute; display: flex; align-items: center; justify-content: center; z-index: 1; }
 .br-tl { top: 4px; left: 5px; } .br-tr { top: 4px; right: 5px; }
 .br-bl { bottom: 4px; left: 5px; } .br-br { bottom: 4px; right: 5px; }
+/* A colour selector on each edge, in the rim between the frame and the cut-out middle: one swatch, the side's own colour. */
+.br-t { top: 2px; left: 50%; transform: translateX(-50%); }
+.br-b { bottom: 2px; left: 50%; transform: translateX(-50%); }
+.br-l { left: 6px; top: 50%; transform: translateY(-50%); }
+.br-r { right: 6px; top: 50%; transform: translateY(-50%); }
 /* The box model's own small inputs, edge for edge: same height, same centred mono value, same quiet surface. */
 .br-box .vf.br-field { flex: none; width: var(--br-field); min-height: 18px; height: 18px; padding: 0; border-radius: var(--radius-small); background: transparent; box-shadow: none; color: inherit; }
 .br-box .vf.br-field:hover { background: #ffffff30; }
 .br-box .vf.br-field:focus-within { background: var(--solid); color: var(--ink); }
 .br-box .vf.br-field .vf-input { width: 100%; min-width: 0; padding: 0; color: inherit; font: 10px/16px var(--mono); text-align: center; }
 .br-box .vf.br-field .vf-input::placeholder { color: inherit; opacity: .72; }
-/* The colour sits in the hole, on the same surface, as a field one step above it. */
+/* The hole holds the one radius that speaks for the whole border, on the panel's own surface. */
 .br-centre {
   position: absolute;
   left: 50%;
@@ -1038,25 +1043,24 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
   width: min(calc(var(--br-ring, 100%) - 96px), 180px);
 }
 .br-shell.br-compact .br-centre { position: static; transform: none; width: 100%; }
-.br-centre .color-field { min-width: 0; flex: 1 1 auto; }
-/* Under the ring: the one radius for every corner, and the side the colour belongs to — the controls that speak for the whole
-   border rather than for one corner or one edge. Both wrap rather than clip when the ring is narrow. */
-.br-below { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; width: 100%; }
-.br-below .br-all { flex: 1 1 118px; min-width: 0; }
-.br-below .side-pick { flex: 0 1 auto; }
-/* A menu button that names itself by its value: it says which side the colour belongs to. */
-/* Positioned, so its own caret anchors to the button instead of the ring's top-right corner. */
-.side-pick { position: relative; display: inline-flex; align-items: center; justify-content: center; height: 24px; padding: 0 18px 0 6px; border: 0; border-radius: var(--radius-inner); background: var(--control); color: var(--ink); font: inherit; cursor: pointer; white-space: nowrap; }
-.side-pick:hover { background: var(--control-hover); }
-.side-pick .pick-v { font-size: 10px; }
-.side-pick .pick-caret { right: 5px; top: calc(50% - 5px); width: 10px; height: 10px; color: var(--muted); }
+/* The middle is a hole a few dozen pixels wide: the one radius for every corner names itself on its own line and keeps its
+   value whole underneath, rather than abbreviating the number. */
+.br-centre .br-all { display: grid; justify-items: center; gap: 0; min-width: 0; height: auto; min-height: 24px; padding: 1px 4px; }
+.br-centre .br-all .vf-k { justify-content: center; padding: 0; min-width: 0; }
+.br-centre .br-all .vf-input { text-align: center; min-width: 0; width: 100%; }
+/* The ring's frame is painted in the element's own border colours, two pixels wide so a side's colour reads as that side. */
+.br-box { border-width: 2px; }
+/* The swatch-only colour selector: one target, no label, no value line. */
+.br-colour-cell .color-swatch-only { min-height: 0; padding: 0; background: transparent; }
+.br-colour-cell .color-swatch-only .swatch { width: 24px; height: 24px; border-radius: var(--radius-small); box-shadow: 0 0 0 1px #4c4b4088; }
 @container ring (max-width: 132px) {
   .br-box { --br-field: 26px; }
   .br-hole { inset: 24px 32px; }
   .br-box .vf.br-field .vf-input { font-size: 9px; }
-  .br-centre .side-pick .pick-v { font-size: 9px; }
+  .br-t { top: 1px; } .br-b { bottom: 1px; }
+  .br-l { left: 4px; } .br-r { right: 4px; }
 }
-/* Border owns its line, edge widths, colour and radius; Appearance keeps fill and typography. */
+/* Border owns its line, the colour of each side and the radius; Appearance keeps fill and typography. */
 .appearance-box, .border-box { display: grid; gap: 8px; }
 /* Fill and Text share a row while a field can still hold its label, swatch, value and clear on one line (≈144px). */
 .appearance-colors { --control-min: 148px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--control-min)), 1fr)); gap: 8px; }
@@ -1076,26 +1080,6 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .color-field .swatch { flex: none; width: 20px; height: 20px; border-radius: var(--radius-small); }
 /* One row while the value fits; a value wider than what is left wraps whole onto its own line instead of clipping. */
 .color-field .color-hex { flex: 1 1 var(--hex-width, 9ch); min-width: min(100%, var(--hex-width, 9ch)); min-height: 28px; }
-/* Inside the ring the colour is a small centred readout on one line: the ring's middle is a fixed few dozen pixels wide, so
-   the value keeps a shorter minimum and never wraps away from its swatch and clear. */
-.br-centre .color-field { padding: 0 3px; background: var(--field); color: var(--ink); flex-wrap: nowrap; min-height: 24px; justify-content: center; }
-.br-centre .color-field .color-hex { flex: 1 1 auto; width: auto; min-width: 0; min-height: 24px; }
-.br-centre .color-field .vf-input.color-hex { font: 10px/16px var(--mono); }
-/* A control a finger has to hit keeps 24px even in the ring's narrow middle (WCAG 2.5.8); only the ring's own value fields
-   are compact, and those are the box model's small fields. */
-.br-centre .color-field .swatch { width: 24px; height: 24px; }
-.br-centre .color-field .color-clear { width: 24px; height: 24px; }
-.br-centre .color-field .color-clear .icon { width: 10px; height: 10px; }
-/* Inside the ring the colour is a small centred readout on one line: the ring's middle is a fixed few dozen pixels wide, so
-   the value keeps a shorter minimum and never wraps away from its swatch and clear. */
-.br-centre .color-field { padding: 0 3px; background: var(--field); color: var(--ink); flex-wrap: nowrap; min-height: 24px; justify-content: center; }
-.br-centre .color-field .color-hex { flex: 1 1 auto; width: auto; min-width: 0; min-height: 24px; }
-.br-centre .color-field .vf-input.color-hex { font: 10px/16px var(--mono); }
-/* A control a finger has to hit keeps 24px even in the ring's narrow middle (WCAG 2.5.8); only the ring's own value
-   fields are compact, and those are the box model's small fields. */
-.br-centre .color-field .swatch { width: 24px; height: 24px; }
-.br-centre .color-field .color-clear { width: 24px; height: 24px; }
-.br-centre .color-field .color-clear .icon { width: 10px; height: 10px; }
 /* A content-sized field must not inherit the wrapper's `width: 100%` as its flex base, or it takes a whole line by itself. */
 @supports (field-sizing: content) { .color-field .color-hex { field-sizing: content; flex: 1 0 auto; width: auto; min-width: 0; max-width: 100%; } }
 .color-block { display: grid; gap: 4px; }

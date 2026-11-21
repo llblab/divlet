@@ -4,6 +4,12 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## 0.2.0 — Inspector and history polish
 
+- **A colour selector on each edge, and a ring painted in those colours.** The Border ring no longer names a side from a menu
+  and edits one shared colour: each edge carries its own selector for its own side, the ring's frame is painted two pixels wide
+  in the element's real per-side border colours, and a picked colour shows there at once. The tip names the side and quotes the
+  colour it paints, Delete removes that side's colour alone, and the one radius for every corner moved into the ring's middle
+  (`web/lib/properties.js`, `web/board.css`, `core/lib/bridge.js`, `web/lib/canvas.js`, `web/tests/appearance.mjs`,
+  `web/tests/fluid.mjs`).
 - **Border is the ring of radii and colour, not a second box model.** The four edge widths are gone from it: a width has one
   home, the four sides of the box model's border band, so it is written where the box model draws it. What is left is the ring
   itself — a radius in each corner, the colour in the middle — plus one field under it that gives all four corners the same
