@@ -4,6 +4,14 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased
 
+- **The border is the band it copies.** Border's diagram is now one hollow ring exactly as wide as the box model's border band, with a corner radius in
+  each corner, the width at each edge's centre and the colour in the hollow middle — the box model's own small fields, in step with it in both
+  directions. The middle names the side the colour belongs to and edits that side alone (`border-t|r|b|l-color`), so the left, right, top or bottom
+  line can keep a colour of its own while the rest stay shared, and the ring paints each side as it is; a ring too narrow for its middle steps the
+  colour out under it rather than clipping, and the fill, text and border colour controls keep their 24px targets there (`web/lib/properties.js`,
+  `web/lib/css-props.js`, `web/board.css`, `core/lib/bridge.js` now measures the four corner radii, `web/tests/appearance.mjs`, `web/tests/fluid.mjs`,
+  `web/tests/toolbars.mjs`). The shared "all four corners" radius field gives way to the four corner fields it stood for; a `rounded-lg` still reads into
+  all four, and editing one corner splits it the way Tailwind does.
 - **A link is editable and clickable.** The inspector gives an anchor its own **Link** section beside the element's name — the address, and a
   **New tab** control that writes `target="_blank"` with `rel="noreferrer noopener"` and takes back exactly what it wrote, while an emptied address
   removes `href` rather than keeping a link to nowhere; double-clicking a link with no words of its own lands in that field. In Play, a link that

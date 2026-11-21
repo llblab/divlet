@@ -688,6 +688,8 @@ function panelFolds(kind, doc, nodes, parent) {
     measured: nodes.length === 1 ? ctx.measuredBox(nodes[0].id) ?? null : null,
     tokens: Object.entries(cachedModel(doc.id)?.tokens || {}).filter(([name]) => /^--color-[a-z0-9-]+$/i.test(name)),
     readers: styleReaders(),
+    // Choosing which side a colour belongs to is inspector state, not project content: it re-renders the panel, and nothing else.
+    rerender: () => render({ force: true }),
   }).map(([name, title, content]) => ({ name, title, content }));
   const sections = [...panelSections(kind, ctx), ...properties];
   const family = fontFamilyControl(nodes, { css: [store.state?.project?.css, cachedModel(doc.id)?.css], apply: applyEdits, views: nodes.map(node => viewOf(node, styleReaders(), { tokens: cachedModel(doc.id)?.tokens || {} })), upload: store.state?.project?.capabilities?.fontUpload ? fontUpload : undefined });

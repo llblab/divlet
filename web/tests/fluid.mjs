@@ -46,9 +46,9 @@ try {
     await page.locator('#inspector [data-key="opacity"]').waitFor();
     assert.deepEqual(await readableNumbers(`${width}px@${size}% element`), []);
     const compactShape = await page.evaluate(() => {
-      // The corners diagram keeps its three columns at every width, and the shared radius still reads `Full` whole inside its cell.
-      const diagram = document.querySelector('#inspector .ca'), inspector = document.querySelector('#inspector').getBoundingClientRect();
-      const radius = diagram.querySelector('[data-key="radius"]'), style = getComputedStyle(radius);
+      // The border ring keeps its three columns at every width, and a corner still reads `Full` whole inside its cell.
+      const diagram = document.querySelector('#inspector .br-box'), inspector = document.querySelector('#inspector').getBoundingClientRect();
+      const radius = diagram.querySelector('[data-key="radius-tl"]'), style = getComputedStyle(radius);
       const context = document.createElement('canvas').getContext('2d');
       context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
       return {
@@ -57,7 +57,7 @@ try {
         inside: diagram.getBoundingClientRect().right <= inspector.right + 1,
       };
     });
-    assert.deepEqual(compactShape, { columns: 3, readable: true, inside: true }, `the corners diagram keeps three readable columns at ${width}px/${size}%`);
+    assert.deepEqual(compactShape, { columns: 3, readable: true, inside: true }, `the border ring keeps three readable columns at ${width}px/${size}%`);
     const spacingCollisions = await page.locator('#inspector .boxmodel').evaluate(model => {
       const fields = [...model.querySelectorAll('.bm-field')].map(node => node.getBoundingClientRect());
       const overlaps = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;

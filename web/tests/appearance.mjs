@@ -75,7 +75,9 @@ try {
         const parts = [...field.children].filter(node => getComputedStyle(node).display !== 'none');
         const centres = parts.map(node => { const rect = node.getBoundingClientRect(); return Math.round(rect.top + rect.height / 2); });
         return {
-          label: field.querySelector('.vf-k').textContent,
+          // The colour inside the ring carries its name on the field itself, because the ring's own narrow middle cannot spare
+          // a separate label column: there the sides control above it names the side.
+          label: field.querySelector('.vf-k')?.textContent ?? field.closest('.br-centre')?.querySelector('.br-sides')?.textContent ?? field.dataset.key,
           spread: Math.max(...centres) - Math.min(...centres),
           inside: parts.every(node => { const rect = node.getBoundingClientRect(); return rect.left >= box.left - 1 && rect.right <= box.right + 1; }),
           order: parts.map(node => Math.round(node.getBoundingClientRect().left)),
@@ -156,15 +158,26 @@ try {
   await select('cta');
   await page.waitForSelector('#inspector [data-section="appearance"] [data-key="fill"]');
   await colorRow('project color swatches');
-  assert.equal(await page.locator('#inspector [data-section="spacing"] [data-key="radius"], #inspector [data-section="spacing"] .ca').count(), 0, 'the box model keeps no radius field');
-  assert.equal(await page.locator('#inspector [data-section="border"] [data-key="radius"]').count(), 1, 'Border owns the one shared radius field, in its corners diagram');
-  assert.equal(await page.locator('#inspector [data-section="border"] .ca input').count(), 9, 'four corners, four edges and the shared radius make the diagram');
-  assert.equal(await page.locator('#inspector [data-section="border"] [data-key="stroke"]').count(), 1, 'border colour belongs to Border');
-  assert.equal(await page.locator('#inspector [data-section="border"] [data-key^="border-width-"]').count(), 4, 'Border has four independent edge widths, in the diagram');
+  assert.equal(await page.locator('#inspector [data-section="spacing"] [data-key="radius"], #inspector [data-section="spacing"] .br-box').count(), 0, 'the box model keeps no radius field');
+  assert.equal(await page.locator('#inspector [data-section="border"] [data-key="radius-tl"]').count(), 1, 'Border gives each corner its own radius field, in its ring');
+  assert.equal(await page.locator('#inspector [data-section="border"] .br-corner').count(), 4, 'one radius in each corner of the ring');
+  assert.equal(await page.locator('#inspector [data-section="border"] [data-key="stroke"]').count(), 1, 'border colour belongs to Border, in the middle of the ring');
+  assert.equal(await page.locator('#inspector [data-section="border"] .br-edge').count(), 4, 'one width at each edge\'s centre');
+  assert.equal(await page.locator('#inspector [data-section="border"] [data-key^="border-width-"]').count(), 4, 'Border has four independent edge widths, in the ring');
+  assert.equal(await page.locator('#inspector [data-section="border"] [data-key="border-side"]').count(), 1, 'one control says which side the colour belongs to');
+  {
+    // The ring is the box model's border band pulled out: hollow, and exactly as wide as that band above it.
+    const widths = await waitUntil(() => page.evaluate(() => {
+      const ring = document.querySelector('#inspector .br-box').getBoundingClientRect();
+      const band = document.querySelector('#inspector .boxmodel .bm-border').getBoundingClientRect();
+      return Math.abs(ring.width - band.width) <= 1 ? { ring: Math.round(ring.width), band: Math.round(band.width) } : null;
+    }), 'the ring follows the border band it copies');
+    assert.ok(Math.abs(widths.ring - widths.band) <= 1, `the ring is as wide as the border band it copies (${widths.ring} vs ${widths.band})`);
+  }
   assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key="radius"], #inspector [data-section="appearance"] [data-key="stroke"]').count(), 0, 'no third home in Appearance');
   const sectionOrder = await page.locator('#inspector [data-section]').evaluateAll(nodes => nodes.map(node => node.dataset.section));
   assert.equal(sectionOrder.indexOf('border'), sectionOrder.indexOf('spacing') + 1, 'Border is a vertical disclosure directly after Spacing, not another tab');
-  checks.push('Border owns line style, colour, four edge widths and the corners diagram; the box model keeps no radius; Appearance keeps fill and typography');
+  checks.push('Border owns line style, colour, four edge widths and the corner radii in its ring; the box model keeps no radius; Appearance keeps fill and typography');
 
   const textAlign = page.locator('#inspector [data-section="appearance"]').getByRole('group', { name: 'Text align', exact: true });
   assert.equal(await textAlign.count(), 1, 'text alignment sits beside font and text colour');
@@ -328,13 +341,14 @@ try {
   await page.mouse.up();
   await waitUntil(() => page.locator('#inspector').evaluate(node => Math.round(node.getBoundingClientRect().width) === 280), 'the inspector reaches its actual resize minimum');
   assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key^="border-width"]').count(), 0, 'only Border and the box model edit widths');
-  assert.equal(await page.locator('#inspector .ca').evaluate(node => node.closest('[data-section="border"]') !== null), true, 'the corners diagram stays in Border at the resize minimum too');
-  // The corners diagram: five radius fields (four corners and the shared one) and the four edge widths between them.
+  assert.equal(await page.locator('#inspector .br-box').evaluate(node => node.closest('[data-section="border"]') !== null), true, 'the ring stays in Border at the resize minimum too');
+  assert.equal(await page.locator('#inspector .br-shell.br-compact .br-centre').count(), 1, 'a ring too narrow for its middle steps the colour out under it');
+  // The ring: a radius in each corner, a width at each edge's centre, the colour in the middle, and one control naming the side.
   {
-    const diagram = page.locator('#inspector [data-section="border"] .ca');
-    assert.equal(await diagram.locator('.ca-corner').count(), 4, 'one field per corner');
-    assert.equal(await diagram.locator('.ca-edge').count(), 4, 'one field per edge, between the corners');
-    assert.equal(await diagram.locator('.ca-all input').count(), 1, 'and one shared value at the centre');
+    const diagram = page.locator('#inspector [data-section="border"] .br-shell');
+    assert.equal(await diagram.locator('.br-corner').count(), 4, 'one field per corner');
+    assert.equal(await diagram.locator('.br-edge').count(), 4, 'one field per edge, at its centre');
+    assert.equal(await page.locator('#inspector [data-section="border"] .br-centre [data-key="stroke"]').count(), 1, 'and the colour in the middle of the ring');
     const corners = () => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => {
       const style = getComputedStyle(node);
       return ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].map(side => style[`border${side}Radius`]);
@@ -342,13 +356,55 @@ try {
     const before = await corners();
     await page.locator('#inspector [data-key="radius-tr"]').fill('6'); await page.keyboard.press('Enter');
     await waitUntil(async () => JSON.stringify(await corners()) === JSON.stringify([before[0], '6px', before[2], before[3]]), `a corner writes its own radius and leaves the others on the page (${before.join(' ')})`);
-    await page.locator('#inspector [data-key="radius"]').fill('3'); await page.keyboard.press('Enter');
-    await waitUntil(async () => JSON.stringify(await corners()) === JSON.stringify(['3px', '3px', '3px', '3px']), 'the shared value applies to all four corners');
-    await waitUntil(async () => (await page.locator('#inspector [data-key="radius-tr"]').inputValue()) === '3', 'and every corner field shows it');
     await page.keyboard.press('Control+z');
-    await waitUntil(async () => (await page.locator('#inspector [data-key="radius-tr"]').inputValue()) === '6', 'one Undo restores the corner that differed');
+    await waitUntil(async () => JSON.stringify(await corners()) === JSON.stringify(before), 'one Undo restores the corner on the page');
+    await waitUntil(async () => (await page.locator('#inspector [data-key="radius-tr"]').inputValue()) === String(parseFloat(before[1])), 'and the field follows it back');
     await sleep(200); // let the writer queue drain, so the next block patches the version it just read
-    checks.push('the corners diagram writes one corner, then all four, and undoes each as one step');
+    checks.push('the ring writes one corner radius and undoes it as one step');
+  }
+
+  // One side can have a colour of its own: the centre edits the shared `border-color`, or the single side the Sides control
+  // names, and the ring paints each side as it is.
+  {
+    const sideColours = () => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => {
+      const style = getComputedStyle(node);
+      return ['Top', 'Right', 'Bottom', 'Left'].map(side => style[`border${side}Color`]);
+    });
+    const sideControl = page.locator('#inspector [data-key="border-side"]');
+    const chooseSide = async label => {
+      await sideControl.click();
+      await page.getByRole('menuitemradio', { name: label, exact: true }).click();
+      await waitUntil(async () => (await sideControl.innerText()).includes(label === 'All sides' ? 'All sides' : label), `the centre edits ${label}`);
+    };
+    const painted = () => page.locator('#inspector .br-box').evaluate(node => {
+      const style = getComputedStyle(node);
+      return [style.borderTopColor, style.borderRightColor, style.borderBottomColor, style.borderLeftColor];
+    });
+    await page.locator('#inspector [data-key="stroke"]').fill('#112233'); await page.keyboard.press('Enter');
+    await waitUntil(async () => (await sideColours()).every(colour => colour === 'rgb(17, 34, 51)'), 'the shared colour paints every side');
+    await chooseSide('Left');
+    await page.locator('#inspector [data-key="stroke"]').fill('#ff0000'); await page.keyboard.press('Enter');
+    await waitUntil(async () => JSON.stringify(await sideColours()) === JSON.stringify(['rgb(17, 34, 51)', 'rgb(17, 34, 51)', 'rgb(17, 34, 51)', 'rgb(255, 0, 0)']), `only the chosen side takes the new colour (${(await sideColours()).join(' ')})`);
+    // One read, repeated until the panel has settled: a re-render can hand back a ring that is already detached, whose
+    // computed style is empty.
+    const peerPaint = await waitUntil(async () => {
+      const colours = await painted();
+      return colours[3] === 'rgb(255, 0, 0)' && colours.slice(0, 3).every(colour => colour === 'rgb(17, 34, 51)') ? colours : null;
+    }, 'the ring paints the chosen side differently and its peers as they were');
+    assert.deepEqual(peerPaint.slice(0, 3), ['rgb(17, 34, 51)', 'rgb(17, 34, 51)', 'rgb(17, 34, 51)'], 'while its peers stay on the shared colour');
+    // The side remembers itself while it is selected, and returns to the shared colour on request.
+    await page.evaluate(async () => { const st = await import('./lib/store.js'); st.selectNodes('welcome', ['hero']); st.selectNodes('welcome', ['cta']); });
+    await waitUntil(async () => (await sideControl.innerText()).includes('Left'), 'the chosen side survives a reselect of the same element');
+    await chooseSide('All sides');
+    // The three remaining sides now carry their own colours, so no shared `border-color` is authored any more: the field says
+    // so instead of inventing one, and the page's real colour stays as its placeholder.
+    await waitUntil(async () => (await page.locator('#inspector [data-key="stroke"]').inputValue()) === '', 'the centre reports that no shared colour is authored');
+    assert.match(await page.locator('#inspector [data-key="stroke"]').getAttribute('placeholder') ?? '', /^#/, 'while quoting the colour the page really paints');
+    await page.locator('#inspector [data-key="stroke"]').fill('#004400'); await page.keyboard.press('Enter');
+    await waitUntil(async () => JSON.stringify(await sideColours()) === JSON.stringify(['rgb(0, 68, 0)', 'rgb(0, 68, 0)', 'rgb(0, 68, 0)', 'rgb(0, 68, 0)']), 'the shared colour wins again on every side');
+    for (let step = 0; step < 3; step++) await page.keyboard.press('Control+z');
+    await waitUntil(async () => (await sideColours()).every(colour => colour !== 'rgb(0, 68, 0)'), 'each colour change is its own Undo step');
+    checks.push('a border side takes its own colour, the ring paints it, the shared colour returns and each change undoes alone');
   }
 
   // A compiler-lowered border width remains visible as the measured fallback, then one edge can override it.
@@ -362,8 +418,8 @@ try {
   await waitUntil(async () => JSON.stringify(await borderWidths()) === JSON.stringify(['2px', '3px', '3px', '3px']), 'one edge changes without changing its peers');
   await page.locator('#inspector [data-key="border-width-r"]').fill('4'); await page.keyboard.press('Tab');
   await waitUntil(async () => await page.locator('#inspector [data-key="border-r"]').inputValue() === '4', 'a Border edit updates the diagram while focus stays in Border');
-  // Inside the diagram the reading order is geometry: top-left radius, top edge, top-right radius, left edge, the shared
-  // radius, right edge, and so on — so the next stop after the right edge is the bottom-left corner.
+  // Inside the ring the reading order is geometry: top-left radius, top edge, top-right radius, left edge, the middle (the
+  // colour and the side it belongs to), the right edge and so on — so the stop after the right edge is the bottom-left corner.
   assert.equal(await page.evaluate(() => document.activeElement?.dataset.key), 'radius-bl');
 
   const beforeClear = afterVersion();
@@ -443,7 +499,7 @@ try {
   });
   assert.deepEqual(dimensions, { paired: true, readable: true }, 'artboard dimensions use two readable columns at minimum panel width');
   await select('cta');
-  await page.locator('#inspector [data-key="radius"]').waitFor();
+  await page.locator('#inspector [data-key="radius-tl"]').waitFor();
   checks.push('minimum-width resizing keeps the corner radius and artboard dimensions readable, border widths are linked between Border and Spacing and long dropdown values remain on one line');
 
   // A picker drag reaches the page while the dialog is still open, and the whole drag stays one Undo step.
@@ -467,7 +523,7 @@ try {
   // A re-render can detach the label between resolution and read, where a detached node reports no computed style.
   await waitUntil(async () => await colourLabel.evaluate(node => getComputedStyle(node).cursor).catch(() => '') === 'pointer', 'the colour name advertises a click, not a scrub');
   const labelVersion = afterVersion();
-  const labelBox = await colourLabel.boundingBox();
+  const labelBox = await waitUntil(async () => await colourLabel.boundingBox(), 'the colour label is attached and visible');
   await page.mouse.move(labelBox.x + labelBox.width / 2, labelBox.y + labelBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(labelBox.x + labelBox.width / 2 + 60, labelBox.y + labelBox.height / 2, { steps: 6 });
@@ -548,31 +604,32 @@ try {
   await waitUntil(() => classesOf('cta').includes('leading-6') && !classesOf('cta').includes('leading-[192%]'), 'one undo returns the px spelling');
   checks.push('the line height unit is a menu that rewrites one value as %, px, em or a multiple, with one undo step');
 
-  // Radius: a bare number, px/rem/em/%, full, and empty — all from the one field in the box model's corner.
+  // Radius: a bare number, px/rem/em/%, full, and empty — all from one corner's own field in the ring. The element starts on
+  // `rounded-xl` for all four corners, so editing one corner splits the shorthand and leaves the other three alone.
   await select('cta');
-  await page.locator('#inspector [data-key="radius"]').fill('12'); await page.keyboard.press('Enter');
-  await waitUntil(() => classesOf('cta').includes('rounded-xl'), 'a bare number reads as px');
-  await page.locator('#inspector [data-key="radius"]').fill('1.5rem'); await page.keyboard.press('Enter');
-  await waitUntil(() => classesOf('cta').includes('rounded-[1.5rem]') && !classesOf('cta').includes('rounded-xl'), 'rem is kept as written and replaces the previous radius');
-  await page.locator('#inspector [data-key="radius"]').fill('50%'); await page.keyboard.press('Enter');
-  await waitUntil(() => classesOf('cta').includes('rounded-full'), 'half a percent radius is the pill');
-  await page.locator('#inspector [data-key="radius"]').fill('25%'); await page.keyboard.press('Enter');
-  await waitUntil(() => classesOf('cta').includes('rounded-[25%]'), 'another percentage is kept as written');
-  await page.locator('#inspector [data-key="radius"]').fill('2em'); await page.keyboard.press('Enter');
-  await waitUntil(() => classesOf('cta').includes('rounded-[2em]'), 'em is kept as written');
-  await page.locator('#inspector [data-key="radius"]').fill('10'); await page.keyboard.press('Enter');
-  await waitUntil(() => classesOf('cta').includes('rounded-[10px]') && !classesOf('cta').some(name => /^rounded-\[/.test(name) && name !== 'rounded-[10px]'), 'a typed number sets an arbitrary radius and replaces the previous one');
+  await page.locator('#inspector [data-key="radius-tl"]').fill('8'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('rounded-tl-lg') && classesOf('cta').includes('rounded-tr-xl'), 'a bare number reads as px and leaves the other corners');
+  await page.locator('#inspector [data-key="radius-tl"]').fill('1.5rem'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('rounded-tl-[1.5rem]') && !classesOf('cta').includes('rounded-tl-lg'), 'rem is kept as written and replaces the previous corner radius');
+  await page.locator('#inspector [data-key="radius-tl"]').fill('50%'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('rounded-tl-full'), 'half a percent radius is the pill on that corner');
+  await page.locator('#inspector [data-key="radius-tl"]').fill('25%'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('rounded-tl-[25%]'), 'another percentage is kept as written');
+  await page.locator('#inspector [data-key="radius-tl"]').fill('2em'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('rounded-tl-[2em]'), 'em is kept as written');
+  await page.locator('#inspector [data-key="radius-tl"]').fill('10'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('rounded-tl-[10px]') && !classesOf('cta').some(name => /^rounded-tl-\[/.test(name) && name !== 'rounded-tl-[10px]'), 'a typed number sets an arbitrary radius and replaces the previous one');
   assert.deepEqual(await borderWidths(), ['2px', '4px', '3px', '3px'], 'changing radius does not change border widths');
-  await page.locator('#inspector [data-key="radius"]').fill('full'); await page.keyboard.press('Enter');
-  await waitUntil(() => classesOf('cta').includes('rounded-full'), 'typing Full sets rounded-full');
-  await page.locator('#inspector [data-key="radius"]').fill(''); await page.keyboard.press('Enter');
-  await waitUntil(() => !classesOf('cta').some(name => /^rounded/.test(name)), 'an empty radius removes the class');
+  await page.locator('#inspector [data-key="radius-tl"]').fill('full'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('rounded-tl-full'), 'typing Full sets the full corner');
+  await page.locator('#inspector [data-key="radius-tl"]').fill(''); await page.keyboard.press('Enter');
+  await waitUntil(() => !classesOf('cta').some(name => /^rounded-tl/.test(name)), 'an empty radius removes that corner');
   // The panel redraws after the commit: the field shows the new state a moment later, so wait for it instead of reading once.
-  await waitUntil(async () => (await page.locator('#inspector [data-key="radius"]').inputValue()) === '', `the field is empty once no class sets the radius (${classesOf('cta').join(' ')})`);
+  await waitUntil(async () => (await page.locator('#inspector [data-key="radius-tl"]').inputValue()) === '', `the field is empty once no class sets the corner (${classesOf('cta').join(' ')})`);
   // The empty field quotes the radius the page really has now, not the pill's measurement from the render before the removal.
   const realRadius = await page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => String(Math.round(parseFloat(getComputedStyle(node).borderTopLeftRadius) || 0)));
-  await waitUntil(async () => (await page.locator('#inspector [data-key="radius"]').getAttribute('placeholder')) === realRadius, `the placeholder is the radius the page has (${await page.locator('#inspector [data-key="radius"]').getAttribute('placeholder')} vs ${realRadius})`);
-  checks.push('corner radius in the box model: a bare number, px/rem/em/%, Full, one value and removal');
+  await waitUntil(async () => (await page.locator('#inspector [data-key="radius-tl"]').getAttribute('placeholder')) === realRadius, `the placeholder is the radius the page has (${await page.locator('#inspector [data-key="radius-tl"]').getAttribute('placeholder')} vs ${realRadius})`);
+  checks.push('a corner radius: a bare number, px/rem/em/%, Full, its own corner only, and removal');
   checks.push('an empty radius field quotes the page\'s real number, not a stale measurement');
 
   // Effects scrub from implicit/explicit auto, keep integer z-order and honour gesture cancellation.
@@ -629,8 +686,8 @@ try {
   await page.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); m.selectNodes('welcome', ['nav', 'cta']); });
   await waitUntil(() => page.evaluate(async () => (await import('./lib/store.js')).store.node?.nodeIds?.length === 2), 'both elements are selected');
   await waitUntil(async () => /2\s*elements selected/.test(await page.locator('#inspector').innerText()), 'the inspector shows two selected elements');
-  await page.locator('#inspector [data-key="radius"]').fill('9'); await page.keyboard.press('Enter');
-  await waitUntil(() => classesOf('nav').includes('rounded-[9px]') && classesOf('cta').includes('rounded-[9px]'), `one radius edit applies to every selected element (nav ${classesOf('nav').join(' ')}, cta ${classesOf('cta').join(' ')})`);
+  await page.locator('#inspector [data-key="radius-tr"]').fill('9'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('nav').includes('rounded-tr-[9px]') && classesOf('cta').includes('rounded-tr-[9px]'), `one corner edit applies to every selected element (nav ${classesOf('nav').join(' ')}, cta ${classesOf('cta').join(' ')})`);
   checks.push('one Appearance edit applies to several selected elements');
   await scrub('z', 6);
   await waitUntil(() => classesOf('nav').includes('z-2') && classesOf('cta').includes('z-2'), 'a mixed z-index scrub applies one integer to every selected element');
@@ -663,8 +720,11 @@ try {
     const layoutErrors = await page.locator('#inspector [data-section="border"]').evaluate(section => {
       const bad = [], context = document.createElement('canvas').getContext('2d');
       if (section.scrollWidth > section.clientWidth + 1) bad.push('horizontal overflow');
-      // The corners diagram is three columns wide at every size, and each cell keeps its own value whole.
-      if (getComputedStyle(section.querySelector('.ca')).gridTemplateColumns.split(' ').length !== 3) bad.push('the corners diagram loses a column');
+      // The ring is three columns wide at every size, and each cell keeps its own value whole; a ring too narrow for the
+      // middle gives the colour a row of its own inside it rather than losing a column.
+      const ring = section.querySelector('.br-box');
+      if (!ring) bad.push('the ring is missing');
+      else if (getComputedStyle(ring).gridTemplateColumns.split(' ').length !== 3) bad.push('the ring loses a column');
       for (const input of section.querySelectorAll('.vf-input')) {
         const style = getComputedStyle(input); context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
         if (context.measureText(input.value || input.placeholder).width > input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1) bad.push(`${input.dataset.key} clips`);

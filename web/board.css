@@ -714,7 +714,7 @@ body.bar-dragging { user-select: none; }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .dialog-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 /* The release, as a caption rather than a control: quiet type, no frame, nothing that invites a click it cannot honour. */
-.dialog-title .version { flex: none; font: 10.5px var(--mono); color: var(--faint); }
+.dialog-title .version { flex: none; font: 10.5px var(--mono); color: var(--muted); }
 .dialog h2 { margin: 0; font-size: 15px; font-weight: 600; }
 /* Settings: one block per section. A line between blocks would be a border doing a divider's job, so the space above and below
    is the same everywhere and the eye separates them by rhythm alone. */
@@ -985,26 +985,59 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 
 /* Border corners: a diagram of the surface, not a form of eight rows. The four radii sit in their own corners, the shared radius
    at the centre and the four edge widths between them, over the same warm tint the box model gives its border band. */
-.ca { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 4px; padding: 6px; border-radius: var(--radius-inner); background: #e3c78f40; }
-.ca-cell { position: relative; display: grid; place-items: center; min-width: 0; border-radius: var(--radius-small); }
-/* The diagram's own marks say which cell is which: a rounded corner in each corner, a line on each edge, no caption anywhere. */
-.ca-corner::before, .ca-edge::before { content: ""; position: absolute; pointer-events: none; }
-.ca-corner::before { left: 4px; top: 4px; width: 7px; height: 7px; border-top: 1.5px solid #a8843c; border-left: 1.5px solid #a8843c; border-top-left-radius: 4px; }
-.ca-tr::before { left: auto; right: 4px; border-left: 0; border-right: 1.5px solid #a8843c; border-top-left-radius: 0; border-top-right-radius: 4px; }
-.ca-bl::before { top: auto; bottom: 4px; border-top: 0; border-bottom: 1.5px solid #a8843c; border-top-left-radius: 0; border-bottom-left-radius: 4px; }
-.ca-br::before { left: auto; right: 4px; top: auto; bottom: 4px; border-top: 0; border-left: 0; border-right: 1.5px solid #a8843c; border-bottom: 1.5px solid #a8843c; border-radius: 0 0 4px 0; }
-.ca-edge::before { background: #a8843c; border-radius: 1px; }
-.ca-t::before { left: 50%; top: 4px; width: 16px; height: 1.5px; transform: translateX(-50%); }
-.ca-b::before { left: 50%; bottom: 4px; width: 16px; height: 1.5px; transform: translateX(-50%); }
-.ca-l::before { left: 4px; top: 50%; width: 1.5px; height: 12px; transform: translateY(-50%); }
-.ca-r::before { right: 4px; top: 50%; width: 1.5px; height: 12px; transform: translateY(-50%); }
-.ca-corner, .ca-edge { background: #e3c78f80; }
-.ca-corner .vf, .ca-edge .vf { width: 100%; background: transparent; }
-.ca-corner .vf:focus-within, .ca-edge .vf:focus-within, .ca-all .vf:focus-within { background: var(--solid); }
-/* The shared value reads as the one that applies to all four: a dashed edge instead of a filled cell. */
-.ca-all { background: transparent; }
-.ca-all .vf { width: 100%; background: transparent; outline: 1px dashed #a8843c; outline-offset: -1px; }
-.ca .vf-input { text-align: center; }
+/* The border as the band it is: one hollow rectangle the width of the box model's border band, with a radius in each corner, an
+   edge width at each edge's centre and the colour in the middle. Its own line is painted from the authored style and the colour
+   of each side, so a side with its own colour reads as a different side rather than as a hidden setting. */
+.br-shell { position: relative; display: grid; gap: 6px; margin: 2px 0 0; container: ring / inline-size; }
+.br-box {
+  --br-field: 30px;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(58px, auto) auto;
+  align-items: center;
+  justify-items: center;
+  gap: 3px 6px;
+  padding: 5px 7px;
+  min-height: 92px;
+  box-sizing: border-box;
+  border: 2px solid #a8843c;
+  border-radius: 8px;
+  color: #4a3d22;
+}
+.br-cell { display: flex; align-items: center; justify-content: center; min-width: 0; }
+/* Each control sits where it applies, by name: a corner radius in its corner, an edge width at its edge's centre. */
+.br-tl { grid-area: 1 / 1; } .br-t { grid-area: 1 / 2; } .br-tr { grid-area: 1 / 3; }
+.br-l { grid-area: 2 / 1; } .br-r { grid-area: 2 / 3; }
+.br-bl { grid-area: 3 / 1; } .br-b { grid-area: 3 / 2; } .br-br { grid-area: 3 / 3; }
+/* The box model's own small inputs, edge for edge: same height, same centred mono value, same quiet surface. */
+.br-box .vf.br-field { flex: none; width: var(--br-field); min-height: 18px; height: 18px; padding: 0; border-radius: var(--radius-small); background: #ffffff35; box-shadow: none; color: inherit; }
+.br-box .vf.br-field:hover { background: #ffffff66; }
+.br-box .vf.br-field:focus-within { background: var(--solid); color: var(--ink); }
+.br-box .vf.br-field .vf-input { width: 100%; min-width: 0; padding: 0; color: inherit; font: 10px/16px var(--mono); text-align: center; }
+.br-box .vf.br-field .vf-input::placeholder { color: inherit; opacity: .72; }
+/* The colour sits in the hollow middle, laid over it rather than inside its grid, so the ring stays empty and the colour can
+   leave the ring when the middle is too narrow for it. */
+.br-centre {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 3px;
+  width: min(calc(var(--br-ring, 100%) - 84px), 168px);
+  justify-items: stretch;
+}
+.br-shell.br-compact .br-centre { position: static; transform: none; width: 100%; }
+.br-centre .pick, .br-centre .color-field { min-width: 0; }
+.br-centre .pick { height: 24px; padding: 0 6px; background: #ffffff30; font-size: 10px; justify-self: center; max-width: 100%; overflow: hidden; }
+.br-centre .pick-k { display: none; }
+.br-centre .pick .pick-v { font-size: 10px; }
+@container ring (max-width: 132px) {
+  .br-box { --br-field: 26px; padding: 4px 5px; gap: 2px 4px; }
+  .br-box .vf.br-field .vf-input { font-size: 9px; }
+  .br-centre .pick .pick-v { font-size: 9px; }
+}
 /* Border owns its line, edge widths, colour and radius; Appearance keeps fill and typography. */
 .appearance-box, .border-box { display: grid; gap: 8px; }
 /* Fill and Text share a row while a field can still hold its label, swatch, value and clear on one line (≈144px). */
@@ -1026,6 +1059,26 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .color-field .swatch { flex: none; width: 20px; height: 20px; border-radius: var(--radius-small); }
 /* One row while the value fits; a value wider than what is left wraps whole onto its own line instead of clipping. */
 .color-field .color-hex { flex: 1 1 var(--hex-width, 9ch); min-width: min(100%, var(--hex-width, 9ch)); min-height: 28px; }
+/* Inside the ring the colour is a small centred readout on one line: the ring's middle is a fixed few dozen pixels wide, so
+   the value keeps a shorter minimum and never wraps away from its swatch and clear. */
+.br-centre .color-field { padding: 0 3px; background: #ffffff40; flex-wrap: nowrap; min-height: 26px; justify-content: center; }
+.br-centre .color-field .color-hex { flex: 1 1 auto; width: auto; min-width: 0; min-height: 24px; }
+.br-centre .color-field .vf-input.color-hex { font: 10px/16px var(--mono); }
+/* A control a finger has to hit keeps 24px even in the ring's narrow middle (WCAG 2.5.8); only the ring's own value fields
+   are compact, and those are the box model's small fields. */
+.br-centre .color-field .swatch { width: 24px; height: 24px; }
+.br-centre .color-field .color-clear { width: 24px; height: 24px; }
+.br-centre .color-field .color-clear .icon { width: 10px; height: 10px; }
+/* Inside the ring the colour is a small centred readout on one line: the ring's middle is a fixed few dozen pixels wide, so
+   the value keeps a shorter minimum and never wraps away from its swatch and clear. */
+.br-centre .color-field { padding: 0 3px; background: #ffffff40; flex-wrap: nowrap; min-height: 26px; justify-content: center; }
+.br-centre .color-field .color-hex { flex: 1 1 auto; width: auto; min-width: 0; min-height: 24px; }
+.br-centre .color-field .vf-input.color-hex { font: 10px/16px var(--mono); }
+/* A control a finger has to hit keeps 24px even in the ring's narrow middle (WCAG 2.5.8); only the ring's own value
+   fields are compact, and those are the box model's small fields. */
+.br-centre .color-field .swatch { width: 24px; height: 24px; }
+.br-centre .color-field .color-clear { width: 24px; height: 24px; }
+.br-centre .color-field .color-clear .icon { width: 10px; height: 10px; }
 /* A content-sized field must not inherit the wrapper's `width: 100%` as its flex base, or it takes a whole line by itself. */
 @supports (field-sizing: content) { .color-field .color-hex { field-sizing: content; flex: 1 0 auto; width: auto; min-width: 0; max-width: 100%; } }
 .color-block { display: grid; gap: 4px; }

@@ -45,15 +45,15 @@ const waitUntil = async (check, label, timeout = 8000) => {
     const shown = await page.evaluate(() => {
       const node = document.querySelector('#help .dialog-title .version');
       const probe = document.createElement('span');
-      probe.style.color = 'var(--faint)';
+      probe.style.color = 'var(--muted)';
       document.body.append(probe);
-      const faint = getComputedStyle(probe).color;
+      const muted = getComputedStyle(probe).color;
       probe.remove();
-      return { text: node.textContent, colour: getComputedStyle(node).color, faint, tip: node.dataset.tip };
+      return { text: node.textContent, colour: getComputedStyle(node).color, muted, tip: node.dataset.tip };
     });
     assert.match(shown.text, /^v\d+\.\d+\.\d+$/, 'the dialog names the release it runs');
     assert.equal(shown.text, `v${runtime.info().version}`, 'and the state carries that same version, not a second copy of the number');
-    assert.equal(shown.colour, shown.faint, 'as a caption in the quiet tone, not a control');
+    assert.equal(shown.colour, shown.muted, 'as a caption in the quiet tone, not a control');
     assert.equal(shown.tip, `divlet ${runtime.info().version}`, 'with the full release in its tooltip');
   }
 

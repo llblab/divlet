@@ -87,6 +87,8 @@ export function declarationClass(property, value, colorOf = () => null, { scale 
   if (scale && property === 'border-radius' && RADIUS_SCALE[value]) return RADIUS_SCALE[value];
   const corner = /^border-(top|bottom)-(left|right)-radius$/.exec(property);
   if (scale && corner && RADIUS_SCALE[value]) return RADIUS_SCALE[value].replace(/^rounded/, `rounded-${corner[1][0]}${corner[2][0]}`);
+  // A per-corner radius keeps its corner in the spelling too: `rounded-tl-[1.5rem]`, not a bare declaration.
+  if (corner && !/[\s,]/.test(value)) return `rounded-${corner[1][0]}${corner[2][0]}-[${arbitrary(value)}]`;
   if (scale && SIZES.has(property) && Object.hasOwn(SIZE_WORDS, value)) return `${PREFIX[property]}-${SIZE_WORDS[value]}`;
   if (scale && (property === 'gap' || property === 'row-gap' || property === 'column-gap' || property === 'line-height' || SIZES.has(property)) && scaleToken(value)) return `${PREFIX[property]}-${scaleToken(value)}`;
   // Whole-number steps have their own utilities (`opacity-40`, `z-10`, `blur-sm`, `grid-cols-3`); anything else stays arbitrary.

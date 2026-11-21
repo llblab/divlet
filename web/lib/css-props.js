@@ -290,6 +290,17 @@ export function radiusOf(view) {
   if (corners.some(value => value == null) || corners.some(value => value !== corners[0])) return corners.every(value => value == null) ? null : undefined;
   return /^(?:9999px|999px|100%|50%)$/.test(corners[0]) ? 'Full' : show(corners[0]);
 }
+/**
+ * One side's effective authored border colour: the side's own longhand when it has one, else the shared `border-color`.
+ * `own` says whether this side was given a colour of its own, so the diagram can mark a side that differs.
+ */
+export function borderColourOf(view, side) {
+  const own = view[`border-${side}-color`] ?? null;
+  if (own != null) return { value: own, own: true };
+  const shared = view['border-color'] ?? null;
+  return shared == null ? null : { value: shared, own: false };
+}
+
 /** One corner's authored radius as its field shows it: `8`, `50%`, `Full`, or nothing when no corner is authored. */
 export function cornerRadiusOf(view, corner) {
   const raw = view[`border-${corner}-radius`] ?? view['border-radius'] ?? null;
