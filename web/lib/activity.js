@@ -159,9 +159,10 @@ function changeRow(row, point = null, timeline = null) {
   const where = row.documents.size > 1 ? `${row.documents.size} artboards` : change.name || change.documentId;
   const details = [where, who, title !== change.summary ? change.summary : ''].filter(Boolean).join(' · ');
   text.append(msg);
-  // Every line is a point in time: marker and metadata share one column, the change itself reads beside it. No elapsed time.
+  // Every line is a point in time: a marker in its own narrow column, then the change with its details under it. No elapsed time.
   const rail = el('div', 'history-rail');
-  rail.append(icon(change.kind === 'undo' || change.kind === 'redo' ? change.kind : iconName), el('div', 'sub', details));
+  rail.append(icon(change.kind === 'undo' || change.kind === 'redo' ? change.kind : iconName));
+  if (details) text.append(el('div', 'sub', details));
   line.append(rail, text);
   if (point) line.append(el('span', 'history-tag', current ? 'Current' : future ? 'Ahead' : 'Restore'));
   line.dataset.tip = count > 1 ? `${count} steps undone together · #${row.seqs[0]}–#${change.seq}` : `#${change.seq} · v${change.fromVersion ?? '—'} → v${change.toVersion ?? '—'}${change.touched?.length ? ` · ${change.touched.length} node${change.touched.length === 1 ? '' : 's'}` : ''}`;
@@ -205,11 +206,11 @@ function stateRow(point, index, timeline) {
   if (current) line.setAttribute('aria-current', 'step');
   if (navigating === point.id) line.setAttribute('aria-busy', 'true');
   const range = point.seq == null ? 'Session baseline' : point.firstSeq !== point.seq ? `#${point.firstSeq}–#${point.seq}` : `#${point.seq}`;
-  // One point in time: its marker and metadata share the left column, the state's name sits beside it.
+  // One point in time: a marker in its own narrow column, then the state's name with the seq range under it.
   const rail = el('div', 'history-rail');
-  rail.append(icon('clock'), el('div', 'sub', range));
+  rail.append(icon('clock'));
   const text = el('div', 'text');
-  text.append(el('div', 'msg', point.label));
+  text.append(el('div', 'msg', point.label), el('div', 'sub', range));
   line.append(rail, text, el('span', 'history-tag', current ? 'Current' : future ? 'Ahead' : 'Restore'));
   line.dataset.tip = current ? 'The project is at this state' : 'Restore the whole project after this grouped edit, including frame placement and project settings';
   const expectedPoint = timeline.current;

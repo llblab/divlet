@@ -152,27 +152,33 @@ try {
   await go(draggedPoint);
   checks.push('history lists only reachable states, oldest first, with the superseded future dimmed but still selectable');
 
-  // Every line is a point in time: marker and metadata in one column, the change beside it, and no elapsed time at all.
+  // Every line is a point in time: a marker in its own narrow column, then the change with its details beneath it — a long
+  // document name wraps in the reading column instead of being squeezed into the marker's strip — and no elapsed time at all.
   const timePoints = await page.evaluate(() => {
-    const rows = [...document.querySelectorAll('#activity .history-states [data-history-point]')];
+    const rows = [...document.querySelectorAll('#activity .history-states [data-history-point], #activity .history-states .change')];
     const boxes = node => node.getBoundingClientRect();
     return {
       times: document.querySelectorAll('#activity time, #activity .when').length,
       rows: rows.length,
       rail: rows.filter(node => {
         const rail = node.querySelector(':scope > .history-rail');
-        const msg = node.querySelector(':scope > .text > .msg');
+        const text = node.querySelector(':scope > .text');
         const marker = rail?.querySelector('.icon');
-        const meta = rail?.querySelector('.sub');
-        if (!rail || !msg || !marker || !meta) return false;
-        const [mark, info, text] = [boxes(marker), boxes(meta), boxes(msg)];
-        return Math.abs((mark.left + mark.right) / 2 - (info.left + info.right) / 2) <= 1 && info.top >= mark.bottom - 1 && text.left >= info.right + 2;
+        const meta = text?.querySelector(':scope > .sub');
+        if (!rail || !text || !marker || !meta) return false;
+        const [mark, info, body] = [boxes(marker), boxes(meta), boxes(text)];
+        // The details sit in the reading column, under the change, never in the marker's column beside it.
+        return info.left >= body.left - 1 && info.top >= boxes(text.querySelector(':scope > .msg')).bottom - 1 && mark.right <= body.left + 1;
       }).length,
+      narrowestRail: Math.min(...rows.map(node => Math.round(node.querySelector(':scope > .history-rail').getBoundingClientRect().width))),
+      widestMeta: Math.max(...rows.map(node => Math.round(node.querySelector(':scope > .text > .sub').getBoundingClientRect().width))),
     };
   });
   assert.equal(timePoints.times, 0, 'a history line shows no elapsed time');
-  assert.equal(timePoints.rail, timePoints.rows, 'every line keeps its marker and metadata in one column, with the change beside it');
-  checks.push('each history line is one time point: marker and metadata in one column, no elapsed time');
+  assert.equal(timePoints.rail, timePoints.rows, 'every line keeps its marker in a narrow column and its details under the change');
+  assert.ok(timePoints.narrowestRail <= 24, `the marker column stays narrow (${timePoints.narrowestRail}px)`);
+  assert.ok(timePoints.widestMeta > 80, `and the details get the reading column to wrap in (${timePoints.widestMeta}px)`);
+  checks.push('each history line is one time point: a narrow marker column, details under the change, no elapsed time');
 
   const group = runtime.newGroup(), groupBase = runtime.historyHead().pointId, beforeGroup = authored(), pointCount = runtime.readTimeline().points.length;
   await patch('welcome', { artboard: { x: doc('welcome').artboard.x + 80 }, nodes: { 'title-text': { content: 'Grouped content' } } }, { group, label: 'Grouped project edit' });

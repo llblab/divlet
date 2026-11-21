@@ -4,6 +4,9 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased
 
+- **History rows read again.** A row's document, actor and change detail no longer sit in the 44–80px marker column, where a long document
+  name became a paragraph squeezed into a strip; the marker keeps its own narrow column and those details read under the change in the reading
+  column, wrapping only where there is width for it (`web/lib/activity.js`, `web/board.css`, `web/tests/history.mjs`).
 - **The border is the band it copies.** Border's diagram is now one hollow ring exactly as wide as the box model's border band, with a corner radius in
   each corner, the width at each edge's centre and the colour in the hollow middle — the box model's own small fields, in step with it in both
   directions. The middle names the side the colour belongs to and edits that side alone (`border-t|r|b|l-color`), so the left, right, top or bottom
