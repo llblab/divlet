@@ -87,7 +87,7 @@ try {
       tips: [...box.querySelectorAll('.bm-field')].filter(field => field.querySelector('.vf-k')?.dataset.tip || field.dataset.tip).length,
       labels: [...box.querySelectorAll('.bm-field')].map(field => field.getAttribute('aria-label')),
       captions: [...box.querySelectorAll('.bm-caption')].map(node => node.textContent),
-      border: box.querySelectorAll('.bm-border > .bm-cell input').length,
+      border: box.querySelectorAll('.bm-border > .bm-cell input, .bm-border > .bm-top > .bm-cell input').length,
       outline: getComputedStyle(box.querySelector('.bm-position')).borderStyle,
       switches: box.querySelectorAll('button').length,
       height: box.getBoundingClientRect().height,
@@ -130,13 +130,13 @@ try {
       return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     };
     return [...document.querySelectorAll('#inspector .boxmodel .bm-sq')].map(band => {
-      const caption = band.querySelector(':scope > .bm-caption');
+      const caption = band.querySelector(':scope > .bm-top > .bm-caption');
       const box = band.getBoundingClientRect(), style = getComputedStyle(band);
       const side = parseFloat(style.paddingLeft), border = parseFloat(style.borderLeftWidth);
       const left = band.querySelector(':scope > .bm-l').getBoundingClientRect(), right = band.querySelector(':scope > .bm-r').getBoundingClientRect();
       const cap = caption.getBoundingClientRect();
       const background = style.backgroundColor;
-      const value = band.querySelector(':scope > .bm-cell input');
+      const value = band.querySelector(':scope > .bm-top > .bm-cell input');
       return {
         label: caption.textContent,
         bandWidth: Math.round(box.width),
@@ -419,7 +419,7 @@ try {
   await waitUntil(async () => /65\.328 by 34/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'actual fractional content dimensions');
   assert.equal(await page.locator('#inspector [data-key="inset-t"]').count(), 1, 'offset has one home in the outer position band');
   assert.equal(await page.locator('#inspector [data-section="layout"] [data-key="inset-t"]').count(), 0, 'no duplicate layout offset editor');
-  assert.deepEqual(await page.locator('#inspector .bm-border > .bm-cell input').evaluateAll(inputs => inputs.map(input => input.value || input.placeholder)), ['1', '1', '1', '1']);
+  assert.deepEqual(await page.locator('#inspector .bm-border > .bm-cell input, #inspector .bm-border > .bm-top > .bm-cell input').evaluateAll(inputs => inputs.map(input => input.value || input.placeholder)), ['1', '1', '1', '1']);
   assert.equal(await page.locator('#inspector .bm-padding [data-key="p-t"]').getAttribute('placeholder'), '4');
   await page.locator('#inspector [data-key="inset-t"]').fill('8');
   await page.keyboard.press('Enter');
@@ -468,7 +468,7 @@ try {
   await page.locator('#inspector [data-key="pick:Position"]').click();
   await page.locator('.menu .menu-item', { hasText: 'Static' }).click();
   await waitUntil(() => runtime.read({ view: 'document', documentId: probe.id }).nodes['box-other'].className.split(' ').includes('static'), 'position mode is editable in Spacing');
-  assert.equal(await page.locator('#inspector .bm-position > .bm-cell input').count(), 4, 'static offsets are still editable');
+  assert.equal(await page.locator('#inspector .bm-position > .bm-cell input, #inspector .bm-position > .bm-top > .bm-cell input').count(), 4, 'static offsets are still editable');
   await page.locator('#inspector [data-key="inset-t"]').fill('6.5'); await page.keyboard.press('Tab');
   await waitUntil(() => runtime.read({ view: 'document', documentId: probe.id }).nodes['box-other'].className.includes('top-[6.5px]'), 'a static offset is authored');
   assert.equal(await probeFrame.locator('[data-divlet-id="box-other"]').evaluate(node => getComputedStyle(node).position), 'static', 'editing an offset never silently changes positioning mode');
@@ -554,7 +554,7 @@ try {
     await revealBoxModel();
     await sleep(350);
     const collisions = await page.locator('#inspector .boxmodel').evaluate(model => {
-      const fields = [...model.querySelectorAll('.bm-field, .bm-offset, .bm-border > .bm-cell .bm-value, .bm-core')].map(node => node.getBoundingClientRect());
+      const fields = [...model.querySelectorAll('.bm-field, .bm-offset, .bm-border > .bm-cell .bm-value, .bm-border > .bm-top > .bm-cell .bm-value, .bm-core')].map(node => node.getBoundingClientRect());
       const overlap = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
       const bad = [];
       if (model.scrollWidth > model.clientWidth + 1) bad.push('widget overflows');
@@ -625,7 +625,7 @@ try {
   await boxTouch.close();
   await page.evaluate(async id => { (await import('./lib/store.js')).selectNodes(id, ['box-probe', 'box-other']); }, probe.id);
   await waitUntil(async () => /— by —/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'multi-selection does not invent aggregate geometry');
-  assert.deepEqual(await page.locator('#inspector .bm-border > .bm-cell input').evaluateAll(inputs => inputs.map(input => input.value || input.placeholder)), ['—', '—', '—', '—']);
+  assert.deepEqual(await page.locator('#inspector .bm-border > .bm-cell input, #inspector .bm-border > .bm-top > .bm-cell input').evaluateAll(inputs => inputs.map(input => input.value || input.placeholder)), ['—', '—', '—', '—']);
   assert.equal(await page.locator('#inspector [data-key="m-t"]').getAttribute('placeholder'), '—');
   checks.push('real per-edge borders, signed margins, fractional untransformed content size, hidden/visible recovery, one undoable offset editor, truthful mixed state and desktop/phone/200% geometry');
   assert.deepEqual(errors, []);

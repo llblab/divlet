@@ -470,18 +470,21 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .bm-margin { background: #bc8c61; border-style: dashed; }
 .bm-border { background: #e3c78f; }
 .bm-padding { background: #c6d7a7; border-style: dashed; }
-/* The band name is a watermark on its own fill: larger than a value and darker than the colour it sits on, 12px in from the
-   left so it reads as part of the band rather than a corner label. It stays inside the top value strip. */
-.bm-caption { position: absolute; top: 0; left: 12px; height: 20px; display: flex; align-items: center; font: 600 12.5px/20px var(--font); letter-spacing: .01em; pointer-events: none; }
-/* A band narrow enough that the name would reach the centred top value gives ground: closer to the edge first, then smaller. */
-@container band (max-width: 180px) { .bm-caption { left: 9px; font-size: 10.5px; } }
-@container band (max-width: 130px) { .bm-caption { left: 4px; font-size: 8px; } }
-.bm-position > .bm-caption { color: var(--muted); }
-.bm-margin > .bm-caption { color: #8a5f3a; }
-.bm-border > .bm-caption { color: #a8843c; }
-.bm-padding > .bm-caption { color: #7d9750; }
+/* The top strip is one row: the band name, then its top value centred in what is left. Sharing the flow means neither can
+   cover the other, whatever the band's width or the font the interface is drawing with. */
+.bm-top { position: absolute; top: 1px; left: 12px; right: 12px; height: 18px; display: flex; align-items: center; gap: 6px; }
+/* The band name is a watermark on its own fill: larger than a value and darker than the colour it sits on. */
+.bm-caption { flex: none; display: flex; align-items: center; height: 18px; font: 600 12.5px/18px var(--font); letter-spacing: .01em; pointer-events: none; }
+/* A band too narrow for both gives the name less room first: it never clips, it steps down instead. */
+@container band (max-width: 180px) { .bm-caption { font-size: 10.5px; } }
+@container band (max-width: 130px) { .bm-caption { font-size: 8px; } }
+.bm-position > .bm-top > .bm-caption { color: var(--muted); }
+.bm-margin > .bm-top > .bm-caption { color: #8a5f3a; }
+.bm-border > .bm-top > .bm-caption { color: #a8843c; }
+.bm-padding > .bm-top > .bm-caption { color: #7d9750; }
 .bm-cell { position: absolute; display: flex; justify-content: center; align-items: center; width: var(--bm-field); height: 18px; min-width: 0; font: 10px/16px var(--mono); }
-.bm-cell.bm-t { top: 1px; left: 50%; transform: translateX(-50%); }
+/* Neither the name nor the value gives ground: the row keeps both whole and lets the band's own font steps below make the room. */
+.bm-cell.bm-t { position: static; flex: none; margin: 0 auto; max-width: none; }
 .bm-cell.bm-b { bottom: 1px; left: 50%; transform: translateX(-50%); }
 /* A side value owns its whole side strip, so it is centred in that strip instead of sitting against the band's inner corner. */
 .bm-cell.bm-l, .bm-cell.bm-r { top: 50%; transform: translateY(-50%); width: var(--bm-side-cell); }
@@ -489,7 +492,7 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .bm-cell.bm-l { left: 1px; }
 .bm-cell.bm-r { right: 1px; }
 .bm-cell { width: max(var(--bm-field), var(--bm-value-width, 0px)); max-width: calc(100% - 4px); }
-.bm-sq > .bm-cell > .vf { width: 100%; }
+.bm-sq > .bm-cell > .vf, .bm-top > .bm-cell > .vf { width: 100%; }
 .bm-centre { min-width: 0; }
 .vf.bm-field, .vf.bm-offset, .vf.bm-value { flex: none; width: var(--bm-field); min-height: 18px; height: 18px; padding: 0; border-radius: var(--radius-small); background: transparent; box-shadow: none; color: inherit; }
 .bm-field:hover, .bm-offset:hover, .bm-value:hover { background: #ffffff30; }

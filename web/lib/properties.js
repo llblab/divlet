@@ -722,14 +722,18 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     const sq = el('div', `bm-sq bm-${kind}`);
     sq.setAttribute('role', 'group');
     sq.setAttribute('aria-label', kind[0].toUpperCase() + kind.slice(1));
-    sq.append(el('span', 'bm-caption', kind));
-    for (const [index, side] of ['t', 'r', 'b', 'l'].entries()) {
+    // The name and the top value share one strip in the flow of the band, so no font or panel width can make them collide;
+    // the other three cells keep their own side strips. Tab order stays top, right, bottom, left.
+    const cells = ['t', 'r', 'b', 'l'].map((side, index) => {
       const cell = el('div', `bm-cell bm-${side}`);
       cell.setAttribute('role', 'group');
       cell.setAttribute('aria-label', `${kind} ${SIDE_NAMES[side]}`);
       cell.append(edgeField(kind, side, index));
-      sq.append(cell);
-    }
+      return cell;
+    });
+    const strip = el('div', 'bm-top');
+    strip.append(el('span', 'bm-caption', kind), cells[0]);
+    sq.append(strip, ...cells.slice(1));
     const centre = el('div', 'bm-centre');
     centre.append(inner);
     sq.append(centre);
@@ -740,7 +744,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     const measuring = document.createElement('canvas').getContext('2d');
     const fitValues = () => {
       let side = 0, strip = 0;
-      for (const cell of sq.querySelectorAll(':scope > .bm-cell')) {
+      for (const cell of sq.querySelectorAll(':scope > .bm-cell, :scope > .bm-top > .bm-cell')) {
         const input = cell.querySelector('input');
         const text = input ? input.value || input.placeholder : cell.textContent;
         const length = text.length;
@@ -753,7 +757,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
       sq.classList.toggle('bm-wide-sides', side > 4);
       sq.classList.toggle('bm-stacked-sides', side > 6);
     };
-    for (const input of sq.querySelectorAll(':scope > .bm-cell input')) {
+    for (const input of sq.querySelectorAll(':scope > .bm-cell input, :scope > .bm-top > .bm-cell input')) {
       input.addEventListener('input', fitValues);
       input.addEventListener('keydown', fitValues);
       input.addEventListener('change', fitValues);

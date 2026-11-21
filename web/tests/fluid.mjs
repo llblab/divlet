@@ -45,8 +45,17 @@ try {
     }, label);
     await page.locator('#inspector [data-key="opacity"]').waitFor();
     assert.deepEqual(await readableNumbers(`${width}px@${size}% element`), []);
-    // The copy's width follows the box model's band, so it is only its own size once the panel has settled.
-    await page.waitForFunction(() => (document.querySelector('#inspector .br-box')?.getBoundingClientRect().width ?? 0) > 100, null, { timeout: 8000 });
+    // The copy's width follows the box model's band, and the copy lays itself out again as the panel settles, so wait for
+    // its own geometry to stop moving instead of for one measurement that happens to be large enough.
+    await page.waitForFunction(() => {
+      const diagram = document.querySelector('#inspector .br-box');
+      if (!(diagram?.getBoundingClientRect().width > 100)) return false;
+      const frame = diagram.getBoundingClientRect(), inspector = document.querySelector('#inspector').getBoundingClientRect();
+      const key = [frame.width, frame.right, inspector.right, ...[...diagram.querySelectorAll('.br-corner, .br-edge')].map(node => node.getBoundingClientRect().right)].map(value => Math.round(value * 10)).join(',');
+      const settled = window.__brBoxKey === key;
+      window.__brBoxKey = key;
+      return settled;
+    }, null, { timeout: 8000 });
     const compactShape = await page.evaluate(() => {
       // The band copy keeps its corner values whole at every width, inside its own frame and the inspector's.
       const diagram = document.querySelector('#inspector .br-box'), inspector = document.querySelector('#inspector').getBoundingClientRect();

@@ -178,7 +178,7 @@ try {
       const panel = getComputedStyle(document.body);
       const report = {
         size: middle, source: box(band), surface: surface(a), sourceSurface: surface(c),
-        captions: ring.querySelectorAll(':scope > .bm-caption').length,
+        captions: ring.querySelectorAll(':scope > .bm-top > .bm-caption').length,
         hole: [Math.round(cut.left - middle.left), Math.round(cut.w), Math.round(cut.h)], holeColour: getComputedStyle(hole).backgroundColor,
         centred: Math.abs((middle.left + middle.right) / 2 - (frame.left + frame.right) / 2) <= 1,
         surfaceOfPanel: getComputedStyle(document.querySelector('#inspector')).backgroundColor,
