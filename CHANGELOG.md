@@ -4,6 +4,8 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased
 
+- **The token row explains itself.** The `--color-brand → bg-brand, text-brand` caption under the Tokens add row is gone: the placeholders say what
+  the two fields take, and the row no longer repeats it (`web/lib/inspector.js`).
 - **Box-model side values keep their distance.** The left and right values sat flush against their band's frame and read as part of the line; they
   now keep one pixel of air from it, and the row they take on a narrow panel keeps the width that air would have cost (`web/board.css`,
   `web/tests/spacing.mjs`).

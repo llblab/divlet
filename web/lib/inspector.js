@@ -307,7 +307,7 @@ function artboardView(doc, model) {
   tokenBox.append(addRow('token', ['--color-brand', '#5b5bf0'], (name, value) => {
     const key = name.replace(/^(?!--)/, '--');
     if (key.length > 2 && value) refreshed(commit(id, { tokens: { [key]: value } }, { label: `token ${key}` }));
-  }), el('span', 'caption', '--color-brand → bg-brand, text-brand'));
+  }));
   view.push(section('tokens', details('Tokens', tokenBox, Object.keys(tokens).length > 0, Object.keys(tokens).length)));
 
   if (model) {
