@@ -4,6 +4,9 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased
 
+- **The history marker leans to its text.** In the history list the marker and its badge are right-aligned in their narrow column instead of
+  centred, so the marker sits next to the change it belongs to and the column reads as one edge against the text (`web/board.css`,
+  `web/tests/history.mjs`).
 - **Labelled rows line up.** Rows that belong to one group now share a label column measured from the widest label in that group, so
   `Center` and `Self` in Layout start their controls on the same line, and the two centring choices fill the width their label leaves
   (`web/lib/properties.js` gained `syncLabelColumns`, `web/lib/inspector.js`, `web/board.css`, `web/tests/appearance.mjs`). The border

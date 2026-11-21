@@ -168,9 +168,9 @@ try {
         const meta = text?.querySelector(':scope > .sub');
         if (!rail || !text || !marker || !tag || !meta) return false;
         const [mark, badge, info, body] = [boxes(marker), boxes(tag), boxes(meta), boxes(text)];
-        // The badge is stacked under the marker in that column, and the details read in the column beside it.
-        return badge.top >= mark.bottom - 1 && Math.abs((badge.left + badge.right) / 2 - (mark.left + mark.right) / 2) <= 2
-          && mark.right <= body.left + 1 && info.left >= body.left - 1 && info.top >= boxes(text.querySelector(':scope > .msg')).bottom - 1;
+        // The badge is stacked under the marker in that column, both ending at the text's edge, and the details read beside them.
+        return badge.top >= mark.bottom - 1 && Math.abs(badge.right - mark.right) <= 2 && mark.right <= body.left + 1
+          && body.left - mark.right <= 14 && info.left >= body.left - 1 && info.top >= boxes(text.querySelector(':scope > .msg')).bottom - 1;
       }).length,
       tagged: rows.filter(node => node.querySelector(':scope > .history-rail > .history-tag')).length,
       strayTags: rows.filter(node => node.querySelector(':scope > .history-tag')).length,
