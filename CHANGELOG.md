@@ -2,7 +2,7 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
-## Unreleased
+## 0.2.0 — Inspector and history polish
 
 - **The token row explains itself.** The `--color-brand → bg-brand, text-brand` caption under the Tokens add row is gone: the placeholders say what
   the two fields take, and the row no longer repeats it (`web/lib/inspector.js`).
