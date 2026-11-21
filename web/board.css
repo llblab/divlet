@@ -202,6 +202,9 @@ body.has-sidebar .tab { border-color: transparent; border-radius: var(--radius-i
 .tool:active:not(:disabled) { transform: scale(.94); }
 .tool.on { background: var(--accent-soft); color: var(--accent); }
 .tool:disabled { opacity: var(--disabled); cursor: default; }
+/* A dangerous action reads red at rest, exactly like the same entry in a dropdown; hover deepens the fill. */
+.tool.danger { color: var(--bad-ink); }
+.tool.danger .icon { color: var(--bad); }
 .tool.danger:hover:not(:disabled) { color: var(--bad); background: var(--bad-soft); }
 .tool.mini { min-width: 26px; height: 26px; padding: 0 3px; border-radius: var(--radius-small); }
 .tool.mini .icon { width: 14px; height: 14px; }
@@ -500,10 +503,11 @@ button.change:hover:not(:disabled) { background: var(--field); }
   .bm-wide-sides > .bm-r { top: 20px; right: 2px; bottom: auto; transform: none; }
 }
 /* One corner radius for the whole element, in the widget's own corner. */
-.bm-radius { position: absolute; right: 2px; bottom: 0; width: 74px; height: 20px; }
+/* The same 18px box-model field height as every other compact control in the widget. */
+.bm-radius { position: absolute; right: 2px; bottom: 0; width: 74px; height: 18px; }
 .bm-radius .vf-input { font-size: 10px; }
 .bm-radius .vf-k { min-width: 14px; padding-left: 2px; font-size: 9px; }
-@container boxmodel (max-width: 210px) { .bm-radius { position: static; width: 100%; margin-top: 4px; height: 24px; } }
+@container boxmodel (max-width: 210px) { .bm-radius { position: static; width: 100%; margin-top: 4px; } }
 .box4 { min-width: 0; flex: 1 1 var(--control-min); }
 .caption.has-variants::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 4px; border-radius: 50%; background: var(--accent); vertical-align: 1px; }
 .quick-attrs { margin-top: 1px; }

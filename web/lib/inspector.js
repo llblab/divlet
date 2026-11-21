@@ -321,7 +321,7 @@ function artboardView(doc, model) {
     view.push(section('meta', details('Metadata', metadataField('metadata', model.metadata, next => quiet(commit(id, { metadata: next }, { label: 'edit metadata' }))), false, Object.keys(model.metadata || {}).length)));
   }
   // Every artboard action in one row; what does not fit moves into a trailing dropdown by itself.
-  view.push(overflowBar(actions.artboardItems(id)));
+  view.push(overflowBar(actions.artboardBarItems(id)));
   return view;
 }
 

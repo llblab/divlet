@@ -147,6 +147,16 @@ try {
   }
   checks.push('both panel widths persist independently across reload, selection, viewport/zoom constraints and same-origin tabs; cancelled drags preserve the choice and explicit reset alone clears it');
 
+  // Expand leads the inspector's action bar — a second home for the heading's Expand — and it is the button that stays longest.
+  const firstAction = page.locator('#inspector .smart-bar .tool:not(.more)').first();
+  assert.equal(await firstAction.getAttribute('aria-label'), 'Expand', 'Expand leads the inspector action bar');
+  assert.equal(await firstAction.getAttribute('data-tip'), 'Expand · E', 'the bar keeps the shortcut the heading uses');
+  await firstAction.click();
+  await page.locator('#expanded-preview:not([hidden])').waitFor();
+  await page.locator('#expanded-back').click();
+  await page.locator('#expanded-preview[hidden]').waitFor({ state: 'attached' });
+  checks.push('the inspector action bar opens the same expanded page first, with the same shortcut as the heading');
+
   // The action bar: every action in one row, the rest in a dynamic dropdown.
   const total = await page.locator('#inspector .smart-bar .tool:not(.more)').count();
   assert.ok(total >= 8, 'every artboard action has a button');
@@ -157,6 +167,7 @@ try {
   await handle.dblclick();
   await page.evaluate(() => { document.documentElement.style.setProperty('--inspector-w', '280px'); });
   await waitUntil(async () => await moreShown() === 1, 'a narrow inspector moves actions into the dropdown');
+  assert.equal(await page.locator('#inspector .smart-bar .tool:not(.more):not([hidden])').first().getAttribute('aria-label'), 'Expand', 'Expand is the last action to leave the row');
   const hiddenCount = total - await visible();
   assert.ok(hiddenCount >= 1);
   await page.locator('#inspector .smart-bar .more').click();
@@ -167,6 +178,17 @@ try {
   await waitUntil(async () => await moreShown() === 0, 'a wide inspector shows every action and no dropdown');
   assert.equal(await visible(), total);
   await page.evaluate(() => { document.documentElement.style.removeProperty('--inspector-w'); });
+  const danger = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--bad)';
+    document.body.append(probe);
+    const bad = getComputedStyle(probe).color;
+    probe.remove();
+    const bar = [...document.querySelectorAll('#inspector .smart-bar .tool:not(.more)')].find(node => node.classList.contains('danger'));
+    return { found: !!bar, tonal: bar && getComputedStyle(bar).color, icon: bar && getComputedStyle(bar.querySelector('.icon')).color, bad };
+  });
+  assert.equal(danger.found, true, 'the bar carries its dangerous action');
+  assert.equal(danger.icon, danger.bad, 'the Delete button is red at rest, like the same entry in a dropdown');
   checks.push('the inspector action bar shows every action in a row and moves what does not fit into a dynamic dropdown');
 
   // Units.
@@ -292,10 +314,9 @@ try {
       const visible = node => { const r = node.getBoundingClientRect(); return r.width > 0 && r.height > 0 && !node.closest('iframe'); };
       const controls = [...document.querySelectorAll('#inspector button, #inspector input, #inspector select, #sidebar button, #dock button, #side-tabs button, #status, .search-pill, .palette-item')].filter(visible);
       const radii = [...new Set(controls.map(node => getComputedStyle(node).borderRadius))].sort();
-      const pills = controls.filter(node => getComputedStyle(node).borderRadius === '11px').map(node => Math.round(node.getBoundingClientRect().height));
       const family = selector => [...new Set([...document.querySelectorAll(selector)].filter(visible).map(node => Math.round(node.getBoundingClientRect().height)))].sort();
       return {
-        radii, pills,
+        radii,
         family: {
           dockTools: family('#dock .tool'), picks: family('#inspector .pick'), chips: family('#inspector .chip'),
           fields: family('#inspector .vf:not(.boxmodel .vf)'), boxFields: family('#inspector .boxmodel .vf'),
@@ -304,8 +325,9 @@ try {
         disabled: [...new Set([...document.querySelectorAll('button:disabled')].map(node => getComputedStyle(node).opacity))],
       };
     });
-    assert.deepEqual(design.radii.filter(radius => radius !== '0px'), ['11px', '14px', '6px', '9px'], `controls use three radii (${design.radii.join(', ')})`);
-    assert.ok(design.pills.every(height => height <= 24), `the only 11px radius is a pill (${design.pills.join(', ')})`);
+    // Exactly the three radius tokens: the outer surface, an inner control and a small one. A pill is half its own height,
+    // so it needs no fourth radius.
+    assert.deepEqual(design.radii.filter(radius => radius !== '0px'), ['14px', '6px', '9px'], `controls use the three radius tokens (${design.radii.join(', ')})`);
     for (const [name, heights] of Object.entries(design.family)) assert.ok(heights.length <= 1, `${name} share one height (${heights.join(', ')})`);
     assert.deepEqual(design.family.fields, [28], 'standard fields keep the full control height');
     assert.deepEqual(design.family.boxFields, [18], 'all compact box-model fields, including offsets, borders and dimensions, share their own height');

@@ -383,6 +383,15 @@ export function tagMenu(documentId, id, position) {
   openMenu(items, { ...position, label: 'Change tag', className: 'menu-tags' });
 }
 
+/**
+ * The inspector's own action bar for a selected artboard: the same list with Expand in front, because the operator works here
+ * and the heading's own Expand may have given way to its menu. Expand is the last button the bar lets go of.
+ */
+export function artboardBarItems(id) {
+  const one = store.selected.has(id) && store.selected.size === 1;
+  return one ? [{ label: 'Expand', icon: 'expand', keys: keys('E'), run: () => canvas.openExpanded(id) }, ...artboardItems(id)] : artboardItems(id);
+}
+
 /** The actions on an artboard (or on the selected artboards): the context menu lists them all, the inspector's bar fits as many as it can. */
 export function artboardItems(id) {
   const ids = store.selected.has(id) ? [...store.selected] : [id];
