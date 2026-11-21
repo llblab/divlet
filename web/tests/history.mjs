@@ -152,8 +152,8 @@ try {
   await go(draggedPoint);
   checks.push('history lists only reachable states, oldest first, with the superseded future dimmed but still selectable');
 
-  // Every line is a point in time: a marker in its own narrow column, then the change with its details beneath it — a long
-  // document name wraps in the reading column instead of being squeezed into the marker's strip — and no elapsed time at all.
+  // Every line is a point in time. The marker and the line's badge share one narrow column, stacked, so the change and its
+  // details own everything beside them; a long document name wraps there instead of being squeezed into the marker's strip.
   const timePoints = await page.evaluate(() => {
     const rows = [...document.querySelectorAll('#activity .history-states [data-history-point], #activity .history-states .change')];
     const boxes = node => node.getBoundingClientRect();
@@ -164,21 +164,30 @@ try {
         const rail = node.querySelector(':scope > .history-rail');
         const text = node.querySelector(':scope > .text');
         const marker = rail?.querySelector('.icon');
+        const tag = rail?.querySelector('.history-tag');
         const meta = text?.querySelector(':scope > .sub');
-        if (!rail || !text || !marker || !meta) return false;
-        const [mark, info, body] = [boxes(marker), boxes(meta), boxes(text)];
-        // The details sit in the reading column, under the change, never in the marker's column beside it.
-        return info.left >= body.left - 1 && info.top >= boxes(text.querySelector(':scope > .msg')).bottom - 1 && mark.right <= body.left + 1;
+        if (!rail || !text || !marker || !tag || !meta) return false;
+        const [mark, badge, info, body] = [boxes(marker), boxes(tag), boxes(meta), boxes(text)];
+        // The badge is stacked under the marker in that column, and the details read in the column beside it.
+        return badge.top >= mark.bottom - 1 && Math.abs((badge.left + badge.right) / 2 - (mark.left + mark.right) / 2) <= 2
+          && mark.right <= body.left + 1 && info.left >= body.left - 1 && info.top >= boxes(text.querySelector(':scope > .msg')).bottom - 1;
       }).length,
-      narrowestRail: Math.min(...rows.map(node => Math.round(node.querySelector(':scope > .history-rail').getBoundingClientRect().width))),
-      widestMeta: Math.max(...rows.map(node => Math.round(node.querySelector(':scope > .text > .sub').getBoundingClientRect().width))),
+      tagged: rows.filter(node => node.querySelector(':scope > .history-rail > .history-tag')).length,
+      strayTags: rows.filter(node => node.querySelector(':scope > .history-tag')).length,
+      railWidths: [...new Set(rows.map(node => Math.round(node.querySelector(':scope > .history-rail').getBoundingClientRect().width)))],
+      narrowestText: Math.min(...rows.map(node => Math.round(node.querySelector(':scope > .text').getBoundingClientRect().width))),
+      clipped: [...document.querySelectorAll('#activity .history-states .history-tag')].filter(node => node.scrollWidth > node.clientWidth + 1).length,
     };
   });
   assert.equal(timePoints.times, 0, 'a history line shows no elapsed time');
-  assert.equal(timePoints.rail, timePoints.rows, 'every line keeps its marker in a narrow column and its details under the change');
-  assert.ok(timePoints.narrowestRail <= 24, `the marker column stays narrow (${timePoints.narrowestRail}px)`);
-  assert.ok(timePoints.widestMeta > 80, `and the details get the reading column to wrap in (${timePoints.widestMeta}px)`);
-  checks.push('each history line is one time point: a narrow marker column, details under the change, no elapsed time');
+  assert.equal(timePoints.rail, timePoints.rows, 'every line stacks its badge under its marker and reads its details beside them');
+  assert.equal(timePoints.tagged, timePoints.rows, 'every line keeps its badge in the marker column');
+  assert.equal(timePoints.strayTags, 0, 'and none is left in a column of its own beside the text');
+  assert.deepEqual(timePoints.railWidths.length, 1, `one narrow marker column for every line (${timePoints.railWidths.join(', ')})`);
+  assert.ok(timePoints.railWidths[0] <= 64, `the marker column stays narrow (${timePoints.railWidths[0]}px)`);
+  assert.ok(timePoints.narrowestText > 120, `and the text keeps the rest of the list (${timePoints.narrowestText}px)`);
+  assert.equal(timePoints.clipped, 0, 'no badge is cut short');
+  checks.push('each history line is one time point: badge stacked under the marker, details beside them, no elapsed time');
 
   const group = runtime.newGroup(), groupBase = runtime.historyHead().pointId, beforeGroup = authored(), pointCount = runtime.readTimeline().points.length;
   await patch('welcome', { artboard: { x: doc('welcome').artboard.x + 80 }, nodes: { 'title-text': { content: 'Grouped content' } } }, { group, label: 'Grouped project edit' });

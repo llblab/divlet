@@ -4,6 +4,9 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased
 
+- **History rows give their width to the text.** The Restore / Current / Ahead badge moved out of a column of its own and now stacks under
+  the marker inside the one narrow left column, so the change, its document and its actor get the whole remaining width to read in
+  (`web/lib/activity.js`, `web/board.css`, `web/tests/history.mjs`).
 - **History rows read again.** A row's document, actor and change detail no longer sit in the 44–80px marker column, where a long document
   name became a paragraph squeezed into a strip; the marker keeps its own narrow column and those details read under the change in the reading
   column, wrapping only where there is width for it (`web/lib/activity.js`, `web/board.css`, `web/tests/history.mjs`).

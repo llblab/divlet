@@ -163,8 +163,10 @@ function changeRow(row, point = null, timeline = null) {
   const rail = el('div', 'history-rail');
   rail.append(icon(change.kind === 'undo' || change.kind === 'redo' ? change.kind : iconName));
   if (details) text.append(el('div', 'sub', details));
+  // The line's marker and its restorability share the one narrow column, stacked, so the text beside them has the whole
+  // width of the list.
+  if (point) rail.append(el('span', 'history-tag', current ? 'Current' : future ? 'Ahead' : 'Restore'));
   line.append(rail, text);
-  if (point) line.append(el('span', 'history-tag', current ? 'Current' : future ? 'Ahead' : 'Restore'));
   line.dataset.tip = count > 1 ? `${count} steps undone together · #${row.seqs[0]}–#${change.seq}` : `#${change.seq} · v${change.fromVersion ?? '—'} → v${change.toVersion ?? '—'}${change.touched?.length ? ` · ${change.touched.length} node${change.touched.length === 1 ? '' : 's'}` : ''}`;
   line.dataset.seq = String(change.seq);
   if (point) {
@@ -208,10 +210,10 @@ function stateRow(point, index, timeline) {
   const range = point.seq == null ? 'Session baseline' : point.firstSeq !== point.seq ? `#${point.firstSeq}–#${point.seq}` : `#${point.seq}`;
   // One point in time: a marker in its own narrow column, then the state's name with the seq range under it.
   const rail = el('div', 'history-rail');
-  rail.append(icon('clock'));
+  rail.append(icon('clock'), el('span', 'history-tag', current ? 'Current' : future ? 'Ahead' : 'Restore'));
   const text = el('div', 'text');
   text.append(el('div', 'msg', point.label), el('div', 'sub', range));
-  line.append(rail, text, el('span', 'history-tag', current ? 'Current' : future ? 'Ahead' : 'Restore'));
+  line.append(rail, text);
   line.dataset.tip = current ? 'The project is at this state' : 'Restore the whole project after this grouped edit, including frame placement and project settings';
   const expectedPoint = timeline.current;
   line.addEventListener('click', () => navigate(point.id, expectedPoint));
