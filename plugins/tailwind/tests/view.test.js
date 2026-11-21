@@ -45,6 +45,16 @@ test('a bare text bracket is a size, and leading reads back as a line height', (
   assert.equal(classView('text-sm/6')['line-height'], '24px', 'a size with a line-height sets both');
 });
 
+test('overflow reads back per axis, so a hand-written axis is not mistaken for a shorthand', () => {
+  assert.deepEqual(declarationsOfClass('overflow-hidden'), [['overflow', 'hidden']]);
+  assert.deepEqual(declarationsOfClass('overflow-x-auto'), [['overflow-x', 'auto']]);
+  assert.deepEqual(declarationsOfClass('overflow-y-clip'), [['overflow-y', 'clip']]);
+  assert.deepEqual(declarationsOfClass('overflow-visible'), [['overflow', 'visible']]);
+  assert.deepEqual(declarationsOfClass('overflow-inset'), [], 'only the five real keywords are overflow');
+  assert.equal(classView('overflow-hidden').overflow, 'hidden', 'the shorthand stays a shorthand for the board to expand');
+  assert.equal(classView('overflow-x-hidden')['overflow-y'], undefined, 'a single axis leaves the other one unset');
+});
+
 test('what the writer lowers to utilities reads back as the same declarations', () => {
   const edits = { display: 'flex', 'padding-right': '4px', 'margin-left': 'auto', 'margin-right': 'auto', 'z-index': '3', opacity: '0.4', filter: 'blur(8px)', 'font-weight': '800', 'background-color': '#112233', top: '8px', 'grid-template-columns': 'repeat(3, minmax(0, 1fr))', 'border-radius': '12px' };
   const className = applyStyles('', edits, { scale: true });

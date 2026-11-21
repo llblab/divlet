@@ -12,6 +12,7 @@ const MIXED = Symbol('mixed');
 const same = values => (values.every(value => value === values[0]) ? values[0] : MIXED);
 
 const DISPLAY = [['block', 'Block'], ['flex', 'Flex'], ['grid', 'Grid'], ['inline', 'Inline'], ['inline-block', 'Inline block'], ['inline-flex', 'Inline flex'], ['inline-grid', 'Inline grid'], ['none', 'Hidden']];
+const OVERFLOW = [['visible', 'Visible'], ['hidden', 'Hidden'], ['clip', 'Clip'], ['scroll', 'Scroll'], ['auto', 'Auto']];
 const POSITION = [['static', 'Static'], ['relative', 'Relative'], ['absolute', 'Absolute'], ['fixed', 'Fixed'], ['sticky', 'Sticky']];
 const AXIS = ['start', 'center', 'end'];
 // How children are spread along the main axis (justify-content) and placed across it (align-items).
@@ -447,8 +448,11 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
   const position = value(view => view.position ?? null);
   const layout = el('div', 'layout-box');
   const top = el('div', 'grid2');
+  const overflow = value(view => css.overflowOf(view));
   top.append(
     pick('Display', display, DISPLAY, next => run({ display: next }, next ? `display ${next === 'none' ? 'hidden' : next}` : 'default display'), { variants: variants('display') }),
+    // How the box treats content that does not fit: a container behaviour next to Display, read from both axes as one value.
+    pick('Overflow', overflow === 'mixed' ? MIXED : overflow, OVERFLOW, next => run({ overflow: next }, next ? `overflow ${next}` : 'default overflow'), { variants: variants('overflow') }),
   );
   layout.append(top);
 

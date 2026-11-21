@@ -595,7 +595,22 @@ try {
   await waitUntil(() => navClasses().includes('grid') && !navClasses().includes('flex'), 'display menu replaces flex');
   await page.keyboard.press('Control+z');
   await waitUntil(() => navClasses().includes('flex') && !navClasses().includes('grid'), 'each tool change is one undo step');
-  check('layout tools: align, pin, padding, margin, position, display, opacity, z-index write classes');
+  // Overflow is a Layout selector beside Display: it reads both axes as one value and writes one utility.
+  await page.locator('#inspector [data-key="pick:Overflow"]').click();
+  await menuItem('Hidden').click();
+  await waitUntil(() => navClasses().includes('overflow-hidden'), 'the overflow selector writes the utility');
+  await new Promise(resolve => setTimeout(resolve, 600));
+  console.log('DEBUG', JSON.stringify({ text: await page.locator('#inspector [data-key="pick:Overflow"]').innerText(), classes: navClasses().filter(name => /overflow/.test(name)), view: await page.evaluate(async () => { const css = await import('./lib/css-props.js'); const store = await import('./lib/store.js'); const node = store.cachedModel('welcome').nodes.nav; const view = css.viewOf(node, []); return { overflow: view.overflow ?? null, x: view['overflow-x'] ?? null, y: view['overflow-y'] ?? null }; }) }));
+  await page.locator('#inspector [data-key="pick:Overflow"]').click();
+  await menuItem('Auto').click();
+  await waitUntil(() => navClasses().includes('overflow-auto') && !navClasses().includes('overflow-hidden'), 'a second choice replaces the first');
+  await page.keyboard.press('Control+z');
+  await waitUntil(() => navClasses().includes('overflow-hidden') && !navClasses().includes('overflow-auto'), 'and it is one undo step');
+  const handWritten = runtime.read({ view: 'document', documentId: 'welcome' });
+  await runtime.patch({ documentId: 'welcome', expectedVersion: handWritten.version, actor: 'user', patch: { nodes: { nav: { className: `${navClasses().filter(name => !/^overflow/.test(name)).join(' ')} overflow-x-hidden` } } } });
+  await waitUntil(async () => /Mixed/.test(await page.locator('#inspector [data-key="pick:Overflow"]').innerText()), 'one hand-written axis is not a shorthand value, so the selector says Mixed instead of guessing the other');
+  await runtime.patch({ documentId: 'welcome', expectedVersion: runtime.read({ view: 'document', documentId: 'welcome' }).version, actor: 'user', patch: { nodes: { nav: { className: navClasses().filter(name => !/^overflow/.test(name)).join(' ') } } } });
+  check('layout tools: align, pin, padding, margin, position, display, overflow, opacity, z-index write classes');
 
   // The same fields change several elements at once.
   await page.evaluate(async () => { const m = await import('./lib/store.js'); m.selectNodes('welcome', ['nav', 'footer']); });

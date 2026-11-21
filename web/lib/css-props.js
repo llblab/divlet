@@ -341,6 +341,17 @@ export function lineHeightIn(number, from, to, base = 16) {
   return String(Math.round(result * 1000) / 1000);
 }
 
+/**
+ * The authored overflow of both axes as one value — what the Layout selector shows and writes. `null` when nothing is authored and
+ * `'mixed'` when the two axes disagree (or a single axis is set), because one shorthand cannot honestly claim such a pair.
+ */
+export function overflowOf(view) {
+  const x = view['overflow-x'] ?? view['overflow'] ?? null;
+  const y = view['overflow-y'] ?? view['overflow'] ?? null;
+  if (x == null && y == null) return null;
+  return x === y && typeof x === 'string' ? x : 'mixed';
+}
+
 /** Font size in px for the field (`16px`, `1rem` at the 16px root), or the value as written. */
 export function fontSizeOf(view) {
   const text = view['font-size'];

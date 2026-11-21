@@ -140,6 +140,13 @@ test('without the provider the same controls write native inline CSS and there i
     await until(async () => (await computed(page, 'paddingRight')) === '4px', 'a padding edit renders');
     assert.equal(await attr(page, 'style'), 'padding-right:4px', 'the edit is a native inline declaration');
     assert.equal(await attr(page, 'class'), classBefore, 'no utility class is invented');
+    // Overflow is a plain declaration without an engine, and the selector reads the authored pair back as one value.
+    await page.locator('#inspector [data-key="pick:Overflow"]').click();
+    await page.getByRole('menuitemradio', { name: 'Hidden', exact: true }).click();
+    await until(async () => (await computed(page, 'overflow')) === 'hidden', 'the overflow selector writes overflow-x and overflow-y');
+    assert.match(await attr(page, 'style') ?? '', /overflow: ?hidden/, 'as one shorthand declaration');
+    await undo(page);
+    await until(async () => !/overflow/.test((await attr(page, 'style')) ?? ''), 'and one Undo removes it');
     // A declaration a control owns is not listed again in the raw CSS list.
     await page.locator('#inspector [data-section="style"] summary').click();
     assert.equal(await page.locator('#inspector [data-section="style"] .kv > .k').count(), 0, 'More CSS lists only what no control shows');

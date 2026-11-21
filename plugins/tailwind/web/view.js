@@ -62,6 +62,9 @@ export function declarationsOfClass(name, names = new Set()) {
   if (m) return [['align-self', EDGE[m[1]]]];
   m = /^text-(left|center|right|justify|start|end)$/.exec(name);
   if (m) return [['text-align', m[1]]];
+  // Overflow: the shorthand sets both axes, an axis utility sets one (`overflow-x-hidden`, `overflow-y-auto`).
+  m = /^overflow-(x-|y-)?(auto|hidden|clip|visible|scroll)$/.exec(name);
+  if (m) return [[m[1] ? `overflow-${m[1][0]}` : 'overflow', m[2]]];
   if (tw.GROUPS.opacity.test(name)) { const value = tw.valueOf(name, 'opacity'); return value == null ? [] : [['opacity', String(value / 100)]]; }
   if (tw.GROUPS.z.test(name)) { const value = tw.valueOf(name, 'z'); return value == null ? [] : [['z-index', String(value)]]; }
   if (tw.GROUPS.blur.test(name)) { const value = tw.valueOf(name, 'blur'); return value == null ? [] : [['filter', `blur(${value}px)`]]; }
