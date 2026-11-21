@@ -39,8 +39,8 @@ const waitUntil = async (check, label, timeout = 8000) => {
     await input.waitFor();
     assert.equal(await input.isDisabled(), false);
   };
-  // The dialog's own layout: every block has the same space above and below the divider, and the actions sit in the bottom-right
-  // corner above nothing but the reserved status line.
+  // The dialog's own layout: every block has the same space above and below it — no line divides them — and the actions sit in
+  // the bottom-right corner above nothing but the reserved status line.
   {
     const layout = await page.evaluate(() => {
       const blocks = [...document.querySelectorAll('#help .settings-block')].map(node => {
@@ -63,10 +63,10 @@ const waitUntil = async (check, label, timeout = 8000) => {
     });
     assert.ok(layout.blocks.length >= 3, 'the dialog is made of blocks');
     for (const block of layout.blocks) {
-      assert.equal(block.top, block.bottom, `every block has the same space above and below its divider (${block.top} / ${block.bottom})`);
+      assert.equal(block.top, block.bottom, `every block has the same space above and below it (${block.top} / ${block.bottom})`);
       assert.equal(block.top, '12px');
     }
-    assert.deepEqual(layout.blocks.map(block => block.border), ['0px', '1px', '1px', '1px'], 'the divider lives between blocks, never above the first');
+    assert.deepEqual(layout.blocks.map(block => block.border), ['0px', '0px', '0px', '0px'], 'no line separates the blocks: their own rhythm does that work');
     assert.ok(layout.rightGap <= 20, `the actions sit in the bottom-right corner (${layout.rightGap}px from the edge)`);
     assert.ok(layout.statusAbove >= 4 && layout.statusAbove <= 16, `and keep a small gap from the options above (${layout.statusAbove}px)`);
     assert.equal(layout.statusIsLastControl, true, 'the status line is the last control above the buttons, so its text cannot push them');

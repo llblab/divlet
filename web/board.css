@@ -14,6 +14,10 @@
   --solid: #fffffd;
   --field: rgba(27, 27, 25, .05);
   --field-hover: rgba(27, 27, 25, .085);
+  /* An action control is a button, not a place to type: it sits one clear step above an input's own fill, so a dropdown
+     selector never reads as a text field. No border separates the two — the tone does. */
+  --control: rgba(27, 27, 25, .11);
+  --control-hover: rgba(27, 27, 25, .17);
   --hair: rgba(27, 27, 25, .1);
   --accent: #5b5bf0; --on-accent: #fff; --bad-ink: #c4262c;
   --accent-ink: #4545d6;
@@ -46,6 +50,7 @@
     color-scheme: dark;
     --bg: #131312; --dot: #2b2b28; --ink: #ecebe6; --muted: #a3a199; --faint: #57564f;
     --panel: #1c1c1a; --solid: #1c1c1a; --field: rgba(236, 235, 230, .06); --field-hover: rgba(236, 235, 230, .1); --hair: rgba(236, 235, 230, .1);
+    --control: rgba(236, 235, 230, .13); --control-hover: rgba(236, 235, 230, .2);
     --accent: #8d8dff; --on-accent: #15141f; --bad-ink: #ff8f93; --accent-ink: #a5a5ff; --accent-soft: rgba(141, 141, 255, .17); --ok: #46c88e; --warn: #e3a83b; --bad-soft: rgba(229, 72, 77, .18); --component: #e58ad0; --component-soft: rgba(229, 138, 208, .16);
     --syn-comment: #6f6e65; --syn-atrule: #c792ea; --syn-selector: #f0b36b; --syn-class: #ffa07a; --syn-pseudo: #7fd6e6; --syn-prop: #82aaff; --syn-number: #7fdbca; --syn-color: #f78fb3; --syn-string: #a5d6a7; --syn-func: #7dcfff; --syn-var: #bb9af7; --syn-important: #ff757f; --syn-punct: #7d7b72;
     --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 36px rgba(0, 0, 0, .45);
@@ -56,6 +61,7 @@
   color-scheme: dark;
   --bg: #131312; --dot: #2b2b28; --ink: #ecebe6; --muted: #a3a199; --faint: #57564f;
   --panel: #1c1c1a; --solid: #1c1c1a; --field: rgba(236, 235, 230, .06); --field-hover: rgba(236, 235, 230, .1); --hair: rgba(236, 235, 230, .1);
+    --control: rgba(236, 235, 230, .13); --control-hover: rgba(236, 235, 230, .2);
   --accent: #8d8dff; --on-accent: #15141f; --bad-ink: #ff8f93; --accent-ink: #a5a5ff; --accent-soft: rgba(141, 141, 255, .17); --ok: #46c88e; --warn: #e3a83b; --bad-soft: rgba(229, 72, 77, .18); --component: #e58ad0; --component-soft: rgba(229, 138, 208, .16);
   --syn-comment: #6f6e65; --syn-atrule: #c792ea; --syn-selector: #f0b36b; --syn-class: #ffa07a; --syn-pseudo: #7fd6e6; --syn-prop: #82aaff; --syn-number: #7fdbca; --syn-color: #f78fb3; --syn-string: #a5d6a7; --syn-func: #7dcfff; --syn-var: #bb9af7; --syn-important: #ff757f; --syn-punct: #7d7b72;
   --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 36px rgba(0, 0, 0, .45);
@@ -407,8 +413,8 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .grid2:has(> .pick) > .pick { flex-basis: auto; max-width: 100%; }
 /* layout, spacing, effects: small controls that write Tailwind classes */
 .layout-box, .spacing-box { display: grid; gap: 8px; }
-.pick { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: center; gap: 2px 6px; min-width: 0; min-height: 30px; padding: 6px 22px 6px 9px; line-height: 18px; border: 0; border-radius: var(--radius-inner); background: var(--field); color: var(--ink); text-align: left; }
-.pick:hover { background: var(--field-hover); }
+.pick { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: center; gap: 2px 6px; min-width: 0; min-height: 30px; padding: 6px 22px 6px 9px; line-height: 18px; border: 0; border-radius: var(--radius-inner); background: var(--control); color: var(--ink); text-align: left; }
+.pick:hover { background: var(--control-hover); }
 .pick-k { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; font-weight: 600; color: var(--ink); }
 .pick-v { text-align: right; white-space: nowrap; overflow-wrap: normal; color: var(--muted); font: 11.5px/18px var(--mono); }
 .pick-caret { position: absolute; right: 7px; top: calc(50% - 5px); width: 10px; height: 10px; color: var(--muted); transform: rotate(90deg); }
@@ -425,12 +431,13 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .segs-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
 .align-controls { justify-content: space-between; }
 .labeled-segs { display: inline-flex; flex: none; align-items: center; gap: 6px; white-space: nowrap; }
-.segs { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--radius-inner); background: var(--field); }
+.segs { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--radius-inner); background: var(--control); }
 .seg-icon { display: grid; place-items: center; width: 26px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-small); background: transparent; color: var(--muted); }
 .seg-icon .icon { width: 14px; height: 14px; }
 .seg-icon:hover { color: var(--ink); }
 .seg-icon.on { background: var(--solid); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, .14); }
-.seg-icon.solo { width: 28px; height: 28px; border-radius: var(--radius-small); background: var(--field); }
+.seg-icon.solo { width: 28px; height: 28px; border-radius: var(--radius-small); background: var(--control); }
+.seg-icon.solo:hover:not(:disabled):not(.on) { background: var(--control-hover); }
 .seg-icon.solo.on { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
 .vf { position: relative; display: flex; align-items: center; gap: 3px; min-width: 0; height: 28px; padding: 0 6px 0 0; border-radius: var(--radius-small); background: var(--field); }
 .vf:focus-within, .vf.scrubbing { outline-offset: 1px; outline: var(--focus-ring) solid var(--accent); }
@@ -704,10 +711,9 @@ body.bar-dragging { user-select: none; }
 .dialog { width: min(720px, 100%); max-height: calc(var(--vh) - 32px); overflow-y: auto; padding: 16px 18px 14px; border: 1px solid var(--hair); border-radius: 16px; background: var(--solid); box-shadow: var(--shadow); animation: rise .2s var(--ease); }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .dialog h2 { margin: 0; font-size: 15px; font-weight: 600; }
-/* Settings: one block per section, the divider between blocks, so nothing is glued to a line and the space above and below it
-   is the same everywhere. */
+/* Settings: one block per section. A line between blocks would be a border doing a divider's job, so the space above and below
+   is the same everywhere and the eye separates them by rhythm alone. */
 .settings-block { padding: 12px 0; }
-.settings-block + .settings-block { border-top: 1px solid var(--hair); }
 .settings-row { display: flex; align-items: center; gap: 12px; }
 .settings-label { min-width: 96px; color: var(--muted); }
 .settings-row { flex-wrap: wrap; }
@@ -746,8 +752,8 @@ body.bar-dragging { user-select: none; }
 html.w440 .shortcut-group dl { grid-template-columns: minmax(0, 1fr); gap: 0; }
 html.w440 .shortcut-group dt { padding-top: 5px; }
 html.w440 .shortcut-group dd { text-align: left; padding-bottom: 5px; white-space: normal; }
-.dialog-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 12px; border-top: 1px solid var(--hair); }
-.segmented { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--field); }
+.dialog-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 4px; padding-top: 12px; }
+.segmented { display: inline-flex; gap: 2px; padding: 2px; border-radius: 9px; background: var(--control); }
 .seg { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border: 0; border-radius: var(--radius-small); background: transparent; color: var(--muted); }
 .seg .icon { width: 14px; height: 14px; }
 .seg:hover { color: var(--ink); }
@@ -845,7 +851,7 @@ html[data-sidebar="tiny"] .chat-list { padding: 0 1px; }
 /* ---- palette -------------------------------------------------------------- */
 .palette-scrim { place-items: start center; padding-top: min(calc(var(--vh) * 0.14), 120px); }
 .palette { display: flex; flex-direction: column; width: min(620px, 100%); max-height: min(560px, calc(var(--vh) - 32px)); padding: 0; overflow: hidden; }
-.palette-field { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--hair); color: var(--muted); }
+.palette-field { display: flex; align-items: center; gap: 10px; padding: 12px 14px 10px; color: var(--muted); }
 .palette-field .icon { width: 17px; height: 17px; }
 .palette-input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 15px; }
 .palette-input::placeholder { color: var(--faint); }
@@ -859,7 +865,7 @@ html[data-sidebar="tiny"] .chat-list { padding: 0 1px; }
 .palette-label { flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .palette-hint { flex: none; font: 11px var(--mono); color: var(--muted); max-width: 40%; white-space: normal; overflow-wrap: anywhere; text-align: right; }
 .palette-tag { font-size: 10.5px; color: var(--muted); flex: none; }
-.palette-foot { display: flex; gap: 14px; padding: 7px 14px; border-top: 1px solid var(--hair); color: var(--muted); font-size: 11px; }
+.palette-foot { display: flex; gap: 14px; padding: 9px 14px 8px; color: var(--muted); font-size: 11px; }
 
 /* ---- history: conversation and collapsed steps ---------------------------- */
 .times { margin-left: 6px; padding: 0 5px; border-radius: 5px; background: var(--field-hover); color: var(--muted); font: 600 10.5px/16px var(--mono); }

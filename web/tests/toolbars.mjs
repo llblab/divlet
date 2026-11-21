@@ -333,6 +333,30 @@ try {
     assert.deepEqual(design.family.boxFields, [18], 'all compact box-model fields, including offsets, borders and dimensions, share their own height');
     assert.deepEqual(design.disabled, ['0.4'], `disabled controls share one step (${design.disabled.join(', ')})`);
 
+    // An action control is a button, not a place to type: its own fill, a clear step above an input's, and no border drawing
+    // the difference. The palette proves that a section boundary is rhythm, never a line.
+    const surfaces = await page.evaluate(() => {
+      const alpha = selector => {
+        const node = document.querySelector(selector);
+        if (!node) return null;
+        const match = /rgba?\(([^)]+)\)/.exec(getComputedStyle(node).backgroundColor);
+        const parts = (match?.[1] || '').split(',').map(part => Number.parseFloat(part));
+        return parts.length === 4 ? parts[3] : 1;
+      };
+      return { pick: alpha('#inspector .pick'), segs: alpha('#inspector .segs'), field: alpha('#inspector .vf'), num: alpha('#inspector .num') };
+    });
+    assert.ok(surfaces.pick - surfaces.field >= .04, `a dropdown selector reads as a button, not as a field (${surfaces.pick} vs ${surfaces.field})`);
+    if (surfaces.segs != null) assert.ok(surfaces.segs - surfaces.field >= .04, `a segmented group is a button too (${surfaces.segs} vs ${surfaces.field})`);
+    if (surfaces.num != null) assert.equal(surfaces.num, surfaces.field, 'a numeric field keeps the field fill');
+    await page.evaluate(async () => (await import('./lib/palette.js')).toggle(true));
+    await page.waitForSelector('.palette .palette-item');
+    const lines = await page.evaluate(() => ['.palette-field', '.palette-foot'].map(selector => {
+      const style = getComputedStyle(document.querySelector(selector));
+      return `${style.borderTopWidth}/${style.borderBottomWidth}`;
+    }));
+    assert.deepEqual(lines, ['0px/0px', '0px/0px'], 'the palette separates its sections by rhythm, never by a line');
+    await page.keyboard.press('Escape');
+
     // One ring, declared once: every focus rule reads the same token, and a field wrapper rings instead of its input (which
     // would draw a second one). `:focus-visible` follows the browser's modality heuristic, so the browser check measures the
     // wrapper's `:focus-within`, which is deterministic.
