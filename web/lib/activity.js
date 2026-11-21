@@ -141,14 +141,14 @@ function collapse(changes) {
   return rows;
 }
 
-/** One line of the linear history. With `point` the line is also the project state after that edit and restores it when activated. */
-function changeRow(row, readOnly = false, point = null, timeline = null) {
+/** One line of the linear history: the project state after that edit, which it restores when activated. */
+function changeRow(row, point = null, timeline = null) {
   const { change, count } = row;
   const [iconName, who] = ACTOR[change.actor] || ACTOR.system;
   const current = !!point && point.id === timeline.current;
   const future = !!point && timeline.points.findIndex(item => item.id === point.id) > timeline.index;
-  const line = el(readOnly && !point ? 'div' : 'button', `change actor-${change.actor} kind-${change.kind}${readOnly && !point ? ' history-audit' : ''}${point ? ` history-state${current ? ' is-current' : ''}${future ? ' is-future' : ''}` : ''}`);
-  if (!readOnly || point) line.type = 'button';
+  const line = el('button', `change actor-${change.actor} kind-${change.kind}${point ? ` history-state${current ? ' is-current' : ''}${future ? ' is-future' : ''}` : ''}`);
+  line.type = 'button';
   const kind = KIND[change.kind];
   const title = change.label && change.label !== change.summary ? change.label : change.summary;
   const text = el('div', 'text');
@@ -176,7 +176,7 @@ function changeRow(row, readOnly = false, point = null, timeline = null) {
     const expectedPoint = timeline.current;
     line.addEventListener('click', () => navigate(point.id, expectedPoint));
     line.addEventListener('keydown', pointKeys(line));
-  } else if (!readOnly) {
+  } else {
     line.disabled = ![...row.documents].some(id => descriptor(id));
     line.dataset.tip += ' · Show affected elements in their current state';
     line.addEventListener('click', () => focusChange({ ...change, touched: row.touched }, [...row.documents]));
@@ -253,23 +253,24 @@ export function render() {
   const rows = collapse(changes).reverse();
   const supported = supportsNavigation();
   if (supported) {
-    // One linear history: every change newest first, and each line that is also a retained project state restores it.
+    // One linear history of the states a restore can reach, oldest first: the reachable past ends at the current state and the
+    // superseded future follows, dimmed because the next edit may overwrite it. Changes that are not an addressable state are
+    // not listed — this list is where you can go, not an audit log.
     const states = el('div', 'history-states');
     states.setAttribute('role', 'group'); states.setAttribute('aria-label', 'Project history'); states.tabIndex = -1;
     if (timelineReady()) {
       const timeline = timelineRead.timeline;
       const byLastSeq = new Map(rows.map(row => [row.change.seq, row]));
-      const pointOf = new Map();
-      const orphans = [];
+      const used = new Set();
+      const limited = timeline.pastLimited || timeline.futureLimited ? ' Some legacy Undo/Redo entries lie outside this connected timeline.' : '';
+      // The boundary explains the oldest state, so it opens the list rather than trailing the dimmed future.
+      states.append(el('p', 'history-boundary', (BOUNDARY[timeline.boundary] || BOUNDARY.retained) + limited));
+      if (!timeline.points.length) states.append(el('div', 'quiet', 'No changes yet. Every edit by you, an agent or an external file appears here; the conversation is in the Agent tab.'));
       for (const point of timeline.points) {
         const row = point.seq == null ? null : byLastSeq.get(point.seq);
-        if (row && !pointOf.has(row)) pointOf.set(row, point); else orphans.push(point);
+        if (row && !used.has(row)) { used.add(row); states.append(changeRow(row, point, timeline)); }
+        else states.append(stateRow(point, timeline.points.indexOf(point), timeline));
       }
-      const entries = [...rows.map(row => ({ seq: row.change.seq, row })), ...orphans.map(point => ({ seq: point.seq ?? -1, point }))].sort((a, b) => b.seq - a.seq);
-      for (const entry of entries) states.append(entry.row ? changeRow(entry.row, true, pointOf.get(entry.row) ?? null, timeline) : stateRow(entry.point, timeline.points.indexOf(entry.point), timeline));
-      if (!entries.length) states.append(el('div', 'quiet', 'No changes yet. Every edit by you, an agent or an external file appears here; the conversation is in the Agent tab.'));
-      const limited = timeline.pastLimited || timeline.futureLimited ? ' Some legacy Undo/Redo entries lie outside this connected timeline.' : '';
-      states.append(el('p', 'history-boundary', (BOUNDARY[timeline.boundary] || BOUNDARY.retained) + limited));
     } else states.append(el('div', 'quiet', readError ? 'The project history is unavailable.' : 'Reading the project history…'));
     body.append(states);
   } else {

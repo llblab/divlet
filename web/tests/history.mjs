@@ -105,6 +105,53 @@ try {
   await go(draggedPoint); assert.deepEqual(authored(), dragged);
   checks.push('real pointer drag creates one endpoint; chosen rows restore exact authored placement and forward return');
 
+  // The list is only the states a restore can reach, oldest first, with everything after the current one dimmed but still a choice.
+  const listed = (selector = '#activity .history-states') => page.evaluate(selector => {
+    const rows = [...document.querySelectorAll(`${selector} [data-history-point]`)];
+    return {
+      points: rows.map(node => node.dataset.historyPoint),
+      rows: document.querySelectorAll(`${selector} > .change`).length,
+      current: rows.findIndex(node => node.getAttribute('aria-current') === 'step'),
+      colours: rows.map(node => getComputedStyle(node.querySelector('.msg')).color),
+      enabled: rows.map(node => node.getAttribute('aria-disabled') !== 'true'),
+    };
+  }, selector);
+  const tones = () => page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#activity .history-states [data-history-point]')];
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--muted)';
+    document.body.append(probe);
+    const muted = getComputedStyle(probe).color;
+    probe.remove();
+    const at = rows.findIndex(node => node.getAttribute('aria-current') === 'step');
+    const tone = node => getComputedStyle(node.querySelector('.msg')).color;
+    return {
+      points: rows.map(node => node.dataset.historyPoint),
+      rows: document.querySelectorAll('#activity .history-states > .change').length,
+      at,
+      muted,
+      current: at < 0 ? null : tone(rows[at]),
+      past: rows.slice(0, Math.max(0, at)).map(tone),
+      future: rows.slice(at + 1).map(tone),
+      futureEnabled: rows.slice(at + 1).map(node => node.getAttribute('aria-disabled') !== 'true'),
+    };
+  });
+  await openHistory();
+  const order = runtime.readTimeline();
+  const all = await tones();
+  assert.deepEqual(all.points, order.points.map(point => point.id), 'every reachable state appears once, oldest first');
+  assert.equal(all.rows, order.points.length, 'no line is listed that a restore cannot reach');
+  assert.equal(all.at, order.index, 'the current state is where the reachable past ends, not the top of the list');
+  assert.ok(all.current && all.current !== all.muted, 'the current state keeps the list colour');
+  await go(initialPoint);
+  const split = await tones();
+  assert.ok(split.future.length > 0 && split.at < split.points.length - 1, 'restoring leaves a superseded future below the current state');
+  assert.deepEqual(split.future.filter(colour => colour !== split.muted), [], 'the superseded future is dimmed to the muted tone');
+  assert.deepEqual(split.past.filter(colour => colour === split.muted), [], 'the reachable past keeps the ordinary list colour');
+  assert.deepEqual(split.futureEnabled.filter(enabled => !enabled), [], 'the dimmed future is still a choice');
+  await go(draggedPoint);
+  checks.push('history lists only reachable states, oldest first, with the superseded future dimmed but still selectable');
+
   const group = runtime.newGroup(), groupBase = runtime.historyHead().pointId, beforeGroup = authored(), pointCount = runtime.readTimeline().points.length;
   await patch('welcome', { artboard: { x: doc('welcome').artboard.x + 80 }, nodes: { 'title-text': { content: 'Grouped content' } } }, { group, label: 'Grouped project edit' });
   await patch(second, { artboard: { y: 330 }, nodes: { root: { children: ['message'] }, message: { id: 'message', type: 'text', content: 'Grouped second frame' } } }, { group, label: '' });

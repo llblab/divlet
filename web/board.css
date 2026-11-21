@@ -360,7 +360,14 @@ button.change:hover:not(:disabled) { background: var(--field); }
 
 /* Addressable states and audit activity have different semantics, not two competing replay controls. */
 .history-state { position: relative; cursor: pointer; }
+/* The reachable past reads in the list's own colour; the superseded future is dimmed because the next edit may overwrite it. */
+.history-state.is-future { color: var(--muted); }
+.history-state.is-future .msg { color: var(--muted); }
+.history-state.is-future .sub, .history-state.is-future .when { color: var(--faint); }
+.history-state.is-future .icon { opacity: .5; }
+.history-state.is-future .history-tag { opacity: .75; }
 .history-state.is-current { background: var(--accent-soft); }
+.history-state.is-current .msg { color: var(--ink); }
 .history-state[aria-disabled="true"] { cursor: default; }
 .history-state[aria-busy="true"] { box-shadow: inset 0 -2px var(--accent); }
 .history-state .icon { flex: none; }

@@ -664,29 +664,21 @@ try {
   page.off('request', countHiddenRead);
   await page.locator('#open-history').click();
   await page.locator('#activity .change').first().waitFor();
-  assert.equal(await page.locator('#activity .chip, #activity [data-filter]').count(), 0, 'History has no author filters: it lists every change, the conversation is in the Agent tab');
+  assert.equal(await page.locator('#activity .chip, #activity [data-filter]').count(), 0, 'History has no author filters and lists only the states a restore can reach; the conversation is in the Agent tab');
   assert.ok(await page.locator('#activity .change.actor-user').count() > 0);
-  for (const [kind, badge] of [['undo', 'Undo'], ['redo', 'Redo'], ['create', 'New'], ['delete', 'Removed'], ['external', 'File edit'], ['host-event', null], ['constructor', null], ['__proto__', null]]) {
-    const change = runtime.record({ actor: 'user', kind, documentId: 'mobile', text: `Audit kind ${kind}` });
-    const row = page.locator(`#activity .change[data-seq="${change.seq}"]`);
-    await row.waitFor({ state: 'attached' });
-    assert.equal(await row.locator('.kind').count(), badge ? 1 : 0, `only registered kinds get badges: ${kind}`);
-    if (badge) assert.equal(await row.locator('.kind').textContent(), badge);
-    assert.ok((await row.locator('.msg').textContent()).includes(change.summary), 'unknown kinds retain their ordinary message');
-  }
   for (const [actor, who] of [['agent', 'Pi'], ['user', 'You'], ['file', 'File'], ['system', 'divlet'], ['external-tool', 'divlet'], ['constructor', 'divlet'], ['__proto__', 'divlet']]) {
     await runtime.patch({ documentId: 'mobile', expectedVersion: doc('mobile').version, patch: { metadata: { historyActorProbe: actor } }, actor });
     const row = page.locator(`#activity .change[data-seq="${last().seq}"]`);
     await row.waitFor({ state: 'attached' });
     assert.ok((await row.locator('.sub').textContent()).includes(` · ${who}`), `actor label uses the registered value or system fallback: ${actor}`);
   }
-  check('audit labels: known variants preserved; unknown/prototype-named kinds have no badge and actors use the system fallback');
+  check('actor labels: known variants preserved and unknown/prototype names use the system fallback');
   const historyBase = runtime.historyHead().pointId, mobileBeforeHistory = doc('mobile').name;
   await runtime.patch({ documentId: 'mobile', expectedVersion: doc('mobile').version, patch: { name: 'Mobile by Pi' }, actor: 'agent', label: 'rename mobile' });
   const historyFuture = runtime.historyHead().pointId;
   const stateRow = point => page.locator(`#activity [data-history-point="${point}"]`);
   await waitUntil(async () => (await stateRow(historyFuture).getAttribute('aria-current').catch(() => null)) === 'step', 'the state row follows the owner point');
-  assert.equal(await page.locator('#activity .history-audit').evaluateAll(rows => rows.filter(row => row.tagName === 'BUTTON' || row.dataset.historyPoint).length), 0, 'a line that is not a retained state is not disguised as a historical address');
+  assert.equal(await page.locator('#activity .history-states > .change:not([data-history-point])').count(), 0, 'a change that is not a retained state is not listed at all');
   await stateRow(historyBase).click();
   await waitUntil(() => doc('mobile').name === mobileBeforeHistory && runtime.historyHead().pointId === historyBase, 'a row restores the project after that grouped state');
   await waitUntil(async () => await stateRow(historyFuture).count() === 1, 'the retained forward state remains visible');
@@ -717,10 +709,10 @@ try {
   await waitUntil(async () => (await stateRow(equalPoint).getAttribute('aria-current').catch(() => null)) === 'step', 'Space activates forward navigation at phone/200%');
   const historyClipping = await page.locator('#activity .history-states').evaluate(states => [...states.querySelectorAll('.history-state, .msg, .sub, .history-tag')].filter(node => node.scrollWidth > node.clientWidth + 1).map(node => node.className));
   assert.deepEqual(historyClipping, [], 'whole state labels and status values fit the narrow timeline');
-  await stateRow(equalPoint).press('End');
-  assert.equal(await page.evaluate(() => document.activeElement?.dataset.historyPoint), runtime.readTimeline().points[0].id, 'End reaches the oldest retained state');
-  await page.keyboard.press('Home');
-  assert.equal(await page.evaluate(() => document.activeElement?.dataset.historyPoint), equalPoint, 'Home reaches the newest state without editing the canvas');
+  await stateRow(equalPoint).press('Home');
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.historyPoint), runtime.readTimeline().points[0].id, 'Home reaches the oldest retained state, which opens the list');
+  await page.keyboard.press('End');
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.historyPoint), runtime.readTimeline().points.at(-1).id, 'End reaches the newest state without editing the canvas');
   await page.evaluate(async () => (await import('./lib/help.js')).setUiSize(100));
   await page.setViewportSize({ width: 1500, height: 960 });
   let historyPosts = 0;
@@ -732,6 +724,16 @@ try {
   await waitUntil(async () => await page.locator('#activity [data-history-point]').count() === 0, 'an owner without the capability never gets replay controls');
   await page.locator('#activity button.change.actor-agent', { hasText: 'rename mobile' }).first().click();
   await waitUntil(() => runtime.info().selection.ids[0] === 'mobile', 'legacy owner rows still reveal current subjects');
+  // Without state navigation the panel is an audit list, and that is where unknown or prototype-named kinds still render.
+  for (const [kind, badge] of [['undo', 'Undo'], ['redo', 'Redo'], ['create', 'New'], ['delete', 'Removed'], ['external', 'File edit'], ['host-event', null], ['constructor', null], ['__proto__', null]]) {
+    const change = runtime.record({ actor: 'user', kind, documentId: 'mobile', text: `Audit kind ${kind}` });
+    const row = page.locator(`#activity .change[data-seq="${change.seq}"]`);
+    await row.waitFor({ state: 'attached' });
+    assert.equal(await row.locator('.kind').count(), badge ? 1 : 0, `only registered kinds get badges: ${kind}`);
+    if (badge) assert.equal(await row.locator('.kind').textContent(), badge);
+    assert.ok((await row.locator('.msg').textContent()).includes(change.summary), 'unknown kinds retain their ordinary message');
+  }
+  check('audit labels: known variants preserved; unknown/prototype-named kinds have no badge');
   assert.equal(historyPosts, 0, 'compatibility fallback never guesses an operation or creates another writer');
   runtime.historyHead = ownerHead;
   runtime.publish();
