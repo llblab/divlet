@@ -478,6 +478,26 @@ try {
   await waitUntil(() => !classesOf('cta').some(name => /^bg-\[/.test(name)), 'the remove button drops the fill class');
   checks.push('a colour can be removed again');
 
+  // A hand-authored `text-[12.5px]` is a size, not a colour: the size field reads it and the colour field stays empty.
+  await select('cta');
+  await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), actor: 'user', patch: { nodes: { cta: { className: `${classesOf('cta').filter(name => !/^text-/.test(name)).join(' ')} text-[12.5px]` } } } });
+  await waitUntil(async () => (await page.locator('#inspector [data-key="font-size"]').inputValue()) === '12.5', 'an unhinted text bracket reads as the font size');
+  assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key="ink"]').inputValue(), '', 'and never as the text colour');
+  checks.push('a size is chosen once: `text-[12.5px]` reads into the size control, not into the colour control');
+
+  // Line height sits beside the size and the weight: a multiple, a px step, and one undo.
+  await select('cta');
+  await page.locator('#inspector [data-key="line-height"]').fill('24px'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('leading-6'), '24px writes the scale utility');
+  await page.locator('#inspector [data-key="line-height"]').fill('1.4'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('leading-[1.4]') && !classesOf('cta').includes('leading-6'), 'a multiple replaces the step');
+  await waitUntil(async () => (await page.locator('#inspector [data-key="line-height"]').inputValue()) === '1.4', 'the control reads the authored multiple back');
+  await page.keyboard.press('Control+z');
+  await waitUntil(() => classesOf('cta').includes('leading-6') && !classesOf('cta').includes('leading-[1.4]'), 'one undo returns the previous line height');
+  await page.locator('#inspector [data-key="line-height"]').fill(''); await page.keyboard.press('Enter');
+  await waitUntil(() => !classesOf('cta').some(name => /^leading-/.test(name)), 'an empty line height removes it');
+  checks.push('line height: a multiple, a px step that lowers to the scale, readback, removal and one undo');
+
   // Radius: a bare number, px/rem/em/%, full, and empty — all from the one field in the box model's corner.
   await select('cta');
   await page.locator('#inspector [data-key="radius"]').fill('12'); await page.keyboard.press('Enter');
@@ -633,6 +653,8 @@ try {
   assert.equal(await page.locator('#inspector [data-section="appearance"]').count(), 1, 'core supplies one minimal Appearance without a provider');
   await colorRow('no style engine or project swatches');
   assert.equal(await page.locator('#inspector [data-section="classes"]').count(), 0);
+  await page.locator('#inspector [data-key="line-height"]').fill('1.6'); await page.keyboard.press('Enter');
+  await waitUntil(() => native.getEntry('plain').document.nodes.first.style['line-height'] === '1.6', 'line height is a native declaration with no engine');
   await family.click(); await page.getByRole('menuitemradio', { name: '"No Engine Face"', exact: true }).click();
   await waitUntil(() => native.getEntry('plain').document.nodes.first.style['font-family'] === '"No Engine Face"', 'family edits have no engine requirement');
   await waitUntil(() => page.locator('iframe[data-document-id="plain"]').contentFrame().locator('#first').evaluate(node => Math.round(node.getBoundingClientRect().width) === 120), 'stored face actually renders with no style engine');

@@ -9,6 +9,9 @@ import * as tw from './tw.js';
 const RADIUS_PX = { 'rounded-none': 0, 'rounded-xs': 2, 'rounded-sm': 4, rounded: 4, 'rounded-md': 6, 'rounded-lg': 8, 'rounded-xl': 12, 'rounded-2xl': 16, 'rounded-3xl': 24, 'rounded-4xl': 32 };
 const FONT_STEPS = { 'text-xs': 12, 'text-sm': 14, 'text-base': 16, 'text-lg': 18, 'text-xl': 20, 'text-2xl': 24, 'text-3xl': 30, 'text-4xl': 36, 'text-5xl': 48, 'text-6xl': 60, 'text-7xl': 72, 'text-8xl': 96, 'text-9xl': 128 };
 const WEIGHTS = { thin: '100', extralight: '200', light: '300', normal: '400', medium: '500', semibold: '600', bold: '700', extrabold: '800', black: '900' };
+const LINE_STEPS = { 'leading-none': '1', 'leading-tight': '1.25', 'leading-snug': '1.375', 'leading-normal': '1.5', 'leading-relaxed': '1.625', 'leading-loose': '2' };
+/** Whether a bracketed `text-[…]` value is a size rather than a colour: `text-[12.5px]` is a font size, `text-[#fff]` a colour. */
+const isSizeValue = value => /^[-+]?(?:\d*\.?\d+)(?:px|rem|em|%|pt|pc|ch|ex|vw|vh|vmin|vmax)$/i.test(value) || /^(?:calc|clamp|min|max)\(/.test(value);
 const EDGE = { start: 'flex-start', end: 'flex-end', center: 'center', stretch: 'stretch', baseline: 'baseline', normal: 'normal', auto: 'auto' };
 const JUSTIFY = { ...EDGE, between: 'space-between', around: 'space-around', evenly: 'space-evenly' };
 const SIZE_PREFIX = { 'min-w': 'min-width', 'min-h': 'min-height', 'max-w': 'max-width', 'max-h': 'max-height', w: 'width', h: 'height' };
@@ -72,9 +75,20 @@ export function declarationsOfClass(name, names = new Set()) {
     if (literal) return [['border-radius', literal[1]]];
     return Object.hasOwn(RADIUS_PX, name) ? [['border-radius', `${RADIUS_PX[name]}px`]] : [];
   }
+  // `text-sm/6` sets a size and a line height; the step after the slash follows the spacing scale.
+  m = /^(text-[a-z0-9]+)\/(\d+)$/.exec(name);
+  if (m && Object.hasOwn(FONT_STEPS, m[1])) return [['font-size', `${FONT_STEPS[m[1]]}px`], ['line-height', `${Number(m[2]) * 4}px`]];
   if (Object.hasOwn(FONT_STEPS, name)) return [['font-size', `${FONT_STEPS[name]}px`]];
   m = /^text-\[length:(.+)\]$/.exec(name);
   if (m) return [['font-size', m[1]]];
+  // A bare bracket without a colour is a size when its value reads as a length: `text-[12.5px]`, not a colour named 12.5px.
+  m = /^text-\[(.+)\]$/.exec(name);
+  if (m && !/^color:/.test(m[1]) && isSizeValue(m[1])) return [['font-size', m[1].replace(/_/g, ' ')]];
+  if (Object.hasOwn(LINE_STEPS, name)) return [['line-height', LINE_STEPS[name]]];
+  m = /^leading-(\d+)$/.exec(name);
+  if (m) return [['line-height', `${Number(m[1]) * 4}px`]];
+  m = /^leading-\[(.+)\]$/.exec(name);
+  if (m) return [['line-height', m[1].replace(/_/g, ' ')]];
   m = /^font-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)$/.exec(name);
   if (m) return [['font-weight', WEIGHTS[m[1]]]];
   m = /^font-\[(\d+)\]$/.exec(name);

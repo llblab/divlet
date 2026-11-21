@@ -299,6 +299,21 @@ export const radiusInput = raw => {
   return /^\d+(?:\.\d+)?(?:px|%|rem|em)$/i.test(text) ? text.toLowerCase() : undefined;
 };
 
+/** Line height as written: a multiple (`1.5`), a length or percentage, or `normal`. */
+export function lineHeightOf(view) {
+  const text = view['line-height'];
+  return text == null ? null : show(text);
+}
+
+/** A line height accepts a unitless multiple, px/%/rem/em, `normal`, or empty to remove it. */
+export const lineHeightInput = raw => {
+  const text = String(raw ?? '').trim();
+  if (!text) return null;
+  if (/^normal$/i.test(text)) return 'normal';
+  if (/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(text)) return text;
+  return /^(?:\d+(?:\.\d+)?)(?:px|%|rem|em)$/i.test(text) ? text.toLowerCase() : undefined;
+};
+
 /** Font size in px for the field (`16px`, `1rem` at the 16px root), or the value as written. */
 export function fontSizeOf(view) {
   const text = view['font-size'];

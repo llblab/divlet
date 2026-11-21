@@ -351,12 +351,16 @@ function appearanceFold({ value, run, measured, tokens }) {
   const box = el('div', 'appearance-box');
   // Typography: size (any px) and weight.
   const sizePx = value(view => css.fontSizeOf(view));
+  const leading = value(view => css.lineHeightOf(view));
   const weight = value(view => css.weightOf(view));
   const type = el('div', 'grid2');
   type.append(
     field('font-size', 'Aa', sizePx, next => run({ 'font-size': next }, `font size ${next ?? 'default'}`), {
       tip: 'Font size, px', unit: 'px', placeholder: measured?.colors?.fontSize ? String(Math.round(parseFloat(measured.colors.fontSize) || 16)) : '16', min: 1, max: 400,
       parse: raw => css.lengthInput(raw, { keywords: [], negative: false }),
+    }),
+    field('line-height', 'Lh', leading, next => run({ 'line-height': next }, `line height ${next ?? 'default'}`), {
+      tip: 'Line height: 1.5, 24px, 150% or normal', placeholder: 'normal', min: 0, max: 200, parse: css.lineHeightInput,
     }),
     pick('Weight', weight, WEIGHTS, next => run({ 'font-weight': next }, next ? `weight ${next}` : 'default weight'), { tip: 'Font weight' }),
   );

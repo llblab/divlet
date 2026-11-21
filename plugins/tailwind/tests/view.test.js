@@ -31,6 +31,20 @@ test('arbitrary properties, theme colours and fractions read back', () => {
   assert.deepEqual(declarationsOfClass('w-[672px]'), [['width', '672px']]);
 });
 
+test('a bare text bracket is a size, and leading reads back as a line height', () => {
+  assert.equal(classView('text-[12.5px]')['font-size'], '12.5px', 'an unhinted length is a font size, not a colour');
+  assert.equal(classView('text-[12.5px]').color, undefined);
+  assert.equal(classView('text-[1.5rem]')['font-size'], '1.5rem');
+  assert.equal(classView('text-[clamp(1rem,2vw,2rem)]')['font-size'], 'clamp(1rem,2vw,2rem)');
+  assert.equal(classView('text-[#112233]').color, '#112233', 'a colour bracket still reads as a colour');
+  assert.equal(classView('text-[color:var(--brand)]').color, 'var(--brand)');
+  assert.equal(classView('text-[12.5px]').color === undefined && classView('text-[#112233]')['font-size'] === undefined, true, 'the two meanings never overlap');
+  assert.equal(classView('leading-tight')['line-height'], '1.25');
+  assert.equal(classView('leading-6')['line-height'], '24px', 'the number steps follow the spacing scale');
+  assert.equal(classView('leading-[1.4]')['line-height'], '1.4');
+  assert.equal(classView('text-sm/6')['line-height'], '24px', 'a size with a line-height sets both');
+});
+
 test('what the writer lowers to utilities reads back as the same declarations', () => {
   const edits = { display: 'flex', 'padding-right': '4px', 'margin-left': 'auto', 'margin-right': 'auto', 'z-index': '3', opacity: '0.4', filter: 'blur(8px)', 'font-weight': '800', 'background-color': '#112233', top: '8px', 'grid-template-columns': 'repeat(3, minmax(0, 1fr))', 'border-radius': '12px' };
   const className = applyStyles('', edits, { scale: true });
