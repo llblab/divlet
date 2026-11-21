@@ -82,7 +82,7 @@ function toggle(iconName, tip, on, run) {
  */
 function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw => raw, stepFrom = Number.parseFloat, step = 1, min = -1e6, max = 1e6, variants = [], unit = '' } = {}) {
   const wrap = el('label', 'vf');
-  const name = el('span', 'vf-k', label);
+  const name = el('span', 'vf-k scrub', label);
   const input = el('input', 'vf-input');
   input.type = 'text';
   input.inputMode = 'decimal';
@@ -289,6 +289,13 @@ function colorField({ key, label, tip, property, value, run, computed, tokens })
   clear.hidden = current == null || current === MIXED;
   clear.addEventListener('click', () => run({ [property]: null }, `no ${label.toLowerCase()}`));
   const name = el('span', 'vf-k', label);
+  // The name is the field's label, not a scrub handle: it opens the same picker as the swatch and a drag on it writes nothing.
+  name.setAttribute('aria-hidden', 'true');
+  name.dataset.tip = `${label} · open the colour picker`;
+  name.addEventListener('click', () => {
+    try { if (swatch.showPicker) { swatch.showPicker(); return; } } catch {}
+    swatch.click();
+  });
   fitHex();
   wrap.append(name, swatch, hex, clear);
   if (alphaOf(computed) < 1 && current == null) hex.title = 'Semi-transparent in the page';

@@ -415,8 +415,10 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .seg-icon.solo.on { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
 .vf { position: relative; display: flex; align-items: center; gap: 3px; min-width: 0; height: 28px; padding: 0 6px 0 0; border-radius: var(--radius-small); background: var(--field); }
 .vf:focus-within, .vf.scrubbing { outline-offset: 1px; outline: var(--focus-ring) solid var(--accent); }
-.vf-k { flex: none; align-self: stretch; display: grid; place-items: center; min-width: 18px; padding-left: 6px; font: 600 10.5px var(--mono); color: var(--muted); cursor: ew-resize; user-select: none; touch-action: none; }
-.vf-k:hover, .scrubbing .vf-k { color: var(--accent); }
+.vf-k { flex: none; align-self: stretch; display: grid; place-items: center; min-width: 18px; padding-left: 6px; font: 600 10.5px var(--mono); color: var(--muted); user-select: none; }
+/* Only a label that really scrubs advertises the gesture; a caption or a colour name must not pretend to. */
+.vf-k.scrub { cursor: ew-resize; touch-action: none; }
+.vf-k.scrub:hover, .color-field .vf-k:hover, .scrubbing .vf-k { color: var(--accent); }
 .vf-input { flex: 1; width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: 11.5px var(--mono); font-variant-numeric: tabular-nums; }
 .vf-input::placeholder { color: var(--faint); }
 .vf-unit, .num-unit { flex: none; font: 10px var(--mono); color: var(--muted); pointer-events: none; user-select: none; }
@@ -963,7 +965,7 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .radius-presets .chip.on { background: var(--accent-soft); color: var(--accent-ink); }
 .color-field { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; min-width: 0; min-height: 28px; padding: 0 2px 0 0; border-radius: var(--radius-inner); background: var(--field); }
 .color-field:focus-within { outline-offset: 1px; outline: var(--focus-ring) solid var(--accent); }
-.color-field .vf-k { min-width: 30px; }
+.color-field .vf-k { min-width: 30px; cursor: pointer; }
 .color-field .swatch { flex: none; width: 20px; height: 20px; border-radius: var(--radius-small); }
 /* One row while the value fits; a value wider than what is left wraps whole onto its own line instead of clipping. */
 .color-field .color-hex { flex: 1 1 var(--hex-width, 9ch); min-width: min(100%, var(--hex-width, 9ch)); min-height: 28px; }

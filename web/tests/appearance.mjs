@@ -438,6 +438,24 @@ try {
   await waitUntil(async () => JSON.stringify(classesOf('cta')) === JSON.stringify(beforeDrag) && await pageFill() !== 'rgb(170, 85, 34)', 'one Undo reverts the whole picker drag');
   checks.push('a colour picker drag paints the page before the dialog closes and stays one Undo step');
 
+  // The colour name is the field's label, not a scrub handle: a drag on it writes nothing, a click opens the picker.
+  const colourLabel = page.locator('#inspector .appearance-colors .color-field').first().locator('.vf-k');
+  assert.equal(await colourLabel.evaluate(node => getComputedStyle(node).cursor), 'pointer', 'the colour name advertises a click, not a scrub');
+  const labelVersion = afterVersion();
+  const labelBox = await colourLabel.boundingBox();
+  await page.mouse.move(labelBox.x + labelBox.width / 2, labelBox.y + labelBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(labelBox.x + labelBox.width / 2 + 60, labelBox.y + labelBox.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await sleep(300);
+  assert.equal(afterVersion(), labelVersion, 'dragging the colour name writes nothing');
+  await page.evaluate(() => { document.querySelector('#inspector [data-key="fill-swatch"]').showPicker = () => { window.__pickerOpened = true; }; });
+  await colourLabel.click();
+  assert.equal(await page.evaluate(() => window.__pickerOpened === true), true, 'clicking the colour name opens the same picker as its swatch');
+  const scrubCursor = await page.locator('#inspector [data-section="effects"] .vf-k').first().evaluate(node => getComputedStyle(node).cursor);
+  assert.equal(scrubCursor, 'ew-resize', 'a numeric label still carries the scrub gesture');
+  checks.push('a colour name opens the picker instead of scrubbing, while numeric labels keep their drag');
+
   // Fill and text colour by typing a hex value: the class that set the colour before is replaced.
   await page.locator('#inspector [data-key="fill"]').fill('#112233'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('bg-[#112233]') && !classesOf('cta').some(name => /^bg-(accent|surface)$/.test(name)), 'typing a fill colour sets one background class and replaces the old one');
