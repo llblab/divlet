@@ -399,7 +399,7 @@ try {
     const layout = inspector.locator('[data-section="layout"] details.fold');
     const order = () => inspectorPage.evaluate(() => [...document.querySelectorAll('#inspector section.group')].map(node => node.dataset.section));
     assert.equal(await inspector.locator('.fold-tabs, .fold-tab, [role="tablist"], [role="tab"]').count(), 0, 'no duplicate section-navigation strip');
-    assert.deepEqual((await order()).filter(name => ['layout', 'spacing', 'effects', 'appearance'].includes(name)), ['layout', 'spacing', 'effects', 'appearance'], 'stable plugin order ignores a stale drag-order preference');
+    assert.deepEqual((await order()).filter(name => ['layout', 'spacing', 'appearance', 'effects'].includes(name)), ['layout', 'spacing', 'appearance', 'effects'], 'stable plugin order ignores a stale drag-order preference');
     assert.deepEqual((await order()).slice(0, 2), ['head', 'classes'], 'identity and direct class editing stay first');
     const version = runtime.info().project.version;
 

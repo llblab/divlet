@@ -67,7 +67,7 @@ test('with the Tailwind provider, controls and the class editor are linked views
   const { context, page, errors } = await open(site);
   try {
     await selectHeading(page);
-    assert.deepEqual((await sections(page)).filter(name => !['head', 'node-meta', 'measured'].includes(name)), ['classes', 'layout', 'spacing', 'border', 'effects', 'appearance', 'attrs', 'style'], 'the class editor leads the core controls');
+    assert.deepEqual((await sections(page)).filter(name => !['head', 'node-meta', 'measured'].includes(name)), ['classes', 'layout', 'spacing', 'border', 'appearance', 'effects', 'attrs', 'style'], 'the class editor leads the core controls');
     // Control → utility: one edit, no inline declaration.
     assert.equal(await computed(page, 'paddingRight'), '0px');
     await setField(page, 'p-r', '4');
@@ -134,7 +134,7 @@ test('without the provider the same controls write native inline CSS and there i
   const { context, page, errors } = await open(site);
   try {
     await selectHeading(page);
-    assert.deepEqual((await sections(page)).filter(name => !['head', 'node-meta', 'measured'].includes(name)), ['layout', 'spacing', 'border', 'effects', 'appearance', 'attrs', 'style'], 'every property control is still there');
+    assert.deepEqual((await sections(page)).filter(name => !['head', 'node-meta', 'measured'].includes(name)), ['layout', 'spacing', 'border', 'appearance', 'effects', 'attrs', 'style'], 'every property control is still there');
     const classBefore = await attr(page, 'class');
     await setField(page, 'p-r', '4');
     await until(async () => (await computed(page, 'paddingRight')) === '4px', 'a padding edit renders');

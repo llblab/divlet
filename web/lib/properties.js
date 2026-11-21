@@ -697,7 +697,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     field('blur', 'Blur', blur, next => run(view => ({ filter: css.blurEdit(view, next === null ? 0 : next) }), `blur ${next ?? 'none'}`), { tip: 'Blur, px', unit: 'px', placeholder: '0', min: 0, max: 200, parse: raw => (raw.trim() === '' ? null : /^\d+(?:\.\d+)?$/.test(raw.trim()) ? Number(raw.trim()) : undefined) }),
   );
 
-  return [['layout', 'Layout', layout], ['spacing', 'Spacing', spacing], ['border', 'Border', borderFold(views, { value, run, measured, tokens, widthField })], ['effects', 'Effects', effects], ['appearance', 'Appearance', appearanceFold({ value, run, measured, tokens })]];
+  return [['layout', 'Layout', layout], ['spacing', 'Spacing', spacing], ['border', 'Border', borderFold(views, { value, run, measured, tokens, widthField })], ['appearance', 'Appearance', appearanceFold({ value, run, measured, tokens })], ['effects', 'Effects', effects]];
 }
 function alignGrid(label, x, y, onPick) {
   const grid = el('div', 'align-grid');
