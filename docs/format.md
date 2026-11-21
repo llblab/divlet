@@ -78,6 +78,39 @@ The source filename/path identifies the project to the editor; the envelope has 
 
 Project and frame names share the same character, length and LF-normalization rules. Their presence/default rules remain contextual: project settings supply an omitted/null name, while a frame requires one. Project, frame and node metadata share the safe JSON validator described below; a project-level payload is not an escape hatch around that profile.
 
+### Ordered patch log (candidate, awaiting approval)
+
+**Status: proposal, not approved and not implemented.** The operator's direction (2026-11-21) is that the stored project becomes fully deterministic and composed of patches: the file carries the ordered log whose replay yields the model, and a direct edit of a managed generated page enters that same log through the codec. This sketch is the smallest shape that satisfies those words; the current reader refuses it, [BACKLOG.md](../BACKLOG.md) owns the implementation and its evidence, and the schema marker stays 1 until a freeze decision settles it.
+
+```json
+{
+  "schemaVersion": 1,
+  "requires": {},
+  "log": {
+    "base": { "name": "Landing", "settings": { "tokens": {}, "css": "" }, "frames": [] },
+    "entries": [
+      { "id": "b7f1…", "parent": null, "seq": 12, "actor": "user", "label": "rename to Landing", "patch": { "settings": { "name": "Landing" } } },
+      { "id": "3a90…", "parent": "b7f1…", "seq": 13, "actor": "agent", "group": "g4", "patch": { "frames": { "home": { "nodes": { "title": { "content": "Hello" } } } } }
+    ],
+    "head": "3a90…"
+  }
+}
+```
+
+`base` is one complete settings-and-frames snapshot; `entries` is the ordered list of accepted patches; `parent` makes the list a tree, so a fork is a second child of the same parent and a drop removes that whole subtree; `head` names the state the project is in now. The model is `base` plus the ancestor chain of `head`. A state is therefore an address in the log, not a second record besides it.
+
+Candidate rules, each of which needs its own implementation evidence:
+
+- **One byte-stable spelling.** A project has exactly one serialized form: stable member order, no insignificant whitespace, no duplicate members, canonical patch bodies (one spelling per patch). Two editors that accept the same change must produce the same bytes.
+- **Replay or refuse.** Applying `base` plus the head chain must reproduce the accepted model exactly, including declaration order and nullable slots; any divergence refuses the file (`REPLAY_DIVERGENCE`) instead of opening a partial or silently repaired project. The shared replay kernel is the only traversal.
+- **Trimming is the only loss.** A bound on entries and bytes advances `base` to a retained ancestor and drops everything before it; kept points stay replayable before and after trimming, and the trimmed file is again canonical.
+- **Never rewritten.** Opaque frame/node metadata, declared resource bytes and names, foreign-format versions and npm/format versions are carried, never re-derived: a patch that would rewrite them is refused, not normalized.
+- **Migration is an explicit copy.** An existing full-model file converts with its model as `base` and an empty `entries`, written to a fresh destination; the original bytes stay untouched and ambiguity (duplicate identity, unknown field, unrepresentable order) refuses instead of guessing.
+- **Derived output.** Generated pages and their publication fingerprint come from the replayed model, never from the log text, so a reordered but equivalent log cannot change published bytes.
+- **Log operations are not content patches.** Trim, fork and drop mutate the log itself and are recorded as such; they must never be expressible as a content patch, and a refusal leaves the file byte-identical.
+
+Open decisions this sketch does not settle: whether a file always carries a snapshot `base` (recommended, so a project opens without replaying tuned history) or may be a pure log with an explicit empty-base marker; whether patch identity is a content hash, a monotonic sequence or both; how large the retained window may be for a project of a given size; what a board does when a stored log cannot reproduce its content (refuse to open, or open the `base` with diagnostics); and whether a dropped subtree is erased immediately or retained as an unreachable tombstone.
+
 ## Frame document
 
 A stored frame has `{ id, name, head?, version, artboard, rootId, tokens, css, metadata, nodes }`. `id`, `name`, `version`, `artboard`, `rootId` and `nodes` are required. Tokens, CSS and metadata default as in the project. Frame names pass the same well-formed-string and line-ending normalization as project names.
