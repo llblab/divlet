@@ -463,7 +463,8 @@ function borderDiagram({ views, value, run, measured, tokens, widthField, nodeId
   centre.setAttribute('role', 'group');
   centre.setAttribute('aria-label', 'Border colour');
   const target = borderSide?.nodeId === nodeId ? borderSide.side : '';
-  const sides = el('button', 'pick br-sides');
+  // A menu button labelled by its own value, not the caption+value selector component: it says which side the colour is for.
+  const sides = el('button', 'side-pick br-sides');
   sides.type = 'button';
   sides.dataset.key = 'border-side';
   sides.setAttribute('aria-haspopup', 'menu');
@@ -549,7 +550,7 @@ function appearanceFold({ value, run, measured, tokens }) {
   const text = value(view => view['text-align'] ?? null);
   const textRow = el('div', 'segs-row align-controls');
   textRow.append(labeledSegments('Text', segmented('Text align', text === MIXED ? null : text, [['left', 'textL', 'Align left'], ['center', 'textC', 'Align center'], ['right', 'textR', 'Align right'], ['justify', 'textJ', 'Justify']], next => run({ 'text-align': next }, next ? `text ${next}` : 'default text align'))));
-  const typography = el('div', 'typography-controls');
+  const typography = el('div', 'typography-controls label-group');
   typography.dataset.inspectorSlot = 'typography';
   typography.append(type, textRow);
   const colors = el('div', 'appearance-colors');
@@ -580,7 +581,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
   /* layout */
   const display = value(view => view.display ?? null);
   const position = value(view => view.position ?? null);
-  const layout = el('div', 'layout-box');
+  const layout = el('div', 'layout-box label-group');
   const top = el('div', 'grid2');
   const overflow = value(view => css.overflowOf(view));
   top.append(
@@ -633,8 +634,8 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
 
   // Not a flex or grid container yet: one click centres what is inside it, or the element itself in its parent.
   if (!flex && !grid) {
-    const centre = el('div', 'centre-row');
-    centre.append(el('span', 'vf-k', 'Center'));
+    const centre = el('div', 'centre-row row-labeled');
+    centre.append(caption('Center'), el('div', 'row-controls'));
     const inside = el('button', 'link-button', 'Content');
     inside.type = 'button';
     inside.dataset.key = 'center-content';
@@ -645,7 +646,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     itself.dataset.key = 'center-element';
     itself.dataset.tip = 'Centre this element horizontally in its parent (auto side margins)';
     itself.addEventListener('click', () => run({ 'margin-left': 'auto', 'margin-right': 'auto' }, 'center element'));
-    centre.append(inside, itself);
+    centre.querySelector('.row-controls').append(inside, itself);
     layout.append(centre);
   }
 
@@ -847,8 +848,24 @@ function alignGrid(label, x, y, onPick) {
 const caption = text => el('span', 'caption', text);
 
 function labeledSegments(label, control) {
-  const group = el('div', 'labeled-segs');
+  const group = el('div', 'labeled-segs row-labeled');
   group.append(caption(label), control);
   return group;
+}
+
+/**
+ * One label column per group of rows: every caption in a group gets the width of the widest one, so `Center` and `Self`
+ * start their controls on the same line instead of each after its own word. Measured after the rows are in place and again
+ * whenever the panel resizes, because the widest label depends on the font the interface is drawing with.
+ */
+export function syncLabelColumns(root) {
+  for (const group of root.querySelectorAll('.label-group')) {
+    const labels = [...group.querySelectorAll(':scope > .row-labeled > .caption, :scope > .row-labeled > .vf-k')];
+    if (!labels.length) continue;
+    // Measure with no floor first: a previous measurement must not keep a long label from shrinking back.
+    group.style.removeProperty('--label-col');
+    const widest = Math.ceil(Math.max(...labels.map(node => node.getBoundingClientRect().width)));
+    if (widest > 0) group.style.setProperty('--label-col', `${widest + 2}px`);
+  }
 }
 

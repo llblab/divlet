@@ -5,7 +5,7 @@ import * as actions from './actions.js';
 import { openMenu, menuAnchor, closeMenu } from './menu.js';
 import { overflowBar } from './toolbar.js';
 import { panelSections, styleReaders } from './panels.js';
-import { propertySections } from './properties.js';
+import { propertySections, syncLabelColumns } from './properties.js';
 import { viewOf, expandShorthand, releaseInline } from './css-props.js';
 import { components as componentSource, native } from './host.js';
 import { fontFamilyControl } from './typography.js';
@@ -20,6 +20,8 @@ const CSS_PROPERTIES = [...new Set(Object.keys(document.documentElement.style).f
 const ATTRIBUTES = 'alt aria-describedby aria-hidden aria-label aria-labelledby dir disabled download for height href hidden id lang loading name placeholder rel required role rows src srcset tabindex target title type value width'.split(' ');
 
 const panel = $('#inspector');
+/** Re-measures the label columns of whatever the panel currently shows, without re-rendering it. */
+const labelObserver = new ResizeObserver(() => syncLabelColumns(panel));
 let token = 0;
 let deferred = false;
 let holding = 0;
@@ -861,7 +863,12 @@ export async function render({ force = false } = {}) {
   if (sameView) for (const node of panel.querySelectorAll('details')) { const state = open.get(node.parentElement?.dataset.section); if (state !== undefined) node.open = state; }
   panel.hidden = false;
   document.body.classList.add('has-inspector');
+  // One label column per group of rows: measured once the rows are in place, so `Center` and `Self` start their controls on
+  // the same line whatever the widest word in the group is.
+  syncLabelColumns(panel);
   if (sameView) panel.scrollTop = scroll;
+  // The widest label in a group depends on the interface size, so a resized panel measures again.
+  labelObserver.observe(panel);
   const claimed = focusWanted();
   if (key && !claimed) {
     const target = [...panel.querySelectorAll('[data-key]')].find(node => node.dataset.key === key);

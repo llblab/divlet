@@ -433,7 +433,12 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .align-cell.on i { width: 10px; height: 4px; border-radius: 2px; }
 .segs-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; }
 .align-controls { justify-content: space-between; }
-.labeled-segs { display: inline-flex; flex: none; align-items: center; gap: 6px; white-space: nowrap; }
+/* One label column per group: every labelled row in a group starts its control on the same line, whatever its own word is.
+   The label and its control stay one unit, so a narrow panel wraps the pair together instead of splitting them. */
+.row-labeled { display: grid; grid-template-columns: var(--label-col, minmax(min-content, auto)) minmax(0, 1fr); align-items: center; gap: 3px 8px; min-width: 0; }
+.row-labeled > .caption, .row-labeled > .vf-k { white-space: nowrap; }
+.row-labeled > :not(.caption):not(.vf-k) { min-width: 0; justify-self: start; }
+.labeled-segs { flex: 1 1 auto; }
 .segs { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--radius-inner); background: var(--control); }
 .seg-icon { display: grid; place-items: center; width: 26px; height: 24px; padding: 0; border: 0; border-radius: var(--radius-small); background: transparent; color: var(--muted); }
 .seg-icon .icon { width: 14px; height: 14px; }
@@ -1031,14 +1036,17 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
   justify-items: stretch;
 }
 .br-shell.br-compact .br-centre { position: static; transform: none; width: 100%; }
-.br-centre .pick, .br-centre .color-field { min-width: 0; }
-.br-centre .pick { height: 24px; padding: 0 6px; background: #ffffff30; font-size: 10px; justify-self: center; max-width: 100%; overflow: hidden; }
-.br-centre .pick-k { display: none; }
-.br-centre .pick .pick-v { font-size: 10px; }
+.br-centre .side-pick, .br-centre .color-field { min-width: 0; }
+/* A menu button that names itself by its value: it says which side the colour belongs to. */
+.side-pick { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 24px; padding: 0 6px; border: 0; border-radius: var(--radius-inner); background: var(--control); color: var(--ink); font: inherit; cursor: pointer; white-space: nowrap; }
+.side-pick:hover { background: var(--control-hover); }
+.side-pick .pick-v { font-size: 10px; }
+.side-pick .icon { width: 10px; height: 10px; color: var(--muted); }
+.br-centre .side-pick { justify-self: center; max-width: 100%; overflow: hidden; }
 @container ring (max-width: 132px) {
   .br-box { --br-field: 26px; padding: 4px 5px; gap: 2px 4px; }
   .br-box .vf.br-field .vf-input { font-size: 9px; }
-  .br-centre .pick .pick-v { font-size: 9px; }
+  .br-centre .side-pick .pick-v { font-size: 9px; }
 }
 /* Border owns its line, edge widths, colour and radius; Appearance keeps fill and typography. */
 .appearance-box, .border-box { display: grid; gap: 8px; }
@@ -1089,7 +1097,10 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .token-swatch:hover, .token-swatch:focus-visible { outline: var(--focus-ring) solid var(--accent); outline-offset: 1px; }
 /* A control that lives inside a field wrapper is ringed by the wrapper, never twice. */
 :is(.vf, .num, .code, .classes, .ident-field, .search, .color-field, .bm-field, .settings-output) :is(input, textarea):focus-visible { outline: none; }
-.centre-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+/* Centring is one row of two equal choices: they share the width the label leaves them. */
+.centre-row .row-controls { display: flex; gap: 6px; width: 100%; }
+.centre-row .row-controls > .link-button { flex: 1 1 0; min-width: 0; }
+.centre-row .row-controls > .link-button { height: 24px; }
 
 @media (pointer: coarse) {
   .color-field { min-height: 36px; }

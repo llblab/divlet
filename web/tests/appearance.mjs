@@ -692,10 +692,29 @@ try {
   await scrub('z', 6);
   await waitUntil(() => classesOf('nav').includes('z-2') && classesOf('cta').includes('z-2'), 'a mixed z-index scrub applies one integer to every selected element');
 
-  // Centring a container that is not flex yet.
+  // Centring a container that is not flex yet. Its row, and the Self row under it, share one label column: the two labels
+  // end where the controls begin, and the centring choices fill the width the label leaves them.
   const doc = runtime.read({ view: 'document', documentId: 'welcome' });
   const plain = Object.keys(doc.nodes).find(id => doc.nodes[id].type === 'element' && !/\b(flex|grid)\b/.test(doc.nodes[id].className || '') && id !== doc.rootId && id !== 'cta' && (doc.nodes[id].children || []).length);
   await select(plain);
+  {
+    const labels = await waitUntil(() => page.evaluate(() => {
+      const rows = [...document.querySelectorAll('#inspector .layout-box .row-labeled')];
+      if (rows.length < 2) return null;
+      const read = node => {
+        const label = node.querySelector(':scope > .caption, :scope > .vf-k').getBoundingClientRect();
+        const control = node.querySelector(':scope > :not(.caption):not(.vf-k)').getBoundingClientRect();
+        return { label: node.textContent.trim().slice(0, 8), right: Math.round(label.right), left: Math.round(control.left), width: Math.round(control.width) };
+      };
+      const box = document.querySelector('#inspector .layout-box').getBoundingClientRect();
+      return { rows: rows.map(read), box: { left: Math.round(box.left), right: Math.round(box.right) } };
+    }), 'both labelled Layout rows are rendered');
+    const [centre, self] = labels.rows;
+    assert.deepEqual(new Set(labels.rows.map(row => row.left)).size, 1, `every labelled row starts its control on one line (${labels.rows.map(row => `${row.label}:${row.left}`).join(' ')})`);
+    assert.ok(labels.rows.every(row => row.right <= row.left), 'a label column is never wider than the control that follows it');
+    assert.ok(centre.width > labels.box.right - labels.box.left - 90, `the centring choices fill the width the label leaves (${centre.width} of ${labels.box.right - labels.box.left})`);
+    assert.ok(self.width < centre.width, 'and a natural-width control is left at its own size beside it');
+  }
   await page.locator('#inspector [data-key="center-content"]').click();
   await waitUntil(() => ['flex', 'items-center', 'justify-center'].every(name => classesOf(plain).includes(name)), 'Center content makes the container flex-centred');
   await page.keyboard.press('Control+z');

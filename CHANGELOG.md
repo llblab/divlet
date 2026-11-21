@@ -4,6 +4,11 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased
 
+- **Labelled rows line up.** Rows that belong to one group now share a label column measured from the widest label in that group, so
+  `Center` and `Self` in Layout start their controls on the same line, and the two centring choices fill the width their label leaves
+  (`web/lib/properties.js` gained `syncLabelColumns`, `web/lib/inspector.js`, `web/board.css`, `web/tests/appearance.mjs`). The border
+  ring's side menu is now its own value-named button rather than the caption-plus-value selector component, which it was never
+  (`web/lib/properties.js`, `web/board.css`).
 - **History rows give their width to the text.** The Restore / Current / Ahead badge moved out of a column of its own and now stacks under
   the marker inside the one narrow left column, so the change, its document and its actor get the whole remaining width to read in
   (`web/lib/activity.js`, `web/board.css`, `web/tests/history.mjs`).
