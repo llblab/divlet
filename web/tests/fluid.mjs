@@ -57,19 +57,21 @@ try {
       return settled;
     }, null, { timeout: 8000 });
     const compactShape = await page.evaluate(() => {
-      // The band copy keeps its corner values whole at every width, inside its own frame and the inspector's.
+      // The ring keeps its four corner values whole at every width, inside its own frame and the inspector's; the radius for
+      // all corners and the side it colours live under the ring and wrap rather than clip.
       const diagram = document.querySelector('#inspector .br-box'), inspector = document.querySelector('#inspector').getBoundingClientRect();
       const radius = diagram.querySelector('[data-key="radius-tl"]'), style = getComputedStyle(radius);
       const context = document.createElement('canvas').getContext('2d');
       context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
       const frame = diagram.getBoundingClientRect(), cell = radius.closest('.br-cell').getBoundingClientRect();
+      const below = document.querySelector('#inspector .br-below');
       return {
-        columns: [...diagram.querySelectorAll('.br-corner, .br-edge')].filter(node => { const box = node.getBoundingClientRect(); return box.left >= frame.left - 1 && box.right <= frame.right + 1; }).length === 8 ? 3 : 0,
+        columns: [...diagram.querySelectorAll('.br-corner')].filter(node => { const box = node.getBoundingClientRect(); return box.left >= frame.left - 1 && box.right <= frame.right + 1; }).length === 4 ? 3 : 0,
         readable: context.measureText('Full').width <= radius.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1,
-        inside: frame.right <= inspector.right + 1 && cell.right <= frame.right + 1,
+        inside: frame.right <= inspector.right + 1 && cell.right <= frame.right + 1 && !!below && below.scrollWidth <= below.clientWidth + 1,
       };
     });
-    assert.deepEqual(compactShape, { columns: 3, readable: true, inside: true }, `the band copy keeps its eight values whole inside its frame at ${width}px/${size}%`);
+    assert.deepEqual(compactShape, { columns: 3, readable: true, inside: true }, `the ring keeps its four corner values whole inside its frame at ${width}px/${size}%`);
     const spacingCollisions = await page.locator('#inspector .boxmodel').evaluate(model => {
       const fields = [...model.querySelectorAll('.bm-field')].map(node => node.getBoundingClientRect());
       const overlaps = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;

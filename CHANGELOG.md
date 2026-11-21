@@ -4,6 +4,12 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## 0.2.0 — Inspector and history polish
 
+- **Border is the ring of radii and colour, not a second box model.** The four edge widths are gone from it: a width has one
+  home, the four sides of the box model's border band, so it is written where the box model draws it. What is left is the ring
+  itself — a radius in each corner, the colour in the middle — plus one field under it that gives all four corners the same
+  radius; that field reads a single value only while the corners agree, and writing it replaces every corner so a per-corner
+  value cannot hide behind it. The Side control's caret now anchors to its own button instead of the ring's corner
+  (`web/lib/properties.js`, `web/board.css`, `web/tests/appearance.mjs`, `web/tests/fluid.mjs`).
 - **The interface measures itself in layout pixels.** At 200% the action row reported every action as twice its real width
   and kept only one plus the "more" menu, and the inspector's shared label column asked for twice the room it needed, so the
   Phone/200% `Fit height` action was reachable only inside the overflow menu. The chrome is drawn under

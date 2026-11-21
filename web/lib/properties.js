@@ -366,7 +366,7 @@ const BORDER_SIDES_MENU = [['', 'All sides'], ['top', 'Top'], ['right', 'Right']
 /** Which edge the centre colour edits: one side at a time, remembered across the re-render choosing one causes. */
 let borderSide = null;
 
-function borderFold(views, { value, run, measured, tokens, widthField, nodeId, rerender }) {
+function borderFold(views, { value, run, measured, tokens, nodeId, rerender }) {
   const box = el('div', 'border-box');
   const style = value(view => {
     const sides = BORDER_SIDES.map(side => view[`border-${side}-style`] ?? view['border-style'] ?? null);
@@ -382,7 +382,7 @@ function borderFold(views, { value, run, measured, tokens, widthField, nodeId, r
       ...Object.fromEntries(BORDER_SIDES.map(side => [`border-${side}-style`, null])),
       'border-style': next,
     }, `border style ${next ?? 'default'}`)),
-    borderDiagram({ views, value, run, measured, tokens, widthField, nodeId, rerender }),
+    borderDiagram({ value, run, measured, tokens, nodeId, rerender }),
   );
   return box;
 }
@@ -396,26 +396,26 @@ const pxOf = raw => {
 };
 
 /**
- * The border as the band it is: one hollow rectangle, exactly as wide as the box model's border band above it, with a corner
- * radius in each corner, an edge width at each edge's centre and its colour in the middle. The ring itself is painted from the
- * authored style and the colour of each side, so a side given its own colour reads as a different side rather than as a hidden
- * setting. The width follows that band (measured, so a narrow inspector narrows both), and falls back to the available width
- * when the band is not on screen.
+ * The border as a ring: the band copied from the box model, with a corner radius in each corner, one radius for all four of them
+ * and the border's colour in the middle. Edge widths are not repeated here — they have their own home on the four sides of the
+ * box model's border band, so a width has exactly one place to be written.
  */
-function borderDiagram({ views, value, run, measured, tokens, widthField, nodeId, rerender }) {
+function borderDiagram({ value, run, measured, tokens, nodeId, rerender }) {
   const box = el('div', 'br-box');
   box.setAttribute('role', 'group');
-  box.setAttribute('aria-label', 'Border ring: corner radii, edge widths and colour');
+  box.setAttribute('aria-label', 'Border ring: corner radii and colour');
   // The band itself, copied: its own fill, its one-pixel frame and square corners, at its own size, with the middle cut out so the
   // panel's own surface shows through where the content sits — the hole the widget above puts a green padding band in.
   box.append(el('div', 'br-hole'));
   const cell = (node, className) => { const wrap = el('div', `br-cell ${className}`); wrap.append(node); return wrap; };
+  const CORNERS = [['tl', 'top-left'], ['tr', 'top-right'], ['bl', 'bottom-left'], ['br', 'bottom-right']];
+  const measuredOf = corner => pxOf(measured?.colors?.[`radius${corner === 'tl' ? 'TopLeft' : corner === 'tr' ? 'TopRight' : corner === 'bl' ? 'BottomLeft' : 'BottomRight'}`]);
   const corner = key => {
-    const named = { tl: 'top-left', tr: 'top-right', bl: 'bottom-left', br: 'bottom-right' }[key];
+    const named = CORNERS.find(([short]) => short === key)[1];
     const property = `border-${named}-radius`;
     const shown = value(v => { const radius = css.cornerRadiusOf(v, named); return radius === undefined ? MIXED : radius; });
     // The empty field quotes the radius this corner has on the page, so a radius set by a stylesheet is still visible.
-    const quoted = pxOf(measured?.colors?.[`radius${key === 'tl' ? 'TopLeft' : key === 'tr' ? 'TopRight' : key === 'br' ? 'BottomRight' : 'BottomLeft'}`]);
+    const quoted = measuredOf(key);
     const node = field(`radius-${key}`, '', shown, next => run({ [property]: next }, `${named.replace('-', ' ')} radius ${next ?? 'default'}`), {
       tip: `${named.replace('-', ' ')} corner radius`, placeholder: quoted == null ? '—' : String(Math.round(quoted)), min: 0, max: 1e4, parse: css.radiusInput,
     });
@@ -423,13 +423,6 @@ function borderDiagram({ views, value, run, measured, tokens, widthField, nodeId
     node.classList.add('br-field');
     node.setAttribute('aria-label', `${named} corner radius`);
     return cell(node, `br-corner br-${key}`);
-  };
-  const edge = side => {
-    const node = widthField(side, { diagram: true, key: `border-width-${side}` });
-    node.classList.remove('bm-value');
-    node.classList.add('br-field');
-    node.setAttribute('aria-label', `Border ${side}, px`);
-    return cell(node, `br-edge br-${side}`);
   };
   // The middle of the ring is hollow: the colour is a sibling laid over it, so it can step outside a ring too narrow to hold
   // a swatch, a value and a clear button on one line.
@@ -464,11 +457,28 @@ function borderDiagram({ views, value, run, measured, tokens, widthField, nodeId
   });
   colour.querySelector('.vf-k')?.remove();
   colour.classList.add('br-colour');
-  // The colour is the middle of the band; the side it applies to reads under the band, where it has room for its word.
   centre.append(colour);
-  // Beside the centre the ring's own corners (radii) and edges (widths) sit where they apply.
-  box.append(corner('tl'), edge('t'), corner('tr'), edge('l'), edge('r'), corner('bl'), edge('b'), corner('br'));
-  shell.append(box, centre, sides);
+  // One radius for all four corners: it reads as one value only while they agree, and writing it replaces every corner at once,
+  // so a value authored per corner cannot survive behind it and contradict what the field says.
+  const every = value(view => {
+    const all = CORNERS.map(([, corner]) => css.cornerRadiusOf(view, corner));
+    if (all.some(radius => radius === undefined)) return MIXED;
+    return all.every(radius => radius === all[0]) ? all[0] : MIXED;
+  });
+  const measuredCorners = CORNERS.map(([key]) => measuredOf(key));
+  const quotedAll = measuredCorners.every(radius => radius != null && radius === measuredCorners[0]) ? String(Math.round(measuredCorners[0])) : '—';
+  // The four corner longhands, not the `border-radius` shorthand: a style engine lowers per-corner declarations into utilities it
+  // owns, while the shorthand would leave nothing behind that the compiler can write.
+  const cornersLonghands = next => Object.fromEntries(CORNERS.map(([, corner]) => [`border-${corner}-radius`, next]));
+  const allCorners = field('radius', 'All corners', every, next => run(cornersLonghands(next), next == null ? 'default corner radius' : `corner radius ${next}`), {
+    tip: 'Radius of all four corners', placeholder: quotedAll, min: 0, max: 1e4, parse: css.radiusInput,
+  });
+  allCorners.classList.add('br-all');
+  // Under the ring: what applies to the whole border — its shared radius and the side its colour belongs to.
+  const below = el('div', 'br-below');
+  below.append(allCorners, sides);
+  box.append(corner('tl'), corner('tr'), corner('bl'), corner('br'));
+  shell.append(box, centre, below);
   followBandWidth(box, shell);
   return shell;
 }
@@ -678,33 +688,16 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     node.classList.add('bm-value');
     return node;
   };
-  const borderFields = new Map(), borderEdits = new Map();
-  const widthField = (side, { diagram = false, key } = {}) => {
+  // One border width per side, and only here: the Border block does not repeat them, so there is no second copy to keep in step.
+  const widthField = side => {
     const property = `border-${SIDE_NAMES[side]}-width`, index = 'trbl'.indexOf(side);
     const authored = value(view => view[property] ?? null);
     const shown = authored === MIXED ? MIXED : authored == null ? null : css.show(authored);
     const placeholder = number(measured?.border?.[index]);
-    const commitWidth = next => {
-      const sequence = (borderEdits.get(side) ?? 0) + 1;
-      borderEdits.set(side, sequence);
-      const result = run({ [property]: next === null ? null : `${next}px` }, `${property} ${next ?? 'default'}`);
-      if (!result?.then) return;
-      const sync = async result => {
-        if (borderEdits.get(side) !== sequence) return;
-        const current = await readNodes(result?.version ?? result?.details?.actualVersion);
-        const raw = same(current.map(node => css.viewOf(node, readers, context)[property] ?? null));
-        const box = raw === null ? await readMeasured() : null;
-        if (borderEdits.get(side) !== sequence) return;
-        for (const input of borderFields.get(side) ?? []) if (input.isConnected) input.dispatchEvent(new CustomEvent('divlet:field-value', { detail: {
-          value: raw === MIXED ? MIXED : raw == null ? null : css.show(raw), placeholder: number(box?.border?.[index]),
-        } }));
-      };
-      result.then(sync, sync).catch(() => {}); // The writer reports refusals; restore inactive peers from accepted state too.
-    };
-    const node = diagram
-      ? bareField(key ?? `border-${side}`, `Border ${SIDE_NAMES[side]}, px`, shown, placeholder, commitWidth)
-      : field(`border-width-${side}`, SIDE_NAMES[side][0].toUpperCase() + SIDE_NAMES[side].slice(1), shown, commitWidth, { tip: `Border ${SIDE_NAMES[side]}, px`, placeholder, unit: 'px', min: 0, parse: nonnegative });
-    borderFields.set(side, [...(borderFields.get(side) ?? []), node.querySelector('input')]);
+    const commitWidth = next => { run({ [property]: next === null ? null : `${next}px` }, `${property} ${next ?? 'default'}`); };
+    const node = field(`border-${side}`, '', shown, commitWidth, { tip: `Border ${SIDE_NAMES[side]}, px`, placeholder, min: 0, parse: nonnegative });
+    node.querySelector('.vf-k')?.remove();
+    node.classList.add('bm-value');
     return node;
   };
   const edgeField = (kind, side, index) => {
@@ -716,7 +709,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
       node.classList.add('bm-offset');
       return node;
     }
-    return widthField(side, { diagram: true });
+    return widthField(side);
   };
   const square = (kind, inner) => {
     const sq = el('div', `bm-sq bm-${kind}`);
@@ -806,7 +799,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     field('blur', 'Blur', blur, next => run(view => ({ filter: css.blurEdit(view, next === null ? 0 : next) }), `blur ${next ?? 'none'}`), { tip: 'Blur, px', unit: 'px', placeholder: '0', min: 0, max: 200, parse: raw => (raw.trim() === '' ? null : /^\d+(?:\.\d+)?$/.test(raw.trim()) ? Number(raw.trim()) : undefined) }),
   );
 
-  return [['layout', 'Layout', layout], ['spacing', 'Spacing', spacing], ['border', 'Border', borderFold(views, { value, run, measured, tokens, widthField, nodeId: nodes.length === 1 ? nodes[0].id : null, rerender })], ['appearance', 'Appearance', appearanceFold({ value, run, measured, tokens })], ['effects', 'Effects', effects]];
+  return [['layout', 'Layout', layout], ['spacing', 'Spacing', spacing], ['border', 'Border', borderFold(views, { value, run, measured, tokens, nodeId: nodes.length === 1 ? nodes[0].id : null, rerender })], ['appearance', 'Appearance', appearanceFold({ value, run, measured, tokens })], ['effects', 'Effects', effects]];
 }
 function alignGrid(label, x, y, onPick) {
   const grid = el('div', 'align-grid');

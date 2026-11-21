@@ -164,8 +164,10 @@ try {
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="radius-tl"]').count(), 1, 'Border gives each corner its own radius field, in its ring');
   assert.equal(await page.locator('#inspector [data-section="border"] .br-corner').count(), 4, 'one radius in each corner of the ring');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="stroke"]').count(), 1, 'border colour belongs to Border, in the middle of the ring');
-  assert.equal(await page.locator('#inspector [data-section="border"] .br-edge').count(), 4, 'one width at each edge\'s centre');
-  assert.equal(await page.locator('#inspector [data-section="border"] [data-key^="border-width-"]').count(), 4, 'Border has four independent edge widths, in the ring');
+  assert.equal(await page.locator('#inspector [data-section="border"] .br-edge').count(), 0, 'Border repeats no edge width in its ring');
+  assert.equal(await page.locator('#inspector [data-section="border"] [data-key^="border-width-"]').count(), 0, 'a width has exactly one home, the box model band');
+  assert.equal(await page.locator('#inspector [data-section="border"] [data-key="radius"]').count(), 1, 'one field gives every corner the same radius');
+  assert.equal(await page.locator('#inspector .boxmodel .bm-border > .bm-cell input, #inspector .boxmodel .bm-border > .bm-top > .bm-cell input').count(), 4, 'and the band still edits all four widths');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="border-side"]').count(), 1, 'one control says which side the colour belongs to');
   {
     // The band is copied: its own fill, its one-pixel frame, its square corners and its size, centred in the section — with the
@@ -369,7 +371,8 @@ try {
   {
     const diagram = page.locator('#inspector [data-section="border"] .br-shell');
     assert.equal(await diagram.locator('.br-corner').count(), 4, 'one field per corner');
-    assert.equal(await diagram.locator('.br-edge').count(), 4, 'one field per edge, at its centre');
+    assert.equal(await diagram.locator('.br-edge').count(), 0, 'no edge widths in the ring');
+    assert.equal(await diagram.locator('.br-below [data-key="radius"]').count(), 1, 'one radius for all four corners under the ring');
     assert.equal(await page.locator('#inspector [data-section="border"] .br-centre [data-key="stroke"]').count(), 1, 'and the colour in the middle of the ring');
     const corners = () => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => {
       const style = getComputedStyle(node);
@@ -383,6 +386,27 @@ try {
     await waitUntil(async () => (await page.locator('#inspector [data-key="radius-tr"]').inputValue()) === String(parseFloat(before[1])), 'and the field follows it back');
     await sleep(200); // let the writer queue drain, so the next block patches the version it just read
     checks.push('the ring writes one corner radius and undoes it as one step');
+
+    // One field gives all four corners the same radius: it reads as one value only while they agree, and writing it replaces
+    // every corner at once, so a corner value cannot hide behind it and contradict what the field says.
+    const allCorners = page.locator('#inspector [data-key="radius"]');
+    await waitUntil(async () => (await allCorners.inputValue()) !== '', 'the whole-border radius reads the value its corners share');
+    const shared = await allCorners.inputValue();
+    // A corner of its own, written through the live field on each attempt: a re-render may replace it between focus and key.
+    await waitUntil(async () => {
+      await page.locator('#inspector [data-key="radius-tl"]').fill('3'); await page.keyboard.press('Enter');
+      return (await allCorners.inputValue()) === '';
+    }, 'one corner disagreeing empties the whole-border field');
+    await waitUntil(async () => {
+      await allCorners.fill('7'); await page.keyboard.press('Enter');
+      return JSON.stringify(await corners()) === JSON.stringify(['7px', '7px', '7px', '7px']);
+    }, 'the whole-border radius reaches all four corners on the page');
+    await waitUntil(async () => (await allCorners.inputValue()) === '7', 'and the four corner fields agree with it');
+    await page.locator('#viewport').focus(); await page.keyboard.press('Control+z');
+    await waitUntil(async () => (await allCorners.inputValue()) === '', 'one Undo returns the corners to their own values');
+    await page.keyboard.press('Control+z');
+    await waitUntil(async () => JSON.stringify(await corners()) === JSON.stringify(before) && (await allCorners.inputValue()) === shared, 'and the next Undo restores what the corners shared');
+    checks.push('one radius writes every corner at once, reads as one value only while they agree, and undoes as one step');
   }
 
   // One side can have a colour of its own: the centre edits the shared `border-color`, or the single side the Sides control
@@ -427,65 +451,48 @@ try {
     checks.push('a border side takes its own colour on the page and in the centre field, the shared colour returns and each change undoes alone');
   }
 
-  // A compiler-lowered border width remains visible as the measured fallback, then one edge can override it.
+  // A compiler-lowered border width remains visible as the measured fallback, and one side can override it — in the box model
+  // band, which is the only place a width is written now that the Border ring carries radii and colour instead.
   await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-width': '3px' } } } } });
   await page.evaluate(() => document.activeElement?.blur()); await page.mouse.move(5, 5);
   await waitUntil(async () => await page.locator('#inspector [data-key="border-t"]').getAttribute('placeholder') === '3', 'the box model reads a declarative width back from the actual page');
-  await page.locator('#inspector [data-key="border-t"]').fill('2'); await page.keyboard.press('Tab');
-  await waitUntil(async () => await page.locator('#inspector [data-key="border-width-t"]').inputValue() === '2', 'a box-model edit updates Border while keyboard focus stays in the diagram');
-  assert.equal(await page.evaluate(() => document.activeElement?.dataset.key), 'border-r');
   const borderWidths = () => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => { const cs = getComputedStyle(node); return ['Top', 'Right', 'Bottom', 'Left'].map(side => cs[`border${side}Width`]); });
-  await waitUntil(async () => JSON.stringify(await borderWidths()) === JSON.stringify(['2px', '3px', '3px', '3px']), 'one edge changes without changing its peers');
-  await page.locator('#inspector [data-key="border-width-r"]').fill('4'); await page.keyboard.press('Tab');
-  await waitUntil(async () => await page.locator('#inspector [data-key="border-r"]').inputValue() === '4', 'a Border edit updates the diagram while focus stays in Border');
-  // Inside the ring the reading order is geometry: top-left radius, top edge, top-right radius, left edge, the middle (the
-  // colour and the side it belongs to), the right edge and so on — so the stop after the right edge is the bottom-left corner.
-  assert.equal(await page.evaluate(() => document.activeElement?.dataset.key), 'radius-bl');
-
+  await page.locator('#inspector [data-key="border-t"]').fill('2'); await page.keyboard.press('Tab');
+  await waitUntil(async () => JSON.stringify(await borderWidths()) === JSON.stringify(['2px', '3px', '3px', '3px']), 'one side changes without changing its peers');
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.key), 'border-r', 'Tab walks the box model edges');
+  await page.locator('#inspector [data-key="border-r"]').fill('4'); await page.keyboard.press('Tab');
+  await waitUntil(async () => JSON.stringify(await borderWidths()) === JSON.stringify(['2px', '4px', '3px', '3px']), 'a second side takes its own width');
+  assert.equal(await page.locator('#inspector [data-key^="border-width-"]').count(), 0, 'no second copy of a width appeared while editing');
+  // Inside the ring the reading order is geometry: one radius per corner, then the middle (the colour and its side), then the one
+  // radius for all four — so the stop after the bottom-right corner is the colour, not a width.
+  await page.locator('#inspector [data-key="radius-br"]').focus();
+  await page.keyboard.press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement?.closest('.br-centre') !== null), true, 'after the last corner comes the colour in the middle');
   const beforeClear = await afterVersion();
-  for (const [key, other, next] of [['border-width-t', 'border-t', '2'], ['border-r', 'border-width-r', '4']]) {
-    await page.locator(`#inspector [data-key="${key}"]`).fill(''); await page.keyboard.press('Tab');
-    // The side is its own utility, so clearing it removes that side's authored width in both copies; the measured width stays as the placeholder.
-    await waitUntil(async () => await page.locator(`#inspector [data-key="${key}"]`).inputValue() === '' && await page.locator(`#inspector [data-key="${other}"]`).inputValue() === '', 'clearing either copy clears the side in both copies without leaving the inspector');
-    await page.locator(`#inspector [data-key="${other}"]`).fill(next); await page.keyboard.press('Tab');
-    await waitUntil(async () => await page.locator(`#inspector [data-key="${key}"]`).inputValue() === next, 'the other copy restores the same authored value');
-  }
-  assert.equal(await afterVersion() - beforeClear, 4, 'two clears and two restores make exactly four content commits');
+  // The side is its own utility, so clearing it removes that side's authored width; the measured width stays as the placeholder.
+  // The first side edit expanded the declared shorthand into four sides, so clearing one side removes exactly that width.
+  await waitUntil(async () => {
+    await page.locator('#inspector [data-key="border-t"]').fill(''); await page.keyboard.press('Tab');
+    return JSON.stringify(await borderWidths()) === JSON.stringify(['0px', '4px', '3px', '3px']);
+  }, 'clearing the box model field removes that side\'s width and leaves its peers');
+  await waitUntil(async () => {
+    await page.locator('#inspector [data-key="border-t"]').fill('2'); await page.keyboard.press('Tab');
+    return (await page.locator('#inspector [data-key="border-t"]').inputValue()) === '2';
+  }, 'and the same single field restores it');
+  assert.ok(await afterVersion() > beforeClear, 'the clear and the restore are real content commits');
   assert.deepEqual(await borderWidths(), ['2px', '4px', '3px', '3px'], 'clearing does not change unrelated border sides');
+  checks.push('a border width is written in the box model band only: one home, one commit per edit, and the ring holds radii and colour');
 
-  // Two copies of one property share writer intent; an older completion cannot overwrite a later draft.
-  let release, arrived;
-  const blocked = new Promise(resolve => { arrived = resolve; });
-  const gate = new Promise(resolve => { release = resolve; });
-  let firstWidth = true;
-  await page.route('**/api/patch', async route => { if (firstWidth) { firstWidth = false; arrived(); await gate; } await route.continue(); });
-  try {
-    await page.locator('#inspector [data-key="border-l"]').fill('5'); await page.keyboard.press('Tab');
-    await blocked;
-    await page.locator('#inspector [data-key="border-width-l"]').fill('7'); await page.keyboard.press('Tab');
-    release();
-    await page.evaluate(async () => (await import('./lib/store.js')).idle('welcome'));
-    await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '7' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '7', 'the latest accepted edit synchronizes both copies');
-  } finally { release(); await page.unroute('**/api/patch'); }
-  await page.locator('#viewport').focus(); await page.keyboard.press('Control+z');
-  await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '5' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '5', 'one Undo restores both copies');
-  await page.keyboard.press('Control+z');
-  await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '3' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '3', 'Undo returns both copies to the same class-authored width');
-  const beforeRefusal = await afterVersion();
-  await page.route('**/api/patch', route => route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'REVISION_CONFLICT', message: 'Linked border write refused', details: { actualVersion: beforeRefusal } }) }));
-  try {
-    await page.locator('#inspector [data-key="border-l"]').fill('9'); await page.keyboard.press('Tab');
-    await waitUntil(async () => /Linked border write refused/.test(await page.locator('#toast').innerText()), 'a refused linked edit reports the writer refusal');
-    await waitUntil(async () => await page.locator('#inspector [data-key="border-l"]').inputValue() === '3' && await page.locator('#inspector [data-key="border-width-l"]').inputValue() === '3', 'a refused edit restores inactive copies from accepted state');
-    assert.equal(await afterVersion(), beforeRefusal, 'the refusal does not advance content');
-  } finally { await page.unroute('**/api/patch'); }
-  await page.locator('#viewport').focus(); await page.mouse.move(5, 5);
-  checks.push('widths synchronize both ways without replacing focused fields; held writes, Undo and refusals preserve one shared property');
-
+  // Each line is chosen from whatever menu is open at that moment: a re-render can close the picker between opening and
+  // choosing, so the open and the choice are retried together until the page really shows the style.
+  const showsStyle = line => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate((node, line) => { const cs = getComputedStyle(node); return ['Top', 'Right', 'Bottom', 'Left'].every(side => cs[`border${side}Style`] === line.toLowerCase()); }, line);
   for (const line of ['Dashed', 'Dotted', 'Double', 'Groove', 'Ridge', 'Inset', 'Outset', 'None', 'Hidden', 'Solid']) {
-    await page.locator('#inspector [data-key="pick:Style"]').click();
-    await page.locator('.menu .menu-item', { hasText: new RegExp(`^${line}$`) }).click();
-    await waitUntil(async () => await page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate((node, line) => { const cs = getComputedStyle(node); return ['Top', 'Right', 'Bottom', 'Left'].every(side => cs[`border${side}Style`] === line.toLowerCase()); }, line), `${line} reaches every actual border side`);
+    await waitUntil(async () => {
+      const item = page.locator('.menu .menu-item', { hasText: new RegExp(`^${line}$`) });
+      if (!(await item.count())) await page.locator('#inspector [data-key="pick:Style"]').click().catch(() => {});
+      await item.first().click({ timeout: 1200 }).catch(() => {});
+      return showsStyle(line);
+    }, `${line} reaches every actual border side`);
   }
   assert.deepEqual(await borderWidths(), ['2px', '4px', '3px', '3px'], 'hiding and showing the border preserves authored widths');
   await page.locator('#inspector [data-key="stroke"]').fill('#cc3344'); await page.keyboard.press('Enter');

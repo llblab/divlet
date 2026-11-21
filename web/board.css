@@ -998,11 +998,11 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
   .swatch:not(.plain) { width: 28px; height: 28px; }
 }
 
-/* Border corners: a diagram of the surface, not a form of eight rows. The four radii sit in their own corners, the shared radius
-   at the centre and the four edge widths between them, over the same warm tint the box model gives its border band. */
+/* Border is the ring of radii and colour, not a second box model: a radius sits in each corner, the colour in the middle, and
+   one field under the ring gives every corner the same radius. Edge widths are not repeated here — they own the four sides of
+   the box model's border band, one place to write them. */
 /* The border layer of the box model, copied into Border: the same fill, the same one-pixel frame, square corners and the same
-   size, centred — with a hole where the widget above shows its content, so the panel's own surface reads through it. A radius
-   sits in each corner, a width at each edge's centre and the colour in the middle. */
+   size, centred — with a hole where the widget above shows its content, so the panel's own surface reads through it. */
 .br-shell { position: relative; display: grid; justify-items: center; gap: 6px; margin: 2px 0 0; container: ring / inline-size; }
 .br-box {
   --br-field: 30px;
@@ -1017,9 +1017,8 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 /* The hole: the panel's own surface, as if the inside of the band had been cut away. */
 .br-hole { position: absolute; inset: 24px 36px; background: var(--solid); }
 .br-cell { position: absolute; display: flex; align-items: center; justify-content: center; z-index: 1; }
-.br-tl { top: 4px; left: 5px; } .br-t { top: 4px; left: 50%; transform: translateX(-50%); } .br-tr { top: 4px; right: 5px; }
-.br-l { left: 3px; top: 50%; transform: translateY(-50%); } .br-r { right: 3px; top: 50%; transform: translateY(-50%); }
-.br-bl { bottom: 4px; left: 5px; } .br-b { bottom: 4px; left: 50%; transform: translateX(-50%); } .br-br { bottom: 4px; right: 5px; }
+.br-tl { top: 4px; left: 5px; } .br-tr { top: 4px; right: 5px; }
+.br-bl { bottom: 4px; left: 5px; } .br-br { bottom: 4px; right: 5px; }
 /* The box model's own small inputs, edge for edge: same height, same centred mono value, same quiet surface. */
 .br-box .vf.br-field { flex: none; width: var(--br-field); min-height: 18px; height: 18px; padding: 0; border-radius: var(--radius-small); background: transparent; box-shadow: none; color: inherit; }
 .br-box .vf.br-field:hover { background: #ffffff30; }
@@ -1040,14 +1039,17 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 }
 .br-shell.br-compact .br-centre { position: static; transform: none; width: 100%; }
 .br-centre .color-field { min-width: 0; flex: 1 1 auto; }
-/* The side the colour belongs to reads under the band, as its own control, with room for the word. */
-.br-shell > .side-pick { justify-self: start; margin-top: 2px; }
-.br-centre .side-pick { display: none; }
+/* Under the ring: the one radius for every corner, and the side the colour belongs to — the controls that speak for the whole
+   border rather than for one corner or one edge. Both wrap rather than clip when the ring is narrow. */
+.br-below { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; width: 100%; }
+.br-below .br-all { flex: 1 1 118px; min-width: 0; }
+.br-below .side-pick { flex: 0 1 auto; }
 /* A menu button that names itself by its value: it says which side the colour belongs to. */
-.side-pick { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 24px; padding: 0 6px; border: 0; border-radius: var(--radius-inner); background: var(--control); color: var(--ink); font: inherit; cursor: pointer; white-space: nowrap; }
+/* Positioned, so its own caret anchors to the button instead of the ring's top-right corner. */
+.side-pick { position: relative; display: inline-flex; align-items: center; justify-content: center; height: 24px; padding: 0 18px 0 6px; border: 0; border-radius: var(--radius-inner); background: var(--control); color: var(--ink); font: inherit; cursor: pointer; white-space: nowrap; }
 .side-pick:hover { background: var(--control-hover); }
 .side-pick .pick-v { font-size: 10px; }
-.side-pick .icon { width: 10px; height: 10px; color: var(--muted); }
+.side-pick .pick-caret { right: 5px; top: calc(50% - 5px); width: 10px; height: 10px; color: var(--muted); }
 @container ring (max-width: 132px) {
   .br-box { --br-field: 26px; }
   .br-hole { inset: 24px 32px; }
@@ -1058,7 +1060,6 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .appearance-box, .border-box { display: grid; gap: 8px; }
 /* Fill and Text share a row while a field can still hold its label, swatch, value and clear on one line (≈144px). */
 .appearance-colors { --control-min: 148px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--control-min)), 1fr)); gap: 8px; }
-.border-widths { --control-min: max(106px, calc(50% - 3px)); }
 .appearance-box > .grid2, .typography-controls > .grid2 { align-items: center; }
 .typography-controls { display: grid; gap: 8px; min-width: 0; }
 .font-family-control { display: grid; gap: 4px; min-width: 0; }
