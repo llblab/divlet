@@ -57,6 +57,28 @@ try {
   }
   assert.equal(await page.locator('#status-dot svg path').nth(1).evaluate(path => path.isPointInFill(new DOMPoint(13, 10))), true, 'the D interior is really painted, not just outlined');
   checks.push('the divlet mark pairs an outlined bracket and filled D/play wedge with one inherited colour, including the empty-state mark');
+
+  // One optical size for every glyph: the painted extent, not the 16px box, is what the eye compares across a row. A caret, a
+  // tick, a close cross and a stop square are deliberately lighter marks and keep their own smaller size.
+  await page.evaluate(async () => { const m = await import('./lib/store.js'); m.selectArtboards(['welcome']); });
+  await page.waitForSelector('#inspector .smart-bar');
+  const glyphs = await page.evaluate(() => {
+    // Deliberate marks, not UI glyphs at the shared size: a caret, a tick, a close cross, a stop square — and the brand mark,
+    // which is authored art that the project and the landing page draw byte for byte.
+    const light = new Set(['chevron', 'check', 'close', 'stop', 'divlet']);
+    const seen = new Map();
+    for (const svg of document.querySelectorAll('#ui .icon, #ui svg, #inspector .smart-bar svg, #side-tabs svg, #dock svg')) {
+      const box = svg.getBBox?.();
+      if (!box || (!box.width && !box.height)) continue;
+      const span = Math.round(Math.max(box.width, box.height) * 100) / 100;
+      seen.set(svg.dataset.icon || '?', span);
+    }
+    return { spans: [...seen.entries()], light: [...light] };
+  });
+  const offSize = glyphs.spans.filter(([name, span]) => !glyphs.light.includes(name) && (span < 13.3 || span > 14.6));
+  assert.deepEqual(offSize, [], `every glyph paints at the shared optical size (${offSize.map(([label, span]) => `${label} ${span}`).join(', ')})`);
+  assert.ok(glyphs.spans.length >= 6, `the chrome really rendered its glyphs (${glyphs.spans.length}: ${glyphs.spans.map(([name]) => name).join(' ')})`);
+  checks.push('every chrome glyph paints at one optical size, so a row of them no longer reads as a decreasing series');
   const rootId = runtime.read({ view: 'document', documentId: 'welcome' }).rootId;
   const versionBeforeNavigation = runtime.read({ view: 'document', documentId: 'welcome' }).version;
   await page.evaluate(async () => (await import('./lib/store.js')).selectArtboards(['welcome']));
