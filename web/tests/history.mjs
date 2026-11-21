@@ -152,6 +152,28 @@ try {
   await go(draggedPoint);
   checks.push('history lists only reachable states, oldest first, with the superseded future dimmed but still selectable');
 
+  // Every line is a point in time: marker and metadata in one column, the change beside it, and no elapsed time at all.
+  const timePoints = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('#activity .history-states [data-history-point]')];
+    const boxes = node => node.getBoundingClientRect();
+    return {
+      times: document.querySelectorAll('#activity time, #activity .when').length,
+      rows: rows.length,
+      rail: rows.filter(node => {
+        const rail = node.querySelector(':scope > .history-rail');
+        const msg = node.querySelector(':scope > .text > .msg');
+        const marker = rail?.querySelector('.icon');
+        const meta = rail?.querySelector('.sub');
+        if (!rail || !msg || !marker || !meta) return false;
+        const [mark, info, text] = [boxes(marker), boxes(meta), boxes(msg)];
+        return Math.abs((mark.left + mark.right) / 2 - (info.left + info.right) / 2) <= 1 && info.top >= mark.bottom - 1 && text.left >= info.right + 2;
+      }).length,
+    };
+  });
+  assert.equal(timePoints.times, 0, 'a history line shows no elapsed time');
+  assert.equal(timePoints.rail, timePoints.rows, 'every line keeps its marker and metadata in one column, with the change beside it');
+  checks.push('each history line is one time point: marker and metadata in one column, no elapsed time');
+
   const group = runtime.newGroup(), groupBase = runtime.historyHead().pointId, beforeGroup = authored(), pointCount = runtime.readTimeline().points.length;
   await patch('welcome', { artboard: { x: doc('welcome').artboard.x + 80 }, nodes: { 'title-text': { content: 'Grouped content' } } }, { group, label: 'Grouped project edit' });
   await patch(second, { artboard: { y: 330 }, nodes: { root: { children: ['message'] }, message: { id: 'message', type: 'text', content: 'Grouped second frame' } } }, { group, label: '' });

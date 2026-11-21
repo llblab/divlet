@@ -1,4 +1,4 @@
-import { $, el, icon, ago, pressGuard } from './util.js';
+import { $, el, icon, pressGuard } from './util.js';
 import { store, on, documents, descriptor, selectArtboards, selectNodes, loadModel } from './store.js';
 import { historyService } from './host.js';
 import { reveal, flashNodes } from './canvas.js';
@@ -158,11 +158,11 @@ function changeRow(row, point = null, timeline = null) {
   if (count > 1) msg.append(el('span', 'times', `×${count}`));
   const where = row.documents.size > 1 ? `${row.documents.size} artboards` : change.name || change.documentId;
   const details = [where, who, title !== change.summary ? change.summary : ''].filter(Boolean).join(' · ');
-  text.append(msg, el('div', 'sub', details));
-  const when = el('time', 'when', ago(change.at));
-  when.dateTime = change.at;
-  when.title = new Date(change.at).toLocaleString();
-  line.append(icon(change.kind === 'undo' || change.kind === 'redo' ? change.kind : iconName), text, when);
+  text.append(msg);
+  // Every line is a point in time: marker and metadata share one column, the change itself reads beside it. No elapsed time.
+  const rail = el('div', 'history-rail');
+  rail.append(icon(change.kind === 'undo' || change.kind === 'redo' ? change.kind : iconName), el('div', 'sub', details));
+  line.append(rail, text);
   if (point) line.append(el('span', 'history-tag', current ? 'Current' : future ? 'Ahead' : 'Restore'));
   line.dataset.tip = count > 1 ? `${count} steps undone together · #${row.seqs[0]}–#${change.seq}` : `#${change.seq} · v${change.fromVersion ?? '—'} → v${change.toVersion ?? '—'}${change.touched?.length ? ` · ${change.touched.length} node${change.touched.length === 1 ? '' : 's'}` : ''}`;
   line.dataset.seq = String(change.seq);
@@ -204,11 +204,13 @@ function stateRow(point, index, timeline) {
   line.setAttribute('aria-disabled', String(current || !!navigating || store.connection !== 'connected'));
   if (current) line.setAttribute('aria-current', 'step');
   if (navigating === point.id) line.setAttribute('aria-busy', 'true');
+  const range = point.seq == null ? 'Session baseline' : point.firstSeq !== point.seq ? `#${point.firstSeq}–#${point.seq}` : `#${point.seq}`;
+  // One point in time: its marker and metadata share the left column, the state's name sits beside it.
+  const rail = el('div', 'history-rail');
+  rail.append(icon('clock'), el('div', 'sub', range));
   const text = el('div', 'text');
   text.append(el('div', 'msg', point.label));
-  const range = point.seq == null ? 'Session baseline' : point.firstSeq !== point.seq ? `Grouped edit · #${point.firstSeq}–#${point.seq}` : `After edit #${point.seq}`;
-  text.append(el('div', 'sub', range));
-  line.append(icon('clock'), text, el('span', 'history-tag', current ? 'Current' : future ? 'Ahead' : 'Restore'));
+  line.append(rail, text, el('span', 'history-tag', current ? 'Current' : future ? 'Ahead' : 'Restore'));
   line.dataset.tip = current ? 'The project is at this state' : 'Restore the whole project after this grouped edit, including frame placement and project settings';
   const expectedPoint = timeline.current;
   line.addEventListener('click', () => navigate(point.id, expectedPoint));
@@ -327,4 +329,3 @@ on('state', () => {
 on('expanded', paintStatus);
 on('connection', render);
 on('sidebar', ({ open, tab }) => { if (open && tab === 'activity') { void loadRecent(); render(); } else restorePoint = null; });
-setInterval(() => { if (isOpen()) for (const node of panel.querySelectorAll('time.when')) node.textContent = ago(node.dateTime); }, 15000);

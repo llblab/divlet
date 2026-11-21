@@ -336,7 +336,13 @@ body.is-expanded .resize-handle, body:has(> .boot-cover) .resize-handle, body:ha
 
 /* activity */
 .filters { gap: 4px; padding: 6px 10px 6px; }
-.change, .diag { display: flex; align-items: flex-start; gap: 9px; width: 100%; padding: 7px 8px; border: 0; border-radius: var(--radius-inner); background: transparent; text-align: left; color: var(--ink); }
+.change, .diag { align-items: flex-start; gap: 9px; width: 100%; padding: 7px 8px; border: 0; border-radius: var(--radius-inner); background: transparent; text-align: left; color: var(--ink); }
+.diag { display: flex; }
+/* Every history line is a point in time: its marker and metadata share one column, the change reads beside it. */
+.change { display: grid; grid-template-columns: var(--history-rail, clamp(44px, 26%, 80px)) minmax(0, 1fr) auto; column-gap: 9px; }
+.history-rail { display: grid; justify-items: center; gap: 1px; min-width: 0; }
+.history-rail > .icon { margin-top: 2px; color: var(--muted); }
+.history-rail > .sub { width: 100%; margin-top: 1px; color: var(--muted); font: 10px/1.25 var(--mono); text-align: center; white-space: normal; overflow: visible; overflow-wrap: anywhere; text-overflow: clip; }
 button.change:hover:not(:disabled) { background: var(--field); }
 .change:disabled { opacity: var(--disabled-field); cursor: default; }
 .change .icon, .diag .icon { margin-top: 1px; color: var(--muted); }
@@ -363,7 +369,7 @@ button.change:hover:not(:disabled) { background: var(--field); }
 /* The reachable past reads in the list's own colour; the superseded future is dimmed because the next edit may overwrite it. */
 .history-state.is-future { color: var(--muted); }
 .history-state.is-future .msg { color: var(--muted); }
-.history-state.is-future .sub, .history-state.is-future .when { color: var(--faint); }
+.history-state.is-future .sub { color: var(--faint); }
 .history-state.is-future .icon { opacity: .5; }
 .history-state.is-future .history-tag { opacity: .75; }
 .history-state.is-current { background: var(--accent-soft); }
