@@ -290,6 +290,13 @@ export function radiusOf(view) {
   if (corners.some(value => value == null) || corners.some(value => value !== corners[0])) return corners.every(value => value == null) ? null : undefined;
   return /^(?:9999px|999px|100%|50%)$/.test(corners[0]) ? 'Full' : show(corners[0]);
 }
+/** One corner's authored radius as its field shows it: `8`, `50%`, `Full`, or nothing when no corner is authored. */
+export function cornerRadiusOf(view, corner) {
+  const raw = view[`border-${corner}-radius`] ?? view['border-radius'] ?? null;
+  if (raw == null) return null;
+  return /^(?:9999px|999px|100%|50%)$/.test(raw) ? 'Full' : show(raw);
+}
+
 /** Corner radius: a plain number reads as px, and px/%/rem/em plus the `full` keyword are kept as written. */
 export const radiusInput = raw => {
   const text = String(raw ?? '').trim();

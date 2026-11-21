@@ -46,15 +46,18 @@ try {
     await page.locator('#inspector [data-key="opacity"]').waitFor();
     assert.deepEqual(await readableNumbers(`${width}px@${size}% element`), []);
     const compactShape = await page.evaluate(() => {
-      const field = document.querySelector('#inspector .bm-radius') ?? document.querySelector('#inspector .boxmodel');
-      const radius = field.querySelector('[data-key="radius"]'), style = getComputedStyle(radius);
+      // The corners diagram keeps its three columns at every width, and the shared radius still reads `Full` whole inside its cell.
+      const diagram = document.querySelector('#inspector .ca'), inspector = document.querySelector('#inspector').getBoundingClientRect();
+      const radius = diagram.querySelector('[data-key="radius"]'), style = getComputedStyle(radius);
       const context = document.createElement('canvas').getContext('2d');
       context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-      const width = field.closest('.vf').offsetWidth, box = field.closest('.boxmodel')?.offsetWidth ?? 0;
-      // In the widget's corner it stays compact; when the widget is too narrow to share, it takes the row instead.
-      return { placed: width <= 84 || Math.abs(width - box) <= 4, readable: context.measureText('Full').width <= radius.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1 };
+      return {
+        columns: getComputedStyle(diagram).gridTemplateColumns.split(' ').filter(Boolean).length,
+        readable: context.measureText('Full').width <= radius.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1,
+        inside: diagram.getBoundingClientRect().right <= inspector.right + 1,
+      };
     });
-    assert.deepEqual(compactShape, { placed: true, readable: true }, `a placed, readable radius at ${width}px/${size}%`);
+    assert.deepEqual(compactShape, { columns: 3, readable: true, inside: true }, `the corners diagram keeps three readable columns at ${width}px/${size}%`);
     const spacingCollisions = await page.locator('#inspector .boxmodel').evaluate(model => {
       const fields = [...model.querySelectorAll('.bm-field')].map(node => node.getBoundingClientRect());
       const overlaps = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;

@@ -462,19 +462,16 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .bm-margin { background: #bc8c61; border-style: dashed; }
 .bm-border { background: #e3c78f; }
 .bm-padding { background: #c6d7a7; border-style: dashed; }
-/* No band names itself inside the diagram any more: one legend under it does that, in nesting order, with a swatch of each
-   band's own fill and the name in the tone that band gave its caption. */
-.bm-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 11px; padding: 0 2px; font: 10.5px/15px var(--mono); }
-.bm-key { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
-.bm-swatch { flex: none; width: 10px; height: 10px; border-radius: 2px; }
-.bm-key-position .bm-swatch { background: transparent; border: 1px dashed var(--faint); }
-.bm-key-position .bm-key-name { color: var(--muted); }
-.bm-key-margin .bm-swatch { background: #bc8c61; }
-.bm-key-margin .bm-key-name { color: #8a5f3a; }
-.bm-key-border .bm-swatch { background: #e3c78f; }
-.bm-key-border .bm-key-name { color: #a8843c; }
-.bm-key-padding .bm-swatch { background: #c6d7a7; }
-.bm-key-padding .bm-key-name { color: #7d9750; }
+/* The band name is a watermark on its own fill: larger than a value and darker than the colour it sits on, 12px in from the
+   left so it reads as part of the band rather than a corner label. It stays inside the top value strip. */
+.bm-caption { position: absolute; top: 0; left: 12px; height: 20px; display: flex; align-items: center; font: 600 12.5px/20px var(--font); letter-spacing: .01em; pointer-events: none; }
+/* A band narrow enough that the name would reach the centred top value gives ground: closer to the edge first, then smaller. */
+@container band (max-width: 180px) { .bm-caption { left: 9px; font-size: 10.5px; } }
+@container band (max-width: 130px) { .bm-caption { left: 4px; font-size: 8px; } }
+.bm-position > .bm-caption { color: var(--muted); }
+.bm-margin > .bm-caption { color: #8a5f3a; }
+.bm-border > .bm-caption { color: #a8843c; }
+.bm-padding > .bm-caption { color: #7d9750; }
 .bm-cell { position: absolute; display: flex; justify-content: center; align-items: center; width: var(--bm-field); height: 18px; min-width: 0; font: 10px/16px var(--mono); }
 .bm-cell.bm-t { top: 1px; left: 50%; transform: translateX(-50%); }
 .bm-cell.bm-b { bottom: 1px; left: 50%; transform: translateX(-50%); }
@@ -494,7 +491,6 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .vf.bm-dimension { width: min(100%, var(--bm-value-width)); min-width: 3ch; }
 .bm-value .vf-input { font-size: inherit; }
 .spacing-box { display: grid; gap: 6px; }
-.bm-unit { position: absolute; top: 4px; right: 5px; color: var(--muted); font: 9px/12px var(--mono); pointer-events: none; }
 @container boxmodel (max-width: 270px) {
   .bm-sq { --bm-edge: 20px; --bm-field: 20px; }
   .bm-cell, .bm-field .vf-input, .bm-offset .vf-input { font-size: 8.5px; }
@@ -984,6 +980,28 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
   .swatch:not(.plain) { width: 28px; height: 28px; }
 }
 
+/* Border corners: a diagram of the surface, not a form of eight rows. The four radii sit in their own corners, the shared radius
+   at the centre and the four edge widths between them, over the same warm tint the box model gives its border band. */
+.ca { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 4px; padding: 6px; border-radius: var(--radius-inner); background: #e3c78f40; }
+.ca-cell { position: relative; display: grid; place-items: center; min-width: 0; border-radius: var(--radius-small); }
+/* The diagram's own marks say which cell is which: a rounded corner in each corner, a line on each edge, no caption anywhere. */
+.ca-corner::before, .ca-edge::before { content: ""; position: absolute; pointer-events: none; }
+.ca-corner::before { left: 4px; top: 4px; width: 7px; height: 7px; border-top: 1.5px solid #a8843c; border-left: 1.5px solid #a8843c; border-top-left-radius: 4px; }
+.ca-tr::before { left: auto; right: 4px; border-left: 0; border-right: 1.5px solid #a8843c; border-top-left-radius: 0; border-top-right-radius: 4px; }
+.ca-bl::before { top: auto; bottom: 4px; border-top: 0; border-bottom: 1.5px solid #a8843c; border-top-left-radius: 0; border-bottom-left-radius: 4px; }
+.ca-br::before { left: auto; right: 4px; top: auto; bottom: 4px; border-top: 0; border-left: 0; border-right: 1.5px solid #a8843c; border-bottom: 1.5px solid #a8843c; border-radius: 0 0 4px 0; }
+.ca-edge::before { background: #a8843c; border-radius: 1px; }
+.ca-t::before { left: 50%; top: 4px; width: 16px; height: 1.5px; transform: translateX(-50%); }
+.ca-b::before { left: 50%; bottom: 4px; width: 16px; height: 1.5px; transform: translateX(-50%); }
+.ca-l::before { left: 4px; top: 50%; width: 1.5px; height: 12px; transform: translateY(-50%); }
+.ca-r::before { right: 4px; top: 50%; width: 1.5px; height: 12px; transform: translateY(-50%); }
+.ca-corner, .ca-edge { background: #e3c78f80; }
+.ca-corner .vf, .ca-edge .vf { width: 100%; background: transparent; }
+.ca-corner .vf:focus-within, .ca-edge .vf:focus-within, .ca-all .vf:focus-within { background: var(--solid); }
+/* The shared value reads as the one that applies to all four: a dashed edge instead of a filled cell. */
+.ca-all { background: transparent; }
+.ca-all .vf { width: 100%; background: transparent; outline: 1px dashed #a8843c; outline-offset: -1px; }
+.ca .vf-input { text-align: center; }
 /* Border owns its line, edge widths, colour and radius; Appearance keeps fill and typography. */
 .appearance-box, .border-box { display: grid; gap: 8px; }
 /* Fill and Text share a row while a field can still hold its label, swatch, value and clear on one line (≈144px). */

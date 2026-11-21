@@ -45,6 +45,16 @@ test('a bare text bracket is a size, and leading reads back as a line height', (
   assert.equal(classView('text-sm/6')['line-height'], '24px', 'a size with a line-height sets both');
 });
 
+test('a corner radius reads back from the split the writer produces', () => {
+  assert.deepEqual(declarationsOfClass('rounded-tl-xl'), [['border-top-left-radius', '12px']]);
+  assert.deepEqual(declarationsOfClass('rounded-tr-[6px]'), [['border-top-right-radius', '6px']]);
+  assert.deepEqual(declarationsOfClass('rounded-bl-full'), [['border-bottom-left-radius', '9999px']]);
+  assert.deepEqual(declarationsOfClass('rounded-t-lg'), [['border-top-left-radius', '8px'], ['border-top-right-radius', '8px']], 'a side pair reaches both corners');
+  assert.deepEqual(declarationsOfClass('rounded-tl'), [['border-top-left-radius', '4px']], 'a bare corner is the default step');
+  assert.deepEqual(declarationsOfClass('rounded-tl-nope'), [], 'an unknown step sets nothing');
+  assert.deepEqual(declarationsOfClass('rounded-xl'), [['border-radius', '12px']], 'the shorthand stays a shorthand');
+});
+
 test('overflow reads back per axis, so a hand-written axis is not mistaken for a shorthand', () => {
   assert.deepEqual(declarationsOfClass('overflow-hidden'), [['overflow', 'hidden']]);
   assert.deepEqual(declarationsOfClass('overflow-x-auto'), [['overflow-x', 'auto']]);

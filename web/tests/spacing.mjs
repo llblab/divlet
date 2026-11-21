@@ -77,8 +77,7 @@ try {
   assert.equal(await frame.locator('body').evaluate(() => document.documentElement.scrollHeight), dim, 'the overlay never changes the page size');
   checks.push('pointing at a number lights its band and leaving restores the quiet default');
 
-  // Full layer names come from one legend under the widget, in nesting order; the bands keep their rectangles for values and
-  // carry no repeated side captions.
+  // The reference uses full layer names in the bands, not a separate legend or eight repeated side captions.
   const sized = await page.evaluate(() => {
     const box = document.querySelector('#inspector .boxmodel');
     const widths = [...new Set([...box.querySelectorAll('.bm-field')].map(field => Math.round(field.getBoundingClientRect().width)))];
@@ -87,8 +86,7 @@ try {
       keys: box.querySelectorAll('.bm-field .vf-k').length,
       tips: [...box.querySelectorAll('.bm-field')].filter(field => field.querySelector('.vf-k')?.dataset.tip || field.dataset.tip).length,
       labels: [...box.querySelectorAll('.bm-field')].map(field => field.getAttribute('aria-label')),
-      legend: [...box.parentElement.querySelectorAll('.bm-legend .bm-key-name')].map(node => node.textContent),
-      captions: box.querySelectorAll('.bm-caption').length,
+      captions: [...box.querySelectorAll('.bm-caption')].map(node => node.textContent),
       border: box.querySelectorAll('.bm-border > .bm-cell input').length,
       outline: getComputedStyle(box.querySelector('.bm-position')).borderStyle,
       switches: box.querySelectorAll('button').length,
@@ -98,12 +96,11 @@ try {
   assert.equal(sized.widths.length, 1, `one field size for all eight numbers (${sized.widths})`);
   assert.equal(sized.keys, 0, 'no letter keys: the square a number sits on says which side it is');
   assert.equal(sized.tips, 0, 'side captions do not add tooltip noise');
-  assert.deepEqual(sized.legend, ['position', 'margin', 'border', 'padding'], 'the legend names the layers in nesting order, outermost first');
-  assert.equal(sized.captions, 0, 'no band writes its own name inside the diagram');
+  assert.deepEqual(sized.captions, ['position', 'margin', 'border', 'padding']);
   assert.equal(sized.border, 4, 'all four border widths are editable');
   assert.equal(sized.outline, 'none', 'the position band has no outer outline');
   assert.equal(await page.locator('#inspector [data-section="layout"] [data-key="pick:Position"]').count(), 0, 'position mode has one home, with its offsets in Spacing');
-  assert.equal(sized.switches, 0, 'no linking switches: eight independent numbers');
+  assert.equal(sized.switches, 0, 'no linking switches or separate legend');
   assert.ok(sized.height <= 225, `the four-layer widget stays compact (${sized.height})`);
   assert.deepEqual(sized.labels, ['Margin top, px', 'Margin right, px', 'Margin bottom, px', 'Margin left, px', 'Padding top, px', 'Padding right, px', 'Padding bottom, px', 'Padding left, px'], 'the accessible name still says which side and unit');
 
@@ -126,34 +123,41 @@ try {
   await sleep(300);
   checks.push('four named bands retain eight independent spacing editors, editable borders and no outer outline');
 
-  // One legend carries the names: each swatch is its band's own fill, each name that band's caption tone, and every side value
-  // stays centred in its own strip.
-  const legend = await page.evaluate(() => {
-    const box = document.querySelector('#inspector .boxmodel');
-    const anchor = box.parentElement.querySelector('.bm-legend');
-    const fillOf = kind => getComputedStyle(box.querySelector(`.bm-${kind}`)).backgroundColor;
-    const keys = [...anchor.querySelectorAll('.bm-key')].map(key => {
-      const kind = key.className.match(/bm-key-(\w+)/)[1];
-      return { kind, name: getComputedStyle(key.querySelector('.bm-key-name')).color, swatch: getComputedStyle(key.querySelector('.bm-swatch')).backgroundColor, fill: fillOf(kind), bottom: key.getBoundingClientRect().bottom };
-    });
-    const boxed = box.getBoundingClientRect();
-    return {
-      keys,
-      below: keys.every(key => key.bottom > boxed.bottom - 1),
-      centred: [...box.querySelectorAll('.bm-sq')].map(band => {
-        const style = getComputedStyle(band), rect = band.getBoundingClientRect();
-        const side = parseFloat(style.paddingLeft), border = parseFloat(style.borderLeftWidth);
-        const left = band.querySelector(':scope > .bm-l').getBoundingClientRect(), right = band.querySelector(':scope > .bm-r').getBoundingClientRect();
-        return Math.abs(left.left + left.width / 2 - (rect.left + border + side / 2)) <= 1 && Math.abs(right.left + right.width / 2 - (rect.right - border - side / 2)) <= 1;
-      }),
+  // The band name reads as a watermark on its own fill, and a side value is centred in its own side strip.
+  const watermark = await page.evaluate(() => {
+    const luminance = colour => {
+      const [r, g, b] = colour.match(/[\d.]+/g).slice(0, 3).map(Number).map(value => { const channel = value / 255; return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4; });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
     };
+    return [...document.querySelectorAll('#inspector .boxmodel .bm-sq')].map(band => {
+      const caption = band.querySelector(':scope > .bm-caption');
+      const box = band.getBoundingClientRect(), style = getComputedStyle(band);
+      const side = parseFloat(style.paddingLeft), border = parseFloat(style.borderLeftWidth);
+      const left = band.querySelector(':scope > .bm-l').getBoundingClientRect(), right = band.querySelector(':scope > .bm-r').getBoundingClientRect();
+      const cap = caption.getBoundingClientRect();
+      const background = style.backgroundColor;
+      const value = band.querySelector(':scope > .bm-cell input');
+      return {
+        label: caption.textContent,
+        bandWidth: Math.round(box.width),
+        size: Math.round(parseFloat(getComputedStyle(caption).fontSize) * 10) / 10,
+        valueSize: value ? Math.round(parseFloat(getComputedStyle(value).fontSize) * 10) / 10 : 0,
+        offset: Math.round(cap.left - (box.left + border)),
+        roomy: box.width - 2 * border - 2 * side > 180,
+        inside: cap.left >= box.left + border - 1 && cap.right <= box.right - border + 1,
+        centred: Math.abs(left.left + left.width / 2 - (box.left + border + side / 2)) <= 1 && Math.abs(right.left + right.width / 2 - (box.right - border - side / 2)) <= 1,
+        darker: background === 'rgba(0, 0, 0, 0)' ? null : luminance(getComputedStyle(caption).color) < luminance(background),
+      };
+    });
   });
-  assert.deepEqual(legend.keys.map(key => key.kind), ['position', 'margin', 'border', 'padding'], 'the legend lists the layers outermost first');
-  assert.equal(legend.below, true, 'it sits under the widget, not inside a band');
-  assert.deepEqual(legend.keys.filter(key => key.kind !== 'position' && key.swatch !== key.fill).map(key => `${key.kind}:${key.swatch}≠${key.fill}`), [], 'every swatch is the fill of the band it names');
-  assert.deepEqual(legend.keys.filter(key => key.kind !== 'position' && key.name === key.fill).map(key => key.kind), [], 'every name is drawn in its own tone, not the fill itself');
-  assert.deepEqual(legend.centred.filter(ok => !ok).length, 0, 'a side value stays centred in its own strip');
-  checks.push('one legend under the widget names the layers in nesting order, each swatch its band fill, and side values stay centred');
+  assert.deepEqual(watermark.map(band => band.label), ['position', 'margin', 'border', 'padding'], 'every band still names itself');
+  assert.deepEqual(watermark.filter(band => !band.centred).map(band => band.label), [], 'a side value stays centred in its own strip');
+  assert.deepEqual(watermark.filter(band => !band.inside || band.offset < 4 || band.offset > 12).map(band => `${band.label}/${band.offset}`), [], 'the band name sits inside its band, 4-12px in from the left edge');
+  assert.deepEqual(watermark.filter(band => band.bandWidth > 200 && band.offset !== 12).map(band => `${band.label}/${band.offset}`), [], 'a roomy band keeps the full 12px inset');
+  assert.deepEqual(watermark.filter(band => band.roomy && band.size < band.valueSize).map(band => `${band.label}/${band.size}<${band.valueSize}`), [], 'a roomy band writes its name larger than the values it backs');
+  assert.deepEqual(watermark.filter(band => band.size < 8).map(band => `${band.label}/${band.size}`), [], 'the band name never drops below the type size the bands already used for it');
+  assert.deepEqual(watermark.filter(band => band.darker === false).map(band => band.label), [], 'the band name is darker than the fill it sits on');
+  checks.push('each band names itself as a darker watermark 12px in, and side values are centred in their own strip');
 
   const paddingValues = () => frame.locator('[data-divlet-id="nav"]').evaluate(node => {
     const style = getComputedStyle(node);
@@ -424,14 +428,14 @@ try {
   await page.keyboard.press('Control+z');
   await waitUntil(() => !runtime.read({ view: 'document', documentId: probe.id }).nodes['box-probe'].className.includes('top-2'), 'position edge edit remains undoable');
   // Native DOM order is the complete outside-in editing path; no positive tabindex or focus trap.
-  const fieldOrder = ['inset-t', 'inset-r', 'inset-b', 'inset-l', 'm-t', 'm-r', 'm-b', 'm-l', 'border-t', 'border-r', 'border-b', 'border-l', 'p-t', 'p-r', 'p-b', 'p-l', 'content-width', 'content-height', 'radius'];
+  const fieldOrder = ['inset-t', 'inset-r', 'inset-b', 'inset-l', 'm-t', 'm-r', 'm-b', 'm-l', 'border-t', 'border-r', 'border-b', 'border-l', 'p-t', 'p-r', 'p-b', 'p-l', 'content-width', 'content-height'];
   const activeKey = () => page.evaluate(() => document.activeElement?.dataset.key);
   await page.locator('#inspector [data-key="pick:Position"]').focus();
   for (const key of fieldOrder) { await page.keyboard.press('Tab'); assert.equal(await activeKey(), key, `Tab reaches ${key}`); }
   await page.keyboard.press('Tab'); assert.equal(await page.evaluate(() => document.activeElement?.closest('[data-section]')?.dataset.section), 'border', 'Tab leaves the last value for the next section');
   for (const key of [...fieldOrder].reverse()) { await page.keyboard.press('Shift+Tab'); assert.equal(await activeKey(), key, `Shift+Tab reaches ${key}`); }
   await page.keyboard.press('Shift+Tab'); assert.equal(await activeKey(), 'pick:Position', 'Shift+Tab leaves the first value for position mode');
-  checks.push('Tab and Shift+Tab traverse position mode, all 19 values including the corner radius, and the section boundaries in native DOM order');
+  checks.push('Tab and Shift+Tab traverse position mode and all 18 values of the widget in native DOM order, then its section boundaries; the corner radius now lives in Border');
 
   await page.locator('#inspector [data-key="border-r"]').fill('4'); await page.keyboard.press('Enter');
   await waitUntil(async () => await probeFrame.locator('[data-divlet-id="box-probe"]').evaluate(node => getComputedStyle(node).borderRightWidth === '4px'), 'per-side border editing changes the actual page');
@@ -493,10 +497,12 @@ try {
   await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); assert.equal(await activeKey(), 'content-width');
   await page.keyboard.insertText('90'); await page.keyboard.press('Tab');
   await page.keyboard.insertText('45');
-  // The corner radius is the widget's last field, so it follows the content size before Tab leaves for Border.
-  await page.keyboard.press('Tab'); assert.equal(await activeKey(), 'radius', 'Tab reaches the corner radius after the content size');
-  await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
-  assert.equal(await activeKey(), 'pick:Style', 'native Tab leaves the widget and reaches the Border section');
+  // The corner radius moved to Border's corners diagram, so the content size is the widget's last field: Tab leaves it at the
+  // section's own disclosure header, and the next stop is Border's first control.
+  await page.keyboard.press('Tab');
+  assert.equal(await page.evaluate(() => document.activeElement?.tagName), 'SUMMARY', 'native Tab leaves the widget at the section header');
+  await page.keyboard.press('Tab');
+  assert.equal(await activeKey(), 'pick:Style', 'and the next stop is the first control in the Border section');
   release();
   await page.evaluate(async id => (await import('./lib/store.js')).idle(id), probe.id);
   await page.unroute('**/api/patch');
@@ -548,7 +554,7 @@ try {
     await revealBoxModel();
     await sleep(350);
     const collisions = await page.locator('#inspector .boxmodel').evaluate(model => {
-      const fields = [...model.querySelectorAll('.bm-field, .bm-offset, .bm-border > .bm-cell .bm-value, .bm-core, .bm-radius')].map(node => node.getBoundingClientRect());
+      const fields = [...model.querySelectorAll('.bm-field, .bm-offset, .bm-border > .bm-cell .bm-value, .bm-core')].map(node => node.getBoundingClientRect());
       const overlap = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
       const bad = [];
       if (model.scrollWidth > model.clientWidth + 1) bad.push('widget overflows');

@@ -195,7 +195,7 @@ try {
   assert.equal(await page.locator('#inspector .num-unit').first().innerText(), 'px', 'artboard X/Y/W/H say px');
   await page.evaluate(async () => { const m = await import('./lib/store.js'); m.selectNodes('welcome', ['nav']); });
   await page.waitForSelector('#inspector .boxmodel');
-  assert.equal((await page.locator('#inspector .bm-unit').first().innerText()), 'px', 'the spacing layers say px');
+  assert.equal(await page.locator('#inspector .bm-unit').count(), 0, 'no px marker in the corner: every number in the widget is pixels unless it says otherwise');
   const gap = page.locator('#inspector [data-key="gap"]');
   if (await gap.count()) {
     const unit = gap.locator('xpath=..').locator('.vf-unit');

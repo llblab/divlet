@@ -363,8 +363,6 @@ const BORDER_STYLES = ['solid', 'dashed', 'dotted', 'double', 'groove', 'ridge',
 
 function borderFold(views, { value, run, measured, tokens, widthField }) {
   const box = el('div', 'border-box');
-  const widths = el('div', 'grid2 border-widths');
-  for (const side of ['t', 'r', 'b', 'l']) widths.append(widthField(side));
   const style = value(view => {
     const sides = ['top', 'right', 'bottom', 'left'].map(side => view[`border-${side}-style`] ?? view['border-style'] ?? null);
     const first = sides[0];
@@ -379,10 +377,51 @@ function borderFold(views, { value, run, measured, tokens, widthField }) {
       ...Object.fromEntries(['top', 'right', 'bottom', 'left'].map(side => [`border-${side}-style`, null])),
       'border-style': next,
     }, `border style ${next ?? 'default'}`)),
-    widths,
+    corners({ value, run, measured, widthField }),
     colorField({ key: 'stroke', label: 'Color', tip: 'Border color', property: 'border-color', value, run, computed: measured?.colors?.borderColor, tokens }),
   );
   return box;
+}
+
+/**
+ * One diagram for the whole border surface: the four corner radii in their own corners, the four edge widths between them, and
+ * the radius that applies to every corner at the centre — a declaration, not a row of eight identical fields. `px`, `%`, `rem`,
+ * `em` and `full` all read and write here, and the widths are the same authored properties as the box model's band, so either
+ * view shows what the other wrote.
+ */
+function corners({ value, run, measured, widthField }) {
+  const grid = el('div', 'ca');
+  grid.setAttribute('role', 'group');
+  grid.setAttribute('aria-label', 'Border corners and edges');
+  const named = { tl: 'top-left', tr: 'top-right', bl: 'bottom-left', br: 'bottom-right' };
+  const shared = value(view => { const radius = css.radiusOf(view); return radius === undefined ? MIXED : radius; });
+  const computed = measured?.colors?.radius ? String(Math.round(parseFloat(measured.colors.radius) || 0)) : '0';
+  const cell = (node, className) => { const wrap = el('div', `ca-cell ${className}`); wrap.append(node); return wrap; };
+  const corner = key => {
+    const property = `border-${named[key]}-radius`;
+    const shown = value(view => { const radius = css.cornerRadiusOf(view, named[key]); return radius === undefined ? MIXED : radius; });
+    const node = field(`radius-${key}`, '', shown, next => run({ [property]: next }, `${named[key].replace('-', ' ')} radius ${next ?? 'default'}`), {
+      tip: `${named[key].replace('-', ' ')} corner radius`, placeholder: '—', min: 0, max: 1e4, parse: css.radiusInput,
+    });
+    node.querySelector('.vf-k')?.remove();
+    node.setAttribute('aria-label', `${named[key]} corner radius`);
+    return cell(node, `ca-corner ca-${key}`);
+  };
+  // All four corners at once: the longhands go first, so the shorthand does not have to expand them again.
+  const every = field('radius', '', shared, (next, text) => run({ ...Object.fromEntries(CORNER_NAMES.map(name => [`border-${name}-radius`, null])), 'border-radius': next }, `radius ${text || 'default'}`), {
+    tip: 'Corner radius for all four corners (px, %, rem, em or full)', placeholder: computed, min: 0, max: 1e4, parse: css.radiusInput,
+  });
+  every.querySelector('.vf-k')?.remove(); // The cell's position says what it is; the name lives on the field.
+  every.setAttribute('aria-label', 'Corner radius for all four corners');
+  // The widths keep the keys the Border rows used, and stay the same authored properties the box model's band edits.
+  const edge = (side, label) => {
+    const node = widthField(side, { diagram: true, key: `border-width-${side}` });
+    node.classList.remove('bm-value'); // The diagram's own cell supplies the surface; the value keeps a field's height.
+    node.setAttribute('aria-label', `Border ${label}, px`);
+    return cell(node, `ca-edge ca-${side}`);
+  };
+  grid.append(corner('tl'), edge('t', 'top'), corner('tr'), edge('l', 'left'), cell(every, 'ca-all'), edge('r', 'right'), corner('bl'), edge('b', 'bottom'), corner('br'));
+  return grid;
 }
 
 /** The measured font size in px — what `%`, `em` and a unitless line height are measured against. */
@@ -567,7 +606,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     return node;
   };
   const borderFields = new Map(), borderEdits = new Map();
-  const widthField = (side, { diagram = false } = {}) => {
+  const widthField = (side, { diagram = false, key } = {}) => {
     const property = `border-${SIDE_NAMES[side]}-width`, index = 'trbl'.indexOf(side);
     const authored = value(view => view[property] ?? null);
     const shown = authored === MIXED ? MIXED : authored == null ? null : css.show(authored);
@@ -590,7 +629,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
       result.then(sync, sync).catch(() => {}); // The writer reports refusals; restore inactive peers from accepted state too.
     };
     const node = diagram
-      ? bareField(`border-${side}`, `Border ${SIDE_NAMES[side]}, px`, shown, placeholder, commitWidth)
+      ? bareField(key ?? `border-${side}`, `Border ${SIDE_NAMES[side]}, px`, shown, placeholder, commitWidth)
       : field(`border-width-${side}`, SIDE_NAMES[side][0].toUpperCase() + SIDE_NAMES[side].slice(1), shown, commitWidth, { tip: `Border ${SIDE_NAMES[side]}, px`, placeholder, unit: 'px', min: 0, parse: nonnegative });
     borderFields.set(side, [...(borderFields.get(side) ?? []), node.querySelector('input')]);
     return node;
@@ -610,6 +649,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     const sq = el('div', `bm-sq bm-${kind}`);
     sq.setAttribute('role', 'group');
     sq.setAttribute('aria-label', kind[0].toUpperCase() + kind.slice(1));
+    sq.append(el('span', 'bm-caption', kind));
     for (const [index, side] of ['t', 'r', 'b', 'l'].entries()) {
       const cell = el('div', `bm-cell bm-${side}`);
       cell.setAttribute('role', 'group');
@@ -674,31 +714,9 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     fit();
     core.append(size);
   }
-  const unit = el('span', 'bm-unit', 'px');
-  unit.setAttribute('aria-hidden', 'true');
-  model.append(square('position', square('margin', square('border', square('padding', core)))), unit);
-  // The corner radius belongs to the widget's own corner: one value for all four corners, written in px, %, rem, em or `full`.
-  const radiusValue = value(view => { const radius = css.radiusOf(view); return radius === undefined ? MIXED : radius; });
-  const computedRadius = measured?.colors?.radius ? String(Math.round(parseFloat(measured.colors.radius) || 0)) : '0';
-  // All corners are one value; the longhands are cleared first so the shorthand does not have to expand them again.
-  const radiusEdits = next => ({ ...Object.fromEntries(CORNER_NAMES.map(corner => [`border-${corner}-radius`, null])), 'border-radius': next });
-  const radius = field('radius', 'R', radiusValue, (next, text) => run(radiusEdits(next), `radius ${text || 'default'}`), {
-    tip: 'Corner radius: px, %, rem, em or full', unit: 'px', placeholder: computedRadius, min: 0, max: 1e4, parse: css.radiusInput,
-  });
-  radius.classList.add('bm-radius');
-  model.append(radius);
+  model.append(square('position', square('margin', square('border', square('padding', core)))));
   spacing.append(model);
-  // The bands no longer name themselves inside the diagram: one legend under it lists the layers in nesting order, each name in
-  // the tone of its own band beside a swatch of that band's fill, so the diagram keeps its whole rectangle for values.
-  const legend = el('div', 'bm-legend');
-  legend.setAttribute('role', 'group');
-  legend.setAttribute('aria-label', 'Box model layers, outermost first');
-  for (const kind of ['position', 'margin', 'border', 'padding']) {
-    const key = el('span', `bm-key bm-key-${kind}`);
-    key.append(el('i', 'bm-swatch'), el('span', 'bm-key-name', kind));
-    legend.append(key);
-  }
-  spacing.append(legend);
+
 
   /* effects */
   const effects = el('div', 'box3');

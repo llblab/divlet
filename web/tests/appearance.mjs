@@ -156,14 +156,15 @@ try {
   await select('cta');
   await page.waitForSelector('#inspector [data-section="appearance"] [data-key="fill"]');
   await colorRow('project color swatches');
-  assert.equal(await page.locator('#inspector [data-section="spacing"] [data-key="radius"]').count(), 1, 'the corner radius lives in the box model');
-  assert.equal(await page.locator('#inspector [data-section="border"] [data-key="radius"], #inspector .radius-presets').count(), 0, 'Border no longer keeps a second radius control or presets');
+  assert.equal(await page.locator('#inspector [data-section="spacing"] [data-key="radius"], #inspector [data-section="spacing"] .ca').count(), 0, 'the box model keeps no radius field');
+  assert.equal(await page.locator('#inspector [data-section="border"] [data-key="radius"]').count(), 1, 'Border owns the one shared radius field, in its corners diagram');
+  assert.equal(await page.locator('#inspector [data-section="border"] .ca input').count(), 9, 'four corners, four edges and the shared radius make the diagram');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="stroke"]').count(), 1, 'border colour belongs to Border');
-  assert.equal(await page.locator('#inspector [data-section="border"] [data-key^="border-width-"]').count(), 4, 'Border has four independent edge widths');
+  assert.equal(await page.locator('#inspector [data-section="border"] [data-key^="border-width-"]').count(), 4, 'Border has four independent edge widths, in the diagram');
   assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key="radius"], #inspector [data-section="appearance"] [data-key="stroke"]').count(), 0, 'no third home in Appearance');
   const sectionOrder = await page.locator('#inspector [data-section]').evaluateAll(nodes => nodes.map(node => node.dataset.section));
   assert.equal(sectionOrder.indexOf('border'), sectionOrder.indexOf('spacing') + 1, 'Border is a vertical disclosure directly after Spacing, not another tab');
-  checks.push('Border owns four widths, line style and colour; the box model owns the one corner radius; Appearance keeps fill and typography');
+  checks.push('Border owns line style, colour, four edge widths and the corners diagram; the box model keeps no radius; Appearance keeps fill and typography');
 
   const textAlign = page.locator('#inspector [data-section="appearance"]').getByRole('group', { name: 'Text align', exact: true });
   assert.equal(await textAlign.count(), 1, 'text alignment sits beside font and text colour');
@@ -327,7 +328,29 @@ try {
   await page.mouse.up();
   await waitUntil(() => page.locator('#inspector').evaluate(node => Math.round(node.getBoundingClientRect().width) === 280), 'the inspector reaches its actual resize minimum');
   assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key^="border-width"]').count(), 0, 'only Border and the box model edit widths');
-  assert.equal(await page.locator('#inspector .bm-radius').evaluate(node => node.closest('.boxmodel') !== null), true, 'the radius field is part of the box model at the resize minimum too');
+  assert.equal(await page.locator('#inspector .ca').evaluate(node => node.closest('[data-section="border"]') !== null), true, 'the corners diagram stays in Border at the resize minimum too');
+  // The corners diagram: five radius fields (four corners and the shared one) and the four edge widths between them.
+  {
+    const diagram = page.locator('#inspector [data-section="border"] .ca');
+    assert.equal(await diagram.locator('.ca-corner').count(), 4, 'one field per corner');
+    assert.equal(await diagram.locator('.ca-edge').count(), 4, 'one field per edge, between the corners');
+    assert.equal(await diagram.locator('.ca-all input').count(), 1, 'and one shared value at the centre');
+    const corners = () => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => {
+      const style = getComputedStyle(node);
+      return ['TopLeft', 'TopRight', 'BottomRight', 'BottomLeft'].map(side => style[`border${side}Radius`]);
+    });
+    const before = await corners();
+    await page.locator('#inspector [data-key="radius-tr"]').fill('6'); await page.keyboard.press('Enter');
+    await waitUntil(async () => JSON.stringify(await corners()) === JSON.stringify([before[0], '6px', before[2], before[3]]), `a corner writes its own radius and leaves the others on the page (${before.join(' ')})`);
+    await page.locator('#inspector [data-key="radius"]').fill('3'); await page.keyboard.press('Enter');
+    await waitUntil(async () => JSON.stringify(await corners()) === JSON.stringify(['3px', '3px', '3px', '3px']), 'the shared value applies to all four corners');
+    await waitUntil(async () => (await page.locator('#inspector [data-key="radius-tr"]').inputValue()) === '3', 'and every corner field shows it');
+    await page.keyboard.press('Control+z');
+    await waitUntil(async () => (await page.locator('#inspector [data-key="radius-tr"]').inputValue()) === '6', 'one Undo restores the corner that differed');
+    await sleep(200); // let the writer queue drain, so the next block patches the version it just read
+    checks.push('the corners diagram writes one corner, then all four, and undoes each as one step');
+  }
+
   // A compiler-lowered border width remains visible as the measured fallback, then one edge can override it.
   await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-width': '3px' } } } } });
   await page.evaluate(() => document.activeElement?.blur()); await page.mouse.move(5, 5);
@@ -339,7 +362,9 @@ try {
   await waitUntil(async () => JSON.stringify(await borderWidths()) === JSON.stringify(['2px', '3px', '3px', '3px']), 'one edge changes without changing its peers');
   await page.locator('#inspector [data-key="border-width-r"]').fill('4'); await page.keyboard.press('Tab');
   await waitUntil(async () => await page.locator('#inspector [data-key="border-r"]').inputValue() === '4', 'a Border edit updates the diagram while focus stays in Border');
-  assert.equal(await page.evaluate(() => document.activeElement?.dataset.key), 'border-width-b');
+  // Inside the diagram the reading order is geometry: top-left radius, top edge, top-right radius, left edge, the shared
+  // radius, right edge, and so on — so the next stop after the right edge is the bottom-left corner.
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.key), 'radius-bl');
 
   const beforeClear = afterVersion();
   for (const [key, other, next] of [['border-width-t', 'border-t', '2'], ['border-r', 'border-width-r', '4']]) {
@@ -638,7 +663,8 @@ try {
     const layoutErrors = await page.locator('#inspector [data-section="border"]').evaluate(section => {
       const bad = [], context = document.createElement('canvas').getContext('2d');
       if (section.scrollWidth > section.clientWidth + 1) bad.push('horizontal overflow');
-      if (getComputedStyle(section.querySelector('.border-widths')).gridTemplateColumns.split(' ').length > 2) bad.push('edge widths need at most two columns');
+      // The corners diagram is three columns wide at every size, and each cell keeps its own value whole.
+      if (getComputedStyle(section.querySelector('.ca')).gridTemplateColumns.split(' ').length !== 3) bad.push('the corners diagram loses a column');
       for (const input of section.querySelectorAll('.vf-input')) {
         const style = getComputedStyle(input); context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
         if (context.measureText(input.value || input.placeholder).width > input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1) bad.push(`${input.dataset.key} clips`);

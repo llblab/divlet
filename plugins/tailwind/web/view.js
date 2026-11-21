@@ -72,6 +72,17 @@ export function declarationsOfClass(name, names = new Set()) {
   if (m) { const value = cssOfToken(m[1]); return value ? [['gap', value]] : []; }
   m = /^gap-(x|y)-(.+)$/.exec(name);
   if (m) { const value = cssOfToken(m[2]); return value ? [[m[1] === 'x' ? 'column-gap' : 'row-gap', value]] : []; }
+  // A corner (or a side pair) of the radius: `rounded-tl-lg`, `rounded-t-[4px]`, `rounded-bl-full`. The provider splits the
+  // shorthand this way when one corner is edited, so it has to read those classes back.
+  m = /^rounded-(tl|tr|br|bl|t|r|b|l)(?:-(.+))?$/.exec(name);
+  if (m) {
+    const literal = m[2] ? /^\[(.+)\]$/.exec(m[2]) : null;
+    const step = m[2] ? RADIUS_PX[`rounded-${m[2]}`] : RADIUS_PX.rounded;
+    const value = m[2] === 'full' ? '9999px' : literal ? literal[1] : step == null ? '' : `${step}px`;
+    if (!value) return [];
+    const corners = { tl: ['top-left'], tr: ['top-right'], br: ['bottom-right'], bl: ['bottom-left'], t: ['top-left', 'top-right'], r: ['top-right', 'bottom-right'], b: ['bottom-right', 'bottom-left'], l: ['bottom-left', 'top-left'] }[m[1]];
+    return corners.map(corner => [`border-${corner}-radius`, value]);
+  }
   if (tw.GROUPS.radius.test(name)) {
     if (name === 'rounded-full') return [['border-radius', '9999px']];
     const literal = /^rounded-\[(.+)\]$/.exec(name);
