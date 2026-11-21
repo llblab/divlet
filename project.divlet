@@ -1,0 +1,4751 @@
+{
+  "schemaVersion": 1,
+  "name": "divlet landing",
+  "version": 1,
+  "tokens": {
+    "--color-paper": "var(--paper)",
+    "--color-ink": "var(--ink)",
+    "--color-muted": "var(--muted)",
+    "--color-faint": "var(--faint)",
+    "--color-hair": "var(--hair)",
+    "--color-panel": "var(--panel)",
+    "--color-accent": "var(--accent)",
+    "--color-accent-ink": "var(--accent-ink)",
+    "--color-accent-soft": "var(--accent-soft)",
+    "--color-code": "var(--code)",
+    "--color-code-ink": "var(--code-ink)"
+  },
+  "css": "",
+  "metadata": {},
+  "frames": [
+    {
+      "id": "index",
+      "name": "divlet — a layout board for agents",
+      "head": {
+        "description": "divlet is a local browser layout board for coding agents: live frames of real HTML and CSS, reusable components, and the same validated tools through Pi, MCP or the board running in your browser.",
+        "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgY29sb3I9IiM1YjViZjAiIHN0cm9rZT0iY3VycmVudENvbG9yIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIj48cGF0aCBkPSJNOCA0LjUgMi41IDEwIDggMTUuNSIgZmlsbD0ibm9uZSIvPjxwYXRoIGQ9Ik0xMC41IDQuNUgxMkwxNy41IDEwIDEyIDE1LjVoLTEuNVoiIGZpbGw9ImN1cnJlbnRDb2xvciIgc3Ryb2tlPSJub25lIi8+PC9zdmc+Cg=="
+      },
+      "version": 14,
+      "artboard": {
+        "x": 80,
+        "y": 80,
+        "width": 1280,
+        "height": 4300
+      },
+      "rootId": "top",
+      "tokens": {},
+      "css": "@layer theme, base, components, utilities;\n@layer base {\n/* Authored in examples/landing/landing.divlet. Everything on the page is a Tailwind utility; this layer only defines the\n   palette for both colour schemes. The project's colour tokens point at these variables, so bg-panel, text-muted and the\n   rest follow the scheme. */\n:root {\n  color-scheme: light dark;\n  --paper: #f7f5f1;\n  --ink: #17161a;\n  --muted: #5f5b57;\n  --faint: #8d8781;\n  --hair: #e2ddd5;\n  --panel: #fffefc;\n  --accent: #5b5bf0;\n  --accent-ink: #4646d8;\n  --accent-soft: #ebebfd;\n  --code: #2a2740;\n  --code-ink: #ece9ff;\n  --shadow: 0 12px 28px -18px rgba(23, 22, 26, .45);\n  --shadow-lift: 0 28px 60px -30px rgba(40, 36, 90, .55);\n}\n@media (prefers-color-scheme: dark) {\n  :root {\n    --paper: #14131a;\n    --ink: #f1eef7;\n    --muted: #a9a4b3;\n    --faint: #7d7887;\n    --hair: #2b2833;\n    --panel: #1b1a22;\n    --accent: #8e8eff;\n    --accent-ink: #a5a5ff;\n    --accent-soft: #262544;\n    --code: #100f16;\n    --code-ink: #dcd8ff;\n    --shadow: 0 18px 34px -22px rgba(0, 0, 0, .8);\n    --shadow-lift: 0 30px 60px -28px rgba(0, 0, 0, .9);\n  }\n}\nbody { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 -apple-system, BlinkMacSystemFont, \"Segoe UI\", Inter, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }\n}",
+      "metadata": {},
+      "nodes": {
+        "top": {
+          "id": "top",
+          "type": "element",
+          "tag": "main",
+          "attrs": {
+            "id": "top"
+          },
+          "className": "mx-auto w-[min(1060px,100%-40px)] pt-14 pb-12 wrap-anywhere max-md:pt-8",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "topbar",
+            "hero",
+            "features",
+            "how",
+            "styles",
+            "try",
+            "start",
+            "agents",
+            "formats",
+            "finale",
+            "footer"
+          ]
+        },
+        "topbar": {
+          "id": "topbar",
+          "type": "element",
+          "tag": "header",
+          "attrs": {},
+          "className": "mb-16 flex flex-wrap items-center justify-between gap-3 max-md:mb-10",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-1",
+            "node-7"
+          ]
+        },
+        "node-1": {
+          "id": "node-1",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#top",
+            "aria-label": "divlet"
+          },
+          "className": "inline-flex items-center gap-2 text-[17px] font-semibold tracking-tight no-underline",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-2",
+            "node-5"
+          ]
+        },
+        "node-2": {
+          "id": "node-2",
+          "type": "element",
+          "tag": "svg",
+          "attrs": {
+            "viewBox": "0 0 20 20",
+            "aria-hidden": "true"
+          },
+          "className": "size-6 fill-none stroke-current stroke-[1.5] text-accent [stroke-linecap:round] [stroke-linejoin:round]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-3",
+            "node-4"
+          ]
+        },
+        "node-3": {
+          "id": "node-3",
+          "type": "element",
+          "tag": "path",
+          "attrs": {
+            "d": "M8 4.5 2.5 10 8 15.5",
+            "fill": "none"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "node-4": {
+          "id": "node-4",
+          "type": "element",
+          "tag": "path",
+          "attrs": {
+            "d": "M10.5 4.5H12L17.5 10 12 15.5h-1.5Z",
+            "fill": "currentColor",
+            "stroke": "none"
+          },
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "node-5": {
+          "id": "node-5",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-6"
+          ]
+        },
+        "text-6": {
+          "id": "text-6",
+          "type": "text",
+          "content": "divlet",
+          "metadata": {}
+        },
+        "node-7": {
+          "id": "node-7",
+          "type": "element",
+          "tag": "nav",
+          "attrs": {
+            "aria-label": "Sections"
+          },
+          "className": "flex flex-wrap gap-1",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-8",
+            "node-10",
+            "node-12",
+            "node-14"
+          ]
+        },
+        "node-8": {
+          "id": "node-8",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#how"
+          },
+          "className": "rounded-[9px] px-[11px] py-1.5 text-sm text-muted no-underline hover:bg-panel hover:text-ink hover:[box-shadow:var(--shadow)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-9"
+          ]
+        },
+        "text-9": {
+          "id": "text-9",
+          "type": "text",
+          "content": "How it works",
+          "metadata": {}
+        },
+        "node-10": {
+          "id": "node-10",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#try"
+          },
+          "className": "rounded-[9px] px-[11px] py-1.5 text-sm text-muted no-underline hover:bg-panel hover:text-ink hover:[box-shadow:var(--shadow)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-11"
+          ]
+        },
+        "text-11": {
+          "id": "text-11",
+          "type": "text",
+          "content": "Try it",
+          "metadata": {}
+        },
+        "node-12": {
+          "id": "node-12",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#start"
+          },
+          "className": "rounded-[9px] px-[11px] py-1.5 text-sm text-muted no-underline hover:bg-panel hover:text-ink hover:[box-shadow:var(--shadow)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-13"
+          ]
+        },
+        "text-13": {
+          "id": "text-13",
+          "type": "text",
+          "content": "Install",
+          "metadata": {}
+        },
+        "node-14": {
+          "id": "node-14",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#agents"
+          },
+          "className": "rounded-[9px] px-[11px] py-1.5 text-sm text-muted no-underline hover:bg-panel hover:text-ink hover:[box-shadow:var(--shadow)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-15"
+          ]
+        },
+        "text-15": {
+          "id": "text-15",
+          "type": "text",
+          "content": "For agents",
+          "metadata": {}
+        },
+        "hero": {
+          "id": "hero",
+          "type": "element",
+          "tag": "section",
+          "attrs": {},
+          "className": "grid gap-9",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-16",
+            "node-22"
+          ]
+        },
+        "node-16": {
+          "id": "node-16",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-[18px]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-17",
+            "headline"
+          ]
+        },
+        "node-17": {
+          "id": "node-17",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-[12.5px] font-semibold tracking-[.1em] text-accent uppercase",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-18"
+          ]
+        },
+        "text-18": {
+          "id": "text-18",
+          "type": "text",
+          "content": "A layout board for coding agents",
+          "metadata": {}
+        },
+        "headline": {
+          "id": "headline",
+          "type": "element",
+          "tag": "h1",
+          "attrs": {},
+          "className": "m-0 text-[clamp(30px,6vw,60px)] leading-[1.08] font-bold tracking-[-.035em] hyphens-auto",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-19",
+            "node-20",
+            "text-21"
+          ]
+        },
+        "text-19": {
+          "id": "text-19",
+          "type": "text",
+          "content": "Design in the browser.",
+          "metadata": {}
+        },
+        "node-20": {
+          "id": "node-20",
+          "type": "element",
+          "tag": "br",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "text-21": {
+          "id": "text-21",
+          "type": "text",
+          "content": "Change it in conversation.",
+          "metadata": {}
+        },
+        "node-22": {
+          "id": "node-22",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid items-start gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] max-lg:gap-9",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-23",
+            "exchange"
+          ]
+        },
+        "node-23": {
+          "id": "node-23",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-[18px]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-24",
+            "node-26",
+            "node-31",
+            "invite"
+          ]
+        },
+        "node-24": {
+          "id": "node-24",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "max-w-[34em] text-[clamp(15.5px,1.8vw,18px)] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-25"
+          ]
+        },
+        "text-25": {
+          "id": "text-25",
+          "type": "text",
+          "content": "divlet gives your agent a board of real web pages. Point at what should change; the agent edits through validated tools, and you watch every accepted change land — versioned, logged and one Undo away.",
+          "metadata": {}
+        },
+        "node-26": {
+          "id": "node-26",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "mt-1.5 flex flex-wrap items-center gap-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-27",
+            "node-29"
+          ]
+        },
+        "node-27": {
+          "id": "node-27",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#start"
+          },
+          "className": "inline-flex h-11 items-center rounded-full bg-accent px-[22px] text-[15px] font-semibold text-white no-underline shadow-[0_10px_24px_-12px_var(--accent)] hover:bg-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-28"
+          ]
+        },
+        "text-28": {
+          "id": "text-28",
+          "type": "text",
+          "content": "Get started",
+          "metadata": {}
+        },
+        "node-29": {
+          "id": "node-29",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#try"
+          },
+          "className": "border-b border-hair text-[14.5px] text-muted no-underline hover:border-accent hover:text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-30"
+          ]
+        },
+        "text-30": {
+          "id": "text-30",
+          "type": "text",
+          "content": "Try it without installing",
+          "metadata": {}
+        },
+        "node-31": {
+          "id": "node-31",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-[13px] text-faint",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-32"
+          ]
+        },
+        "text-32": {
+          "id": "text-32",
+          "type": "text",
+          "content": "MIT licensed · runs on your machine, or right here in your browser",
+          "metadata": {}
+        },
+        "invite": {
+          "id": "invite",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "mt-3 flex items-start gap-2.5 rounded-[14px] bg-accent-soft px-4 py-3 text-sm",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-33",
+            "node-36"
+          ]
+        },
+        "node-33": {
+          "id": "node-33",
+          "type": "element",
+          "tag": "span",
+          "attrs": {
+            "aria-hidden": "true"
+          },
+          "className": "relative mt-[7px] flex size-[9px] flex-none",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-34",
+            "node-35"
+          ]
+        },
+        "node-34": {
+          "id": "node-34",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "absolute inset-0 animate-ping rounded-full bg-accent opacity-60 motion-reduce:animate-none",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "node-35": {
+          "id": "node-35",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "relative size-[9px] rounded-full bg-accent",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "node-36": {
+          "id": "node-36",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-37",
+            "node-38",
+            "text-40"
+          ]
+        },
+        "text-37": {
+          "id": "text-37",
+          "type": "text",
+          "content": "This page is a divlet project too. On the divlet site, press ",
+          "metadata": {}
+        },
+        "node-38": {
+          "id": "node-38",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "font-semibold",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-39"
+          ]
+        },
+        "text-39": {
+          "id": "text-39",
+          "type": "text",
+          "content": "Edit on the board",
+          "metadata": {}
+        },
+        "text-40": {
+          "id": "text-40",
+          "type": "text",
+          "content": " — the button at the top centre of the page — and it becomes yours to change.",
+          "metadata": {}
+        },
+        "exchange": {
+          "id": "exchange",
+          "type": "element",
+          "tag": "figure",
+          "attrs": {},
+          "className": "m-0 grid gap-2.5 overflow-hidden rounded-[18px] border border-white/[.06] bg-code pb-5 font-mono text-[12.5px] leading-normal text-code-ink [box-shadow:var(--shadow-lift)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-41",
+            "node-45",
+            "node-47",
+            "node-54",
+            "node-61",
+            "node-68"
+          ]
+        },
+        "node-41": {
+          "id": "node-41",
+          "type": "element",
+          "tag": "div",
+          "attrs": {
+            "aria-hidden": "true"
+          },
+          "className": "flex items-center gap-1.5 border-b border-white/[.07] px-4 py-3",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-42",
+            "node-43",
+            "node-44"
+          ]
+        },
+        "node-42": {
+          "id": "node-42",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "size-[9px] rounded-full bg-white/[.16]",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "node-43": {
+          "id": "node-43",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "size-[9px] rounded-full bg-white/[.16]",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "node-44": {
+          "id": "node-44",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "size-[9px] rounded-full bg-white/[.16]",
+          "style": {},
+          "metadata": {},
+          "children": []
+        },
+        "node-45": {
+          "id": "node-45",
+          "type": "element",
+          "tag": "figcaption",
+          "attrs": {},
+          "className": "mx-5 mt-1 mb-1.5 font-sans text-xs text-[#a9a4c9]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-46"
+          ]
+        },
+        "text-46": {
+          "id": "text-46",
+          "type": "text",
+          "content": "One edit, as the agent and the board see it",
+          "metadata": {}
+        },
+        "node-47": {
+          "id": "node-47",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "mx-5 grid grid-cols-[6ch_13ch_minmax(0,1fr)] items-baseline gap-2.5 max-md:grid-cols-[6ch_minmax(0,1fr)] max-[300px]:mx-3.5 max-[300px]:grid-cols-1 max-[300px]:gap-0",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-48",
+            "node-50",
+            "node-52"
+          ]
+        },
+        "node-48": {
+          "id": "node-48",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[#8d88b0]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-49"
+          ]
+        },
+        "text-49": {
+          "id": "text-49",
+          "type": "text",
+          "content": "agent",
+          "metadata": {}
+        },
+        "node-50": {
+          "id": "node-50",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "font-semibold text-white",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-51"
+          ]
+        },
+        "text-51": {
+          "id": "text-51",
+          "type": "text",
+          "content": "divlet_read",
+          "metadata": {}
+        },
+        "node-52": {
+          "id": "node-52",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[#cfcaf2] max-md:col-start-2 max-[300px]:col-start-1",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-53"
+          ]
+        },
+        "text-53": {
+          "id": "text-53",
+          "type": "text",
+          "content": "frame index · v4",
+          "metadata": {}
+        },
+        "node-54": {
+          "id": "node-54",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "mx-5 grid grid-cols-[6ch_13ch_minmax(0,1fr)] items-baseline gap-2.5 max-md:grid-cols-[6ch_minmax(0,1fr)] max-[300px]:mx-3.5 max-[300px]:grid-cols-1 max-[300px]:gap-0",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-55",
+            "node-57",
+            "node-59"
+          ]
+        },
+        "node-55": {
+          "id": "node-55",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[#8d88b0]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-56"
+          ]
+        },
+        "text-56": {
+          "id": "text-56",
+          "type": "text",
+          "content": "agent",
+          "metadata": {}
+        },
+        "node-57": {
+          "id": "node-57",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "font-semibold text-white",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-58"
+          ]
+        },
+        "text-58": {
+          "id": "text-58",
+          "type": "text",
+          "content": "divlet_patch",
+          "metadata": {}
+        },
+        "node-59": {
+          "id": "node-59",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[#cfcaf2] max-md:col-start-2 max-[300px]:col-start-1",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-60"
+          ]
+        },
+        "text-60": {
+          "id": "text-60",
+          "type": "text",
+          "content": "index@v4 · h1 → “Ship the calm version”",
+          "metadata": {}
+        },
+        "node-61": {
+          "id": "node-61",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "mx-5 grid grid-cols-[6ch_13ch_minmax(0,1fr)] items-baseline gap-2.5 max-md:grid-cols-[6ch_minmax(0,1fr)] max-[300px]:mx-3.5 max-[300px]:grid-cols-1 max-[300px]:gap-0",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-62",
+            "node-64",
+            "node-66"
+          ]
+        },
+        "node-62": {
+          "id": "node-62",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[#8d88b0]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-63"
+          ]
+        },
+        "text-63": {
+          "id": "text-63",
+          "type": "text",
+          "content": "board",
+          "metadata": {}
+        },
+        "node-64": {
+          "id": "node-64",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "font-semibold text-[#8fe0b0]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-65"
+          ]
+        },
+        "text-65": {
+          "id": "text-65",
+          "type": "text",
+          "content": "accepted",
+          "metadata": {}
+        },
+        "node-66": {
+          "id": "node-66",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[#cfcaf2] max-md:col-start-2 max-[300px]:col-start-1",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-67"
+          ]
+        },
+        "text-67": {
+          "id": "text-67",
+          "type": "text",
+          "content": "v5 · rendered · saved · undoable",
+          "metadata": {}
+        },
+        "node-68": {
+          "id": "node-68",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "mx-5 grid grid-cols-[6ch_13ch_minmax(0,1fr)] items-baseline gap-2.5 max-md:grid-cols-[6ch_minmax(0,1fr)] max-[300px]:mx-3.5 max-[300px]:grid-cols-1 max-[300px]:gap-0",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-69",
+            "node-71",
+            "node-73"
+          ]
+        },
+        "node-69": {
+          "id": "node-69",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[#8d88b0]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-70"
+          ]
+        },
+        "text-70": {
+          "id": "text-70",
+          "type": "text",
+          "content": "board",
+          "metadata": {}
+        },
+        "node-71": {
+          "id": "node-71",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "font-semibold text-[#ffb4a8]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-72"
+          ]
+        },
+        "text-72": {
+          "id": "text-72",
+          "type": "text",
+          "content": "refused",
+          "metadata": {}
+        },
+        "node-73": {
+          "id": "node-73",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[#cfcaf2] max-md:col-start-2 max-[300px]:col-start-1",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-74"
+          ]
+        },
+        "text-74": {
+          "id": "text-74",
+          "type": "text",
+          "content": "REVISION_CONFLICT · read v5 first",
+          "metadata": {}
+        },
+        "features": {
+          "id": "features",
+          "type": "element",
+          "tag": "section",
+          "attrs": {
+            "aria-labelledby": "what-title"
+          },
+          "className": "mt-[72px] grid grid-cols-[repeat(auto-fit,minmax(min(220px,100%),1fr))] gap-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "what-title",
+            "node-76",
+            "node-83",
+            "node-90",
+            "node-97"
+          ]
+        },
+        "what-title": {
+          "id": "what-title",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {
+            "id": "what-title"
+          },
+          "className": "sr-only",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-75"
+          ]
+        },
+        "text-75": {
+          "id": "text-75",
+          "type": "text",
+          "content": "What divlet is",
+          "metadata": {}
+        },
+        "node-76": {
+          "id": "node-76",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "grid content-start gap-2 rounded-[18px] border border-hair bg-panel p-5 max-[300px]:p-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-77",
+            "node-79",
+            "node-81"
+          ]
+        },
+        "node-77": {
+          "id": "node-77",
+          "type": "element",
+          "tag": "span",
+          "attrs": {
+            "aria-hidden": "true"
+          },
+          "className": "mb-1 grid size-[30px] place-items-center rounded-[9px] bg-accent-soft font-mono text-[13px] font-semibold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-78"
+          ]
+        },
+        "text-78": {
+          "id": "text-78",
+          "type": "text",
+          "content": "</>",
+          "metadata": {}
+        },
+        "node-79": {
+          "id": "node-79",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "m-0 text-base font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-80"
+          ]
+        },
+        "text-80": {
+          "id": "text-80",
+          "type": "text",
+          "content": "Real pages",
+          "metadata": {}
+        },
+        "node-81": {
+          "id": "node-81",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-82"
+          ]
+        },
+        "text-82": {
+          "id": "text-82",
+          "type": "text",
+          "content": "Every artboard is a live page of HTML, SVG and CSS. Nothing is redrawn on a canvas; the browser lays it out and paints it.",
+          "metadata": {}
+        },
+        "node-83": {
+          "id": "node-83",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "grid content-start gap-2 rounded-[18px] border border-hair bg-panel p-5 max-[300px]:p-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-84",
+            "node-86",
+            "node-88"
+          ]
+        },
+        "node-84": {
+          "id": "node-84",
+          "type": "element",
+          "tag": "span",
+          "attrs": {
+            "aria-hidden": "true"
+          },
+          "className": "mb-1 grid size-[30px] place-items-center rounded-[9px] bg-accent-soft font-mono text-[13px] font-semibold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-85"
+          ]
+        },
+        "text-85": {
+          "id": "text-85",
+          "type": "text",
+          "content": "↖",
+          "metadata": {}
+        },
+        "node-86": {
+          "id": "node-86",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "m-0 text-base font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-87"
+          ]
+        },
+        "text-87": {
+          "id": "text-87",
+          "type": "text",
+          "content": "Point, then ask",
+          "metadata": {}
+        },
+        "node-88": {
+          "id": "node-88",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-89"
+          ]
+        },
+        "text-89": {
+          "id": "text-89",
+          "type": "text",
+          "content": "Select an element and ask. The agent reads the same selection, frame and measured layout you are looking at.",
+          "metadata": {}
+        },
+        "node-90": {
+          "id": "node-90",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "grid content-start gap-2 rounded-[18px] border border-hair bg-panel p-5 max-[300px]:p-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-91",
+            "node-93",
+            "node-95"
+          ]
+        },
+        "node-91": {
+          "id": "node-91",
+          "type": "element",
+          "tag": "span",
+          "attrs": {
+            "aria-hidden": "true"
+          },
+          "className": "mb-1 grid size-[30px] place-items-center rounded-[9px] bg-accent-soft font-mono text-[13px] font-semibold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-92"
+          ]
+        },
+        "text-92": {
+          "id": "text-92",
+          "type": "text",
+          "content": "v5",
+          "metadata": {}
+        },
+        "node-93": {
+          "id": "node-93",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "m-0 text-base font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-94"
+          ]
+        },
+        "text-94": {
+          "id": "text-94",
+          "type": "text",
+          "content": "Validated edits",
+          "metadata": {}
+        },
+        "node-95": {
+          "id": "node-95",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-96"
+          ]
+        },
+        "text-96": {
+          "id": "text-96",
+          "type": "text",
+          "content": "Each change names the version it was made against. Stale or invalid edits are refused, never half-applied, and History records who changed what.",
+          "metadata": {}
+        },
+        "node-97": {
+          "id": "node-97",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "grid content-start gap-2 rounded-[18px] border border-hair bg-panel p-5 max-[300px]:p-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-98",
+            "node-100",
+            "node-102"
+          ]
+        },
+        "node-98": {
+          "id": "node-98",
+          "type": "element",
+          "tag": "span",
+          "attrs": {
+            "aria-hidden": "true"
+          },
+          "className": "mb-1 grid size-[30px] place-items-center rounded-[9px] bg-accent-soft font-mono text-[13px] font-semibold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-99"
+          ]
+        },
+        "text-99": {
+          "id": "text-99",
+          "type": "text",
+          "content": "{ }",
+          "metadata": {}
+        },
+        "node-100": {
+          "id": "node-100",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "m-0 text-base font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-101"
+          ]
+        },
+        "text-101": {
+          "id": "text-101",
+          "type": "text",
+          "content": "One file you own",
+          "metadata": {}
+        },
+        "node-102": {
+          "id": "node-102",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-103",
+            "text-105"
+          ]
+        },
+        "node-103": {
+          "id": "node-103",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-[.92em]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-104"
+          ]
+        },
+        "text-104": {
+          "id": "text-104",
+          "type": "text",
+          "content": "project.divlet",
+          "metadata": {}
+        },
+        "text-105": {
+          "id": "text-105",
+          "type": "text",
+          "content": " holds frames, components, tokens and CSS. Generated pages are plain HTML you can host anywhere.",
+          "metadata": {}
+        },
+        "how": {
+          "id": "how",
+          "type": "element",
+          "tag": "section",
+          "attrs": {
+            "id": "how"
+          },
+          "className": "mt-24 scroll-mt-6 max-md:mt-[72px]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-106",
+            "node-111"
+          ]
+        },
+        "node-106": {
+          "id": "node-106",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "mb-7 grid max-w-[44em] gap-2.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-107",
+            "node-109"
+          ]
+        },
+        "node-107": {
+          "id": "node-107",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-[12.5px] font-semibold tracking-[.1em] text-accent uppercase",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-108"
+          ]
+        },
+        "text-108": {
+          "id": "text-108",
+          "type": "text",
+          "content": "How it works",
+          "metadata": {}
+        },
+        "node-109": {
+          "id": "node-109",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "m-0 text-[clamp(22px,3.2vw,32px)] leading-[1.15] font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-110"
+          ]
+        },
+        "text-110": {
+          "id": "text-110",
+          "type": "text",
+          "content": "How a change lands",
+          "metadata": {}
+        },
+        "node-111": {
+          "id": "node-111",
+          "type": "element",
+          "tag": "ol",
+          "attrs": {},
+          "className": "m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(210px,100%),1fr))] gap-6 p-0",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-112",
+            "node-119",
+            "node-126",
+            "node-133"
+          ]
+        },
+        "node-112": {
+          "id": "node-112",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid content-start gap-2 border-t-2 border-accent pt-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-113",
+            "node-115",
+            "node-117"
+          ]
+        },
+        "node-113": {
+          "id": "node-113",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "grid size-7 place-items-center rounded-full bg-accent-soft text-[13px] font-bold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-114"
+          ]
+        },
+        "text-114": {
+          "id": "text-114",
+          "type": "text",
+          "content": "1",
+          "metadata": {}
+        },
+        "node-115": {
+          "id": "node-115",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "text-[15px] font-semibold",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-116"
+          ]
+        },
+        "text-116": {
+          "id": "text-116",
+          "type": "text",
+          "content": "You point",
+          "metadata": {}
+        },
+        "node-117": {
+          "id": "node-117",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-118"
+          ]
+        },
+        "text-118": {
+          "id": "text-118",
+          "type": "text",
+          "content": "Select a frame or an element and say what you want: “tighter hero, warmer card”.",
+          "metadata": {}
+        },
+        "node-119": {
+          "id": "node-119",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid content-start gap-2 border-t-2 border-hair pt-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-120",
+            "node-122",
+            "node-124"
+          ]
+        },
+        "node-120": {
+          "id": "node-120",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "grid size-7 place-items-center rounded-full bg-accent-soft text-[13px] font-bold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-121"
+          ]
+        },
+        "text-121": {
+          "id": "text-121",
+          "type": "text",
+          "content": "2",
+          "metadata": {}
+        },
+        "node-122": {
+          "id": "node-122",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "text-[15px] font-semibold",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-123"
+          ]
+        },
+        "text-123": {
+          "id": "text-123",
+          "type": "text",
+          "content": "The agent reads, then edits",
+          "metadata": {}
+        },
+        "node-124": {
+          "id": "node-124",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-125"
+          ]
+        },
+        "text-125": {
+          "id": "text-125",
+          "type": "text",
+          "content": "It reads the frame and its version, then changes structure, text, styles or components by stable IDs.",
+          "metadata": {}
+        },
+        "node-126": {
+          "id": "node-126",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid content-start gap-2 border-t-2 border-hair pt-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-127",
+            "node-129",
+            "node-131"
+          ]
+        },
+        "node-127": {
+          "id": "node-127",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "grid size-7 place-items-center rounded-full bg-accent-soft text-[13px] font-bold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-128"
+          ]
+        },
+        "text-128": {
+          "id": "text-128",
+          "type": "text",
+          "content": "3",
+          "metadata": {}
+        },
+        "node-129": {
+          "id": "node-129",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "text-[15px] font-semibold",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-130"
+          ]
+        },
+        "text-130": {
+          "id": "text-130",
+          "type": "text",
+          "content": "The board checks and shows it",
+          "metadata": {}
+        },
+        "node-131": {
+          "id": "node-131",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-132"
+          ]
+        },
+        "text-132": {
+          "id": "text-132",
+          "type": "text",
+          "content": "The change is validated, rendered and saved as one step, or refused with a reason the agent can act on.",
+          "metadata": {}
+        },
+        "node-133": {
+          "id": "node-133",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid content-start gap-2 border-t-2 border-hair pt-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-134",
+            "node-136",
+            "node-138"
+          ]
+        },
+        "node-134": {
+          "id": "node-134",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "grid size-7 place-items-center rounded-full bg-accent-soft text-[13px] font-bold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-135"
+          ]
+        },
+        "text-135": {
+          "id": "text-135",
+          "type": "text",
+          "content": "4",
+          "metadata": {}
+        },
+        "node-136": {
+          "id": "node-136",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "text-[15px] font-semibold",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-137"
+          ]
+        },
+        "text-137": {
+          "id": "text-137",
+          "type": "text",
+          "content": "You keep it or undo it",
+          "metadata": {}
+        },
+        "node-138": {
+          "id": "node-138",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-139"
+          ]
+        },
+        "text-139": {
+          "id": "text-139",
+          "type": "text",
+          "content": "Undo reverts the whole accepted edit, whether the agent made it or you dragged something a minute ago.",
+          "metadata": {}
+        },
+        "styles": {
+          "id": "styles",
+          "type": "element",
+          "tag": "section",
+          "attrs": {
+            "id": "styles"
+          },
+          "className": "mt-24 scroll-mt-6 max-md:mt-[72px]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-140",
+            "node-147",
+            "node-174",
+            "node-202"
+          ]
+        },
+        "node-140": {
+          "id": "node-140",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "mb-7 grid max-w-[44em] gap-2.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-141",
+            "node-143",
+            "node-145"
+          ]
+        },
+        "node-141": {
+          "id": "node-141",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-[12.5px] font-semibold tracking-[.1em] text-accent uppercase",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-142"
+          ]
+        },
+        "text-142": {
+          "id": "text-142",
+          "type": "text",
+          "content": "Styling",
+          "metadata": {}
+        },
+        "node-143": {
+          "id": "node-143",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "m-0 text-[clamp(22px,3.2vw,32px)] leading-[1.15] font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-144"
+          ]
+        },
+        "text-144": {
+          "id": "text-144",
+          "type": "text",
+          "content": "Plain CSS first. Tailwind where it fits.",
+          "metadata": {}
+        },
+        "node-145": {
+          "id": "node-145",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "mt-0.5 text-[15px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-146"
+          ]
+        },
+        "text-146": {
+          "id": "text-146",
+          "type": "text",
+          "content": "The inspector edits CSS properties, not class names. Layout, spacing, borders, color, type and effects are ordinary declarations that work in any project. Enable the Tailwind plugin and the same edit is stored as a utility class — and typing a class updates the controls. This page is styled with utilities only.",
+          "metadata": {}
+        },
+        "node-147": {
+          "id": "node-147",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid items-stretch gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-148",
+            "node-158",
+            "node-160",
+            "node-166",
+            "node-168"
+          ]
+        },
+        "node-148": {
+          "id": "node-148",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid content-start gap-2.5 rounded-2xl border border-hair bg-panel p-5 [box-shadow:var(--shadow)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-149",
+            "node-151"
+          ]
+        },
+        "node-149": {
+          "id": "node-149",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-[11.5px] font-semibold tracking-[.08em] text-faint uppercase",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-150"
+          ]
+        },
+        "text-150": {
+          "id": "text-150",
+          "type": "text",
+          "content": "Inspector",
+          "metadata": {}
+        },
+        "node-151": {
+          "id": "node-151",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "flex items-baseline gap-2 rounded-[10px] border border-hair bg-paper px-3 py-2 text-[13.5px]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-152",
+            "node-154",
+            "node-156"
+          ]
+        },
+        "node-152": {
+          "id": "node-152",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "mr-auto text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-153"
+          ]
+        },
+        "text-153": {
+          "id": "text-153",
+          "type": "text",
+          "content": "Padding right",
+          "metadata": {}
+        },
+        "node-154": {
+          "id": "node-154",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "font-mono text-sm font-semibold",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-155"
+          ]
+        },
+        "text-155": {
+          "id": "text-155",
+          "type": "text",
+          "content": "4",
+          "metadata": {}
+        },
+        "node-156": {
+          "id": "node-156",
+          "type": "element",
+          "tag": "i",
+          "attrs": {},
+          "className": "text-xs text-faint not-italic",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-157"
+          ]
+        },
+        "text-157": {
+          "id": "text-157",
+          "type": "text",
+          "content": "px",
+          "metadata": {}
+        },
+        "node-158": {
+          "id": "node-158",
+          "type": "element",
+          "tag": "span",
+          "attrs": {
+            "aria-hidden": "true"
+          },
+          "className": "self-center justify-self-center text-xl text-faint max-md:rotate-90",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-159"
+          ]
+        },
+        "text-159": {
+          "id": "text-159",
+          "type": "text",
+          "content": "→",
+          "metadata": {}
+        },
+        "node-160": {
+          "id": "node-160",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid content-start gap-2.5 rounded-2xl border border-hair bg-panel p-5 [box-shadow:var(--shadow)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-161",
+            "node-163"
+          ]
+        },
+        "node-161": {
+          "id": "node-161",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-[11.5px] font-semibold tracking-[.08em] text-faint uppercase",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-162"
+          ]
+        },
+        "text-162": {
+          "id": "text-162",
+          "type": "text",
+          "content": "CSS",
+          "metadata": {}
+        },
+        "node-163": {
+          "id": "node-163",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "rounded-[10px] bg-code px-3 py-[9px] text-[13.5px] text-code-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-164"
+          ]
+        },
+        "node-164": {
+          "id": "node-164",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-165"
+          ]
+        },
+        "text-165": {
+          "id": "text-165",
+          "type": "text",
+          "content": "padding-right: 4px;",
+          "metadata": {}
+        },
+        "node-166": {
+          "id": "node-166",
+          "type": "element",
+          "tag": "span",
+          "attrs": {
+            "aria-hidden": "true"
+          },
+          "className": "self-center justify-self-center text-xl text-faint max-md:rotate-90",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-167"
+          ]
+        },
+        "text-167": {
+          "id": "text-167",
+          "type": "text",
+          "content": "→",
+          "metadata": {}
+        },
+        "node-168": {
+          "id": "node-168",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid content-start gap-2.5 rounded-2xl border border-hair bg-panel p-5 [box-shadow:var(--shadow)]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-169",
+            "node-171"
+          ]
+        },
+        "node-169": {
+          "id": "node-169",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-[11.5px] font-semibold tracking-[.08em] text-faint uppercase",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-170"
+          ]
+        },
+        "text-170": {
+          "id": "text-170",
+          "type": "text",
+          "content": "Tailwind",
+          "metadata": {}
+        },
+        "node-171": {
+          "id": "node-171",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "rounded-[10px] bg-code px-3 py-[9px] text-[13.5px] text-code-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-172"
+          ]
+        },
+        "node-172": {
+          "id": "node-172",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-173"
+          ]
+        },
+        "text-173": {
+          "id": "text-173",
+          "type": "text",
+          "content": "pr-1",
+          "metadata": {}
+        },
+        "node-174": {
+          "id": "node-174",
+          "type": "element",
+          "tag": "ul",
+          "attrs": {},
+          "className": "mt-7 grid list-none grid-cols-[repeat(auto-fit,minmax(min(260px,100%),1fr))] gap-x-7 gap-y-5 p-0",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-175",
+            "node-183",
+            "node-197"
+          ]
+        },
+        "node-175": {
+          "id": "node-175",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid content-start gap-1 text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-176",
+            "node-178"
+          ]
+        },
+        "node-176": {
+          "id": "node-176",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "text-[15px] font-semibold text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-177"
+          ]
+        },
+        "text-177": {
+          "id": "text-177",
+          "type": "text",
+          "content": "Both ways.",
+          "metadata": {}
+        },
+        "node-178": {
+          "id": "node-178",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-179",
+            "node-180",
+            "text-182"
+          ]
+        },
+        "text-179": {
+          "id": "text-179",
+          "type": "text",
+          "content": "Type ",
+          "metadata": {}
+        },
+        "node-180": {
+          "id": "node-180",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "rounded-md bg-accent-soft px-1.5 py-px font-mono text-[.92em] text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-181"
+          ]
+        },
+        "text-181": {
+          "id": "text-181",
+          "type": "text",
+          "content": "pr-[37px]",
+          "metadata": {}
+        },
+        "text-182": {
+          "id": "text-182",
+          "type": "text",
+          "content": " in the class editor and the Padding field reads 37. The utility compiles in your browser — no server, no build step.",
+          "metadata": {}
+        },
+        "node-183": {
+          "id": "node-183",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid content-start gap-1 text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-184",
+            "node-186"
+          ]
+        },
+        "node-184": {
+          "id": "node-184",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "text-[15px] font-semibold text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-185"
+          ]
+        },
+        "text-185": {
+          "id": "text-185",
+          "type": "text",
+          "content": "No class left fighting.",
+          "metadata": {}
+        },
+        "node-186": {
+          "id": "node-186",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-187",
+            "node-188",
+            "text-190",
+            "node-191",
+            "text-193",
+            "node-194",
+            "text-196"
+          ]
+        },
+        "text-187": {
+          "id": "text-187",
+          "type": "text",
+          "content": "An edit replaces whatever utility set that property before — ",
+          "metadata": {}
+        },
+        "node-188": {
+          "id": "node-188",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "rounded-md bg-accent-soft px-1.5 py-px font-mono text-[.92em] text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-189"
+          ]
+        },
+        "text-189": {
+          "id": "text-189",
+          "type": "text",
+          "content": "leading-tight",
+          "metadata": {}
+        },
+        "text-190": {
+          "id": "text-190",
+          "type": "text",
+          "content": ", ",
+          "metadata": {}
+        },
+        "node-191": {
+          "id": "node-191",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "rounded-md bg-accent-soft px-1.5 py-px font-mono text-[.92em] text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-192"
+          ]
+        },
+        "text-192": {
+          "id": "text-192",
+          "type": "text",
+          "content": "max-w-md",
+          "metadata": {}
+        },
+        "text-193": {
+          "id": "text-193",
+          "type": "text",
+          "content": ", ",
+          "metadata": {}
+        },
+        "node-194": {
+          "id": "node-194",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "rounded-md bg-accent-soft px-1.5 py-px font-mono text-[.92em] text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-195"
+          ]
+        },
+        "text-195": {
+          "id": "text-195",
+          "type": "text",
+          "content": "gap-4",
+          "metadata": {}
+        },
+        "text-196": {
+          "id": "text-196",
+          "type": "text",
+          "content": " — so the value you typed is the value you see.",
+          "metadata": {}
+        },
+        "node-197": {
+          "id": "node-197",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid content-start gap-1 text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-198",
+            "node-200"
+          ]
+        },
+        "node-198": {
+          "id": "node-198",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "text-[15px] font-semibold text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-199"
+          ]
+        },
+        "text-199": {
+          "id": "text-199",
+          "type": "text",
+          "content": "What cannot be a utility stays CSS.",
+          "metadata": {}
+        },
+        "node-200": {
+          "id": "node-200",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-201"
+          ]
+        },
+        "text-201": {
+          "id": "text-201",
+          "type": "text",
+          "content": "A single border edge, a measured content size or a shared stylesheet rule remains plain CSS; nothing is dropped or flattened.",
+          "metadata": {}
+        },
+        "node-202": {
+          "id": "node-202",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "mt-[22px] text-[13px] text-faint",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-203"
+          ]
+        },
+        "text-203": {
+          "id": "text-203",
+          "type": "text",
+          "content": "Open this page on the board, select any card above and change its padding.",
+          "metadata": {}
+        },
+        "try": {
+          "id": "try",
+          "type": "element",
+          "tag": "section",
+          "attrs": {
+            "id": "try"
+          },
+          "className": "mt-24 scroll-mt-6 max-md:mt-[72px]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-204",
+            "node-214"
+          ]
+        },
+        "node-204": {
+          "id": "node-204",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "mb-7 grid max-w-[44em] gap-2.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-205",
+            "node-207",
+            "node-209"
+          ]
+        },
+        "node-205": {
+          "id": "node-205",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-[12.5px] font-semibold tracking-[.1em] text-accent uppercase",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-206"
+          ]
+        },
+        "text-206": {
+          "id": "text-206",
+          "type": "text",
+          "content": "Guided tour · about two minutes",
+          "metadata": {}
+        },
+        "node-207": {
+          "id": "node-207",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "m-0 text-[clamp(22px,3.2vw,32px)] leading-[1.15] font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-208"
+          ]
+        },
+        "text-208": {
+          "id": "text-208",
+          "type": "text",
+          "content": "Try it without installing",
+          "metadata": {}
+        },
+        "node-209": {
+          "id": "node-209",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "mt-0.5 text-[15px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-210",
+            "node-211",
+            "text-213"
+          ]
+        },
+        "text-210": {
+          "id": "text-210",
+          "type": "text",
+          "content": "On the divlet site this page opens inside the board itself, running entirely in your browser. Nothing is uploaded: your copy lives in this browser, and you can download it as a ",
+          "metadata": {}
+        },
+        "node-211": {
+          "id": "node-211",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-[.92em]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-212"
+          ]
+        },
+        "text-212": {
+          "id": "text-212",
+          "type": "text",
+          "content": ".divlet",
+          "metadata": {}
+        },
+        "text-213": {
+          "id": "text-213",
+          "type": "text",
+          "content": " file at any time. Each step says what you should see.",
+          "metadata": {}
+        },
+        "node-214": {
+          "id": "node-214",
+          "type": "element",
+          "tag": "ol",
+          "attrs": {},
+          "className": "m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(400px,100%),1fr))] gap-x-10 gap-y-[26px] p-0",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-215",
+            "node-228",
+            "node-241",
+            "node-257",
+            "node-273",
+            "node-283"
+          ]
+        },
+        "node-215": {
+          "id": "node-215",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid grid-cols-[32px_minmax(0,1fr)] items-start gap-3.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-216",
+            "node-218"
+          ]
+        },
+        "node-216": {
+          "id": "node-216",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "grid size-8 place-items-center rounded-full bg-accent-soft text-sm font-bold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-217"
+          ]
+        },
+        "text-217": {
+          "id": "text-217",
+          "type": "text",
+          "content": "1",
+          "metadata": {}
+        },
+        "node-218": {
+          "id": "node-218",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-1.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-219",
+            "node-221",
+            "node-226"
+          ]
+        },
+        "node-219": {
+          "id": "node-219",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "text-[15.5px] font-semibold",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-220"
+          ]
+        },
+        "text-220": {
+          "id": "text-220",
+          "type": "text",
+          "content": "Open the board",
+          "metadata": {}
+        },
+        "node-221": {
+          "id": "node-221",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-222",
+            "node-223",
+            "text-225"
+          ]
+        },
+        "text-222": {
+          "id": "text-222",
+          "type": "text",
+          "content": "Press ",
+          "metadata": {}
+        },
+        "node-223": {
+          "id": "node-223",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "font-semibold text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-224"
+          ]
+        },
+        "text-224": {
+          "id": "text-224",
+          "type": "text",
+          "content": "Edit on the board",
+          "metadata": {}
+        },
+        "text-225": {
+          "id": "text-225",
+          "type": "text",
+          "content": ", the button at the top centre of the page (drag it aside if it is in your way). The page steps back into an artboard on a dotted canvas.",
+          "metadata": {}
+        },
+        "node-226": {
+          "id": "node-226",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "border-l-2 border-accent-soft pl-3 text-[13px] text-faint",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-227"
+          ]
+        },
+        "text-227": {
+          "id": "text-227",
+          "type": "text",
+          "content": "You should see: the DIVLET button top left, three tabs bottom left, a toolbar bottom right.",
+          "metadata": {}
+        },
+        "node-228": {
+          "id": "node-228",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid grid-cols-[32px_minmax(0,1fr)] items-start gap-3.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-229",
+            "node-231"
+          ]
+        },
+        "node-229": {
+          "id": "node-229",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "grid size-8 place-items-center rounded-full bg-accent-soft text-sm font-bold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-230"
+          ]
+        },
+        "text-230": {
+          "id": "text-230",
+          "type": "text",
+          "content": "2",
+          "metadata": {}
+        },
+        "node-231": {
+          "id": "node-231",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-1.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-232",
+            "node-234",
+            "node-236"
+          ]
+        },
+        "node-232": {
+          "id": "node-232",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "text-[15.5px] font-semibold",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-233"
+          ]
+        },
+        "text-233": {
+          "id": "text-233",
+          "type": "text",
+          "content": "Select something",
+          "metadata": {}
+        },
+        "node-234": {
+          "id": "node-234",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-235"
+          ]
+        },
+        "text-235": {
+          "id": "text-235",
+          "type": "text",
+          "content": "Click the headline “Design in the browser.” The inspector opens on the right.",
+          "metadata": {}
+        },
+        "node-236": {
+          "id": "node-236",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "border-l-2 border-accent-soft pl-3 text-[13px] text-faint",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-237",
+            "node-238",
+            "text-240"
+          ]
+        },
+        "text-237": {
+          "id": "text-237",
+          "type": "text",
+          "content": "You should see: ",
+          "metadata": {}
+        },
+        "node-238": {
+          "id": "node-238",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "rounded-md bg-accent-soft px-1.5 py-px font-mono text-[.92em] text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-239"
+          ]
+        },
+        "text-239": {
+          "id": "text-239",
+          "type": "text",
+          "content": "h1",
+          "metadata": {}
+        },
+        "text-240": {
+          "id": "text-240",
+          "type": "text",
+          "content": " at the top, its classes in a box, then Layout, Spacing, Border, Effects and Appearance.",
+          "metadata": {}
+        },
+        "node-241": {
+          "id": "node-241",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid grid-cols-[32px_minmax(0,1fr)] items-start gap-3.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-242",
+            "node-244"
+          ]
+        },
+        "node-242": {
+          "id": "node-242",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "grid size-8 place-items-center rounded-full bg-accent-soft text-sm font-bold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-243"
+          ]
+        },
+        "text-243": {
+          "id": "text-243",
+          "type": "text",
+          "content": "3",
+          "metadata": {}
+        },
+        "node-244": {
+          "id": "node-244",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-1.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-245",
+            "node-247",
+            "node-252"
+          ]
+        },
+        "node-245": {
+          "id": "node-245",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "text-[15.5px] font-semibold",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-246"
+          ]
+        },
+        "text-246": {
+          "id": "text-246",
+          "type": "text",
+          "content": "Change a value",
+          "metadata": {}
+        },
+        "node-247": {
+          "id": "node-247",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-248",
+            "node-249",
+            "text-251"
+          ]
+        },
+        "text-248": {
+          "id": "text-248",
+          "type": "text",
+          "content": "In Spacing, click the number on the right side of the green padding band, type ",
+          "metadata": {}
+        },
+        "node-249": {
+          "id": "node-249",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "rounded-md bg-accent-soft px-1.5 py-px font-mono text-[.92em] text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-250"
+          ]
+        },
+        "text-250": {
+          "id": "text-250",
+          "type": "text",
+          "content": "4",
+          "metadata": {}
+        },
+        "text-251": {
+          "id": "text-251",
+          "type": "text",
+          "content": " and press Enter.",
+          "metadata": {}
+        },
+        "node-252": {
+          "id": "node-252",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "border-l-2 border-accent-soft pl-3 text-[13px] text-faint",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-253",
+            "node-254",
+            "text-256"
+          ]
+        },
+        "text-253": {
+          "id": "text-253",
+          "type": "text",
+          "content": "You should see: the headline gain 4px on its right, and ",
+          "metadata": {}
+        },
+        "node-254": {
+          "id": "node-254",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "rounded-md bg-accent-soft px-1.5 py-px font-mono text-[.92em] text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-255"
+          ]
+        },
+        "text-255": {
+          "id": "text-255",
+          "type": "text",
+          "content": "pr-1",
+          "metadata": {}
+        },
+        "text-256": {
+          "id": "text-256",
+          "type": "text",
+          "content": " appear in the class box. The control edited CSS; Tailwind stored it as a class.",
+          "metadata": {}
+        },
+        "node-257": {
+          "id": "node-257",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid grid-cols-[32px_minmax(0,1fr)] items-start gap-3.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-258",
+            "node-260"
+          ]
+        },
+        "node-258": {
+          "id": "node-258",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "grid size-8 place-items-center rounded-full bg-accent-soft text-sm font-bold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-259"
+          ]
+        },
+        "text-259": {
+          "id": "text-259",
+          "type": "text",
+          "content": "4",
+          "metadata": {}
+        },
+        "node-260": {
+          "id": "node-260",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-1.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-261",
+            "node-263",
+            "node-268"
+          ]
+        },
+        "node-261": {
+          "id": "node-261",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "text-[15.5px] font-semibold",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-262"
+          ]
+        },
+        "text-262": {
+          "id": "text-262",
+          "type": "text",
+          "content": "Type a class instead",
+          "metadata": {}
+        },
+        "node-263": {
+          "id": "node-263",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-264",
+            "node-265",
+            "text-267"
+          ]
+        },
+        "text-264": {
+          "id": "text-264",
+          "type": "text",
+          "content": "Click the class box, type ",
+          "metadata": {}
+        },
+        "node-265": {
+          "id": "node-265",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "rounded-md bg-accent-soft px-1.5 py-px font-mono text-[.92em] text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-266"
+          ]
+        },
+        "text-266": {
+          "id": "text-266",
+          "type": "text",
+          "content": "pr-[37px]",
+          "metadata": {}
+        },
+        "text-267": {
+          "id": "text-267",
+          "type": "text",
+          "content": " and press Enter.",
+          "metadata": {}
+        },
+        "node-268": {
+          "id": "node-268",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "border-l-2 border-accent-soft pl-3 text-[13px] text-faint",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-269",
+            "node-270",
+            "text-272"
+          ]
+        },
+        "text-269": {
+          "id": "text-269",
+          "type": "text",
+          "content": "You should see: the padding grow to 37px and that padding field read ",
+          "metadata": {}
+        },
+        "node-270": {
+          "id": "node-270",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "rounded-md bg-accent-soft px-1.5 py-px font-mono text-[.92em] text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-271"
+          ]
+        },
+        "text-271": {
+          "id": "text-271",
+          "type": "text",
+          "content": "37",
+          "metadata": {}
+        },
+        "text-272": {
+          "id": "text-272",
+          "type": "text",
+          "content": ". The utility was compiled in your browser; the controls read it back.",
+          "metadata": {}
+        },
+        "node-273": {
+          "id": "node-273",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid grid-cols-[32px_minmax(0,1fr)] items-start gap-3.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-274",
+            "node-276"
+          ]
+        },
+        "node-274": {
+          "id": "node-274",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "grid size-8 place-items-center rounded-full bg-accent-soft text-sm font-bold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-275"
+          ]
+        },
+        "text-275": {
+          "id": "text-275",
+          "type": "text",
+          "content": "5",
+          "metadata": {}
+        },
+        "node-276": {
+          "id": "node-276",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-1.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-277",
+            "node-279",
+            "node-281"
+          ]
+        },
+        "node-277": {
+          "id": "node-277",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "text-[15.5px] font-semibold",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-278"
+          ]
+        },
+        "text-278": {
+          "id": "text-278",
+          "type": "text",
+          "content": "Undo, redo, look back",
+          "metadata": {}
+        },
+        "node-279": {
+          "id": "node-279",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-280"
+          ]
+        },
+        "text-280": {
+          "id": "text-280",
+          "type": "text",
+          "content": "Press Ctrl+Z (⌘Z on a Mac) twice, then Ctrl+Shift+Z once. Open the History tab at the bottom left.",
+          "metadata": {}
+        },
+        "node-281": {
+          "id": "node-281",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "border-l-2 border-accent-soft pl-3 text-[13px] text-faint",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-282"
+          ]
+        },
+        "text-282": {
+          "id": "text-282",
+          "type": "text",
+          "content": "You should see: each accepted edit undo and redo as one step, and History list them.",
+          "metadata": {}
+        },
+        "node-283": {
+          "id": "node-283",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid grid-cols-[32px_minmax(0,1fr)] items-start gap-3.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-284",
+            "node-286"
+          ]
+        },
+        "node-284": {
+          "id": "node-284",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "grid size-8 place-items-center rounded-full bg-accent-soft text-sm font-bold text-accent",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-285"
+          ]
+        },
+        "text-285": {
+          "id": "text-285",
+          "type": "text",
+          "content": "6",
+          "metadata": {}
+        },
+        "node-286": {
+          "id": "node-286",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-1.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-287",
+            "node-289",
+            "node-291"
+          ]
+        },
+        "node-287": {
+          "id": "node-287",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "text-[15.5px] font-semibold",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-288"
+          ]
+        },
+        "text-288": {
+          "id": "text-288",
+          "type": "text",
+          "content": "Hand it to an agent",
+          "metadata": {}
+        },
+        "node-289": {
+          "id": "node-289",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-290"
+          ]
+        },
+        "text-290": {
+          "id": "text-290",
+          "type": "text",
+          "content": "This site is its own MCP provider. Connect your agent to it by URL and ask it to change the headline; the tools run in a browser page the adapter opens, and the same edit lands on the page.",
+          "metadata": {}
+        },
+        "node-291": {
+          "id": "node-291",
+          "type": "element",
+          "tag": "pre",
+          "attrs": {},
+          "className": "m-0 mt-1 overflow-x-auto rounded-xl bg-code px-3.5 py-3 font-mono text-[12.5px] leading-relaxed whitespace-pre text-code-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-292"
+          ]
+        },
+        "node-292": {
+          "id": "node-292",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-293"
+          ]
+        },
+        "text-293": {
+          "id": "text-293",
+          "type": "text",
+          "content": "npx -y @divlet/mcp --connect https://llblab.github.io/divlet/",
+          "metadata": {}
+        },
+        "start": {
+          "id": "start",
+          "type": "element",
+          "tag": "section",
+          "attrs": {
+            "id": "start"
+          },
+          "className": "mt-24 scroll-mt-6 max-md:mt-[72px]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-294",
+            "node-301",
+            "node-338"
+          ]
+        },
+        "node-294": {
+          "id": "node-294",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "mb-7 grid max-w-[44em] gap-2.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-295",
+            "node-297",
+            "node-299"
+          ]
+        },
+        "node-295": {
+          "id": "node-295",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-[12.5px] font-semibold tracking-[.1em] text-accent uppercase",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-296"
+          ]
+        },
+        "text-296": {
+          "id": "text-296",
+          "type": "text",
+          "content": "Install",
+          "metadata": {}
+        },
+        "node-297": {
+          "id": "node-297",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "m-0 text-[clamp(22px,3.2vw,32px)] leading-[1.15] font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-298"
+          ]
+        },
+        "text-298": {
+          "id": "text-298",
+          "type": "text",
+          "content": "Use it on your own projects",
+          "metadata": {}
+        },
+        "node-299": {
+          "id": "node-299",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "mt-0.5 text-[15px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-300"
+          ]
+        },
+        "text-300": {
+          "id": "text-300",
+          "type": "text",
+          "content": "Requires Node.js 22.19 or later. The board binds to loopback and your project stays a file in your folder; nothing is uploaded.",
+          "metadata": {}
+        },
+        "node-301": {
+          "id": "node-301",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-302",
+            "node-313",
+            "node-324"
+          ]
+        },
+        "node-302": {
+          "id": "node-302",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "grid items-center gap-x-8 gap-y-3 rounded-[18px] border border-hair bg-panel p-[22px] [box-shadow:var(--shadow)] md:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)] max-[300px]:p-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-303",
+            "node-310"
+          ]
+        },
+        "node-303": {
+          "id": "node-303",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-1.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-304",
+            "node-306",
+            "node-308"
+          ]
+        },
+        "node-304": {
+          "id": "node-304",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs font-semibold tracking-[.08em] text-accent uppercase",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-305"
+          ]
+        },
+        "text-305": {
+          "id": "text-305",
+          "type": "text",
+          "content": "Standalone",
+          "metadata": {}
+        },
+        "node-306": {
+          "id": "node-306",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "m-0 text-base font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-307"
+          ]
+        },
+        "text-307": {
+          "id": "text-307",
+          "type": "text",
+          "content": "A board on your machine",
+          "metadata": {}
+        },
+        "node-308": {
+          "id": "node-308",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-309"
+          ]
+        },
+        "text-309": {
+          "id": "text-309",
+          "type": "text",
+          "content": "Open a folder; an empty one gets a starter project, an existing one opens as it is.",
+          "metadata": {}
+        },
+        "node-310": {
+          "id": "node-310",
+          "type": "element",
+          "tag": "pre",
+          "attrs": {},
+          "className": "m-0 overflow-x-auto rounded-xl bg-code px-3.5 py-3 font-mono text-[12.5px] leading-relaxed whitespace-pre text-code-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-311"
+          ]
+        },
+        "node-311": {
+          "id": "node-311",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-312"
+          ]
+        },
+        "text-312": {
+          "id": "text-312",
+          "type": "text",
+          "content": "npx -y @divlet/cli ./my-project",
+          "metadata": {}
+        },
+        "node-313": {
+          "id": "node-313",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "grid items-center gap-x-8 gap-y-3 rounded-[18px] border border-hair bg-panel p-[22px] [box-shadow:var(--shadow)] md:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)] max-[300px]:p-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-314",
+            "node-321"
+          ]
+        },
+        "node-314": {
+          "id": "node-314",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-1.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-315",
+            "node-317",
+            "node-319"
+          ]
+        },
+        "node-315": {
+          "id": "node-315",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs font-semibold tracking-[.08em] text-accent uppercase",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-316"
+          ]
+        },
+        "text-316": {
+          "id": "text-316",
+          "type": "text",
+          "content": "Any MCP host",
+          "metadata": {}
+        },
+        "node-317": {
+          "id": "node-317",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "m-0 text-base font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-318"
+          ]
+        },
+        "text-318": {
+          "id": "text-318",
+          "type": "text",
+          "content": "Your MCP agent",
+          "metadata": {}
+        },
+        "node-319": {
+          "id": "node-319",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-320"
+          ]
+        },
+        "text-320": {
+          "id": "text-320",
+          "type": "text",
+          "content": "Install the workflow skill once, then register the server. The agent opens the board when it needs one.",
+          "metadata": {}
+        },
+        "node-321": {
+          "id": "node-321",
+          "type": "element",
+          "tag": "pre",
+          "attrs": {},
+          "className": "m-0 overflow-x-auto rounded-xl bg-code px-3.5 py-3 font-mono text-[12.5px] leading-relaxed whitespace-pre text-code-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-322"
+          ]
+        },
+        "node-322": {
+          "id": "node-322",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-323"
+          ]
+        },
+        "text-323": {
+          "id": "text-323",
+          "type": "text",
+          "content": "npx skills add llblab/divlet --skill divlet --global\nnpx -y @divlet/mcp --cwd ./my-project",
+          "metadata": {}
+        },
+        "node-324": {
+          "id": "node-324",
+          "type": "element",
+          "tag": "article",
+          "attrs": {},
+          "className": "grid items-center gap-x-8 gap-y-3 rounded-[18px] border border-hair bg-panel p-[22px] [box-shadow:var(--shadow)] md:grid-cols-[minmax(0,.85fr)_minmax(0,1.15fr)] max-[300px]:p-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-325",
+            "node-335"
+          ]
+        },
+        "node-325": {
+          "id": "node-325",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-1.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-326",
+            "node-328",
+            "node-330"
+          ]
+        },
+        "node-326": {
+          "id": "node-326",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-xs font-semibold tracking-[.08em] text-accent uppercase",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-327"
+          ]
+        },
+        "text-327": {
+          "id": "text-327",
+          "type": "text",
+          "content": "Pi",
+          "metadata": {}
+        },
+        "node-328": {
+          "id": "node-328",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "m-0 text-base font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-329"
+          ]
+        },
+        "text-329": {
+          "id": "text-329",
+          "type": "text",
+          "content": "The Pi extension",
+          "metadata": {}
+        },
+        "node-330": {
+          "id": "node-330",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-sm text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-331",
+            "node-332",
+            "text-334"
+          ]
+        },
+        "text-331": {
+          "id": "text-331",
+          "type": "text",
+          "content": "Brings the tools, the skill and the Agent conversation to the board. Then run ",
+          "metadata": {}
+        },
+        "node-332": {
+          "id": "node-332",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-[.92em] text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-333"
+          ]
+        },
+        "text-333": {
+          "id": "text-333",
+          "type": "text",
+          "content": "/divlet",
+          "metadata": {}
+        },
+        "text-334": {
+          "id": "text-334",
+          "type": "text",
+          "content": " in your workspace.",
+          "metadata": {}
+        },
+        "node-335": {
+          "id": "node-335",
+          "type": "element",
+          "tag": "pre",
+          "attrs": {},
+          "className": "m-0 overflow-x-auto rounded-xl bg-code px-3.5 py-3 font-mono text-[12.5px] leading-relaxed whitespace-pre text-code-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-336"
+          ]
+        },
+        "node-336": {
+          "id": "node-336",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-337"
+          ]
+        },
+        "text-337": {
+          "id": "text-337",
+          "type": "text",
+          "content": "pi install npm:@divlet/pi",
+          "metadata": {}
+        },
+        "node-338": {
+          "id": "node-338",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "mt-[18px] max-w-[46em] text-[13px] text-faint",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-339"
+          ]
+        },
+        "text-339": {
+          "id": "text-339",
+          "type": "text",
+          "content": "Version 0.2.0. The native project format remains a pre-freeze draft, so keep backups of projects you care about.",
+          "metadata": {}
+        },
+        "agents": {
+          "id": "agents",
+          "type": "element",
+          "tag": "section",
+          "attrs": {
+            "id": "agents"
+          },
+          "className": "mt-24 scroll-mt-6 max-md:mt-[72px]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-340",
+            "node-347"
+          ]
+        },
+        "node-340": {
+          "id": "node-340",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "mb-7 grid max-w-[44em] gap-2.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-341",
+            "node-343",
+            "node-345"
+          ]
+        },
+        "node-341": {
+          "id": "node-341",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-[12.5px] font-semibold tracking-[.1em] text-accent uppercase",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-342"
+          ]
+        },
+        "text-342": {
+          "id": "text-342",
+          "type": "text",
+          "content": "For agents",
+          "metadata": {}
+        },
+        "node-343": {
+          "id": "node-343",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "m-0 text-[clamp(22px,3.2vw,32px)] leading-[1.15] font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-344"
+          ]
+        },
+        "text-344": {
+          "id": "text-344",
+          "type": "text",
+          "content": "Seven tools, one contract",
+          "metadata": {}
+        },
+        "node-345": {
+          "id": "node-345",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "mt-0.5 text-[15px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-346"
+          ]
+        },
+        "text-346": {
+          "id": "text-346",
+          "type": "text",
+          "content": "Pi, MCP and the browser board run the same tool definitions, validation and refusal codes. The skill teaches the loop: read, edit with the version you read, verify what rendered.",
+          "metadata": {}
+        },
+        "node-347": {
+          "id": "node-347",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid grid-cols-[repeat(auto-fit,minmax(min(280px,100%),1fr))] gap-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-348",
+            "node-362",
+            "node-381"
+          ]
+        },
+        "node-348": {
+          "id": "node-348",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid content-start gap-1 rounded-[18px] border border-hair bg-panel p-5 max-[300px]:p-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-349",
+            "node-351"
+          ]
+        },
+        "node-349": {
+          "id": "node-349",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "m-0 mb-2 text-base font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-350"
+          ]
+        },
+        "text-350": {
+          "id": "text-350",
+          "type": "text",
+          "content": "Open and inspect",
+          "metadata": {}
+        },
+        "node-351": {
+          "id": "node-351",
+          "type": "element",
+          "tag": "ul",
+          "attrs": {},
+          "className": "m-0 grid list-none gap-3 p-0",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-352",
+            "node-357"
+          ]
+        },
+        "node-352": {
+          "id": "node-352",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid gap-0.5 border-t border-hair pt-3",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-353",
+            "node-355"
+          ]
+        },
+        "node-353": {
+          "id": "node-353",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-[13px] font-semibold text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-354"
+          ]
+        },
+        "text-354": {
+          "id": "text-354",
+          "type": "text",
+          "content": "divlet_open",
+          "metadata": {}
+        },
+        "node-355": {
+          "id": "node-355",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[13.5px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-356"
+          ]
+        },
+        "text-356": {
+          "id": "text-356",
+          "type": "text",
+          "content": "Open a project and its local board.",
+          "metadata": {}
+        },
+        "node-357": {
+          "id": "node-357",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid gap-0.5 border-t border-hair pt-3",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-358",
+            "node-360"
+          ]
+        },
+        "node-358": {
+          "id": "node-358",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-[13px] font-semibold text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-359"
+          ]
+        },
+        "text-359": {
+          "id": "text-359",
+          "type": "text",
+          "content": "divlet_read",
+          "metadata": {}
+        },
+        "node-360": {
+          "id": "node-360",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[13.5px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-361"
+          ]
+        },
+        "text-361": {
+          "id": "text-361",
+          "type": "text",
+          "content": "Frames, nodes, components, the user's selection, measured layout and history.",
+          "metadata": {}
+        },
+        "node-362": {
+          "id": "node-362",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid content-start gap-1 rounded-[18px] border border-hair bg-panel p-5 max-[300px]:p-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-363",
+            "node-365"
+          ]
+        },
+        "node-363": {
+          "id": "node-363",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "m-0 mb-2 text-base font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-364"
+          ]
+        },
+        "text-364": {
+          "id": "text-364",
+          "type": "text",
+          "content": "Change the layout",
+          "metadata": {}
+        },
+        "node-365": {
+          "id": "node-365",
+          "type": "element",
+          "tag": "ul",
+          "attrs": {},
+          "className": "m-0 grid list-none gap-3 p-0",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-366",
+            "node-371",
+            "node-376"
+          ]
+        },
+        "node-366": {
+          "id": "node-366",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid gap-0.5 border-t border-hair pt-3",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-367",
+            "node-369"
+          ]
+        },
+        "node-367": {
+          "id": "node-367",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-[13px] font-semibold text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-368"
+          ]
+        },
+        "text-368": {
+          "id": "text-368",
+          "type": "text",
+          "content": "divlet_patch",
+          "metadata": {}
+        },
+        "node-369": {
+          "id": "node-369",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[13.5px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-370"
+          ]
+        },
+        "text-370": {
+          "id": "text-370",
+          "type": "text",
+          "content": "Change a frame or the project by stable IDs, at a known version. Styles are plain CSS declarations.",
+          "metadata": {}
+        },
+        "node-371": {
+          "id": "node-371",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid gap-0.5 border-t border-hair pt-3",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-372",
+            "node-374"
+          ]
+        },
+        "node-372": {
+          "id": "node-372",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-[13px] font-semibold text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-373"
+          ]
+        },
+        "text-373": {
+          "id": "text-373",
+          "type": "text",
+          "content": "divlet_edit",
+          "metadata": {}
+        },
+        "node-374": {
+          "id": "node-374",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[13.5px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-375"
+          ]
+        },
+        "text-375": {
+          "id": "text-375",
+          "type": "text",
+          "content": "Insert, move, wrap, duplicate, rename or remove elements.",
+          "metadata": {}
+        },
+        "node-376": {
+          "id": "node-376",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid gap-0.5 border-t border-hair pt-3",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-377",
+            "node-379"
+          ]
+        },
+        "node-377": {
+          "id": "node-377",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-[13px] font-semibold text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-378"
+          ]
+        },
+        "text-378": {
+          "id": "text-378",
+          "type": "text",
+          "content": "divlet_frame_manage",
+          "metadata": {}
+        },
+        "node-379": {
+          "id": "node-379",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[13.5px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-380"
+          ]
+        },
+        "text-380": {
+          "id": "text-380",
+          "type": "text",
+          "content": "Create, duplicate or delete frames.",
+          "metadata": {}
+        },
+        "node-381": {
+          "id": "node-381",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid content-start gap-1 rounded-[18px] border border-hair bg-panel p-5 max-[300px]:p-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-382",
+            "node-384"
+          ]
+        },
+        "node-382": {
+          "id": "node-382",
+          "type": "element",
+          "tag": "h3",
+          "attrs": {},
+          "className": "m-0 mb-2 text-base font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-383"
+          ]
+        },
+        "text-383": {
+          "id": "text-383",
+          "type": "text",
+          "content": "Explain and recover",
+          "metadata": {}
+        },
+        "node-384": {
+          "id": "node-384",
+          "type": "element",
+          "tag": "ul",
+          "attrs": {},
+          "className": "m-0 grid list-none gap-3 p-0",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-385",
+            "node-390"
+          ]
+        },
+        "node-385": {
+          "id": "node-385",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid gap-0.5 border-t border-hair pt-3",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-386",
+            "node-388"
+          ]
+        },
+        "node-386": {
+          "id": "node-386",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-[13px] font-semibold text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-387"
+          ]
+        },
+        "text-387": {
+          "id": "text-387",
+          "type": "text",
+          "content": "divlet_mark",
+          "metadata": {}
+        },
+        "node-388": {
+          "id": "node-388",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[13.5px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-389"
+          ]
+        },
+        "text-389": {
+          "id": "text-389",
+          "type": "text",
+          "content": "Show the user where the agent is about to work.",
+          "metadata": {}
+        },
+        "node-390": {
+          "id": "node-390",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "grid gap-0.5 border-t border-hair pt-3",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-391",
+            "node-393"
+          ]
+        },
+        "node-391": {
+          "id": "node-391",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-[13px] font-semibold text-accent-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-392"
+          ]
+        },
+        "text-392": {
+          "id": "text-392",
+          "type": "text",
+          "content": "divlet_undo",
+          "metadata": {}
+        },
+        "node-393": {
+          "id": "node-393",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "text-[13.5px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-394"
+          ]
+        },
+        "text-394": {
+          "id": "text-394",
+          "type": "text",
+          "content": "Undo or redo the latest change.",
+          "metadata": {}
+        },
+        "formats": {
+          "id": "formats",
+          "type": "element",
+          "tag": "section",
+          "attrs": {},
+          "className": "mt-24 grid grid-cols-[repeat(auto-fit,minmax(min(360px,100%),1fr))] gap-12 max-md:mt-[72px]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-395",
+            "node-418"
+          ]
+        },
+        "node-395": {
+          "id": "node-395",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid content-start gap-3.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-396",
+            "node-398",
+            "node-403"
+          ]
+        },
+        "node-396": {
+          "id": "node-396",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "m-0 text-[clamp(20px,2.6vw,24px)] leading-[1.15] font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-397"
+          ]
+        },
+        "text-397": {
+          "id": "text-397",
+          "type": "text",
+          "content": "Bring pages in, take plain HTML out",
+          "metadata": {}
+        },
+        "node-398": {
+          "id": "node-398",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-[15px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-399",
+            "node-400",
+            "text-402"
+          ]
+        },
+        "text-399": {
+          "id": "text-399",
+          "type": "text",
+          "content": "Static HTML pages open through the native importer, Pencil files convert through a plugin, and Markdown folders become routed sites. A source is never rewritten: divlet creates a sibling ",
+          "metadata": {}
+        },
+        "node-400": {
+          "id": "node-400",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-[.92em]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-401"
+          ]
+        },
+        "text-401": {
+          "id": "text-401",
+          "type": "text",
+          "content": ".divlet",
+          "metadata": {}
+        },
+        "text-402": {
+          "id": "text-402",
+          "type": "text",
+          "content": " once. What comes out is ordinary HTML and CSS.",
+          "metadata": {}
+        },
+        "node-403": {
+          "id": "node-403",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "flex flex-wrap gap-2",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-404",
+            "node-408",
+            "node-412",
+            "node-414"
+          ]
+        },
+        "node-404": {
+          "id": "node-404",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "rounded-full border border-hair bg-panel px-3 py-1.5 text-[13px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-405",
+            "text-407"
+          ]
+        },
+        "node-405": {
+          "id": "node-405",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-406"
+          ]
+        },
+        "text-406": {
+          "id": "text-406",
+          "type": "text",
+          "content": ".html",
+          "metadata": {}
+        },
+        "text-407": {
+          "id": "text-407",
+          "type": "text",
+          "content": " static pages",
+          "metadata": {}
+        },
+        "node-408": {
+          "id": "node-408",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "rounded-full border border-hair bg-panel px-3 py-1.5 text-[13px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-409",
+            "text-411"
+          ]
+        },
+        "node-409": {
+          "id": "node-409",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-410"
+          ]
+        },
+        "text-410": {
+          "id": "text-410",
+          "type": "text",
+          "content": ".pen",
+          "metadata": {}
+        },
+        "text-411": {
+          "id": "text-411",
+          "type": "text",
+          "content": " Pencil",
+          "metadata": {}
+        },
+        "node-412": {
+          "id": "node-412",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "rounded-full border border-hair bg-panel px-3 py-1.5 text-[13px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-413"
+          ]
+        },
+        "text-413": {
+          "id": "text-413",
+          "type": "text",
+          "content": "Markdown sites",
+          "metadata": {}
+        },
+        "node-414": {
+          "id": "node-414",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "rounded-full border border-hair bg-panel px-3 py-1.5 text-[13px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-415",
+            "text-417"
+          ]
+        },
+        "node-415": {
+          "id": "node-415",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "font-mono text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-416"
+          ]
+        },
+        "text-416": {
+          "id": "text-416",
+          "type": "text",
+          "content": ".divlet",
+          "metadata": {}
+        },
+        "text-417": {
+          "id": "text-417",
+          "type": "text",
+          "content": " native",
+          "metadata": {}
+        },
+        "node-418": {
+          "id": "node-418",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid content-start gap-3.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-419",
+            "node-421"
+          ]
+        },
+        "node-419": {
+          "id": "node-419",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "m-0 text-[clamp(20px,2.6vw,24px)] leading-[1.15] font-semibold tracking-tight",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-420"
+          ]
+        },
+        "text-420": {
+          "id": "text-420",
+          "type": "text",
+          "content": "Honest boundaries",
+          "metadata": {}
+        },
+        "node-421": {
+          "id": "node-421",
+          "type": "element",
+          "tag": "ul",
+          "attrs": {},
+          "className": "m-0 grid list-none gap-2.5 p-0",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-422",
+            "node-426",
+            "node-430"
+          ]
+        },
+        "node-422": {
+          "id": "node-422",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "text-[14.5px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-423",
+            "text-425"
+          ]
+        },
+        "node-423": {
+          "id": "node-423",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "font-semibold text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-424"
+          ]
+        },
+        "text-424": {
+          "id": "text-424",
+          "type": "text",
+          "content": "Layouts, not applications.",
+          "metadata": {}
+        },
+        "text-425": {
+          "id": "text-425",
+          "type": "text",
+          "content": " HTML, SVG and CSS; no scripts or event handlers.",
+          "metadata": {}
+        },
+        "node-426": {
+          "id": "node-426",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "text-[14.5px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-427",
+            "text-429"
+          ]
+        },
+        "node-427": {
+          "id": "node-427",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "font-semibold text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-428"
+          ]
+        },
+        "text-428": {
+          "id": "text-428",
+          "type": "text",
+          "content": "Generated pages are output.",
+          "metadata": {}
+        },
+        "text-429": {
+          "id": "text-429",
+          "type": "text",
+          "content": " Hand edits there are reported and preserved, not imported back.",
+          "metadata": {}
+        },
+        "node-430": {
+          "id": "node-430",
+          "type": "element",
+          "tag": "li",
+          "attrs": {},
+          "className": "text-[14.5px] text-muted",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-431",
+            "text-433"
+          ]
+        },
+        "node-431": {
+          "id": "node-431",
+          "type": "element",
+          "tag": "b",
+          "attrs": {},
+          "className": "font-semibold text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-432"
+          ]
+        },
+        "text-432": {
+          "id": "text-432",
+          "type": "text",
+          "content": "The browser board is a copy.",
+          "metadata": {}
+        },
+        "text-433": {
+          "id": "text-433",
+          "type": "text",
+          "content": " It edits this site's project; images, fonts, build output and opening other projects need the local board.",
+          "metadata": {}
+        },
+        "finale": {
+          "id": "finale",
+          "type": "element",
+          "tag": "section",
+          "attrs": {},
+          "className": "mt-24 grid items-center gap-7 rounded-3xl border border-white/[.06] bg-code p-9 text-code-ink [box-shadow:var(--shadow-lift)] md:grid-cols-2 max-md:mt-[72px] max-md:p-[26px] max-[300px]:p-4",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-434",
+            "node-439"
+          ]
+        },
+        "node-434": {
+          "id": "node-434",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-2.5",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-435",
+            "node-437"
+          ]
+        },
+        "node-435": {
+          "id": "node-435",
+          "type": "element",
+          "tag": "h2",
+          "attrs": {},
+          "className": "m-0 text-[clamp(22px,3.2vw,32px)] leading-[1.15] font-semibold tracking-tight text-white",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-436"
+          ]
+        },
+        "text-436": {
+          "id": "text-436",
+          "type": "text",
+          "content": "Start with a folder.",
+          "metadata": {}
+        },
+        "node-437": {
+          "id": "node-437",
+          "type": "element",
+          "tag": "p",
+          "attrs": {},
+          "className": "text-[15px] text-[#b9b4d8]",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-438"
+          ]
+        },
+        "text-438": {
+          "id": "text-438",
+          "type": "text",
+          "content": "One command opens a board on your machine. Point at something, and let your agent take it from there.",
+          "metadata": {}
+        },
+        "node-439": {
+          "id": "node-439",
+          "type": "element",
+          "tag": "div",
+          "attrs": {},
+          "className": "grid gap-3",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-440",
+            "node-443"
+          ]
+        },
+        "node-440": {
+          "id": "node-440",
+          "type": "element",
+          "tag": "pre",
+          "attrs": {},
+          "className": "m-0 overflow-x-auto rounded-xl bg-white/[.07] px-3.5 py-3 font-mono text-[13.5px] leading-relaxed whitespace-pre text-code-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-441"
+          ]
+        },
+        "node-441": {
+          "id": "node-441",
+          "type": "element",
+          "tag": "code",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-442"
+          ]
+        },
+        "text-442": {
+          "id": "text-442",
+          "type": "text",
+          "content": "npx -y @divlet/cli ./my-project",
+          "metadata": {}
+        },
+        "node-443": {
+          "id": "node-443",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "#try"
+          },
+          "className": "justify-self-start border-b border-white/20 text-[14.5px] text-[#cfcaf2] no-underline hover:border-white hover:text-white",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-444"
+          ]
+        },
+        "text-444": {
+          "id": "text-444",
+          "type": "text",
+          "content": "Or take the two-minute tour first",
+          "metadata": {}
+        },
+        "footer": {
+          "id": "footer",
+          "type": "element",
+          "tag": "footer",
+          "attrs": {},
+          "className": "mt-12 flex flex-wrap justify-between gap-2 border-t border-hair pt-[18px] text-[13px] text-faint",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "node-445",
+            "node-447"
+          ]
+        },
+        "node-445": {
+          "id": "node-445",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-446",
+            "node-github"
+          ]
+        },
+        "text-446": {
+          "id": "text-446",
+          "type": "text",
+          "content": "divlet · MIT · ",
+          "metadata": {}
+        },
+        "node-github": {
+          "id": "node-github",
+          "type": "element",
+          "tag": "a",
+          "attrs": {
+            "href": "https://github.com/llblab/divlet",
+            "target": "_blank",
+            "rel": "noreferrer noopener"
+          },
+          "className": "underline underline-offset-[3px] hover:text-ink",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-github"
+          ]
+        },
+        "text-github": {
+          "id": "text-github",
+          "type": "text",
+          "content": "github.com/llblab/divlet",
+          "metadata": {}
+        },
+        "node-447": {
+          "id": "node-447",
+          "type": "element",
+          "tag": "span",
+          "attrs": {},
+          "className": "",
+          "style": {},
+          "metadata": {},
+          "children": [
+            "text-448"
+          ]
+        },
+        "text-448": {
+          "id": "text-448",
+          "type": "text",
+          "content": "A browser board, not a service.",
+          "metadata": {}
+        }
+      }
+    }
+  ]
+}
