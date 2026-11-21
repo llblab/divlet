@@ -132,7 +132,7 @@ export async function startBrowserBoard(options: BrowserBoardOptions) {
   if (options.styleEngine) installBrowserStyleEngine(options.styleEngine);
   const compiler = options.styleEngine ? engineCompiler(options.styleEngine) : snapshotCompiler(styles);
   const persist = (text: string) => store.put(options.storageKey, { base, text, savedAt: new Date().toISOString() });
-  const open = (source: string) => BrowserRuntime.open({ source, file: options.file, projectId: `browser-${base.slice(0, 16)}`, compiler, styleEngine: options.styleEngine, clientPlugins: options.clientPlugins, persist, projectPreview: options.projectPreview, resourcePolicy: options.resourcePolicy, capabilities: { browser: true, assets: false, export: false, ...(options.resourcePolicy !== undefined ? { sourceAssets: true } : {}) } });
+  const open = (source: string) => BrowserRuntime.open({ source, file: options.file, version: options.version, projectId: `browser-${base.slice(0, 16)}`, compiler, styleEngine: options.styleEngine, clientPlugins: options.clientPlugins, persist, projectPreview: options.projectPreview, resourcePolicy: options.resourcePolicy, capabilities: { browser: true, assets: false, export: false, ...(options.resourcePolicy !== undefined ? { sourceAssets: true } : {}) } });
   let runtime: BrowserRuntime;
   let restored = false;
   if (stored?.base === base) {

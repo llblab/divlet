@@ -39,6 +39,24 @@ const waitUntil = async (check, label, timeout = 8000) => {
     await input.waitFor();
     assert.equal(await input.isDisabled(), false);
   };
+  // The release names itself quietly in the dialog that is about the board: the version comes from the board's own state, which the
+  // Node host reads from its package manifest.
+  {
+    const shown = await page.evaluate(() => {
+      const node = document.querySelector('#help .dialog-title .version');
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--faint)';
+      document.body.append(probe);
+      const faint = getComputedStyle(probe).color;
+      probe.remove();
+      return { text: node.textContent, colour: getComputedStyle(node).color, faint, tip: node.dataset.tip };
+    });
+    assert.match(shown.text, /^v\d+\.\d+\.\d+$/, 'the dialog names the release it runs');
+    assert.equal(shown.text, `v${runtime.info().version}`, 'and the state carries that same version, not a second copy of the number');
+    assert.equal(shown.colour, shown.faint, 'as a caption in the quiet tone, not a control');
+    assert.equal(shown.tip, `divlet ${runtime.info().version}`, 'with the full release in its tooltip');
+  }
+
   // The dialog's own layout: every block has the same space above and below it — no line divides them — and the actions sit in
   // the bottom-right corner above nothing but the reserved status line.
   {

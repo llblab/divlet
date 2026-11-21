@@ -10,6 +10,7 @@ import { createDemoDocument } from '../lib/model.ts';
 import { encodeHtml } from '../lib/codec.ts';
 
 const digest = text => createHash('sha256').update(text).digest('hex');
+const manifestVersion = JSON.parse(await fs.readFile(new URL('../../package.json', import.meta.url), 'utf8')).version;
 
 async function fixture(t, options = {}) {
   const cwd = await fs.mkdtemp(path.join(os.tmpdir(), 'divlet-test-'));
@@ -312,4 +313,10 @@ test('a styles patch replaces a project-colour class instead of leaving two back
   await runtime.patch({ documentId: 'example', expectedVersion: version + 1, patch: { tokens: { '--color-paper': '#f4efe6' }, nodes: { root: { className: 'text-paper p-2' } } } });
   await runtime.patch({ documentId: 'example', expectedVersion: version + 2, patch: { nodes: { root: { styles: { color: '#000000' } } } } });
   assert.equal(runtime.read({ view: 'frame', documentId: 'example' }).nodes.root.className.trim(), 'p-2 text-[color:#000000]');
+});
+
+test('the board state names the release it runs, read from the package manifest', async t => {
+  const { runtime } = await fixture(t);
+  assert.equal(runtime.info().version, manifestVersion, 'the version is the npm version, never a second copy of the number');
+  assert.match(runtime.info().version, /^\d+\.\d+\.\d+$/);
 });

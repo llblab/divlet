@@ -58,6 +58,8 @@ export interface BrowserRuntimeOptions {
   readonly source: unknown;
   /** A label for the project, shown where the Node host shows its file path. Never a filesystem path. */
   readonly file: string;
+  /** The product release this page runs, for the interface to name itself; the composition passes its build-time version. */
+  readonly version?: string;
   /** A stable identifier for this browser copy of the project. */
   readonly projectId: string;
   readonly compiler: FrameCompiler;
@@ -89,6 +91,7 @@ export class BrowserRuntime {
   #stateKey = '';
   #capabilities: Record<string, unknown>;
   readonly file: string;
+  readonly #version: string | undefined;
   readonly projectId: string;
   settings!: ProjectSettings;
   documents = new Map<string, Entry>();
@@ -111,6 +114,7 @@ export class BrowserRuntime {
 
   private constructor(options: BrowserRuntimeOptions) {
     this.file = options.file;
+    this.#version = options.version;
     this.projectId = options.projectId;
     this.#compiler = options.compiler;
     this.#engine = options.styleEngine;
@@ -205,6 +209,7 @@ export class BrowserRuntime {
 
   info() {
     const state = {
+      version: this.#version ?? null,
       projectId: this.projectId,
       url: this.url,
       revision: this.revision,

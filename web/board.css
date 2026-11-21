@@ -711,7 +711,10 @@ body.bar-dragging { user-select: none; }
 .scrim { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 16px; background: rgba(10, 10, 8, .28); backdrop-filter: blur(2px); animation: fade .15s ease-out; }
 @keyframes fade { from { opacity: 0; } }
 .dialog { width: min(720px, 100%); max-height: calc(var(--vh) - 32px); overflow-y: auto; padding: 16px 18px 14px; border: 1px solid var(--hair); border-radius: 16px; background: var(--solid); box-shadow: var(--shadow); animation: rise .2s var(--ease); }
-.dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.dialog-title { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+/* The release, as a caption rather than a control: quiet type, no frame, nothing that invites a click it cannot honour. */
+.dialog-title .version { flex: none; font: 10.5px var(--mono); color: var(--faint); }
 .dialog h2 { margin: 0; font-size: 15px; font-weight: 600; }
 /* Settings: one block per section. A line between blocks would be a border doing a divider's job, so the space above and below
    is the same everywhere and the eye separates them by rhythm alone. */

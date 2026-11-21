@@ -1,3 +1,4 @@
+import { productVersion } from './version.ts';
 import { EventEmitter } from 'node:events';
 
 import { createHash, randomBytes } from 'node:crypto';
@@ -257,6 +258,8 @@ export class DivletRuntime extends EventEmitter {
 
   info() {
     const state = {
+      // The product release this board runs, for the interface to name itself; null when no manifest travels with it.
+      version: productVersion(),
       projectId: this.projectId,
       cwd: this.cwd,
       projectDir: this.projectDir,

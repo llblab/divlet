@@ -186,6 +186,13 @@ test('the prepared landing is the first paint and stays until the visitor leaves
   await page.waitForSelector('#expanded-preview', { state: 'hidden' });
   assert.equal(await page.locator('#boot-cover').count(), 0, 'collapsing reveals the board itself');
   assert.equal(await page.locator('#brand').isVisible(), true);
+  // The release names itself in Settings, from the version this static composition was built with; no backend supplies it.
+  const builtRelease = JSON.parse(await (await import('node:fs/promises')).readFile(new URL('../../package.json', import.meta.url), 'utf8')).version;
+  await page.keyboard.press('Control+,');
+  await page.waitForSelector('#help .dialog-title .version');
+  assert.equal(await page.locator('#help .dialog-title .version').innerText(), `v${builtRelease}`, 'the static board names the same release its bundle was built from');
+  await page.keyboard.press('Escape');
+  await page.waitForSelector('#help', { state: 'hidden' });
   assert.deepEqual(errors, []);
   await page.close();
 });

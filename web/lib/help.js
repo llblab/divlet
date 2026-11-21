@@ -88,7 +88,16 @@ function render() {
   close.dataset.tip = 'Close · Esc';
   close.append(icon('close'));
   close.addEventListener('click', () => toggle(false));
-  head.append(title, close);
+  // The release names itself once, quietly, in the one dialog that is about the board itself: the version comes from the board's
+  // own state, which every host fills from its package manifest (the static site from its build).
+  const heading = el('div', 'dialog-title');
+  heading.append(title);
+  if (store.state?.version) {
+    const version = el('span', 'version', `v${store.state.version}`);
+    version.dataset.tip = `divlet ${store.state.version}`;
+    heading.append(version);
+  }
+  head.append(heading, close);
 
   const themes = el('div', 'segmented');
   themes.setAttribute('role', 'radiogroup');
