@@ -117,24 +117,34 @@ $('#empty-new').addEventListener('click', () => actions.newArtboard());
 siteLink.append(icon('site'));
 
 /*
- * The start is one spinner. This module builds the chrome — every icon, label and tool — so a shell shown before it runs is the
- * board without its parts, which is what a visitor sees as a flash of unfinished interface. The chrome therefore stays out of
- * sight (and the spinner up) until the board can show itself whole: the first state, plus its first artboard preview painted.
- * The cap keeps one slow frame from holding the whole interface back, and an expanded page or an empty board reveals at once,
- * because neither waits on a canvas preview.
+ * The start has two halves, because they are ready at different times and waiting for the slower one cost the whole board its
+ * responsiveness.
+ *
+ * The chrome — every icon, label and tool — is built by this module, synchronously, just above: by the time this code runs it is
+ * finished, so it is shown at once. Hidden longer, it is the interface the visitor waits for while nothing of it is missing.
+ *
+ * The canvas is not finished yet: its artboards are empty until their first preview paints. It keeps its own surface and one
+ * quiet spinner until that first preview arrives, so nothing half-painted is ever shown, and a short cap stops one slow frame
+ * from leaving a plain surface any longer than a moment. An expanded page and an empty board have no canvas preview to wait for.
  */
-let booted = false;
-const boot = () => {
-  if (booted) return;
-  booted = true;
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    $('#loading').hidden = true;
-    document.documentElement.classList.remove('booting');
-  }));
+const nextPaint = fn => requestAnimationFrame(() => requestAnimationFrame(fn));
+let chromeShown = false;
+const showChrome = () => {
+  if (chromeShown) return;
+  chromeShown = true;
+  nextPaint(() => document.documentElement.classList.remove('booting'));
 };
-on('frames', frames => { if (frames.live > 0) boot(); });
+let canvasShown = false;
+const showCanvas = () => {
+  if (canvasShown) return;
+  canvasShown = true;
+  nextPaint(() => { $('#loading').hidden = true; });
+};
+const boot = () => { showChrome(); showCanvas(); };
+showChrome(); // This module has just finished building it.
+on('frames', frames => { if (frames.live > 0) showCanvas(); });
 on('expanded', () => boot());
-setTimeout(boot, 2000);
+setTimeout(showCanvas, 800);
 
 on('state', state => {
   if (!state.documents.length || store.expanded) boot();
