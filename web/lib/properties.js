@@ -582,16 +582,21 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     sq.append(centre);
     // Long values widen their own cell; long left/right values widen both side bands alike, so the band stays symmetric.
     // Only values too long for a side band (or any long side in a narrow inspector, board.css) move to rows.
+    // The side strip is measured in pixels of the value's own font: a `ch` there would resolve in the band's larger font for
+    // the padding and in the value's smaller one for the cell, and the two halves of the strip would disagree.
+    const measuring = document.createElement('canvas').getContext('2d');
     const fitValues = () => {
-      let side = 0;
+      let side = 0, strip = 0;
       for (const cell of sq.querySelectorAll(':scope > .bm-cell')) {
         const input = cell.querySelector('input');
         const text = input ? input.value || input.placeholder : cell.textContent;
         const length = text.length;
         cell.style.setProperty('--bm-value-width', `calc(${length}ch + 2px)`);
-        if (cell.classList.contains('bm-l') || cell.classList.contains('bm-r')) side = Math.max(side, length);
+        if (!cell.classList.contains('bm-l') && !cell.classList.contains('bm-r')) continue;
+        side = Math.max(side, length);
+        if (input) { measuring.font = getComputedStyle(input).font; strip = Math.max(strip, measuring.measureText(text).width + 4); }
       }
-      sq.style.setProperty('--bm-side-width', `calc(${side}ch + 4px)`);
+      sq.style.setProperty('--bm-side-width', strip ? `${Math.ceil(strip)}px` : `calc(${side}ch + 4px)`);
       sq.classList.toggle('bm-wide-sides', side > 4);
       sq.classList.toggle('bm-stacked-sides', side > 6);
     };
