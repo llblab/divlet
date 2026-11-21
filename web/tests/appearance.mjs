@@ -156,13 +156,14 @@ try {
   await select('cta');
   await page.waitForSelector('#inspector [data-section="appearance"] [data-key="fill"]');
   await colorRow('project color swatches');
-  assert.equal(await page.locator('#inspector [data-section="border"] [data-key="radius"]').count(), 1, 'radius belongs to Border');
+  assert.equal(await page.locator('#inspector [data-section="spacing"] [data-key="radius"]').count(), 1, 'the corner radius lives in the box model');
+  assert.equal(await page.locator('#inspector [data-section="border"] [data-key="radius"], #inspector .radius-presets').count(), 0, 'Border no longer keeps a second radius control or presets');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="stroke"]').count(), 1, 'border colour belongs to Border');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key^="border-width-"]').count(), 4, 'Border has four independent edge widths');
   assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key="radius"], #inspector [data-section="appearance"] [data-key="stroke"]').count(), 0, 'no third home in Appearance');
   const sectionOrder = await page.locator('#inspector [data-section]').evaluateAll(nodes => nodes.map(node => node.dataset.section));
   assert.equal(sectionOrder.indexOf('border'), sectionOrder.indexOf('spacing') + 1, 'Border is a vertical disclosure directly after Spacing, not another tab');
-  checks.push('Border owns four widths, line style, colour and radius; Appearance keeps fill and typography');
+  checks.push('Border owns four widths, line style and colour; the box model owns the one corner radius; Appearance keeps fill and typography');
 
   const textAlign = page.locator('#inspector [data-section="appearance"]').getByRole('group', { name: 'Text align', exact: true });
   assert.equal(await textAlign.count(), 1, 'text alignment sits beside font and text colour');
@@ -326,9 +327,7 @@ try {
   await page.mouse.up();
   await waitUntil(() => page.locator('#inspector').evaluate(node => Math.round(node.getBoundingClientRect().width) === 280), 'the inspector reaches its actual resize minimum');
   assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key^="border-width"]').count(), 0, 'only Border and the box model edit widths');
-  await page.locator('#inspector [data-key="radius"]').focus();
-  await page.keyboard.press('Tab');
-  assert.equal(await page.evaluate(() => document.activeElement?.closest('.radius-presets') !== null), true, 'Tab reaches radius presets after the radius field');
+  assert.equal(await page.locator('#inspector .bm-radius').evaluate(node => node.closest('.boxmodel') !== null), true, 'the radius field is part of the box model at the resize minimum too');
   // A compiler-lowered border width remains visible as the measured fallback, then one edge can override it.
   await runtime.patch({ documentId: 'welcome', expectedVersion: afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-width': '3px' } } } } });
   await page.evaluate(() => document.activeElement?.blur()); await page.mouse.move(5, 5);
@@ -420,7 +419,7 @@ try {
   assert.deepEqual(dimensions, { paired: true, readable: true }, 'artboard dimensions use two readable columns at minimum panel width');
   await select('cta');
   await page.locator('#inspector [data-key="radius"]').waitFor();
-  checks.push('minimum-width resizing keeps radius/presets and artboard dimensions readable, border widths are linked between Border and Spacing and long dropdown values remain on one line');
+  checks.push('minimum-width resizing keeps the corner radius and artboard dimensions readable, border widths are linked between Border and Spacing and long dropdown values remain on one line');
 
   // A picker drag reaches the page while the dialog is still open, and the whole drag stays one Undo step.
   const beforeDrag = classesOf('cta');
@@ -440,7 +439,8 @@ try {
 
   // The colour name is the field's label, not a scrub handle: a drag on it writes nothing, a click opens the picker.
   const colourLabel = page.locator('#inspector .appearance-colors .color-field').first().locator('.vf-k');
-  assert.equal(await colourLabel.evaluate(node => getComputedStyle(node).cursor), 'pointer', 'the colour name advertises a click, not a scrub');
+  // A re-render can detach the label between resolution and read, where a detached node reports no computed style.
+  await waitUntil(async () => await colourLabel.evaluate(node => getComputedStyle(node).cursor).catch(() => '') === 'pointer', 'the colour name advertises a click, not a scrub');
   const labelVersion = afterVersion();
   const labelBox = await colourLabel.boundingBox();
   await page.mouse.move(labelBox.x + labelBox.width / 2, labelBox.y + labelBox.height / 2);
@@ -478,12 +478,20 @@ try {
   await waitUntil(() => !classesOf('cta').some(name => /^bg-\[/.test(name)), 'the remove button drops the fill class');
   checks.push('a colour can be removed again');
 
-  // Radius: presets, a number, Full, empty.
+  // Radius: a bare number, px/rem/em/%, full, and empty — all from the one field in the box model's corner.
   await select('cta');
-  await page.locator('#inspector .radius-presets .chip', { hasText: '12' }).click();
-  await waitUntil(() => classesOf('cta').includes('rounded-xl'), 'the 12 preset sets rounded-xl');
+  await page.locator('#inspector [data-key="radius"]').fill('12'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('rounded-xl'), 'a bare number reads as px');
+  await page.locator('#inspector [data-key="radius"]').fill('1.5rem'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('rounded-[1.5rem]') && !classesOf('cta').includes('rounded-xl'), 'rem is kept as written and replaces the previous radius');
+  await page.locator('#inspector [data-key="radius"]').fill('50%'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('rounded-full'), 'half a percent radius is the pill');
+  await page.locator('#inspector [data-key="radius"]').fill('25%'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('rounded-[25%]'), 'another percentage is kept as written');
+  await page.locator('#inspector [data-key="radius"]').fill('2em'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('rounded-[2em]'), 'em is kept as written');
   await page.locator('#inspector [data-key="radius"]').fill('10'); await page.keyboard.press('Enter');
-  await waitUntil(() => classesOf('cta').includes('rounded-[10px]') && !classesOf('cta').includes('rounded-xl'), 'a typed number sets an arbitrary radius and replaces the preset');
+  await waitUntil(() => classesOf('cta').includes('rounded-[10px]') && !classesOf('cta').some(name => /^rounded-\[/.test(name) && name !== 'rounded-[10px]'), 'a typed number sets an arbitrary radius and replaces the previous one');
   assert.deepEqual(await borderWidths(), ['2px', '4px', '3px', '3px'], 'changing radius does not change border widths');
   await page.locator('#inspector [data-key="radius"]').fill('full'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('rounded-full'), 'typing Full sets rounded-full');
@@ -494,7 +502,7 @@ try {
   // The empty field quotes the radius the page really has now, not the pill's measurement from the render before the removal.
   const realRadius = await page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => String(Math.round(parseFloat(getComputedStyle(node).borderTopLeftRadius) || 0)));
   await waitUntil(async () => (await page.locator('#inspector [data-key="radius"]').getAttribute('placeholder')) === realRadius, `the placeholder is the radius the page has (${await page.locator('#inspector [data-key="radius"]').getAttribute('placeholder')} vs ${realRadius})`);
-  checks.push('corner radius: presets, a typed number, Full and removal');
+  checks.push('corner radius in the box model: a bare number, px/rem/em/%, Full, one value and removal');
   checks.push('an empty radius field quotes the page\'s real number, not a stale measurement');
 
   // Effects scrub from implicit/explicit auto, keep integer z-order and honour gesture cancellation.

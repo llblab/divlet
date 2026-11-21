@@ -499,6 +499,11 @@ button.change:hover:not(:disabled) { background: var(--field); }
   .bm-wide-sides > .bm-l { top: 20px; left: 2px; bottom: auto; transform: none; }
   .bm-wide-sides > .bm-r { top: 20px; right: 2px; bottom: auto; transform: none; }
 }
+/* One corner radius for the whole element, in the widget's own corner. */
+.bm-radius { position: absolute; right: 2px; bottom: 0; width: 74px; height: 20px; }
+.bm-radius .vf-input { font-size: 10px; }
+.bm-radius .vf-k { min-width: 14px; padding-left: 2px; font-size: 9px; }
+@container boxmodel (max-width: 210px) { .bm-radius { position: static; width: 100%; margin-top: 4px; height: 24px; } }
 .box4 { min-width: 0; flex: 1 1 var(--control-min); }
 .caption.has-variants::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 4px; border-radius: 50%; background: var(--accent); vertical-align: 1px; }
 .quick-attrs { margin-top: 1px; }
@@ -971,11 +976,6 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .font-upload[aria-busy="true"]::after { content: ""; position: absolute; inset: 0; margin: auto; width: 12px; height: 12px; border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
 .font-family-scroll { min-width: 0; max-width: 100%; overflow-x: auto; border-radius: var(--radius-inner); }
 .font-family { width: 100%; min-width: max-content; }
-.border-geometry { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.border-geometry > .vf { flex: 0 1 84px; }
-.border-geometry > .radius-presets { flex: 1 1 130px; }
-.radius-presets { display: flex; flex-wrap: wrap; gap: 4px; }
-.radius-presets .chip.on { background: var(--accent-soft); color: var(--accent-ink); }
 .color-field { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; min-width: 0; min-height: 28px; padding: 0 2px 0 0; border-radius: var(--radius-inner); background: var(--field); }
 .color-field:focus-within { outline-offset: 1px; outline: var(--focus-ring) solid var(--accent); }
 .color-field .vf-k { min-width: 30px; cursor: pointer; }
@@ -993,7 +993,6 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .centre-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 
 @media (pointer: coarse) {
-  .radius-presets .chip { min-width: 32px; }
   .color-field { min-height: 36px; }
   .color-field .swatch { width: 28px; height: 28px; }
   .token-swatch { width: 26px; height: 26px; }

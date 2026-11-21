@@ -428,14 +428,14 @@ try {
   await page.keyboard.press('Control+z');
   await waitUntil(() => !runtime.read({ view: 'document', documentId: probe.id }).nodes['box-probe'].className.includes('top-2'), 'position edge edit remains undoable');
   // Native DOM order is the complete outside-in editing path; no positive tabindex or focus trap.
-  const fieldOrder = ['inset-t', 'inset-r', 'inset-b', 'inset-l', 'm-t', 'm-r', 'm-b', 'm-l', 'border-t', 'border-r', 'border-b', 'border-l', 'p-t', 'p-r', 'p-b', 'p-l', 'content-width', 'content-height'];
+  const fieldOrder = ['inset-t', 'inset-r', 'inset-b', 'inset-l', 'm-t', 'm-r', 'm-b', 'm-l', 'border-t', 'border-r', 'border-b', 'border-l', 'p-t', 'p-r', 'p-b', 'p-l', 'content-width', 'content-height', 'radius'];
   const activeKey = () => page.evaluate(() => document.activeElement?.dataset.key);
   await page.locator('#inspector [data-key="pick:Position"]').focus();
   for (const key of fieldOrder) { await page.keyboard.press('Tab'); assert.equal(await activeKey(), key, `Tab reaches ${key}`); }
   await page.keyboard.press('Tab'); assert.equal(await page.evaluate(() => document.activeElement?.closest('[data-section]')?.dataset.section), 'border', 'Tab leaves the last value for the next section');
   for (const key of [...fieldOrder].reverse()) { await page.keyboard.press('Shift+Tab'); assert.equal(await activeKey(), key, `Shift+Tab reaches ${key}`); }
   await page.keyboard.press('Shift+Tab'); assert.equal(await activeKey(), 'pick:Position', 'Shift+Tab leaves the first value for position mode');
-  checks.push('Tab and Shift+Tab traverse position mode, all 18 values and the section boundaries in native DOM order');
+  checks.push('Tab and Shift+Tab traverse position mode, all 19 values including the corner radius, and the section boundaries in native DOM order');
 
   await page.locator('#inspector [data-key="border-r"]').fill('4'); await page.keyboard.press('Enter');
   await waitUntil(async () => await probeFrame.locator('[data-divlet-id="box-probe"]').evaluate(node => getComputedStyle(node).borderRightWidth === '4px'), 'per-side border editing changes the actual page');
@@ -496,7 +496,10 @@ try {
   await page.keyboard.insertText('8'); await page.keyboard.press('Tab');
   await page.keyboard.press('Tab'); await page.keyboard.press('Tab'); assert.equal(await activeKey(), 'content-width');
   await page.keyboard.insertText('90'); await page.keyboard.press('Tab');
-  await page.keyboard.insertText('45'); await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
+  await page.keyboard.insertText('45');
+  // The corner radius is the widget's last field, so it follows the content size before Tab leaves for Border.
+  await page.keyboard.press('Tab'); assert.equal(await activeKey(), 'radius', 'Tab reaches the corner radius after the content size');
+  await page.keyboard.press('Tab'); await page.keyboard.press('Tab');
   assert.equal(await activeKey(), 'pick:Style', 'native Tab leaves the widget and reaches the Border section');
   release();
   await page.evaluate(async id => (await import('./lib/store.js')).idle(id), probe.id);
@@ -549,7 +552,7 @@ try {
     await revealBoxModel();
     await sleep(350);
     const collisions = await page.locator('#inspector .boxmodel').evaluate(model => {
-      const fields = [...model.querySelectorAll('.bm-field, .bm-offset, .bm-border > .bm-cell .bm-value, .bm-core')].map(node => node.getBoundingClientRect());
+      const fields = [...model.querySelectorAll('.bm-field, .bm-offset, .bm-border > .bm-cell .bm-value, .bm-core, .bm-radius')].map(node => node.getBoundingClientRect());
       const overlap = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1;
       const bad = [];
       if (model.scrollWidth > model.clientWidth + 1) bad.push('widget overflows');

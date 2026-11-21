@@ -198,7 +198,6 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
 /** 3×3 cells: which one is on, and what a click on a cell does. */
 
 /* ---- appearance: corner radius, fill and text colour --------------------------------------------- */
-const RADIUS_PRESETS = [['0', '0px'], ['4', '4px'], ['8', '8px'], ['12', '12px'], ['16', '16px'], ['Full', '9999px']];
 const KEYWORD_COLORS = { transparent: 'transparent', white: '#ffffff', black: '#000000' };
 const SIDE_NAMES = { t: 'top', r: 'right', b: 'bottom', l: 'left' };
 const CORNER_NAMES = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
@@ -324,23 +323,6 @@ const BORDER_STYLES = ['solid', 'dashed', 'dotted', 'double', 'groove', 'ridge',
 
 function borderFold(views, { value, run, measured, tokens, widthField }) {
   const box = el('div', 'border-box');
-  const radiusValue = value(view => { const radius = css.radiusOf(view); return radius === undefined ? MIXED : radius; });
-  const computedRadius = measured?.colors?.radius ? String(Math.round(parseFloat(measured.colors.radius) || 0)) : '0';
-  // All corners are one value; the longhands are cleared first so the shorthand does not have to expand them again.
-  const radiusEdits = next => ({ ...Object.fromEntries(CORNER_NAMES.map(corner => [`border-${corner}-radius`, null])), 'border-radius': next });
-  const radius = field('radius', 'R', radiusValue, (next, text) => run(radiusEdits(next), `radius ${text || 'default'}`), {
-    tip: 'Corner radius, px · type Full for a pill', unit: 'px', placeholder: computedRadius, min: 0, max: 1000, parse: css.radiusInput,
-  });
-  const presets = el('div', 'radius-presets');
-  presets.setAttribute('role', 'group');
-  presets.setAttribute('aria-label', 'Corner radius presets');
-  for (const [text, px] of RADIUS_PRESETS) {
-    const chip = el('button', `chip${radiusValue === text ? ' on' : ''}`, text);
-    chip.type = 'button';
-    chip.dataset.tip = px === '9999px' ? 'Fully rounded' : `${text}px corners`;
-    chip.addEventListener('click', () => run(radiusEdits(px), `radius ${text}`));
-    presets.append(chip);
-  }
   const widths = el('div', 'grid2 border-widths');
   for (const side of ['t', 'r', 'b', 'l']) widths.append(widthField(side));
   const style = value(view => {
@@ -351,8 +333,6 @@ function borderFold(views, { value, run, measured, tokens, widthField }) {
   });
   const measuredStyle = measured?.colors?.borderStyle;
   const effectiveStyle = measuredStyle !== undefined && measuredStyle !== null ? (style === MIXED || !BORDER_STYLES.some(([key]) => key === measuredStyle) ? MIXED : measuredStyle) : style;
-  const geometry = el('div', 'border-geometry');
-  geometry.append(radius, presets);
   box.append(
     pick('Style', effectiveStyle, BORDER_STYLES, next => run({
       // Per-side styles go first: the shorthand that follows then replaces them without expanding.
@@ -361,7 +341,6 @@ function borderFold(views, { value, run, measured, tokens, widthField }) {
     }, `border style ${next ?? 'default'}`)),
     widths,
     colorField({ key: 'stroke', label: 'Color', tip: 'Border color', property: 'border-color', value, run, computed: measured?.colors?.borderColor, tokens }),
-    geometry,
   );
   return box;
 }
@@ -644,6 +623,16 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
   const unit = el('span', 'bm-unit', 'px');
   unit.setAttribute('aria-hidden', 'true');
   model.append(square('position', square('margin', square('border', square('padding', core)))), unit);
+  // The corner radius belongs to the widget's own corner: one value for all four corners, written in px, %, rem, em or `full`.
+  const radiusValue = value(view => { const radius = css.radiusOf(view); return radius === undefined ? MIXED : radius; });
+  const computedRadius = measured?.colors?.radius ? String(Math.round(parseFloat(measured.colors.radius) || 0)) : '0';
+  // All corners are one value; the longhands are cleared first so the shorthand does not have to expand them again.
+  const radiusEdits = next => ({ ...Object.fromEntries(CORNER_NAMES.map(corner => [`border-${corner}-radius`, null])), 'border-radius': next });
+  const radius = field('radius', 'R', radiusValue, (next, text) => run(radiusEdits(next), `radius ${text || 'default'}`), {
+    tip: 'Corner radius: px, %, rem, em or full', unit: 'px', placeholder: computedRadius, min: 0, max: 1e4, parse: css.radiusInput,
+  });
+  radius.classList.add('bm-radius');
+  model.append(radius);
   spacing.append(model);
 
   /* effects */

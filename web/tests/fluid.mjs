@@ -46,13 +46,15 @@ try {
     await page.locator('#inspector [data-key="opacity"]').waitFor();
     assert.deepEqual(await readableNumbers(`${width}px@${size}% element`), []);
     const compactShape = await page.evaluate(() => {
-      const node = document.querySelector('#inspector .border-geometry');
-      const radius = node.querySelector('[data-key="radius"]'), style = getComputedStyle(radius);
+      const field = document.querySelector('#inspector .bm-radius') ?? document.querySelector('#inspector .boxmodel');
+      const radius = field.querySelector('[data-key="radius"]'), style = getComputedStyle(radius);
       const context = document.createElement('canvas').getContext('2d');
       context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-      return { compact: radius.closest('.vf').offsetWidth <= 84, readable: context.measureText('Full').width <= radius.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1 };
+      const width = field.closest('.vf').offsetWidth, box = field.closest('.boxmodel')?.offsetWidth ?? 0;
+      // In the widget's corner it stays compact; when the widget is too narrow to share, it takes the row instead.
+      return { placed: width <= 84 || Math.abs(width - box) <= 4, readable: context.measureText('Full').width <= radius.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1 };
     });
-    assert.deepEqual(compactShape, { compact: true, readable: true }, `compact readable radius at ${width}px/${size}%`);
+    assert.deepEqual(compactShape, { placed: true, readable: true }, `a placed, readable radius at ${width}px/${size}%`);
     const spacingCollisions = await page.locator('#inspector .boxmodel').evaluate(model => {
       const fields = [...model.querySelectorAll('.bm-field')].map(node => node.getBoundingClientRect());
       const overlaps = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5;

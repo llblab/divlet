@@ -290,11 +290,13 @@ export function radiusOf(view) {
   if (corners.some(value => value == null) || corners.some(value => value !== corners[0])) return corners.every(value => value == null) ? null : undefined;
   return /^(?:9999px|999px|100%|50%)$/.test(corners[0]) ? 'Full' : show(corners[0]);
 }
+/** Corner radius: a plain number reads as px, and px/%/rem/em plus the `full` keyword are kept as written. */
 export const radiusInput = raw => {
   const text = String(raw ?? '').trim();
   if (!text) return null;
   if (/^full$/i.test(text)) return '9999px';
-  return /^\d+(?:\.\d+)?$/.test(text) ? `${Number(text)}px` : undefined;
+  if (/^\d+(?:\.\d+)?$/.test(text)) return `${Number(text)}px`;
+  return /^\d+(?:\.\d+)?(?:px|%|rem|em)$/i.test(text) ? text.toLowerCase() : undefined;
 };
 
 /** Font size in px for the field (`16px`, `1rem` at the 16px root), or the value as written. */
