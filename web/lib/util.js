@@ -12,7 +12,7 @@ export function el(tag, className, content) {
   return node;
 }
 
-const ICONS = {
+export const ICONS = {
   select: '<path d="m5 3 11 7.5-5 1-2.5 5L5 3Z"/>',
   inspect: '<path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4 M8.5 7.5h3.0a1.0 1.0 0 0 1 1.0 1.0v3.0a1.0 1.0 0 0 1 -1.0 1.0h-3.0a1.0 1.0 0 0 1 -1.0 -1.0v-3.0a1.0 1.0 0 0 1 1.0 -1.0Z"/>',
   play: '<path d="M6.5 4.5v11l9-5.5-9-5.5Z"/>',
@@ -23,7 +23,9 @@ const ICONS = {
   redo: '<path d="m13 4 3.5 3.5L13 11 M16 7.5H9a4.5 4.5 0 0 0 0 9h3"/>',
   layers: '<path d="m10 3 7 3.8-7 3.8-7-3.8L10 3Z m3 10.2 7 3.8 7-3.8M3 13.6 10 17.4l7-3.8"/>',
   artboard: '<path d="M3.5 7.5h13 M5.5 3.5h9.0a2.0 2.0 0 0 1 2.0 2.0v9.0a2.0 2.0 0 0 1 -2.0 2.0h-9.0a2.0 2.0 0 0 1 -2.0 -2.0v-9.0a2.0 2.0 0 0 1 2.0 -2.0Z"/>',
-  expand: '<path d="M12 3h5v5M17 3l-6 6M8 17H3v-5M3 17l6-6"/>',
+  // Four arrows out of the centre, each with its bracket in the outer corner: the brackets alone draw the square a frame
+  // occupies, so the collapsed state reads as a viewport rather than as two opposite corners.
+  expand: '<path d="M3 8V3h5M3 3l6 6M17 8V3h-5M17 3l-6 6M3 12v5h5M3 17l6-6M17 12v5h-5M17 17l-6-6"/>',
   collapse: '<path d="M3 3l5 5M8 4v4H4M17 3l-5 5M12 4v4h4M17 17l-5-5M12 16v-4h4M3 17l5-5M8 16v-4H4"/>',
   close: '<path d="m5 5 10 10M15 5 5 15"/>',
   site: '<path d="M8 4H5a1.5 1.5 0 0 0-1.5 1.5v9A1.5 1.5 0 0 0 5 16h9a1.5 1.5 0 0 0 1.5-1.5V12M11 3.5h5.5V9M16.5 3.5 9 11"/>',

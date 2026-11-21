@@ -63,6 +63,20 @@ test('the divlet mark keeps an open bracket and a filled D with matching diagona
   }
 });
 
+test('expand opens out of the centre in four directions and collapse closes into it', async () => {
+  const { ICONS } = await import('../lib/util.js');
+  // The glyph's own path data, so this checks what the board draws rather than a copy of it.
+  const pathOf = name => ((/d="([^"]+)"/.exec(ICONS[name]) || [])[1] || '');
+  for (const name of ['expand', 'collapse']) {
+    assert.equal((pathOf(name).match(/M/g) || []).length, 8, `${name} is four corners and four arrows in one path`);
+  }
+  // The bracket sits in the outer corner when the frame opens and beside the centre when it returns: that alone tells the two
+  // states apart at 16px, which is why one glyph is not reused for the other.
+  for (const bracket of ['M3 8V3h5', 'M17 8V3h-5', 'M3 12v5h5', 'M17 12v5h-5']) assert.ok(pathOf('expand').includes(bracket), `the open glyph brackets its outer corner (${bracket})`);
+  for (const bracket of ['M8 4v4H4', 'M12 4v4h4', 'M12 16v-4h4', 'M8 16v-4H4']) assert.ok(pathOf('collapse').includes(bracket), `the closing glyph brackets its inner corner (${bracket})`);
+  assert.equal(pathOf('expand').includes('M8 4v4H4'), false, 'the two states do not share one shape');
+});
+
 test('the stroke style applies to the whole icon, never to its parts', async () => {
   const css = await readFile(path.join(root, 'web/board.css'), 'utf8');
   assert.match(css, /\.icon \{[^}]*fill: none;[^}]*stroke: currentColor;/, 'one stroke style for the icon element');
