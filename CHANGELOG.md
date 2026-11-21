@@ -10,6 +10,9 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
   `transform: scale(--ui)`, so a painted width is a layout width times the scale: the toolbar's fit and the label column now
   measure with `offsetWidth` (`web/lib/toolbar.js`, `web/lib/properties.js`, `web/tests/chrome.mjs`,
   `web/tests/appearance.mjs`).
+- **Two more witnesses wait for the state they assert.** The action bar's count is read only after the board restores its
+  selection, and an inspector action whose row re-fits under the pointer is taken from the overflow menu the way a person
+  would (`web/tests/toolbars.mjs`, `web/tests/controls.mjs`).
 - **A band's name and its top value share one row.** At phone/200% the box model's watermark could reach the centred top value
   by a pixel and, on a different font stack, cover it. The name and that value now sit in one flow row inside the band — the
   value centred in what the name leaves — so no width or font can make them collide; long values keep their whole cell

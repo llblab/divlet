@@ -158,8 +158,12 @@ try {
   checks.push('the inspector action bar opens the same expanded page first, with the same shortcut as the heading');
 
   // The action bar: every action in one row, the rest in a dynamic dropdown.
-  const total = await page.locator('#inspector .smart-bar .tool:not(.more)').count();
-  assert.ok(total >= 8, 'every artboard action has a button');
+  // Coming back from the expanded page restores the board's selection, and the bar lists the artboard's own actions only
+  // with one artboard chosen: wait for that instead of reading a bar that is still catching up.
+  const actionCount = () => page.locator('#inspector .smart-bar .tool:not(.more)').count();
+  await waitUntil(async () => await actionCount() >= 8, 'the bar restores every artboard action');
+  const total = await actionCount();
+  assert.ok(total >= 8, `every artboard action has a button (${total})`);
   const visible = () => page.locator('#inspector .smart-bar .tool:not(.more):not([hidden])').count();
   const moreShown = () => page.locator('#inspector .smart-bar .more:not([hidden])').count();
   assert.ok(await visible() >= 6, 'many actions fit in the row');
