@@ -166,18 +166,25 @@ try {
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key^="border-width-"]').count(), 4, 'Border has four independent edge widths, in the ring');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="border-side"]').count(), 1, 'one control says which side the colour belongs to');
   {
-    // The ring is the box model's border band pulled out: hollow, and exactly as wide as that band above it.
-    const widths = await waitUntil(() => page.evaluate(() => {
-      const ring = document.querySelector('#inspector .br-box').getBoundingClientRect();
-      const band = document.querySelector('#inspector .boxmodel .bm-border').getBoundingClientRect();
-      return Math.abs(ring.width - band.width) <= 1 ? { ring: Math.round(ring.width), band: Math.round(band.width) } : null;
-    }), 'the ring follows the border band it copies');
-    assert.ok(Math.abs(widths.ring - widths.band) <= 1, `the ring is as wide as the border band it copies (${widths.ring} vs ${widths.band})`);
+    // The band is copied one-to-one: its own fill, its one-pixel frame, its square corners, its caption and its size — not a
+    // painting of the element's authored border.
+    const copy = await waitUntil(() => page.evaluate(() => {
+      const ring = document.querySelector('#inspector .br-box'), band = document.querySelector('#inspector .boxmodel .bm-border');
+      const a = getComputedStyle(ring), c = getComputedStyle(band);
+      const size = node => { const r = node.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height) }; };
+      const surface = style => [style.backgroundColor, style.borderTopWidth, style.borderTopStyle, style.borderTopColor, style.borderRadius].join(' ');
+      const report = { size: size(ring), source: size(band), surface: surface(a), sourceSurface: surface(c), caption: ring.querySelector(':scope > .bm-caption')?.textContent };
+      return report.surface === report.sourceSurface && Math.abs(report.size.w - report.source.w) <= 1 ? report : null;
+    }), 'the border band is copied into Border');
+    assert.equal(copy.surface, copy.sourceSurface, 'the copy shares the band\'s fill, frame and square corners');
+    assert.equal(copy.size.w, copy.source.w, `and its width (${copy.size.w} vs ${copy.source.w})`);
+    assert.ok(Math.abs(copy.size.h - copy.source.h) <= 4, `and its height (${copy.size.h} vs ${copy.source.h})`);
+    assert.equal(copy.caption, 'border', 'with the band\'s own caption');
   }
   assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key="radius"], #inspector [data-section="appearance"] [data-key="stroke"]').count(), 0, 'no third home in Appearance');
   const sectionOrder = await page.locator('#inspector [data-section]').evaluateAll(nodes => nodes.map(node => node.dataset.section));
   assert.equal(sectionOrder.indexOf('border'), sectionOrder.indexOf('spacing') + 1, 'Border is a vertical disclosure directly after Spacing, not another tab');
-  checks.push('Border owns line style, colour, four edge widths and the corner radii in its ring; the box model keeps no radius; Appearance keeps fill and typography');
+  checks.push('Border owns line style, colour, four edge widths and the corner radii in a copy of the box model\'s border band; Appearance keeps fill and typography');
 
   const textAlign = page.locator('#inspector [data-section="appearance"]').getByRole('group', { name: 'Text align', exact: true });
   assert.equal(await textAlign.count(), 1, 'text alignment sits beside font and text colour');
@@ -376,22 +383,18 @@ try {
       await page.getByRole('menuitemradio', { name: label, exact: true }).click();
       await waitUntil(async () => (await sideControl.innerText()).includes(label === 'All sides' ? 'All sides' : label), `the centre edits ${label}`);
     };
-    const painted = () => page.locator('#inspector .br-box').evaluate(node => {
+    // The copy is the band's surface, not the element's painted border: an authored colour shows on the page and in the
+    // centre field, and never repaints the block that edits it.
+    const surface = () => page.locator('#inspector .br-box').evaluate(node => {
       const style = getComputedStyle(node);
-      return [style.borderTopColor, style.borderRightColor, style.borderBottomColor, style.borderLeftColor];
+      return [style.backgroundColor, style.borderTopColor, style.borderLeftColor];
     });
     await page.locator('#inspector [data-key="stroke"]').fill('#112233'); await page.keyboard.press('Enter');
     await waitUntil(async () => (await sideColours()).every(colour => colour === 'rgb(17, 34, 51)'), 'the shared colour paints every side');
     await chooseSide('Left');
     await page.locator('#inspector [data-key="stroke"]').fill('#ff0000'); await page.keyboard.press('Enter');
     await waitUntil(async () => JSON.stringify(await sideColours()) === JSON.stringify(['rgb(17, 34, 51)', 'rgb(17, 34, 51)', 'rgb(17, 34, 51)', 'rgb(255, 0, 0)']), `only the chosen side takes the new colour (${(await sideColours()).join(' ')})`);
-    // One read, repeated until the panel has settled: a re-render can hand back a ring that is already detached, whose
-    // computed style is empty.
-    const peerPaint = await waitUntil(async () => {
-      const colours = await painted();
-      return colours[3] === 'rgb(255, 0, 0)' && colours.slice(0, 3).every(colour => colour === 'rgb(17, 34, 51)') ? colours : null;
-    }, 'the ring paints the chosen side differently and its peers as they were');
-    assert.deepEqual(peerPaint.slice(0, 3), ['rgb(17, 34, 51)', 'rgb(17, 34, 51)', 'rgb(17, 34, 51)'], 'while its peers stay on the shared colour');
+    assert.deepEqual(await surface(), ['rgb(227, 199, 143)', 'rgb(76, 75, 64)', 'rgb(76, 75, 64)'], 'while the block that edits it keeps the band surface');
     // The side remembers itself while it is selected, and returns to the shared colour on request.
     await page.evaluate(async () => { const st = await import('./lib/store.js'); st.selectNodes('welcome', ['hero']); st.selectNodes('welcome', ['cta']); });
     await waitUntil(async () => (await sideControl.innerText()).includes('Left'), 'the chosen side survives a reselect of the same element');
@@ -404,7 +407,7 @@ try {
     await waitUntil(async () => JSON.stringify(await sideColours()) === JSON.stringify(['rgb(0, 68, 0)', 'rgb(0, 68, 0)', 'rgb(0, 68, 0)', 'rgb(0, 68, 0)']), 'the shared colour wins again on every side');
     for (let step = 0; step < 3; step++) await page.keyboard.press('Control+z');
     await waitUntil(async () => (await sideColours()).every(colour => colour !== 'rgb(0, 68, 0)'), 'each colour change is its own Undo step');
-    checks.push('a border side takes its own colour, the ring paints it, the shared colour returns and each change undoes alone');
+    checks.push('a border side takes its own colour on the page and in the centre field, the shared colour returns and each change undoes alone');
   }
 
   // A compiler-lowered border width remains visible as the measured fallback, then one edge can override it.

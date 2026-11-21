@@ -993,59 +993,63 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 
 /* Border corners: a diagram of the surface, not a form of eight rows. The four radii sit in their own corners, the shared radius
    at the centre and the four edge widths between them, over the same warm tint the box model gives its border band. */
-/* The border as the band it is: one hollow rectangle the width of the box model's border band, with a radius in each corner, an
-   edge width at each edge's centre and the colour in the middle. Its own line is painted from the authored style and the colour
-   of each side, so a side with its own colour reads as a different side rather than as a hidden setting. */
-.br-shell { position: relative; display: grid; gap: 6px; margin: 2px 0 0; container: ring / inline-size; }
+/* The border layer of the box model, copied into Border: the same fill, the same one-pixel frame, square corners and the same
+   caption, at the same size. Inside it a radius sits in each corner, a width at each edge's centre and the colour in the middle. */
+.br-shell { position: relative; display: grid; gap: 6px; justify-items: start; margin: 2px 0 0; container: ring / inline-size; }
 .br-box {
   --br-field: 30px;
   position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-rows: auto minmax(58px, auto) auto;
+  grid-template-rows: auto minmax(26px, auto) auto;
   align-items: center;
   justify-items: center;
   gap: 3px 6px;
-  padding: 5px 7px;
+  padding: 20px 7px;
   min-height: 92px;
   box-sizing: border-box;
-  border: 2px solid #a8843c;
-  border-radius: 8px;
-  color: #4a3d22;
+  border: 1px solid #4c4b40;
+  border-radius: 0;
+  background: #e3c78f;
+  color: #202621;
 }
+.br-box > .bm-caption { color: #a8843c; }
 .br-cell { display: flex; align-items: center; justify-content: center; min-width: 0; }
 /* Each control sits where it applies, by name: a corner radius in its corner, an edge width at its edge's centre. */
 .br-tl { grid-area: 1 / 1; } .br-t { grid-area: 1 / 2; } .br-tr { grid-area: 1 / 3; }
 .br-l { grid-area: 2 / 1; } .br-r { grid-area: 2 / 3; }
 .br-bl { grid-area: 3 / 1; } .br-b { grid-area: 3 / 2; } .br-br { grid-area: 3 / 3; }
 /* The box model's own small inputs, edge for edge: same height, same centred mono value, same quiet surface. */
-.br-box .vf.br-field { flex: none; width: var(--br-field); min-height: 18px; height: 18px; padding: 0; border-radius: var(--radius-small); background: #ffffff35; box-shadow: none; color: inherit; }
-.br-box .vf.br-field:hover { background: #ffffff66; }
+.br-box .vf.br-field { flex: none; width: var(--br-field); min-height: 18px; height: 18px; padding: 0; border-radius: var(--radius-small); background: transparent; box-shadow: none; color: inherit; }
+.br-box .vf.br-field:hover { background: #ffffff30; }
 .br-box .vf.br-field:focus-within { background: var(--solid); color: var(--ink); }
 .br-box .vf.br-field .vf-input { width: 100%; min-width: 0; padding: 0; color: inherit; font: 10px/16px var(--mono); text-align: center; }
 .br-box .vf.br-field .vf-input::placeholder { color: inherit; opacity: .72; }
-/* The colour sits in the hollow middle, laid over it rather than inside its grid, so the ring stays empty and the colour can
-   leave the ring when the middle is too narrow for it. */
+/* The colour sits in the hollow middle, laid over it rather than inside its grid, so the band stays empty and the colour can
+   leave it when the middle is too narrow. */
 .br-centre {
   position: absolute;
-  left: 50%;
+  /* Centred on the band, not on the panel the band sits in. */
+  left: calc(var(--br-ring, 100%) / 2);
   top: 50%;
   transform: translate(-50%, -50%);
-  display: grid;
-  gap: 3px;
-  width: min(calc(var(--br-ring, 100%) - 84px), 168px);
-  justify-items: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(calc(var(--br-ring, 100%) - 78px), 190px);
 }
 .br-shell.br-compact .br-centre { position: static; transform: none; width: 100%; }
-.br-centre .side-pick, .br-centre .color-field { min-width: 0; }
+.br-centre .color-field { min-width: 0; flex: 1 1 auto; }
+/* The side the colour belongs to reads under the band, as its own control, with room for the word. */
+.br-shell > .side-pick { justify-self: start; margin-top: 2px; }
 /* A menu button that names itself by its value: it says which side the colour belongs to. */
 .side-pick { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 24px; padding: 0 6px; border: 0; border-radius: var(--radius-inner); background: var(--control); color: var(--ink); font: inherit; cursor: pointer; white-space: nowrap; }
 .side-pick:hover { background: var(--control-hover); }
 .side-pick .pick-v { font-size: 10px; }
 .side-pick .icon { width: 10px; height: 10px; color: var(--muted); }
-.br-centre .side-pick { justify-self: center; max-width: 100%; overflow: hidden; }
+.br-centre .side-pick { display: none; }
 @container ring (max-width: 132px) {
-  .br-box { --br-field: 26px; padding: 4px 5px; gap: 2px 4px; }
+  .br-box { --br-field: 26px; padding: 18px 5px 5px; gap: 2px 4px; }
   .br-box .vf.br-field .vf-input { font-size: 9px; }
   .br-centre .side-pick .pick-v { font-size: 9px; }
 }
@@ -1072,7 +1076,7 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .color-field .color-hex { flex: 1 1 var(--hex-width, 9ch); min-width: min(100%, var(--hex-width, 9ch)); min-height: 28px; }
 /* Inside the ring the colour is a small centred readout on one line: the ring's middle is a fixed few dozen pixels wide, so
    the value keeps a shorter minimum and never wraps away from its swatch and clear. */
-.br-centre .color-field { padding: 0 3px; background: #ffffff40; flex-wrap: nowrap; min-height: 26px; justify-content: center; }
+.br-centre .color-field { padding: 0 3px; background: var(--solid); color: var(--ink); flex-wrap: nowrap; min-height: 24px; justify-content: center; box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
 .br-centre .color-field .color-hex { flex: 1 1 auto; width: auto; min-width: 0; min-height: 24px; }
 .br-centre .color-field .vf-input.color-hex { font: 10px/16px var(--mono); }
 /* A control a finger has to hit keeps 24px even in the ring's narrow middle (WCAG 2.5.8); only the ring's own value fields
@@ -1082,7 +1086,7 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .br-centre .color-field .color-clear .icon { width: 10px; height: 10px; }
 /* Inside the ring the colour is a small centred readout on one line: the ring's middle is a fixed few dozen pixels wide, so
    the value keeps a shorter minimum and never wraps away from its swatch and clear. */
-.br-centre .color-field { padding: 0 3px; background: #ffffff40; flex-wrap: nowrap; min-height: 26px; justify-content: center; }
+.br-centre .color-field { padding: 0 3px; background: var(--solid); color: var(--ink); flex-wrap: nowrap; min-height: 24px; justify-content: center; box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
 .br-centre .color-field .color-hex { flex: 1 1 auto; width: auto; min-width: 0; min-height: 24px; }
 .br-centre .color-field .vf-input.color-hex { font: 10px/16px var(--mono); }
 /* A control a finger has to hit keeps 24px even in the ring's narrow middle (WCAG 2.5.8); only the ring's own value

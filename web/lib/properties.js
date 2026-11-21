@@ -406,34 +406,9 @@ function borderDiagram({ views, value, run, measured, tokens, widthField, nodeId
   const box = el('div', 'br-box');
   box.setAttribute('role', 'group');
   box.setAttribute('aria-label', 'Border ring: corner radii, edge widths and colour');
-  const view = views.length === 1 ? views[0] : null;
-  // Paint each edge from the authored state; a side with no line keeps a ghost of one so the ring still reads as a ring.
-  for (const [cssName, side] of [['Top', 'top'], ['Right', 'right'], ['Bottom', 'bottom'], ['Left', 'left']]) {
-    const own = view?.[`border-${side}-width`] ?? null;
-    const px = own == null ? null : pxOf(own);
-    const line = view?.[`border-${side}-style`] ?? view?.['border-style'] ?? null;
-    const colour = css.borderColourOf(view ?? {}, side);
-    const off = line === 'none' || line === 'hidden' || px === 0;
-    box.style[`border${cssName}Style`] = off ? 'dotted' : BORDER_STYLES.some(([key]) => key === line) ? line : 'solid';
-    box.style[`border${cssName}Width`] = `${off ? 1 : clamp(px ?? 2, 2, 8)}px`;
-    box.style[`border${cssName}Color`] = off && colour == null ? 'var(--hair)' : css.hexOf(colour?.value) || measured?.colors?.borderColor || 'var(--hair)';
-  }
-  // The corners bend the ring by the radius they show: px directly, a percentage or `full` against the ring's own height.
-  const radiusPx = corner => {
-    const raw = view?.[`border-${corner}-radius`] ?? view?.['border-radius'] ?? null;
-    if (raw == null) return 0;
-    const text = String(raw).trim();
-    if (/^(?:full|50%|100%|9999px|999px)$/i.test(text)) return 999;
-    const px = pxOf(text);
-    if (px != null) return px;
-    const percent = /^(\d+(?:\.\d+)?)%$/.exec(text);
-    return percent ? Number(percent[1]) : 0;
-  };
-  box.style.borderTopLeftRadius = `${clamp(radiusPx('top-left'), 0, 18)}px`;
-  box.style.borderTopRightRadius = `${clamp(radiusPx('top-right'), 0, 18)}px`;
-  box.style.borderBottomRightRadius = `${clamp(radiusPx('bottom-right'), 0, 18)}px`;
-  box.style.borderBottomLeftRadius = `${clamp(radiusPx('bottom-left'), 0, 18)}px`;
-
+  // The band itself, copied: its own fill, its one-pixel frame, square corners and its caption, so this block reads as the
+  // border layer of the widget above rather than as a picture of the element's painted border.
+  box.append(el('span', 'bm-caption', 'border'));
   const cell = (node, className) => { const wrap = el('div', `br-cell ${className}`); wrap.append(node); return wrap; };
   const corner = key => {
     const named = { tl: 'top-left', tr: 'top-right', bl: 'bottom-left', br: 'bottom-right' }[key];
@@ -489,11 +464,11 @@ function borderDiagram({ views, value, run, measured, tokens, widthField, nodeId
   });
   colour.querySelector('.vf-k')?.remove();
   colour.classList.add('br-colour');
-  // The colour is the centre of the ring; the side it applies to reads under it.
-  centre.append(colour, sides);
+  // The colour is the middle of the band; the side it applies to reads under the band, where it has room for its word.
+  centre.append(colour);
   // Beside the centre the ring's own corners (radii) and edges (widths) sit where they apply.
   box.append(corner('tl'), edge('t'), corner('tr'), edge('l'), edge('r'), corner('bl'), edge('b'), corner('br'));
-  shell.append(box, centre);
+  shell.append(box, centre, sides);
   followBandWidth(box, shell);
   return shell;
 }
@@ -506,12 +481,14 @@ function followBandWidth(node, shell) {
   const panel = () => node.closest('#inspector');
   const apply = () => {
     const band = panel()?.querySelector('.boxmodel .bm-border');
-    // Layout pixels, not painted ones: the interface scale zooms the board, and a width copied from a zoomed rect would be
+    // Layout pixels, not painted ones: the interface scale zooms the board, and a size copied from a zoomed rect would be
     // written back already multiplied.
-    const width = band ? band.offsetWidth : 0;
+    const width = band ? band.offsetWidth : 0, height = band ? band.offsetHeight : 0;
     node.style.width = width > 60 ? `${width}px` : '';
+    // The band's own size, so this block is the same shape as the layer it copies; its controls may need it taller.
+    node.style.minHeight = height > 40 ? `${height}px` : '';
     shell.style.setProperty('--br-ring', width > 60 ? `${width}px` : '100%');
-    // Below this the ring's hollow middle cannot hold a colour row, so the colour steps out under the ring instead of clipping.
+    // Below this the middle cannot hold a colour row, so the colour steps out under the band instead of clipping.
     shell.classList.toggle('br-compact', width > 60 && width < 190);
   };
   apply();
