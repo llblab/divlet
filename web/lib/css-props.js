@@ -300,19 +300,46 @@ export const radiusInput = raw => {
 };
 
 /** Line height as written: a multiple (`1.5`), a length or percentage, or `normal`. */
+/** The line height's number for the field: its unit sits beside it in the unit button (`150%` → `150`, `24px` → `24`). */
 export function lineHeightOf(view) {
   const text = view['line-height'];
-  return text == null ? null : show(text);
+  if (text == null) return null;
+  return show(text).replace(/(?:px|rem|em|%)$/i, '');
 }
 
-/** A line height accepts a unitless multiple, px/%/rem/em, `normal`, or empty to remove it. */
+/**
+ * A line height accepts a unitless multiple, px/%/rem/em, `normal`, or empty to remove it. A bare number at or above 10 is a
+ * percentage written without its sign (`150`), because a line height of 10 multiples does not exist; below that it stays the
+ * multiple it reads as (`1.5`), which is the same value as `150%`.
+ */
 export const lineHeightInput = raw => {
   const text = String(raw ?? '').trim();
   if (!text) return null;
   if (/^normal$/i.test(text)) return 'normal';
-  if (/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(text)) return text;
+  if (/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(text)) return Number(text) >= 10 ? `${Number(text)}%` : text;
   return /^(?:\d+(?:\.\d+)?)(?:px|%|rem|em)$/i.test(text) ? text.toLowerCase() : undefined;
 };
+
+/** The unit a written line height uses: `%`, `em`, `rem`, `px`, or `×` for a unitless multiple; null for a keyword or nothing. */
+export function lineHeightUnit(text) {
+  const value = String(text ?? '').trim().toLowerCase();
+  const written = /^[-+]?[\d.]+(px|rem|em|%)$/.exec(value);
+  if (written) return written[1];
+  return /^[-+]?[\d.]+$/.test(value) ? '×' : null;
+}
+
+/**
+ * The same line height spelled in another unit, as its number: `24` px is `150` %, `1.5` em or `1.5` times. `%`, `em` and a
+ * unitless multiple all measure the element's own font size — `base` px — so converting between them changes no value, and px
+ * converts against that same size. Null when there is nothing to convert.
+ */
+export function lineHeightIn(number, from, to, base = 16) {
+  const value = Number.parseFloat(String(number ?? '').trim());
+  if (!from || !to || !Number.isFinite(value) || !(base > 0)) return null;
+  const px = from === 'px' ? value : from === '%' ? (value / 100) * base : value * base;
+  const result = to === 'px' ? px : to === '%' ? (px / base) * 100 : px / base;
+  return String(Math.round(result * 1000) / 1000);
+}
 
 /** Font size in px for the field (`16px`, `1rem` at the 16px root), or the value as written. */
 export function fontSizeOf(view) {

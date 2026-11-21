@@ -80,7 +80,9 @@ function toggle(iconName, tip, on, run) {
  * any text the parser accepts (px numbers, auto, 50%, 1/2). Empty clears the value.
  * stepFrom defines the numeric gesture/arrow origin independently of the authored-value parser.
  */
-function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw => raw, stepFrom = Number.parseFloat, step = 1, min = -1e6, max = 1e6, variants = [], unit = '' } = {}) {
+const UNIT_NAMES = { '%': 'Percent %', px: 'Pixels px', em: 'Em em', rem: 'Rem rem', '×': 'Multiple ×' };
+
+function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw => raw, stepFrom = Number.parseFloat, step = 1, min = -1e6, max = 1e6, variants = [], unit = '', units = null, convert = () => null, defaultUnit = null } = {}) {
   const wrap = el('label', 'vf');
   const name = el('span', 'vf-k scrub', label);
   const input = el('input', 'vf-input');
@@ -98,8 +100,45 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
   if (variants.length) wrap.append(el('i', 'variant-dot'));
   wrap.prepend(name, input);
   let syncUnit = () => {};
-  // The unit stays visible beside plain numbers (and the empty default); words and fractions such as auto or 1/2 carry none.
-  if (unit) {
+  // A unit button: it names the unit the value is written in and rewrites the same length in another one, so a line height
+  // can be read and written as `150%`, `24px`, `1.5em` or `1.5` without leaving the field. A value that has no unit yet
+  // (empty, `normal`) keeps the unit last chosen for this field, opening with the field's own default.
+  if (units) {
+    const unitButton = el('button', 'vf-unit unit-switch');
+    unitButton.type = 'button';
+    unitButton.dataset.key = `unit:${key}`;
+    unitButton.setAttribute('aria-haspopup', 'menu');
+    unitButton.setAttribute('aria-label', `${tip || label} unit`);
+    let chosen = null;
+    const now = () => unit || chosen || defaultUnit;
+    const sync = () => { unitButton.textContent = now(); };
+    syncUnit = sync;
+    // A new unit rewrites the number, not the meaning: `24` px becomes `150` % or `1.5` em. The authored spelling is the
+    // source, so the switch really writes; with no value yet (`normal`, empty) it only remembers the unit for this field.
+    const applyUnit = to => {
+      const written = input.value.trim();
+      chosen = to;
+      sync();
+      const next = unit && written ? convert(written, unit, to) : null;
+      if (next == null || !written || to === unit) return;
+      const spelled = to === '×' ? next : `${next}${to}`;
+      const parsed = parse(spelled);
+      if (parsed === undefined) { toast(`“${spelled}” is not a value for ${tip || label}`); return; }
+      input.value = next;
+      current = next;
+      onCommit(parsed, spelled);
+    };
+    unitButton.addEventListener('pointerdown', event => event.stopPropagation());
+    unitButton.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      openMenu(units.map(unitKey => ({ label: UNIT_NAMES[unitKey] || unitKey, checked: now() === unitKey, run: () => applyUnit(unitKey) })), { anchor: unitButton, label: 'Unit' });
+    });
+    input.addEventListener('input', sync);
+    wrap.append(unitButton);
+    sync();
+  } else if (unit) {
+    // The unit stays visible beside plain numbers (and the empty default); words and fractions such as auto or 1/2 carry none.
     const suffix = el('span', 'vf-unit', unit);
     suffix.setAttribute('aria-hidden', 'true');
     const sync = () => { suffix.hidden = !/^-?\d*\.?\d*$/.test(input.value.trim()); };
@@ -345,6 +384,9 @@ function borderFold(views, { value, run, measured, tokens, widthField }) {
   return box;
 }
 
+/** The measured font size in px — what `%`, `em` and a unitless line height are measured against. */
+const fontSizePx = measured => Number.parseFloat(measured?.colors?.fontSize) || 16;
+
 const WEIGHTS = [['100', 'Thin 100'], ['200', 'Extra light 200'], ['300', 'Light 300'], ['400', 'Regular 400'], ['500', 'Medium 500'], ['600', 'Semibold 600'], ['700', 'Bold 700'], ['800', 'Extra bold 800'], ['900', 'Black 900']];
 
 function appearanceFold({ value, run, measured, tokens }) {
@@ -352,6 +394,7 @@ function appearanceFold({ value, run, measured, tokens }) {
   // Typography: size (any px) and weight.
   const sizePx = value(view => css.fontSizeOf(view));
   const leading = value(view => css.lineHeightOf(view));
+  const leadingUnit = value(view => css.lineHeightUnit(view['line-height']));
   const weight = value(view => css.weightOf(view));
   const type = el('div', 'grid2');
   type.append(
@@ -360,7 +403,11 @@ function appearanceFold({ value, run, measured, tokens }) {
       parse: raw => css.lengthInput(raw, { keywords: [], negative: false }),
     }),
     field('line-height', 'Lh', leading, next => run({ 'line-height': next }, `line height ${next ?? 'default'}`), {
-      tip: 'Line height: 1.5, 24px, 150% or normal', placeholder: 'normal', min: 0, max: 200, parse: css.lineHeightInput,
+      tip: 'Line height: 150%, 24px, 1.5em or 1.5', placeholder: 'normal', min: 0, max: 1000, parse: css.lineHeightInput,
+      // `%`, `em` and a unitless multiple are one value — all measure the element's own font size — so the unit button
+      // changes only the spelling, and px converts against that measured size. An unset line height opens on percent.
+      units: ['%', 'px', 'em', '×'], defaultUnit: '%', unit: leadingUnit === MIXED ? '' : leadingUnit || '',
+      convert: (number, from, to) => css.lineHeightIn(number, from, to, fontSizePx(measured)),
     }),
     pick('Weight', weight, WEIGHTS, next => run({ 'font-weight': next }, next ? `weight ${next}` : 'default weight'), { tip: 'Font weight' }),
   );
@@ -372,7 +419,7 @@ function appearanceFold({ value, run, measured, tokens }) {
   typography.append(type, textRow);
   const colors = el('div', 'appearance-colors');
   colors.append(
-    colorField({ key: 'fill', label: 'Fill', tip: 'Background color', property: 'background-color', value, run, computed: measured?.colors?.background, tokens }),
+    colorField({ key: 'fill', label: 'Bg', tip: 'Background color', property: 'background-color', value, run, computed: measured?.colors?.background, tokens }),
     colorField({ key: 'ink', label: 'Text', tip: 'Text color', property: 'color', value, run, computed: measured?.colors?.color, tokens }),
   );
   box.append(colors, typography);

@@ -498,6 +498,31 @@ try {
   await waitUntil(() => !classesOf('cta').some(name => /^leading-/.test(name)), 'an empty line height removes it');
   checks.push('line height: a multiple, a px step that lowers to the scale, readback, removal and one undo');
 
+  // The unit beside the line height is a menu, not a caption: one value, spelled the way the author wants it. `%`, `em` and a
+  // multiple all measure the element's own font size, so switching rewrites only the spelling — and px converts against it.
+  const lhUnit = () => page.locator('#inspector [data-key="unit:line-height"]');
+  await waitUntil(async () => (await lhUnit().innerText()) === '%', 'an unset line height opens on percent');
+  await page.locator('#inspector [data-key="line-height"]').fill('1.5'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('leading-[1.5]'), 'a small bare number stays the multiple it reads as');
+  await page.locator('#inspector [data-key="line-height"]').fill('150'); await page.keyboard.press('Enter');
+  await waitUntil(() => classesOf('cta').includes('leading-[150%]'), 'a bare 150 is a percent written without its sign');
+  await waitUntil(async () => (await lhUnit().innerText()) === '%', 'the button names the written unit');
+  await page.locator('#inspector [data-key="line-height"]').fill('24px'); await page.keyboard.press('Enter');
+  await waitUntil(async () => (await lhUnit().innerText()) === 'px' && classesOf('cta').includes('leading-6'), 'the button follows a px step');
+  await lhUnit().click();
+  await page.waitForSelector('.menu[aria-label="Unit"] .menu-item');
+  const unitChoices = await page.locator('.menu[aria-label="Unit"] .menu-item').allInnerTexts();
+  assert.deepEqual(unitChoices, ['Percent %', 'Pixels px', 'Em em', 'Multiple ×'], 'every spelling is offered');
+  await page.locator('.menu[aria-label="Unit"] .menu-item', { hasText: 'Percent %' }).click();
+  // The cta author wrote `text-[12.5px]`, so its 24px line height is 192% of its own font size — the conversion is measured,
+  // not a fixed ratio.
+  await waitUntil(() => classesOf('cta').includes('leading-[192%]'), '24px rewrites as the percent it is for this font size');
+  await waitUntil(async () => (await lhUnit().innerText()) === '%', 'and the button follows the rewrite');
+  await waitUntil(async () => (await page.locator('#inspector [data-key="line-height"]').inputValue()) === '192', 'with the number converted, not the unit swapped on the same number');
+  await page.keyboard.press('Control+z');
+  await waitUntil(() => classesOf('cta').includes('leading-6') && !classesOf('cta').includes('leading-[192%]'), 'one undo returns the px spelling');
+  checks.push('the line height unit is a menu that rewrites one value as %, px, em or a multiple, with one undo step');
+
   // Radius: a bare number, px/rem/em/%, full, and empty — all from the one field in the box model's corner.
   await select('cta');
   await page.locator('#inspector [data-key="radius"]').fill('12'); await page.keyboard.press('Enter');
@@ -655,6 +680,9 @@ try {
   assert.equal(await page.locator('#inspector [data-section="classes"]').count(), 0);
   await page.locator('#inspector [data-key="line-height"]').fill('1.6'); await page.keyboard.press('Enter');
   await waitUntil(() => native.getEntry('plain').document.nodes.first.style['line-height'] === '1.6', 'line height is a native declaration with no engine');
+  await page.locator('#inspector [data-key="line-height"]').fill('150'); await page.keyboard.press('Enter');
+  await waitUntil(() => native.getEntry('plain').document.nodes.first.style['line-height'] === '150%', 'a bare 150 is a percent in plain CSS too');
+  await waitUntil(async () => (await page.locator('#inspector [data-key="unit:line-height"]').innerText()) === '%', 'and the unit button reads it back as the percent it wrote');
   await family.click(); await page.getByRole('menuitemradio', { name: '"No Engine Face"', exact: true }).click();
   await waitUntil(() => native.getEntry('plain').document.nodes.first.style['font-family'] === '"No Engine Face"', 'family edits have no engine requirement');
   await waitUntil(() => page.locator('iframe[data-document-id="plain"]').contentFrame().locator('#first').evaluate(node => Math.round(node.getBoundingClientRect().width) === 120), 'stored face actually renders with no style engine');
