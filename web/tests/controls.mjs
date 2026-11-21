@@ -192,9 +192,12 @@ try {
 
   await page.locator('#inspector .chip', { hasText: '390' }).click();
   await waitUntil(() => doc(fresh).artboard.width === 390, 'width preset');
-  await page.locator('#inspector button[aria-label="Swap width and height"]').click();
-  await waitUntil(() => doc(fresh).artboard.width === 720 && doc(fresh).artboard.height === 390, 'rotate');
-  check('width preset chips and rotate');
+  // Rotating keeps two homes and neither is the geometry block: the artboard's own ⋯ menu, and the palette's Rotate.
+  const turned = { width: doc(fresh).artboard.height, height: doc(fresh).artboard.width };
+  await page.evaluate(async id => (await import('./lib/actions.js')).rotateArtboard(id), fresh);
+  await waitUntil(() => doc(fresh).artboard.width === turned.width && doc(fresh).artboard.height === turned.height, 'rotate');
+  assert.equal(await page.locator('#inspector button[aria-label="Swap width and height"]').count(), 0, 'the geometry block keeps no swap button of its own');
+  check('width preset chips and rotate, with no duplicate swap control in the geometry block');
 
   await focusCanvas();
   await page.keyboard.press('r');

@@ -273,7 +273,6 @@ function artboardView(doc, model) {
     chip.addEventListener('click', () => quiet(commit(id, { artboard: { width } }, { label: `width ${width}` })));
     presets.append(chip);
   }
-  presets.append(button('rotate', 'Swap width and height', () => actions.rotateArtboard(id), 'mini'));
   // Aspect ratio: set the height from the width, or lock the ratio while typing W or H.
   const ratios = el('div', 'chips ratio-row');
   const lock = el('button', `chip lock${locked() ? ' on' : ''}`);
