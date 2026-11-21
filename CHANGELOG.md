@@ -4,6 +4,12 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## 0.2.0 — Inspector and history polish
 
+- **The interface measures itself in layout pixels.** At 200% the action row reported every action as twice its real width
+  and kept only one plus the "more" menu, and the inspector's shared label column asked for twice the room it needed, so the
+  Phone/200% `Fit height` action was reachable only inside the overflow menu. The chrome is drawn under
+  `transform: scale(--ui)`, so a painted width is a layout width times the scale: the toolbar's fit and the label column now
+  measure with `offsetWidth` (`web/lib/toolbar.js`, `web/lib/properties.js`, `web/tests/chrome.mjs`,
+  `web/tests/appearance.mjs`).
 - **The token row explains itself.** The `--color-brand → bg-brand, text-brand` caption under the Tokens add row is gone: the placeholders say what
   the two fields take, and the row no longer repeats it (`web/lib/inspector.js`).
 - **Box-model side values keep their distance.** The left and right values sat flush against their band's frame and read as part of the line; they

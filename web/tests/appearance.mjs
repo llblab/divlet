@@ -903,6 +903,17 @@ try {
   assert.equal(geometry.text, longFamily);
   assert.equal(geometry.nowrap, 'nowrap');
   assert.ok(geometry.fieldWidth <= geometry.inspectorWidth && geometry.contentsWidth > geometry.fieldWidth, 'only the overlong whole control pans, not the inspector');
+  // A shared label column is a layout measurement in a painted, scaled interface: a rect would ask for twice the room
+  // at 200% and squeeze every control beside it.
+  const labels = await page.evaluate(() => {
+    const group = document.querySelector('#inspector .label-group');
+    const nodes = group ? [...group.querySelectorAll(':scope > .row-labeled > .caption, :scope > .row-labeled > .vf-k')] : [];
+    return { column: group ? Number.parseFloat(getComputedStyle(group).getPropertyValue('--label-col')) : null, widths: nodes.map(node => ({ layout: node.offsetWidth, painted: Math.round(node.getBoundingClientRect().width) })) };
+  });
+  const widestLabel = Math.max(0, ...labels.widths.map(label => label.layout));
+  assert.ok(widestLabel > 0, `the element inspector has a shared label column at phone/200%: ${JSON.stringify(labels)}`);
+  assert.ok(labels.column >= widestLabel && labels.column <= widestLabel + 2, `the label column is measured in layout pixels: ${JSON.stringify(labels)}`);
+  assert.ok(Math.max(...labels.widths.map(label => label.painted)) > widestLabel + 2, `at 200% the painted label is wider than the column it asked for: ${JSON.stringify(labels)}`);
   const beforePan = native.getEntry('plain').document.version;
   // A late measurement redraw may replace the control between focus and key; each attempt targets the live element.
   await waitUntil(async () => {

@@ -841,7 +841,9 @@ export function syncLabelColumns(root) {
     if (!labels.length) continue;
     // Measure with no floor first: a previous measurement must not keep a long label from shrinking back.
     group.style.removeProperty('--label-col');
-    const widest = Math.ceil(Math.max(...labels.map(node => node.getBoundingClientRect().width)));
+    // Layout pixels: the panel is drawn under `transform: scale(--ui)`, where a rect would return the painted width
+    // and hand the column twice the room it needs at 200%.
+    const widest = Math.max(...labels.map(node => node.offsetWidth));
     if (widest > 0) group.style.setProperty('--label-col', `${widest + 2}px`);
   }
 }

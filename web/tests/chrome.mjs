@@ -254,6 +254,14 @@ try {
     return { height: bar?.offsetHeight ?? 0, scrollHeight: bar?.scrollHeight ?? 0, flexShrink: bar ? getComputedStyle(bar).flexShrink : '', connected: bar?.isConnected ?? false };
   });
   assert.ok(actionRow.height >= 24, `the scrollable inspector must not shrink its action row out of reach: ${JSON.stringify(actionRow)}`);
+  // The chrome is drawn under `transform: scale(--ui)`, so the row must fit itself in layout pixels: a painted rect is
+  // twice its layout width at 200% and would report almost every action as too wide to keep.
+  const rowItems = await phone.evaluate(() => {
+    const bar = document.querySelector('#inspector .smart-bar'), buttons = [...bar.querySelectorAll('button:not(.more)')];
+    return { keeps: buttons.filter(button => !button.hidden).length, layout: buttons[0].offsetWidth, painted: Math.round(buttons[0].getBoundingClientRect().width), room: bar.clientWidth };
+  });
+  assert.ok(rowItems.keeps >= 2, `the action row keeps its leading controls at 200%: ${JSON.stringify(rowItems)}`);
+  assert.ok(rowItems.painted > rowItems.layout, `the row is drawn wider than it measures itself: ${JSON.stringify(rowItems)}`);
   await phone.locator('#inspector button[aria-label="More"]:not([hidden])').click();
   const compactActions = await phone.locator('.menu .menu-label').allTextContents();
   assert.ok(compactActions.includes('Delete artboard'), 'the real narrow inspector overflow is open');

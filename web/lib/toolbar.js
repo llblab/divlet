@@ -40,8 +40,10 @@ export function overflowBar(items, { label = 'More' } = {}) {
     const room = bar.clientWidth;
     if (!room) { more.hidden = true; return; }
     const gap = parseFloat(getComputedStyle(bar).columnGap) || 0;
-    const sizes = buttons.map(node => node.getBoundingClientRect().width);
-    const moreSize = more.getBoundingClientRect().width;
+    // Layout pixels, never painted ones: the chrome is drawn under `transform: scale(--ui)`, so a rect would come back
+    // scaled while `clientWidth` stays in the bar's own layout coordinates.
+    const sizes = buttons.map(node => node.offsetWidth);
+    const moreSize = more.offsetWidth;
     const used = count => sizes.slice(0, count).reduce((sum, size, index) => sum + size + (index ? gap : 0), 0);
     let keep = buttons.length;
     // Without the dropdown everything must fit; otherwise drop buttons from the end until the rest and the dropdown do (the first always stays).
