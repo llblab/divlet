@@ -226,16 +226,61 @@ function colorField({ key, label, tip, property, value, run, computed, tokens })
   hex.setAttribute('aria-label', tip);
   const fitHex = () => hex.style.setProperty('--hex-width', `calc(${Math.max(7, (hex.value || hex.placeholder).length) + 2}ch + 8px)`);
   hex.addEventListener('input', fitHex);
-  const set = (raw, shown) => {
+  // A colour follows the picker and the typed text instead of waiting for the dialog to close. Each gesture (a drag, or one
+  // focus session) is one group, so the whole change stays one Undo step; a live write keeps the next value pending instead
+  // of stacking a backlog, so the page converges on the colour last picked, and it skips the forced re-render that would
+  // replace the control under the pointer.
+  let picking = 0, typing = 0, pending = null, inFlight = false;
+  const begin = () => { if (!sessionGroup) sessionGroup = newGroup(); };
+  const settle = () => { clearTimeout(picking); clearTimeout(typing); pending = null; sessionGroup = null; };
+  const set = (raw, shown, { live = false } = {}) => {
     const next = css.colourInput(raw);
-    if (next === undefined) { toast(`“${raw}” is not a color: use #rrggbb, a project color or white, black, transparent`); hex.value = hex.dataset.last ?? ''; return; }
-    hex.dataset.last = hex.value = shown ?? raw;
-    run({ [property]: next }, `${label.toLowerCase()} ${shown ?? raw}`);
+    if (next === undefined) { toast(`“${raw}” is not a color: use #rrggbb, a project color or white, black, transparent`); hex.value = hex.dataset.last ?? ''; fitHex(); return null; }
+    const text = shown ?? raw;
+    hex.dataset.last = text;
+    // A queued live write must not overwrite text the user is still typing into the field.
+    if (!(live && document.activeElement === hex && hex.value.trim() !== String(text).trim())) hex.value = text;
+    fitHex();
+    typingLive = live;
+    try { return run({ [property]: next }, `${label.toLowerCase()} ${shown ?? raw}`); } finally { typingLive = false; }
   };
-  swatch.addEventListener('change', () => set(swatch.value));
-  hex.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Enter') { event.preventDefault(); if (hex.value.trim()) set(hex.value); hex.blur(); } else if (event.key === 'Escape') { hex.value = hex.dataset.last ?? hex.defaultValue; hex.blur(); } });
+  const pump = () => {
+    if (inFlight || pending === null) return;
+    const raw = pending; pending = null;
+    inFlight = true;
+    Promise.resolve(set(raw, raw, { live: true })).catch(() => null).finally(() => { inFlight = false; pump(); });
+  };
+  // A window stays open for the length of one write, so a continuous drag keeps sending the latest colour instead of waiting
+  // for the pointer to stop.
+  const follow = raw => {
+    pending = raw;
+    if (picking) return;
+    picking = setTimeout(() => { picking = 0; pump(); }, 40);
+  };
+  swatch.addEventListener('focus', begin);
+  swatch.addEventListener('blur', settle);
+  swatch.addEventListener('input', () => {
+    begin();
+    // The field shows the picked colour at once; the page follows within one write.
+    hex.dataset.last = hex.value = swatch.value;
+    fitHex();
+    follow(swatch.value);
+  });  // The dialog closing ends the gesture: the last colour is accepted with a normal re-render.
+  swatch.addEventListener('change', () => { begin(); clearTimeout(picking); pending = null; set(swatch.value, swatch.value); settle(); });
+  hex.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Enter') { event.preventDefault(); if (hex.value.trim()) set(hex.value); hex.blur(); } else if (event.key === 'Escape') { hex.value = hex.dataset.last ?? hex.defaultValue; fitHex(); hex.blur(); } });
   hex.addEventListener('change', () => { if (hex.value.trim()) set(hex.value); });
-  hex.addEventListener('focus', () => hex.select());
+  hex.addEventListener('focus', () => { begin(); hex.select(); });
+  hex.addEventListener('blur', settle);
+  // Typing a colour commits a short pause after it parses; a half-typed value waits for Enter or blur, where it is reported.
+  hex.addEventListener('input', () => {
+    clearTimeout(typing);
+    typing = setTimeout(() => {
+      if (css.colourInput(hex.value.trim()) === undefined) return;
+      if (hex.value.trim() === hex.dataset.last) return;
+      begin();
+      follow(hex.value.trim());
+    }, 140);
+  });
   const clear = el('button', 'tool mini color-clear');
   clear.type = 'button';
   clear.append(icon('close'));

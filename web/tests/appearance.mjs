@@ -422,6 +422,22 @@ try {
   await page.locator('#inspector [data-key="radius"]').waitFor();
   checks.push('minimum-width resizing keeps radius/presets and artboard dimensions readable, border widths are linked between Border and Spacing and long dropdown values remain on one line');
 
+  // A picker drag reaches the page while the dialog is still open, and the whole drag stays one Undo step.
+  const beforeDrag = classesOf('cta');
+  const swatch = page.locator('#inspector [data-key="fill-swatch"]');
+  const pageFill = () => page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => getComputedStyle(node).backgroundColor);
+  const pick = value => swatch.evaluate((node, value) => { node.value = value; node.dispatchEvent(new Event('input', { bubbles: true })); }, value);
+  await pick('#aa3322');
+  await waitUntil(async () => await pageFill() === 'rgb(170, 51, 34)', 'the page follows the picker before the dialog closes');
+  await pick('#aa5522');
+  await waitUntil(async () => await pageFill() === 'rgb(170, 85, 34)', 'a second move reaches the page too');
+  await swatch.evaluate(node => node.dispatchEvent(new Event('change', { bubbles: true })));
+  await waitUntil(() => classesOf('cta').includes('bg-[#aa5522]'), 'closing the picker keeps the colour it left on');
+  await page.evaluate(() => document.activeElement?.blur?.());
+  await page.keyboard.press('Control+z');
+  await waitUntil(async () => JSON.stringify(classesOf('cta')) === JSON.stringify(beforeDrag) && await pageFill() !== 'rgb(170, 85, 34)', 'one Undo reverts the whole picker drag');
+  checks.push('a colour picker drag paints the page before the dialog closes and stays one Undo step');
+
   // Fill and text colour by typing a hex value: the class that set the colour before is replaced.
   await page.locator('#inspector [data-key="fill"]').fill('#112233'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('bg-[#112233]') && !classesOf('cta').some(name => /^bg-(accent|surface)$/.test(name)), 'typing a fill colour sets one background class and replaces the old one');

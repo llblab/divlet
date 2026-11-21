@@ -4,6 +4,8 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## Unreleased
 
+- **A colour follows the picker while it is dragged.** The value field shows the picked colour at once and the page repaints within one write, instead of waiting for the dialog to close; typing a colour does the same after a short pause. A gesture stays one Undo step, and a fast drag keeps at most one write pending, so the page converges on the colour last picked rather than replaying a queue (`web/tests/appearance.mjs`).
+
 - **A colour control is one row again.** Label, swatch, value and clear sit on one line in Border and in Appearance, and only a value longer than the room left takes a line of its own without being clipped. The content-sized value field was taking the wrapper's full width as its flex base, so it claimed a line by itself and pushed the clear button onto a third. Fill and Text now stay paired only while each field can still hold its own parts on one line (148px each) and otherwise stack whole, instead of squeezing both into a three-line column (`web/tests/appearance.mjs`).
 
 ## 0.1.2 — Hotfix: compact color controls and a full-window connection
