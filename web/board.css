@@ -462,16 +462,19 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .bm-margin { background: #bc8c61; border-style: dashed; }
 .bm-border { background: #e3c78f; }
 .bm-padding { background: #c6d7a7; border-style: dashed; }
-/* The band name is a watermark on its own fill: larger than a value and darker than the colour it sits on, 12px in from the
-   left so it reads as part of the band rather than a corner label. It stays inside the top value strip. */
-.bm-caption { position: absolute; top: 0; left: 12px; height: 20px; display: flex; align-items: center; font: 600 12.5px/20px var(--font); letter-spacing: .01em; pointer-events: none; }
-/* A band narrow enough that the name would reach the centred top value gives ground: closer to the edge first, then smaller. */
-@container band (max-width: 180px) { .bm-caption { left: 9px; font-size: 10.5px; } }
-@container band (max-width: 130px) { .bm-caption { left: 4px; font-size: 8px; } }
-.bm-position > .bm-caption { color: var(--muted); }
-.bm-margin > .bm-caption { color: #8a5f3a; }
-.bm-border > .bm-caption { color: #a8843c; }
-.bm-padding > .bm-caption { color: #7d9750; }
+/* No band names itself inside the diagram any more: one legend under it does that, in nesting order, with a swatch of each
+   band's own fill and the name in the tone that band gave its caption. */
+.bm-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 11px; padding: 0 2px; font: 10.5px/15px var(--mono); }
+.bm-key { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+.bm-swatch { flex: none; width: 10px; height: 10px; border-radius: 2px; }
+.bm-key-position .bm-swatch { background: transparent; border: 1px dashed var(--faint); }
+.bm-key-position .bm-key-name { color: var(--muted); }
+.bm-key-margin .bm-swatch { background: #bc8c61; }
+.bm-key-margin .bm-key-name { color: #8a5f3a; }
+.bm-key-border .bm-swatch { background: #e3c78f; }
+.bm-key-border .bm-key-name { color: #a8843c; }
+.bm-key-padding .bm-swatch { background: #c6d7a7; }
+.bm-key-padding .bm-key-name { color: #7d9750; }
 .bm-cell { position: absolute; display: flex; justify-content: center; align-items: center; width: var(--bm-field); height: 18px; min-width: 0; font: 10px/16px var(--mono); }
 .bm-cell.bm-t { top: 1px; left: 50%; transform: translateX(-50%); }
 .bm-cell.bm-b { bottom: 1px; left: 50%; transform: translateX(-50%); }
@@ -522,7 +525,9 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .bm-radius { position: absolute; right: 2px; bottom: 0; width: 74px; height: 18px; }
 .bm-radius .vf-input { font-size: 10px; }
 .bm-radius .vf-k { min-width: 14px; padding-left: 2px; font-size: 9px; }
-@container boxmodel (max-width: 210px) { .bm-radius { position: static; width: 100%; margin-top: 4px; } }
+/* The corner keeps the field while the diagram's bottom edge has room to spare; a narrower widget takes it on its own row,
+   where it cannot sit on the bottom offset. */
+@container boxmodel (max-width: 270px) { .bm-radius { position: static; width: 100%; margin-top: 4px; } }
 .box4 { min-width: 0; flex: 1 1 var(--control-min); }
 .caption.has-variants::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 4px; border-radius: 50%; background: var(--accent); vertical-align: 1px; }
 .quick-attrs { margin-top: 1px; }

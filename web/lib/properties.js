@@ -606,7 +606,6 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     const sq = el('div', `bm-sq bm-${kind}`);
     sq.setAttribute('role', 'group');
     sq.setAttribute('aria-label', kind[0].toUpperCase() + kind.slice(1));
-    sq.append(el('span', 'bm-caption', kind));
     for (const [index, side] of ['t', 'r', 'b', 'l'].entries()) {
       const cell = el('div', `bm-cell bm-${side}`);
       cell.setAttribute('role', 'group');
@@ -685,6 +684,17 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
   radius.classList.add('bm-radius');
   model.append(radius);
   spacing.append(model);
+  // The bands no longer name themselves inside the diagram: one legend under it lists the layers in nesting order, each name in
+  // the tone of its own band beside a swatch of that band's fill, so the diagram keeps its whole rectangle for values.
+  const legend = el('div', 'bm-legend');
+  legend.setAttribute('role', 'group');
+  legend.setAttribute('aria-label', 'Box model layers, outermost first');
+  for (const kind of ['position', 'margin', 'border', 'padding']) {
+    const key = el('span', `bm-key bm-key-${kind}`);
+    key.append(el('i', 'bm-swatch'), el('span', 'bm-key-name', kind));
+    legend.append(key);
+  }
+  spacing.append(legend);
 
   /* effects */
   const effects = el('div', 'box3');
