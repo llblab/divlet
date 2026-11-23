@@ -19,7 +19,7 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
   heads (`web/lib/inspector.js`, `web/tests/spacing.mjs`).
 - **The release battery no longer waits out a hung transport test.** The browser-MCP suite hung on the hosted runner three times
   (never locally); each of its tests now has a deadline, the file a watchdog that names the test it is stuck in, and
-  `test:browser:all` retries that one suite once (`web/tests/browser-mcp.mjs`, `package.json`, `BACKLOG.md`).
+  `test:browser:all` retries that one suite once through `scripts/retry-once.mjs` (`web/tests/browser-mcp.mjs`, `package.json`, `BACKLOG.md`).
 - **The sidebar tabs stay in their corner until they touch the dock.** The phone layout used to stretch them over the window below
   720px even with room beside the dock; now they stay at the sidebar's default width, left of the dock, and stack above it only
   when the two would touch (`web/board.js`, `web/board.css`, `web/index.html`, `web/tests/chrome.mjs`).
