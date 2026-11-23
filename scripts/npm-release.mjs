@@ -75,7 +75,10 @@ export async function refusePriorPublication(tag, runId, get) {
       for (let jobPage = 1; ; jobPage++) {
         const jobs = (await get(`actions/runs/${run.id}/jobs?filter=all&per_page=100&page=${jobPage}`)).jobs;
         assert.ok(Array.isArray(jobs));
-        assert.ok(!jobs.some(job => job.name === 'Publish npm' && job.status !== 'queued' && job.conclusion !== 'skipped'), `Publication already started in run ${run.id}; inspect it and recover explicitly, never replay blindly.`);
+        // A publisher cancelled before any runner took it (a cancelled or timed-out validation cancels the jobs after it) never
+        // held an OIDC token and ran no step, so it cannot have uploaded anything; any job that reached a runner counts.
+        const neverRan = job => job.conclusion === 'cancelled' && job.runner_id == null && !(job.steps?.length > 0);
+        assert.ok(!jobs.some(job => job.name === 'Publish npm' && job.status !== 'queued' && job.conclusion !== 'skipped' && !neverRan(job)), `Publication already started in run ${run.id}; inspect it and recover explicitly, never replay blindly.`);
         if (jobs.length < 100) break;
       }
     }

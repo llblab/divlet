@@ -50,6 +50,13 @@ test('prior-publication guard paginates runs and all job attempts; skipped valid
   assert.ok(calls.some(route => route.endsWith('page=2')));
   assert.ok(calls.some(route => route.includes('filter=all')));
   await refusePriorPublication('v0.0.2', '123', async route => route.includes('/workflows/') ? { workflow_runs: [{ id: 123, display_title: 'npm v0.0.2' }, { id: 124, display_title: 'npm v0.0.2' }] } : { jobs: [{ name: 'Publish npm', status: 'completed', conclusion: 'skipped' }] });
+  // A publisher cancelled before any runner took it (validation was cancelled) ran nothing and may be retried; one that reached a
+  // runner, or has run any step, may not, whatever its conclusion.
+  const only = job => async route => route.includes('/workflows/') ? { workflow_runs: [{ id: 456, display_title: 'npm v0.0.2' }] } : { jobs: [{ name: 'Publish npm', status: 'completed', ...job }] };
+  await refusePriorPublication('v0.0.2', '123', only({ conclusion: 'cancelled', runner_id: null, steps: [] }));
+  await assert.rejects(refusePriorPublication('v0.0.2', '123', only({ conclusion: 'cancelled', runner_id: 7, steps: [] })), /already started/);
+  await assert.rejects(refusePriorPublication('v0.0.2', '123', only({ conclusion: 'cancelled', runner_id: null, steps: [{ name: 'Publish' }] })), /already started/);
+  await assert.rejects(refusePriorPublication('v0.0.2', '123', only({ conclusion: 'failure', runner_id: null, steps: [] })), /already started/);
 });
 
 test('all-package preflight precedes uploads; checkpoints enclose serial web/core/adapter publication', async () => {

@@ -2,7 +2,7 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
-## 0.3.2 — Unreleased
+## 0.3.1 — The finished Border frame and one release flow started by a tag
 
 - **One release flow, started by a tag.** Pushing a stable `vX.Y.Z` tag on a commit of `main` now validates and freezes the
   candidate, creates the GitHub Release from that version's CHANGELOG section, publishes the five packages to npm through OIDC
@@ -11,8 +11,8 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
   Release comes after validation and before npm, and an existing Release for the tag is left as it is
   (`.github/workflows/release.yml`, `scripts/release-notes.mjs`, `scripts/npm-release.mjs`, `docs/publishing.md`,
   `core/tests/release-notes.test.js`, `core/tests/npm-release.test.js`).
-
-## 0.3.1 — Unreleased
+  A publisher job that was cancelled before any runner took it (a validation cancelled after it) no longer counts as a
+  started publication, so a cancelled run does not block the tag's retry.
 
 - **The Border frame, finished.** The four corner radii moved out of the frame, above and below its corners, so none covers a
   side; the radius and the colour for all four sides never step out of the cut-out any more, because it always fits them (the
