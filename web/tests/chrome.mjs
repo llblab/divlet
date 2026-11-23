@@ -230,7 +230,11 @@ try {
     const side = await open(1000, 800);
     const readFoot = async () => side.evaluate(() => { const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width }; }; return { tabs: box('#side-tabs'), dock: box('#dock'), brand: box('#brand'), stacked: document.documentElement.classList.contains('foot-stack'), phone: document.documentElement.classList.contains('w720') }; });
     const desktop = await readFoot();
-    for (const width of [700, 640, 600]) {
+    // The rule, not a constant: the tabs and the dock fit side by side when their own widths and three edges fit the window, and the
+    // widths depend on the fonts, so the test windows are taken from the measured ones.
+    const needed = Math.ceil(desktop.tabs.width + desktop.dock.width + 3 * 8);
+    assert.ok(needed < 720, `the two fit side by side below the phone threshold (${needed}px)`);
+    for (const width of [...new Set([720, Math.max(needed + 40, 560), needed + 4])].filter(width => width <= 720 && width >= needed + 4)) {
       await side.setViewportSize({ width, height: 800 });
       await waitUntil(async () => (await readFoot()).phone, `${width}px uses the phone layout`);
       await waitUntil(async () => { const now = await readFoot(); return !now.stacked && Math.abs(now.tabs.width - desktop.tabs.width) <= 2; }, `at ${width}px the tabs keep their own width and corner`);
@@ -238,7 +242,7 @@ try {
       assert.ok(now.tabs.left <= 12 && now.tabs.right < now.dock.left, `at ${width}px the tabs sit left of the dock, not over it (${now.tabs.right} vs ${now.dock.left})`);
       assert.ok(Math.abs(now.tabs.bottom - now.dock.bottom) <= 6, `and on its row (${now.tabs.bottom} vs ${now.dock.bottom})`);
     }
-    await side.setViewportSize({ width: 500, height: 800 });
+    await side.setViewportSize({ width: Math.max(440, needed - 40), height: 800 });
     await waitUntil(async () => (await readFoot()).stacked, 'a window too narrow for both stacks the tabs above the dock');
     const stacked = await readFoot();
     assert.ok(stacked.tabs.bottom <= stacked.dock.top + 2 && stacked.tabs.width > desktop.tabs.width * 1.5, 'across the whole width, above the dock');
