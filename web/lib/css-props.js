@@ -317,6 +317,44 @@ export const radiusInput = raw => {
   return /^\d+(?:\.\d+)?(?:px|%|rem|em)$/i.test(text) ? text.toLowerCase() : undefined;
 };
 
+const FULL_RADIUS = /^(?:9999px|999px)$/;
+
+/**
+ * One corner's authored radius split for a field with a unit menu: the number (`8` for `8px`, `100` for `100%`), `full` for the
+ * pill value, or the text as written for anything else (`var(--r)`), and nothing when no corner is authored. `100%` stays a
+ * percentage rather than turning into `full`: what was written is what the field shows.
+ */
+export function cornerRadiusNumber(view, corner) {
+  const raw = view[`border-${corner}-radius`] ?? view['border-radius'] ?? null;
+  if (raw == null) return null;
+  const text = String(raw).trim();
+  if (FULL_RADIUS.test(text)) return 'full';
+  const written = /^(-?(?:\d+\.?\d*|\.\d+))(px|rem|em|%)$/.exec(text);
+  return written ? String(Math.round(Number(written[1]) * 100) / 100) : show(text);
+}
+
+/** The unit of a written corner radius (`px`, `rem`, `em`, `%`); null for `full`, a variable or nothing. */
+export function cornerRadiusUnit(view, corner) {
+  const raw = view[`border-${corner}-radius`] ?? view['border-radius'] ?? null;
+  if (raw != null && FULL_RADIUS.test(String(raw).trim())) return null;
+  const written = raw == null ? null : /^-?(?:\d+\.?\d*|\.\d+)(px|rem|em|%)$/.exec(String(raw).trim());
+  if (written) return written[1];
+  return raw != null && /^-?(?:\d+\.?\d*|\.\d+)$/.test(String(raw).trim()) ? 'px' : null;
+}
+
+/**
+ * The same radius spelled in another unit, as its number. `px`, `em` and `rem` are lengths, so they convert exactly against the
+ * font sizes `em`/`rem` measure (`em` the element's own, `rem` the root's). `%` is a share of the box rather than a length: no
+ * pixel value is "the same" as it for every box, so a switch to or from it keeps the number and changes only what it means.
+ */
+export function cornerRadiusIn(number, from, to, { em = 16, rem = 16 } = {}) {
+  const value = Number.parseFloat(String(number ?? '').trim());
+  if (!from || !to || !Number.isFinite(value)) return null;
+  if (from === '%' || to === '%') return String(value);
+  const size = unit => (unit === 'em' ? em : unit === 'rem' ? rem : 1);
+  return String(Math.round(((value * size(from)) / size(to)) * 1000) / 1000);
+}
+
 /** Line height as written: a multiple (`1.5`), a length or percentage, or `normal`. */
 /** The line height's number for the field: its unit sits beside it in the unit button (`150%` → `150`, `24px` → `24`). */
 export function lineHeightOf(view) {

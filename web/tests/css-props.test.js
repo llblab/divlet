@@ -37,6 +37,13 @@ test('lengths, colours and single values parse what a person types', () => {
   assert.equal(css.zInput('auto'), 'auto'); assert.equal(css.zInput('-3'), '-3'); assert.equal(css.zInput('x'), undefined);
   assert.equal(css.radiusInput('Full'), '9999px'); assert.equal(css.radiusOf({ 'border-radius': '9999px' }), 'Full'); assert.equal(css.radiusOf({ 'border-radius': '8px' }), '8');
   assert.equal(css.radiusOf({ 'border-radius': '8px', 'border-top-left-radius': '2px' }), undefined, 'unequal corners are mixed');
+  // A radius field splits the number from its unit: `100%` stays a percentage, only the pill value is `full`, and `full` has no unit.
+  assert.equal(css.cornerRadiusNumber({ 'border-radius': '100%' }, 'top-left'), '100'); assert.equal(css.cornerRadiusUnit({ 'border-radius': '100%' }, 'top-left'), '%');
+  assert.equal(css.cornerRadiusNumber({ 'border-top-left-radius': '1.5rem', 'border-radius': '4px' }, 'top-left'), '1.5'); assert.equal(css.cornerRadiusUnit({ 'border-top-left-radius': '1.5rem' }, 'top-left'), 'rem');
+  assert.equal(css.cornerRadiusNumber({ 'border-radius': '9999px' }, 'top-left'), 'full'); assert.equal(css.cornerRadiusUnit({ 'border-radius': '9999px' }, 'top-left'), null);
+  assert.equal(css.cornerRadiusNumber({}, 'top-left'), null);
+  assert.equal(css.cornerRadiusIn('16', 'px', 'rem'), '1'); assert.equal(css.cornerRadiusIn('1', 'rem', 'px'), '16'); assert.equal(css.cornerRadiusIn('2', 'em', 'px', { em: 10 }), '20');
+  assert.equal(css.cornerRadiusIn('50', 'px', '%'), '50', 'a percentage is a share of the box, so the number is kept');
   assert.equal(css.weightOf({ 'font-weight': 'bold' }), '700');
   assert.equal(css.fontSizeOf({ 'font-size': '1.5rem' }), '24');
 });

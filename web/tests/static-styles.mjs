@@ -114,7 +114,7 @@ test('with the Tailwind provider, controls and the class editor are linked views
     await until(async () => /(?:^|\s)tracking-\[1px\](?:\s|$)/.test(await attr(page, 'class') ?? '') && !/letter-spacing/.test(await attr(page, 'style') ?? ''), 'the declaration became a class');
     assert.equal(await computed(page, 'letterSpacing'), '1px', 'the rendering is unchanged');
     // Every control edit is a utility, a single border edge included.
-    await setField(page, 'border-width-t', '3');
+    await setField(page, 'border-t', '3');
     await until(async () => /(?:^|\s)\[border-top-width:3px\](?:\s|$)/.test(await attr(page, 'class') ?? ''), 'a single edge is a utility');
     assert.ok(!/border-top-width/.test(await attr(page, 'style') ?? ''), 'not an inline declaration');
     // The copy persists across a reload.

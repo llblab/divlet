@@ -324,7 +324,7 @@ try {
         family: {
           dockTools: family('#dock .tool'), picks: family('#inspector .pick'), chips: family('#inspector .chip'),
           fields: family('#inspector .vf:not(.boxmodel .vf):not(.br-box .vf)'), boxFields: family('#inspector .boxmodel .vf'),
-          ringFields: family('#inspector .br-box .vf'),
+          ringFields: family('#inspector .br-box .br-corner .vf'), ringMiddle: family('#inspector .br-centre .vf'),
           nums: family('#inspector .num'), segs: family('#inspector .seg'),
         },
         disabled: [...new Set([...document.querySelectorAll('button:disabled')].map(node => getComputedStyle(node).opacity))],
@@ -336,7 +336,8 @@ try {
     for (const [name, heights] of Object.entries(design.family)) assert.ok(heights.length <= 1, `${name} share one height (${heights.join(', ')})`);
     assert.deepEqual(design.family.fields, [28], 'standard fields keep the full control height');
     assert.deepEqual(design.family.boxFields, [18], 'all compact box-model fields, including offsets, borders and dimensions, share their own height');
-    assert.deepEqual(design.family.ringFields, [18], 'and the border ring is those same small fields, not a second size');
+    assert.deepEqual(design.family.ringFields, [20], 'the frame\'s corner radii share one height, the smallest a touch target allows');
+    assert.equal(design.family.ringMiddle.length, 1, 'and the radius in its middle is one control size');
     assert.deepEqual(design.disabled, ['0.4'], `disabled controls share one step (${design.disabled.join(', ')})`);
 
     // An action control is a button, not a place to type: its own fill, a clear step above an input's, and no border drawing

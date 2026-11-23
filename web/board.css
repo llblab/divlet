@@ -457,9 +457,9 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .vf-input { flex: 1; width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: 11.5px var(--mono); font-variant-numeric: tabular-nums; }
 .vf-input::placeholder { color: var(--faint); }
 .vf-unit, .num-unit { flex: none; font: 10px var(--mono); color: var(--muted); pointer-events: none; user-select: none; }
-.vf-unit[hidden] { display: none; }
+.vf-unit[hidden], .vf-unit.unit-switch[hidden] { display: none; }
 /* A unit that can be switched is a menu button, so it keeps the same look but takes the pointer and a caret. */
-.vf-unit.unit-switch { pointer-events: auto; display: inline-flex; align-items: center; justify-content: center; gap: 1px; min-width: 24px; min-height: 24px; padding: 0 2px; border: 0; border-radius: var(--radius-small); background: transparent; color: var(--muted); font: 10px var(--mono); cursor: pointer; }
+.vf-unit.unit-switch { pointer-events: auto; display: inline-flex; align-items: center; justify-content: center; gap: 1px; min-width: 24px; min-height: 24px; padding: 0 2px; border: 0; border-radius: var(--radius-small); background: transparent; color: var(--accent); font: 10px var(--mono); cursor: pointer; }
 .vf-unit.unit-switch::after { content: "▾"; font-size: 7px; line-height: 1; opacity: .7; }
 .vf-unit.unit-switch:hover:not(:disabled), .vf-unit.unit-switch:focus-visible { background: var(--field-hover); color: var(--ink); }
 .num-unit { padding-right: 8px; }
@@ -470,11 +470,11 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .bm-margin { background: #bc8c61; border-style: dashed; }
 .bm-border { background: #e3c78f; }
 .bm-padding { background: #c6d7a7; border-style: dashed; }
-/* The top strip is one row: the band name, then its top value centred in what is left. Sharing the flow means neither can
-   cover the other, whatever the band's width or the font the interface is drawing with. */
-.bm-top { position: absolute; top: 1px; left: 12px; right: 12px; height: 18px; display: flex; align-items: center; gap: 6px; }
+/* The top strip holds the band's top value on the band's centre axis, straight above the bottom value. The band name is only a
+   watermark on the band's own fill: it sits out of the flow near the left edge and takes no part in placing any value. */
+.bm-top { position: absolute; top: 1px; left: 0; right: 0; height: 18px; display: flex; align-items: center; justify-content: center; }
 /* The band name is a watermark on its own fill: larger than a value and darker than the colour it sits on. */
-.bm-caption { flex: none; display: flex; align-items: center; height: 18px; font: 600 12.5px/18px var(--font); letter-spacing: .01em; pointer-events: none; }
+.bm-caption { position: absolute; top: 0; left: 5px; width: max-content; white-space: nowrap; display: flex; align-items: center; height: 18px; font: 600 12.5px/18px var(--font); letter-spacing: .01em; pointer-events: none; }
 /* A band too narrow for both gives the name less room first: it never clips, it steps down instead. */
 @container band (max-width: 180px) { .bm-caption { font-size: 10.5px; } }
 @container band (max-width: 130px) { .bm-caption { font-size: 8px; } }
@@ -998,67 +998,54 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
   .swatch:not(.plain) { width: 28px; height: 28px; }
 }
 
-/* Border is the ring of radii and colour, not a second box model: a radius sits in each corner, the colour in the middle, and
-   one field under the ring gives every corner the same radius. Edge widths are not repeated here — they own the four sides of
-   the box model's border band, one place to write them. */
-/* The border layer of the box model, copied into Border: the same fill, the same one-pixel frame, square corners and the same
-   size, centred — with a hole where the widget above shows its content, so the panel's own surface reads through it. */
+/* Border is the box model's border band pulled out at its own size and cut into the four trapezoids of a picture frame: each
+   one is the colour selector of its side and is painted in that colour. A radius with its unit sits in each corner; the cut-out
+   middle (the padding band's own place) holds one radius and one colour for all four. Edge widths are not repeated here — they
+   own the four sides of the box model's border band, one place to write them. The --br-* insets are the cut-out's measured place. */
 .br-shell { position: relative; display: grid; justify-items: center; gap: 6px; margin: 2px 0 0; container: ring / inline-size; }
-.br-box {
-  --br-field: 30px;
-  position: relative;
-  box-sizing: border-box;
-  min-height: 108px;
-  border: 1px solid #4c4b40;
-  border-radius: 0;
-  background: #e3c78f;
-  color: #202621;
+.br-box { width: 100%; --br-l: 36px; --br-t: 20px; --br-r: 36px; --br-b: 20px; position: relative; box-sizing: border-box; min-height: 108px; border: 1px solid #4c4b40; border-radius: 0; background: #e3c78f; color: var(--ink); }
+/* A side is the whole polygon between the outer edge and the cut-out, mitred on the diagonals; the pointer only reaches its own shape. */
+.br-cell.br-side { position: absolute; inset: 0; z-index: 1; }
+.br-side > .color-field, .br-side > .color-field .swatch { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.br-side .swatch { cursor: pointer; }
+.br-side:hover > .color-field .swatch { filter: brightness(1.08); }
+.br-side > .color-field .swatch:focus-visible { outline: var(--focus-ring) solid var(--accent); outline-offset: -4px; }
+.br-t { clip-path: polygon(0 0, 100% 0, calc(100% - var(--br-r)) var(--br-t), var(--br-l) var(--br-t)); }
+.br-r { clip-path: polygon(100% 0, 100% 100%, calc(100% - var(--br-r)) calc(100% - var(--br-b)), calc(100% - var(--br-r)) var(--br-t)); }
+.br-b { clip-path: polygon(100% 100%, 0 100%, var(--br-l) calc(100% - var(--br-b)), calc(100% - var(--br-r)) calc(100% - var(--br-b))); }
+.br-l { clip-path: polygon(0 100%, 0 0, var(--br-l) var(--br-t), var(--br-l) calc(100% - var(--br-b))); }
+/* The cut-out: the panel's own surface, as if the inside of the band had been cut away, framed like the band's inner edge. */
+.br-hole { position: absolute; left: var(--br-l); top: var(--br-t); right: var(--br-r); bottom: var(--br-b); display: grid; align-content: center; background: var(--solid); outline: 1px solid #4c4b40; }
+/* A radius in each corner of the rim, on a small chip of the panel's surface so its digits read over any side colour. */
+.br-cell { position: absolute; z-index: 2; display: flex; align-items: center; justify-content: center; }
+.br-tl { top: 0; left: 1px; } .br-tr { top: 0; right: 1px; }
+.br-bl { bottom: 0; left: 1px; } .br-br { bottom: 0; right: 1px; }
+.br-box .vf.br-field { flex: none; gap: 0; width: auto; min-height: 20px; height: 20px; padding: 0 0 0 3px; border-radius: var(--radius-small); background: color-mix(in srgb, var(--solid) 92%, transparent); color: var(--ink); }
+.br-box .vf.br-field:hover { background: var(--solid); }
+.br-box .vf.br-field .vf-input { flex: none; width: 4ch; min-width: 0; padding: 0; color: inherit; font: 10px/16px var(--mono); text-align: center; }
+.br-box .vf.br-field .vf-input::placeholder { color: var(--muted); opacity: 1; }
+.br-box .vf.br-field .vf-unit.unit-switch { min-width: 20px; min-height: 20px; height: 20px; padding: 0 2px; font-size: 9px; }
+/* The middle: the one radius for every corner above the one colour for every side, each as wide as the cut-out. */
+.br-centre { display: grid; gap: 4px; min-width: 0; width: 100%; padding: 0 6px; box-sizing: border-box; }
+.br-centre > .vf, .br-centre .color-field { height: 24px; min-height: 24px; box-sizing: border-box; }
+.br-centre .vf .vf-input, .br-centre .color-field .color-hex { min-height: 24px; font-size: 10.5px; }
+.br-centre .color-field .vf-k { display: none; }
+.br-centre .color-field .swatch { width: 18px; height: 18px; margin-left: 3px; }
+.br-centre .color-field { flex-wrap: nowrap; }
+.br-centre .color-field .color-hex { flex: 1 1 0; min-width: 0; width: 100%; }
+/* Too small a cut-out hands the pair to the row under the frame, at the panel's usual control size. */
+.br-shell.br-compact > .br-centre { padding: 0; }
+.br-shell.br-compact > .br-centre > .vf, .br-shell.br-compact > .br-centre .color-field { height: 28px; min-height: 28px; }
+@media (pointer: coarse) {
+  .br-box .vf.br-field, .br-box .vf.br-field .vf-unit.unit-switch { min-height: 24px; height: 24px; }
+  .br-box .vf.br-field .vf-unit.unit-switch { min-width: 24px; }
+  .br-cell.br-tl, .br-cell.br-tr { top: 0; } .br-cell.br-bl, .br-cell.br-br { bottom: 0; }
+  .br-centre > .vf, .br-centre .color-field { height: 28px; min-height: 28px; }
+  .br-centre .color-field .swatch { width: 24px; height: 24px; }
 }
-/* The hole: the panel's own surface, as if the inside of the band had been cut away. */
-.br-hole { position: absolute; inset: 24px 36px; background: var(--solid); }
-.br-cell { position: absolute; display: flex; align-items: center; justify-content: center; z-index: 1; }
-.br-tl { top: 4px; left: 5px; } .br-tr { top: 4px; right: 5px; }
-.br-bl { bottom: 4px; left: 5px; } .br-br { bottom: 4px; right: 5px; }
-/* A colour selector on each edge, in the rim between the frame and the cut-out middle: one swatch, the side's own colour. */
-.br-t { top: 2px; left: 50%; transform: translateX(-50%); }
-.br-b { bottom: 2px; left: 50%; transform: translateX(-50%); }
-.br-l { left: 6px; top: 50%; transform: translateY(-50%); }
-.br-r { right: 6px; top: 50%; transform: translateY(-50%); }
-/* The box model's own small inputs, edge for edge: same height, same centred mono value, same quiet surface. */
-.br-box .vf.br-field { flex: none; width: var(--br-field); min-height: 18px; height: 18px; padding: 0; border-radius: var(--radius-small); background: transparent; box-shadow: none; color: inherit; }
-.br-box .vf.br-field:hover { background: #ffffff30; }
-.br-box .vf.br-field:focus-within { background: var(--solid); color: var(--ink); }
-.br-box .vf.br-field .vf-input { width: 100%; min-width: 0; padding: 0; color: inherit; font: 10px/16px var(--mono); text-align: center; }
-.br-box .vf.br-field .vf-input::placeholder { color: inherit; opacity: .72; }
-/* The hole holds the one radius that speaks for the whole border, on the panel's own surface. */
-.br-centre {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-  width: min(calc(var(--br-ring, 100%) - 96px), 180px);
-}
-.br-shell.br-compact .br-centre { position: static; transform: none; width: 100%; }
-/* The middle is a hole a few dozen pixels wide: the one radius for every corner names itself on its own line and keeps its
-   value whole underneath, rather than abbreviating the number. */
-.br-centre .br-all { display: grid; justify-items: center; gap: 0; min-width: 0; height: auto; min-height: 24px; padding: 1px 4px; }
-.br-centre .br-all .vf-k { justify-content: center; padding: 0; min-width: 0; }
-.br-centre .br-all .vf-input { text-align: center; min-width: 0; width: 100%; }
-/* The ring's frame is painted in the element's own border colours, two pixels wide so a side's colour reads as that side. */
-.br-box { border-width: 2px; }
-/* The swatch-only colour selector: one target, no label, no value line. */
-.br-colour-cell .color-swatch-only { min-height: 0; padding: 0; background: transparent; }
-.br-colour-cell .color-swatch-only .swatch { width: 24px; height: 24px; border-radius: var(--radius-small); box-shadow: 0 0 0 1px #4c4b4088; }
 @container ring (max-width: 132px) {
-  .br-box { --br-field: 26px; }
-  .br-hole { inset: 24px 32px; }
-  .br-box .vf.br-field .vf-input { font-size: 9px; }
-  .br-t { top: 1px; } .br-b { bottom: 1px; }
-  .br-l { left: 4px; } .br-r { right: 4px; }
+  .br-box .vf.br-field .vf-input { width: 3.5ch; font-size: 9px; }
+  .br-box .vf.br-field .vf-unit.unit-switch { font-size: 8px; padding: 0 1px; }
 }
 /* Border owns its line, the colour of each side and the radius; Appearance keeps fill and typography. */
 .appearance-box, .border-box { display: grid; gap: 8px; }

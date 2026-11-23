@@ -153,11 +153,11 @@ try {
   assert.deepEqual(watermark.map(band => band.label), ['position', 'margin', 'border', 'padding'], 'every band still names itself');
   assert.deepEqual(watermark.filter(band => !band.centred).map(band => band.label), [], 'a side value stays centred in its own strip');
   assert.deepEqual(watermark.filter(band => !band.inside || band.offset < 4 || band.offset > 12).map(band => `${band.label}/${band.offset}`), [], 'the band name sits inside its band, 4-12px in from the left edge');
-  assert.deepEqual(watermark.filter(band => band.bandWidth > 200 && band.offset !== 12).map(band => `${band.label}/${band.offset}`), [], 'a roomy band keeps the full 12px inset');
+  assert.deepEqual(watermark.filter(band => band.bandWidth > 200 && band.offset !== 5).map(band => `${band.label}/${band.offset}`), [], 'a roomy band keeps the name 5px from its left edge, out of the flow of every value');
   assert.deepEqual(watermark.filter(band => band.roomy && band.size < band.valueSize).map(band => `${band.label}/${band.size}<${band.valueSize}`), [], 'a roomy band writes its name larger than the values it backs');
   assert.deepEqual(watermark.filter(band => band.size < 8).map(band => `${band.label}/${band.size}`), [], 'the band name never drops below the type size the bands already used for it');
   assert.deepEqual(watermark.filter(band => band.darker === false).map(band => band.label), [], 'the band name is darker than the fill it sits on');
-  checks.push('each band names itself as a darker watermark 12px in, and side values are centred in their own strip');
+  checks.push('each band names itself as a darker watermark 5px in, and side values are centred in their own strip');
 
   const paddingValues = () => frame.locator('[data-divlet-id="nav"]').evaluate(node => {
     const style = getComputedStyle(node);

@@ -83,7 +83,7 @@ function toggle(iconName, tip, on, run) {
  */
 const UNIT_NAMES = { '%': 'Percent %', px: 'Pixels px', em: 'Em em', rem: 'Rem rem', '×': 'Multiple ×' };
 
-function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw => raw, stepFrom = Number.parseFloat, step = 1, min = -1e6, max = 1e6, variants = [], unit = '', units = null, convert = () => null, defaultUnit = null } = {}) {
+function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw => raw, stepFrom = Number.parseFloat, step = 1, min = -1e6, max = 1e6, variants = [], unit = '', units = null, convert = () => null, defaultUnit = null, spell = false } = {}) {
   const wrap = el('label', 'vf');
   const name = el('span', 'vf-k scrub', label);
   const input = el('input', 'vf-input');
@@ -101,6 +101,10 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
   if (variants.length) wrap.append(el('i', 'variant-dot'));
   wrap.prepend(name, input);
   let syncUnit = () => {};
+  // A bare number typed into a field with a unit menu is written in the unit the menu names, so `50` beside `%` is `50%`.
+  let spelling = text => text;
+  // A unit typed into the number (`100%`) moves to the unit button once the value is accepted; the field then holds only the number.
+  let adoptUnit = () => {};
   // A unit button: it names the unit the value is written in and rewrites the same length in another one, so a line height
   // can be read and written as `150%`, `24px`, `1.5em` or `1.5` without leaving the field. A value that has no unit yet
   // (empty, `normal`) keeps the unit last chosen for this field, opening with the field's own default.
@@ -111,8 +115,11 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
     unitButton.setAttribute('aria-haspopup', 'menu');
     unitButton.setAttribute('aria-label', `${tip || label} unit`);
     let chosen = null;
-    const now = () => unit || chosen || defaultUnit;
-    const sync = () => { unitButton.textContent = now(); };
+    const now = () => chosen || unit || defaultUnit;
+    if (spell) spelling = text => (/^-?(?:\d+\.?\d*|\.\d+)$/.test(text) && now() && now() !== '×' ? `${text}${now()}` : text);
+    // A keyword such as `full` or `normal` is not a number and has no unit, so the button steps aside until a number returns.
+    const sync = () => { unitButton.textContent = now(); unitButton.hidden = /^[a-z][a-z-]*$/i.test(input.value.trim()); };
+    adoptUnit = to => { chosen = to; sync(); };
     syncUnit = sync;
     // A new unit rewrites the number, not the meaning: `24` px becomes `150` % or `1.5` em. The authored spelling is the
     // source, so the switch really writes; with no value yet (`normal`, empty) it only remembers the unit for this field.
@@ -121,7 +128,7 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
       chosen = to;
       sync();
       const next = unit && written ? convert(written, unit, to) : null;
-      if (next == null || !written || to === unit) return;
+      if (next == null || !written || to === unit) { if (written && unit) { chosen = null; sync(); } return; }
       const spelled = to === '×' ? next : `${next}${to}`;
       const parsed = parse(spelled);
       if (parsed === undefined) { toast(`“${spelled}” is not a value for ${tip || label}`); return; }
@@ -169,16 +176,18 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
     clearTimeout(typing);
     typing = setTimeout(() => {
       const text = input.value.trim();
-      if (text === current || parse(text) === undefined) return;
+      if (text === current || parse(spelling(text)) === undefined) return;
       commit(text, { live: true });
     }, 140);
   });
   const commit = (raw, { live = false } = {}) => {
     const text = String(raw).trim();
     if (text === current) return;
-    const parsed = parse(text);
+    const parsed = parse(spelling(text));
     if (parsed === undefined) { toast(`“${text}” is not a value for ${tip || label}`); input.value = current; return; }
-    current = text;
+    const typed = units ? /^(-?(?:\d+\.?\d*|\.\d+))(px|rem|em|%)$/i.exec(text) : null;
+    if (typed && units.includes(typed[2].toLowerCase())) { adoptUnit(typed[2].toLowerCase()); input.value = typed[1]; syncUnit(); }
+    current = typed && units.includes(typed[2].toLowerCase()) ? typed[1] : text;
     typingLive = live;
     try { onCommit(parsed, text); } finally { typingLive = false; }
   };
@@ -407,109 +416,132 @@ const pxOf = raw => {
 };
 
 /**
- * The border as a ring: the band copied from the box model, painted in the element's own border colours. A radius sits in each
- * corner, a colour selector at each edge's centre for that side, and one radius for all four corners in the middle. Edge widths
- * are not repeated here — they have their own home on the four sides of the box model's border band.
+ * The border as a frame: the box model's border band pulled out at its own size, its four sides cut on the diagonals into the
+ * trapezoids of a picture frame. Each trapezoid is the colour selector of its own side and is painted in that colour, so the
+ * preview and the control are one thing. A radius with its unit sits in each corner, and the cut-out middle — the box model's
+ * padding band — holds one radius for all four corners and one colour for all four sides. Edge widths are not repeated here: they
+ * live on the four sides of the box model's border band.
  */
 function borderDiagram({ value, run, measured, tokens }) {
   const box = el('div', 'br-box');
   box.setAttribute('role', 'group');
-  box.setAttribute('aria-label', 'Border ring: corner radii and the colour of each side');
-  // The band itself, copied: its own fill, its one-pixel frame and square corners, at its own size, with the middle cut out so the
-  // panel's own surface shows through where the content sits. Its frame is painted in the border colours themselves.
-  box.append(el('div', 'br-hole'));
+  box.setAttribute('aria-label', 'Border frame: corner radii and the colour of each side');
+  const hole = el('div', 'br-hole');
   const cell = (node, className) => { const wrap = el('div', `br-cell ${className}`); wrap.append(node); return wrap; };
   const CORNERS = [['tl', 'top-left'], ['tr', 'top-right'], ['bl', 'bottom-left'], ['br', 'bottom-right']];
   const measuredOf = corner => pxOf(measured?.colors?.[`radius${corner === 'tl' ? 'TopLeft' : corner === 'tr' ? 'TopRight' : corner === 'bl' ? 'BottomLeft' : 'BottomRight'}`]);
+  const fonts = { em: fontSizePx(measured), rem: 16 };
+  // The number and its unit are separate: the unit is a menu on the right of the field that rewrites the same radius in another
+  // spelling, and a bare number typed beside it takes that unit.
+  const radiusOptions = (tip, quoted, unit) => ({
+    tip, placeholder: quoted == null ? '—' : String(Math.round(quoted)), min: 0, max: 1e4, parse: css.radiusInput, spell: true,
+    units: ['px', '%', 'rem', 'em'], defaultUnit: 'px', unit: unit === MIXED ? '' : unit || '',
+    convert: (number, from, to) => css.cornerRadiusIn(number, from, to, fonts),
+  });
   const corner = key => {
     const named = CORNERS.find(([short]) => short === key)[1];
     const property = `border-${named}-radius`;
-    const shown = value(v => { const radius = css.cornerRadiusOf(v, named); return radius === undefined ? MIXED : radius; });
+    const shown = value(v => { const radius = css.cornerRadiusNumber(v, named); return radius === undefined ? MIXED : radius; });
+    const unit = value(v => css.cornerRadiusUnit(v, named));
     // The empty field quotes the radius this corner has on the page, so a radius set by a stylesheet is still visible.
-    const quoted = measuredOf(key);
-    const node = field(`radius-${key}`, '', shown, next => run({ [property]: next }, `${named.replace('-', ' ')} radius ${next ?? 'default'}`), {
-      tip: `${named.replace('-', ' ')} corner radius`, placeholder: quoted == null ? '—' : String(Math.round(quoted)), min: 0, max: 1e4, parse: css.radiusInput,
-    });
+    const node = field(`radius-${key}`, '', shown, next => run({ [property]: next }, `${named.replace('-', ' ')} radius ${next ?? 'default'}`), radiusOptions(`${named.replace('-', ' ')} corner radius`, measuredOf(key), unit));
     node.querySelector('.vf-k')?.remove();
     node.classList.add('br-field');
     node.setAttribute('aria-label', `${named} corner radius`);
     return cell(node, `br-corner br-${key}`);
   };
-  // One colour selector per side, at that side's own edge: it paints the ring's frame as soon as a colour is picked, so the
-  // preview answers to the control without waiting for the write to come back.
-  const painted = () => {
-    for (const side of BORDER_SIDES) {
-      const shown = colourShown(value(view => view[`border-${side}-color`] ?? view['border-color'] ?? null));
-      const real = measured?.colors?.[`border${side[0].toUpperCase()}${side.slice(1)}Color`];
-      const colour = shown && shown !== MIXED ? shown : real;
-      if (colour) box.style.setProperty(`border-${side}-color`, colour);
-    }
-  };
+  // A colour selector over the whole trapezoid of one side: the native picker's swatch fills it and paints it.
   const sideColour = side => {
     const label = `${BORDER_SIDES_MENU.find(([key]) => key === side)[1]} border`;
-    const property = `border-${side}-color`;
     const node = colorField({
-      key: `stroke-${side}`, label, tip: `Border ${side} color`, property, value,
-      // The pick writes the colour and the ring's own frame at the same moment; the field's tip keeps quoting the page.
-      run: (patch, label) => {
-        for (const [name, next] of Object.entries(patch)) if (name === property && next) box.style.setProperty(`border-${side}-color`, /^#|^rgb|^var\(/i.test(String(next)) ? next : String(next));
-        return run(patch, label);
-      },
+      key: `stroke-${side}`, label, tip: `Border ${side} color`, property: `border-${side}-color`, value, run,
       computed: measured?.colors?.[`border${side[0].toUpperCase()}${side.slice(1)}Color`], tokens, compact: true,
     });
     node.classList.add('br-colour');
     node.setAttribute('aria-label', `${label} colour`);
-    return cell(node, `br-colour-cell br-${side[0]}`);
+    return cell(node, `br-side br-${side[0]}`);
   };
-  const shell = el('div', 'br-shell');
   const centre = el('div', 'br-centre');
   // One radius for all four corners: it reads as one value only while they agree, and writing it replaces every corner at once,
   // so a value authored per corner cannot survive behind it and contradict what the field says.
-  const every = value(view => {
-    const all = CORNERS.map(([, corner]) => css.cornerRadiusOf(view, corner));
-    if (all.some(radius => radius === undefined)) return MIXED;
-    return all.every(radius => radius === all[0]) ? all[0] : MIXED;
-  });
+  const agreed = read => {
+    const all = CORNERS.map(([, corner]) => read(corner));
+    if (all.some(item => item === undefined)) return MIXED;
+    return all.every(item => item === all[0]) ? all[0] : MIXED;
+  };
+  const every = value(view => agreed(corner => css.cornerRadiusNumber(view, corner)));
+  const everyUnit = value(view => agreed(corner => css.cornerRadiusUnit(view, corner)));
   const measuredCorners = CORNERS.map(([key]) => measuredOf(key));
-  const quotedAll = measuredCorners.every(radius => radius != null && radius === measuredCorners[0]) ? String(Math.round(measuredCorners[0])) : '—';
+  const quotedAll = measuredCorners.every(radius => radius != null && radius === measuredCorners[0]) ? measuredCorners[0] : null;
   // The four corner longhands, not the `border-radius` shorthand: a style engine lowers per-corner declarations into utilities it
   // owns, while the shorthand would leave nothing behind that the compiler can write.
   const cornersLonghands = next => Object.fromEntries(CORNERS.map(([, corner]) => [`border-${corner}-radius`, next]));
-  const allCorners = field('radius', 'All corners', every, next => run(cornersLonghands(next), next == null ? 'default corner radius' : `corner radius ${next}`), {
-    tip: 'Radius of all four corners', placeholder: quotedAll, min: 0, max: 1e4, parse: css.radiusInput,
-  });
+  const allCorners = field('radius', 'Radius', every, next => run(cornersLonghands(next), next == null ? 'default corner radius' : `corner radius ${next}`), radiusOptions('Radius of all four corners', quotedAll, everyUnit));
   allCorners.classList.add('br-all');
-  centre.append(allCorners);
-  box.append(corner('tl'), corner('tr'), corner('bl'), corner('br'),
-    sideColour('top'), sideColour('right'), sideColour('bottom'), sideColour('left'));
-  painted();
-  shell.append(box, centre);
-  followBandWidth(box, shell);
+  // One colour for all four sides, written as the four side longhands for the same reason as the radius. It shows a colour only
+  // while the sides agree.
+  const sameColour = value(view => {
+    const sides = BORDER_SIDES.map(side => colourShown(view[`border-${side}-color`] ?? view['border-color'] ?? null));
+    return sides.every(item => item === sides[0]) ? sides[0] : MIXED;
+  });
+  const sidesColours = BORDER_SIDES.map(side => measured?.colors?.[`border${side[0].toUpperCase()}${side.slice(1)}Color`]);
+  const allColour = colorField({
+    key: 'stroke-all', label: 'Border', tip: 'Colour of all four borders', property: 'border-color',
+    value: () => sameColour,
+    run: (patch, label) => run(Object.fromEntries(BORDER_SIDES.map(side => [`border-${side}-color`, patch['border-color']])), label),
+    computed: sidesColours.every(item => item && item === sidesColours[0]) ? sidesColours[0] : null, tokens: [],
+  });
+  allColour.classList.add('br-all-colour');
+  centre.append(allCorners, allColour);
+  hole.append(centre);
+  // Tab order follows what a reader sees: the four corner radii, one colour selector per edge, then the middle.
+  box.append(corner('tl'), corner('tr'), corner('bl'), corner('br'), ...BORDER_SIDES.map(sideColour), hole);
+  const shell = el('div', 'br-shell');
+  shell.append(box);
+  followBand(box, hole, centre, shell);
   return shell;
 }
 
 /**
- * Follow the box model's border band: the diagram is that band pulled out of the box, so it keeps the band's own width —
- * measured, because the band narrows and widens with the inspector — and lets go of it when the band is not on screen.
+ * Follow the box model's border band: the frame is that band pulled out of the box, so it has the band's own outer size and its
+ * cut-out is the padding band's own place inside it — measured, because the band narrows and widens with the inspector and with
+ * the values written on its edges. When that cut-out is too small to hold the two middle controls they step out under the frame
+ * instead of clipping, and when the band is not on screen the frame keeps its default shape.
  */
-function followBandWidth(node, shell) {
-  const panel = () => node.closest('#inspector');
+function followBand(box, hole, centre, shell) {
+  const panel = () => box.closest('#inspector');
   const apply = () => {
     const band = panel()?.querySelector('.boxmodel .bm-border');
+    const inner = band?.querySelector(':scope > .bm-centre > .bm-padding');
     // Layout pixels, not painted ones: the interface scale zooms the board, and a size copied from a zoomed rect would be
-    // written back already multiplied.
+    // written back already multiplied. `offsetLeft`/`offsetTop` are measured from the band's padding edge, which is exactly
+    // where this frame's own absolutely placed parts start.
     const width = band ? band.offsetWidth : 0, height = band ? band.offsetHeight : 0;
-    node.style.width = width > 60 ? `${width}px` : '';
-    // The band's own size, so this block is the same shape as the layer it copies; its controls may need it taller.
-    node.style.minHeight = height > 40 ? `${height}px` : '';
-    shell.style.setProperty('--br-ring', width > 60 ? `${width}px` : '100%');
-    // Below this the middle cannot hold a colour row, so the colour steps out under the band instead of clipping.
-    shell.classList.toggle('br-compact', width > 60 && width < 190);
+    const measuredHole = inner && width > 60 && height > 40 ? { left: inner.offsetLeft, top: inner.offsetTop, width: inner.offsetWidth, height: inner.offsetHeight } : null;
+    box.style.width = width > 60 ? `${width}px` : '';
+    box.style.height = height > 40 ? `${height}px` : '';
+    if (measuredHole) {
+      box.style.setProperty('--br-l', `${measuredHole.left}px`);
+      box.style.setProperty('--br-t', `${measuredHole.top}px`);
+      box.style.setProperty('--br-r', `${Math.max(0, band.clientWidth - measuredHole.left - measuredHole.width)}px`);
+      box.style.setProperty('--br-b', `${Math.max(0, band.clientHeight - measuredHole.top - measuredHole.height)}px`);
+    } else for (const name of ['--br-l', '--br-t', '--br-r', '--br-b']) box.style.removeProperty(name);
+    // Until the band has been measured the cut-out's size is a guess, so the pair waits under the frame rather than in a guess.
+    const roomy = !!measuredHole && measuredHole.width >= 120 && measuredHole.height >= 56;
+    shell.classList.toggle('br-compact', !roomy);
+    const home = roomy ? hole : shell;
+    if (centre.parentNode !== home) home.append(centre);
   };
   apply();
   requestAnimationFrame(apply);
   const observer = new ResizeObserver(apply);
-  requestAnimationFrame(() => { const host = panel(); if (host) observer.observe(host); else observer.disconnect(); });
+  requestAnimationFrame(() => {
+    const host = panel();
+    if (!host) { observer.disconnect(); return; }
+    observer.observe(host);
+    const band = host.querySelector('.boxmodel .bm-border');
+    if (band) observer.observe(band);
+  });
 }
 
 /** The measured font size in px — what `%`, `em` and a unitless line height are measured against. */

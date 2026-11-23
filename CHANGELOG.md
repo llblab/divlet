@@ -2,20 +2,21 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
+## 0.3.0 — Unreleased
+
+- **Border is a picture frame of colour selectors, cut like the band it copies.** The Border control is the box model's border
+  band at its own measured outer size with the padding band's measured place cut out, divided on the diagonals into four
+  trapezoids; each is the colour selector for its side and is painted in that colour. Each corner carries its radius with a
+  unit menu, and the cut-out holds one radius for all corners and one colour for all four sides (written as the four side
+  longhands). A unit typed into any unit-menu field (`100%`) moves to the clickable accent-coloured unit button on its right,
+  a bare number takes that unit, the menu rewrites px/rem/em exactly and keeps the number across `%`, and `full` has no unit.
+  The four edge widths stay out of Border: a width has one home, the four sides of the box model's border band. The box
+  model's band names became out-of-flow watermarks, so every top value now sits on the same axis as its bottom value
+  (`web/lib/properties.js`, `web/lib/css-props.js`, `web/board.css`, `web/tests/appearance.mjs`, `web/tests/spacing.mjs`,
+  `web/tests/toolbars.mjs`, `web/tests/css-props.test.js`).
+
 ## 0.2.0 — Inspector and history polish
 
-- **A colour selector on each edge, and a ring painted in those colours.** The Border ring no longer names a side from a menu
-  and edits one shared colour: each edge carries its own selector for its own side, the ring's frame is painted two pixels wide
-  in the element's real per-side border colours, and a picked colour shows there at once. The tip names the side and quotes the
-  colour it paints, Delete removes that side's colour alone, and the one radius for every corner moved into the ring's middle
-  (`web/lib/properties.js`, `web/board.css`, `core/lib/bridge.js`, `web/lib/canvas.js`, `web/tests/appearance.mjs`,
-  `web/tests/fluid.mjs`).
-- **Border is the ring of radii and colour, not a second box model.** The four edge widths are gone from it: a width has one
-  home, the four sides of the box model's border band, so it is written where the box model draws it. What is left is the ring
-  itself — a radius in each corner, the colour in the middle — plus one field under it that gives all four corners the same
-  radius; that field reads a single value only while the corners agree, and writing it replaces every corner so a per-corner
-  value cannot hide behind it. The Side control's caret now anchors to its own button instead of the ring's corner
-  (`web/lib/properties.js`, `web/board.css`, `web/tests/appearance.mjs`, `web/tests/fluid.mjs`).
 - **The interface measures itself in layout pixels.** At 200% the action row reported every action as twice its real width
   and kept only one plus the "more" menu, and the inspector's shared label column asked for twice the room it needed, so the
   Phone/200% `Fit height` action was reachable only inside the overflow menu. The chrome is drawn under
