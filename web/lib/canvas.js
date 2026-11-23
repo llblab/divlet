@@ -1533,7 +1533,7 @@ viewport.addEventListener('contextmenu', event => {
     const at = inside && event.target.closest('.frame-cover') && store.mode === 'select' ? framePoint(entry, event) : null;
     if (!store.selected.has(id)) selectArtboards([id]);
     if (at) postToFrame(id, { type: 'divlet:context-at', ...at });
-    else emit('context', { kind: 'artboard', id, x: event.clientX, y: event.clientY });
+    else emit('context', { kind: 'artboard', id, x: event.clientX, y: event.clientY, expand: true });
   } else emit('context', { kind: 'canvas', x: event.clientX, y: event.clientY, world: worldPoint(event.clientX, event.clientY) });
 });
 

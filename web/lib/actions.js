@@ -413,10 +413,15 @@ export function artboardItems(id) {
   ];
 }
 
-/** `expand`: the heading had no room for its Expand button, so its menu carries Expand instead (one slot, one occupant). */
+/**
+ * `expand`: Expand goes first in the menu. The heading's menu carries it only when the heading had no room for its own Expand button
+ * (one slot, one occupant); a context menu (right-click, the menu key, a Layers row) is the one place that lists every action of an
+ * artboard, so it always leads with Expand — never for several artboards at once, which Expand does not apply to.
+ */
 export function artboardMenu(id, position, { expand = false } = {}) {
   const items = artboardItems(id);
-  if (expand) items.unshift({ label: 'Expand', icon: 'expand', keys: 'E', run: () => canvas.openExpanded(id, canvas.entries.get(id)?.more) }, '-');
+  const several = store.selected.has(id) && store.selected.size > 1;
+  if (expand && !several) items.unshift({ label: 'Expand', icon: 'expand', keys: keys('E'), run: () => canvas.openExpanded(id, canvas.entries.get(id)?.more) }, '-');
   openMenu(items, { ...position, label: 'Artboard' });
 }
 

@@ -2,11 +2,15 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
-## 0.3.5 — Unreleased
+## 0.3.5 — A default that says what it is, and Expand in a frame's menu
 
 - **A default colour no longer reads as a chosen one.** A Border side with no colour set showed the text colour it resolves to as a
   hex in the field, as if it had been picked. The field now says `currentColor`, the swatch keeps the resolved colour under the
-  hatching, and the hex of the text colour is only in the tip (`web/lib/properties.js`, `web/tests/appearance.mjs`).
+  hatching, and the hex of the text colour is only in the tip; the hatching's lines are now seven pixels apart instead of four, so
+  it no longer shouts (`web/lib/properties.js`, `web/board.css`, `web/tests/appearance.mjs`).
+- **A frame's context menu leads with Expand.** Right-clicking a frame (or pressing the menu key, or right-clicking its Layers row)
+  listed every action except Expand, which the heading and the inspector's lower row already had; it is now the first entry, for
+  one artboard (`web/lib/actions.js`, `web/lib/canvas.js`, `web/lib/layers.js`, `web/board.js`, `web/tests/controls.mjs`).
 
 ## 0.3.4 — Hatching means the default, and Undo reaches a colour selector
 

@@ -315,7 +315,7 @@ function handleKey(event) {
   if (key === 'contextmenu' || (event.shiftKey && key === 'f10')) {
     prevent();
     if (node) actions.nodeMenu(node.documentId, canvas.anchorPoint(node.documentId, node.nodeIds[0]));
-    else if (single) actions.artboardMenu(single, canvas.anchorPoint(single, null));
+    else if (single) actions.artboardMenu(single, canvas.anchorPoint(single, null), { expand: true });
     else return false;
     return true;
   }

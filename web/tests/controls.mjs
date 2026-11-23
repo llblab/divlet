@@ -266,6 +266,11 @@ try {
   for (const other of runtime.info().documents) if (other.id !== copy) assert.equal(overlaps(doc(copy).artboard, other.artboard), false, `the copy overlaps ${other.id}`);
   const copyBox = await board(copy).locator('.ab-label').boundingBox();
   await page.mouse.click(copyBox.x + 30, copyBox.y + copyBox.height / 2, { button: 'right' });
+  // The context menu is the one place that lists every action of a frame, so it leads with Expand, as the inspector's bar does.
+  await waitUntil(async () => (await page.locator('.menu[aria-label="Artboard"] .menu-item').count()) > 0, 'the frame\'s context menu opens');
+  const contextItems = await page.locator('.menu[aria-label="Artboard"] .menu-item').allInnerTexts();
+  assert.match(contextItems[0], /^Expand/, `the context menu of a frame leads with Expand (${contextItems[0]})`);
+  assert.equal(contextItems.filter(text => /^Expand/.test(text)).length, 1, 'and lists it once');
   await menuItem('Delete artboard').click();
   await waitUntil(() => !ids().includes(copy), 'delete from the context menu');
   await page.locator('#toast .toast-action', { hasText: 'Undo' }).click();

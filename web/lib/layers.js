@@ -225,7 +225,7 @@ function boardRow(doc, model) {
   item.addEventListener('contextmenu', event => {
     event.preventDefault();
     if (!store.selected.has(doc.id)) selectArtboards([doc.id]);
-    artboardMenu(doc.id, { x: event.clientX, y: event.clientY });
+    artboardMenu(doc.id, { x: event.clientX, y: event.clientY }, { expand: true });
   });
   item.addEventListener('keydown', event => rowKeydown(event, item));
   return item;
