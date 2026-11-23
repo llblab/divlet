@@ -3583,7 +3583,7 @@
         "text-339": {
           "id": "text-339",
           "type": "text",
-          "content": "Version 0.3.1. The native project format remains a pre-freeze draft, so keep backups of projects you care about.",
+          "content": "Version 0.3.2. The native project format remains a pre-freeze draft, so keep backups of projects you care about.",
           "metadata": {}
         },
         "agents": {
