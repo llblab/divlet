@@ -163,7 +163,7 @@ try {
   await colorRow('project color swatches');
   assert.equal(await page.locator('#inspector [data-section="spacing"] [data-key="radius"], #inspector [data-section="spacing"] .br-box').count(), 0, 'the box model keeps no radius field');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="radius-tl"]').count(), 1, 'Border gives each corner its own radius field, in its ring');
-  assert.equal(await page.locator('#inspector [data-section="border"] .br-corner').count(), 4, 'one radius in each corner of the ring');
+  assert.equal(await page.locator('#inspector [data-section="border"] .br-row .br-field').count(), 4, 'one radius for each corner, outside the frame');
   assert.equal(await page.locator('#inspector [data-section="border"] .br-side input[type="color"]').count(), 4, 'every side is its own colour selector: one trapezoid of the frame each');
   assert.equal(await page.locator('#inspector [data-section="border"] .br-centre [data-key="stroke-all"]').count(), 1, 'and one colour in the middle gives all four sides the same colour');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="stroke"]').count(), 0, 'there is no legacy shared colour field');
@@ -173,7 +173,7 @@ try {
   assert.equal(await page.locator('#inspector .boxmodel .bm-border > .bm-cell input, #inspector .boxmodel .bm-border > .bm-top > .bm-cell input').count(), 4, 'and the band still edits all four widths');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="border-side"]').count(), 0, 'no separate control names the side: each selector is already on its side');
   {
-    // The band is copied: its own fill, its one-pixel frame, its square corners and its size, centred in the section — with the
+    // The band is copied: its one-pixel frame, its square corners and its size, centred in the section — with the
     // middle cut out so the panel's own surface shows where the widget above puts its content band.
     const copy = await waitUntil(() => page.evaluate(() => {
       const ring = document.querySelector('#inspector .br-box'), band = document.querySelector('#inspector .boxmodel .bm-border');
@@ -182,7 +182,7 @@ try {
       const box = node => { const r = node.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), left: Math.round(r.left), right: Math.round(r.right) }; };
       // The copy keeps the band's fill, square corners and size; its frame carries the element's own border colours, which is
       // what makes it the border's preview rather than a second box model.
-      const surface = style => [style.backgroundColor, style.borderTopStyle, style.borderRadius].join(' ');
+      const surface = style => [style.borderTopStyle, style.borderTopWidth, style.borderRadius].join(' ');
       const middle = box(ring), frame = box(section), cut = box(hole);
       const panel = getComputedStyle(document.body);
       const report = {
@@ -195,13 +195,17 @@ try {
       };
       return report.surface === report.sourceSurface && Math.abs(report.size.w - report.source.w) <= 1 ? report : null;
     }), 'the border band is copied into Border');
-    assert.equal(copy.surface, copy.sourceSurface, 'the copy shares the band\'s fill, line style and square corners');
+    assert.equal(copy.surface, copy.sourceSurface, 'the frame shares the band\'s one-pixel line and square corners (its own fill is the seam between the sides)');
     assert.equal(copy.size.w, copy.source.w, `and its width (${copy.size.w} vs ${copy.source.w})`);
     assert.ok(Math.abs(copy.size.h - copy.source.h) <= 4, `and its height (${copy.size.h} vs ${copy.source.h})`);
     assert.equal(copy.captions, 0, 'and carries no caption of its own');
     assert.equal(copy.centred, true, 'it is centred in the section, on the same axis as the band it copies');
     assert.ok(copy.hole[0] > 20 && copy.hole[0] < 60, `the middle is cut out (${copy.hole[0]}px of rim)`);
     assert.equal(copy.holeColour, copy.surfaceOfPanel, 'showing the panel\'s own surface through the cut');
+    // The frame is the band, and its cut-out is the padding band, to the pixel — in layout pixels, whatever the interface scale.
+    const sizes = await page.evaluate(() => { const q = selector => document.querySelector(selector); return { frame: [q('#inspector .br-box').offsetWidth, q('#inspector .br-box').offsetHeight], band: [q('#inspector .bm-border').offsetWidth, q('#inspector .bm-border').offsetHeight], hole: [q('#inspector .br-hole').offsetWidth, q('#inspector .br-hole').offsetHeight], padding: [q('#inspector .bm-padding').offsetWidth, q('#inspector .bm-padding').offsetHeight] }; });
+    assert.deepEqual(sizes.frame, sizes.band, 'the frame is exactly the border band\'s outer size');
+    assert.deepEqual(sizes.hole, sizes.padding, 'and its cut-out exactly the padding band\'s');
   }
   assert.equal(await page.locator('#inspector [data-section="appearance"] [data-key="radius"], #inspector [data-section="appearance"] [data-key^="stroke-"]').count(), 0, 'no third home in Appearance');
   const sectionOrder = await page.locator('#inspector [data-section]').evaluateAll(nodes => nodes.map(node => node.dataset.section));
@@ -374,13 +378,13 @@ try {
   // The middle controls live in the cut-out while it can hold them whole, and step out under the frame when it cannot: either way
   // none of them is clipped by, or sticks out of, the place it is in.
   assert.equal(await page.locator('#inspector .br-shell').evaluate(shell => {
-    const centre = shell.querySelector('.br-centre'), home = (centre.parentNode === shell ? shell.querySelector('.br-box') : shell.querySelector('.br-hole')).getBoundingClientRect(), c = centre.getBoundingClientRect();
-    return c.left >= home.left - 1 && c.right <= home.right + 1 && c.top >= home.top - 1 && (centre.parentNode === shell || c.bottom <= home.bottom + 1) && centre.scrollWidth <= centre.clientWidth + 1;
-  }), true, 'the radius and colour for all sides sit whole in the frame\'s cut-out, or under it when it is too small');
+    const centre = shell.querySelector('.br-centre'), home = shell.querySelector('.br-hole').getBoundingClientRect(), c = centre.getBoundingClientRect();
+    return centre.parentNode === shell.querySelector('.br-hole') && c.left >= home.left - 1 && c.right <= home.right + 1 && c.top >= home.top - 1 && c.bottom <= home.bottom + 1 && centre.scrollWidth <= centre.clientWidth + 1;
+  }), true, 'the radius and colour for all sides always sit whole in the frame\'s cut-out, even at the narrowest inspector');
   // The ring: a radius in each corner, a width at each edge's centre, the colour in the middle, and one control naming the side.
   {
     const diagram = page.locator('#inspector [data-section="border"] .br-shell');
-    assert.equal(await diagram.locator('.br-corner').count(), 4, 'one field per corner');
+    assert.equal(await diagram.locator('.br-row .br-field').count(), 4, 'one field per corner');
     assert.equal(await diagram.locator('.br-edge').count(), 0, 'no edge widths in the ring');
     assert.equal(await diagram.locator('.br-centre [data-key="radius"]').count(), 1, 'one radius for all four corners in the middle');
     assert.equal(await page.locator('#inspector [data-section="border"] .br-centre [data-key="radius"]').count(), 1, 'and the one radius for every corner in the middle of the ring');
@@ -464,13 +468,13 @@ try {
   await page.locator('#inspector [data-key="border-r"]').fill('4'); await page.keyboard.press('Tab');
   await waitUntil(async () => JSON.stringify(await borderWidths()) === JSON.stringify(['2px', '4px', '3px', '3px']), 'a second side takes its own width');
   assert.equal(await page.locator('#inspector [data-key^="border-width-"]').count(), 0, 'no second copy of a width appeared while editing');
-  // Inside the ring the reading order is geometry: the four corner radii, then one colour selector per edge (top, right, bottom,
-  // left), then the single radius for all four in the middle.
-  await page.locator('#inspector [data-key="radius-br"]').focus();
+  // The reading order is geometry: the top corners (each number, then its unit), one colour selector per side (top, right,
+  // bottom, left), then the middle's radius and colour, then the bottom corners.
+  await page.locator('#inspector [data-key="radius-tr"]').focus();
   await page.keyboard.press('Tab');
-  assert.equal(await page.evaluate(() => document.activeElement?.dataset.key ?? ''), 'unit:radius-br', 'a corner\'s unit menu follows its number');
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.key ?? ''), 'unit:radius-tr', 'a corner\'s unit menu follows its number');
   await page.keyboard.press('Tab');
-  assert.equal(await page.evaluate(() => document.activeElement?.closest('.br-side')?.className.includes('br-t') ?? false), true, 'after the last corner comes the top edge\'s colour');
+  assert.equal(await page.evaluate(() => document.activeElement?.closest('.br-side')?.className.includes('br-t') ?? false), true, 'after the top corners comes the top side\'s colour');
   await page.locator('#inspector .br-side.br-l .swatch').focus();
   await page.keyboard.press('Tab');
   assert.equal(await page.evaluate(() => document.activeElement?.dataset.key ?? ''), 'radius', 'after the last side comes the one radius for every corner');
@@ -794,12 +798,15 @@ try {
       if (!ring) bad.push('the copy is missing');
       else {
         const frame = ring.getBoundingClientRect(), hole = ring.querySelector('.br-hole').getBoundingClientRect();
-        for (const field of ring.querySelectorAll('.br-cell')) {
+        // The corner radii sit outside the frame, above and below its corners: within its width, never over a side.
+        for (const field of section.querySelectorAll('.br-row .br-field')) {
           const box = field.getBoundingClientRect();
-          if (box.left < frame.left - 1 || box.right > frame.right + 1 || box.top < frame.top - 1 || box.bottom > frame.bottom + 1) bad.push(`${field.className.slice(-8)} leaves the copy`);
-          const inside = box.left >= hole.left - 1 && box.right <= hole.right + 1 && box.top >= hole.top - 1 && box.bottom <= hole.bottom + 1;
-          if (inside) bad.push(`${field.className.slice(-8)} sits in the cut middle`);
+          if (box.left < frame.left - 1 || box.right > frame.right + 1) bad.push(`${field.dataset.key || field.className.slice(-8)} leaves the frame's width`);
+          if (Math.min(box.bottom, frame.bottom) - Math.max(box.top, frame.top) > 1) bad.push(`${field.className.slice(-8)} covers the frame`);
         }
+        // The middle always stays in the cut-out.
+        const centre = section.querySelector('.br-centre').getBoundingClientRect();
+        if (centre.left < hole.left - 1 || centre.right > hole.right + 1 || centre.top < hole.top - 1 || centre.bottom > hole.bottom + 1) bad.push('the middle leaves the cut-out');
       }
       for (const input of section.querySelectorAll('.vf-input')) {
         const style = getComputedStyle(input); context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;

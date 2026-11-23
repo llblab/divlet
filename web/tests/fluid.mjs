@@ -51,7 +51,7 @@ try {
       const diagram = document.querySelector('#inspector .br-box');
       if (!(diagram?.getBoundingClientRect().width > 100)) return false;
       const frame = diagram.getBoundingClientRect(), inspector = document.querySelector('#inspector').getBoundingClientRect();
-      const key = [frame.width, frame.right, inspector.right, ...[...diagram.querySelectorAll('.br-corner, .br-edge')].map(node => node.getBoundingClientRect().right)].map(value => Math.round(value * 10)).join(',');
+      const key = [frame.width, frame.right, inspector.right, ...[...document.querySelectorAll('#inspector .br-row .br-field')].map(node => node.getBoundingClientRect().right)].map(value => Math.round(value * 10)).join(',');
       const settled = window.__brBoxKey === key;
       window.__brBoxKey = key;
       return settled;
@@ -60,13 +60,13 @@ try {
       // The ring keeps its four corner values whole at every width, inside its own frame and the inspector's; the radius for
       // all corners and the side it colours live under the ring and wrap rather than clip.
       const diagram = document.querySelector('#inspector .br-box'), inspector = document.querySelector('#inspector').getBoundingClientRect();
-      const radius = diagram.querySelector('[data-key="radius-tl"]'), style = getComputedStyle(radius);
+      const radius = document.querySelector('#inspector [data-key="radius-tl"]'), style = getComputedStyle(radius);
       const context = document.createElement('canvas').getContext('2d');
       context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-      const frame = diagram.getBoundingClientRect(), cell = radius.closest('.br-cell').getBoundingClientRect();
+      const frame = diagram.getBoundingClientRect(), cell = radius.getBoundingClientRect();
       const middle = document.querySelector('#inspector .br-centre');
       return {
-        columns: [...diagram.querySelectorAll('.br-corner')].filter(node => { const box = node.getBoundingClientRect(); return box.left >= frame.left - 1 && box.right <= frame.right + 1; }).length === 4 ? 3 : 0,
+        columns: [...document.querySelectorAll('#inspector .br-row .br-field')].filter(node => { const box = node.getBoundingClientRect(); return box.left >= frame.left - 1 && box.right <= frame.right + 1; }).length === 4 ? 3 : 0,
         readable: context.measureText('Full').width <= radius.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1,
         inside: frame.right <= inspector.right + 1 && cell.right <= frame.right + 1 && !!middle && middle.scrollWidth <= middle.clientWidth + 1,
       };

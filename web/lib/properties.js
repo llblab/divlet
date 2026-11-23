@@ -415,17 +415,17 @@ const pxOf = raw => {
 
 /**
  * The border as a frame: the box model's border band pulled out at its own size, its four sides cut on the diagonals into the
- * trapezoids of a picture frame. Each trapezoid is the colour selector of its own side and is painted in that colour, so the
- * preview and the control are one thing. A radius with its unit sits in each corner, and the cut-out middle — the box model's
- * padding band — holds one radius for all four corners and one colour for all four sides. Edge widths are not repeated here: they
- * live on the four sides of the box model's border band.
+ * trapezoids of a picture frame with a one-pixel seam between them, like the band's own line. Each trapezoid is the colour
+ * selector of its own side and is painted in that colour, so the preview and the control are one thing. The four corner radii sit
+ * outside the frame, above and below its corners where they can never cover a side, and the cut-out middle — the box model's
+ * padding band — always holds one radius for all four corners and one colour for all four sides. Edge widths are not repeated
+ * here: they live on the four sides of the box model's border band.
  */
 function borderDiagram({ value, run, measured, tokens }) {
   const box = el('div', 'br-box');
   box.setAttribute('role', 'group');
-  box.setAttribute('aria-label', 'Border frame: corner radii and the colour of each side');
+  box.setAttribute('aria-label', 'Border frame: the colour of each side');
   const hole = el('div', 'br-hole');
-  const cell = (node, className) => { const wrap = el('div', `br-cell ${className}`); wrap.append(node); return wrap; };
   const CORNERS = [['tl', 'top-left'], ['tr', 'top-right'], ['bl', 'bottom-left'], ['br', 'bottom-right']];
   const measuredOf = corner => pxOf(measured?.colors?.[`radius${corner === 'tl' ? 'TopLeft' : corner === 'tr' ? 'TopRight' : corner === 'bl' ? 'BottomLeft' : 'BottomRight'}`]);
   // The number and its unit are separate: the unit is a menu on the right of the field that swaps only the unit, and a bare
@@ -442,12 +442,13 @@ function borderDiagram({ value, run, measured, tokens }) {
     // The empty field quotes the radius this corner has on the page, so a radius set by a stylesheet is still visible.
     const node = field(`radius-${key}`, '', shown, next => run({ [property]: next }, `${named.replace('-', ' ')} radius ${next ?? 'default'}`), radiusOptions(`${named.replace('-', ' ')} corner radius`, measuredOf(key), unit));
     node.querySelector('.vf-k')?.remove();
-    node.classList.add('br-field');
+    node.classList.add('br-field', `br-${key}`);
     node.setAttribute('aria-label', `${named} corner radius`);
-    return cell(node, `br-corner br-${key}`);
+    return node;
   };
   // A colour selector over the whole trapezoid of one side: the native picker's swatch fills it and paints it.
-  const sideColour = side => {
+  const sides = {};
+  for (const side of BORDER_SIDES) {
     const label = `${BORDER_SIDES_MENU.find(([key]) => key === side)[1]} border`;
     const node = colorField({
       key: `stroke-${side}`, label, tip: `Border ${side} color`, property: `border-${side}-color`, value, run,
@@ -455,8 +456,10 @@ function borderDiagram({ value, run, measured, tokens }) {
     });
     node.classList.add('br-colour');
     node.setAttribute('aria-label', `${label} colour`);
-    return cell(node, `br-side br-${side[0]}`);
-  };
+    const wrap = el('div', `br-side br-${side[0]}`);
+    wrap.append(node);
+    sides[side] = wrap;
+  }
   const centre = el('div', 'br-centre');
   // One radius for all four corners: it reads as one value only while they agree, and writing it replaces every corner at once,
   // so a value authored per corner cannot survive behind it and contradict what the field says.
@@ -477,34 +480,58 @@ function borderDiagram({ value, run, measured, tokens }) {
   // One colour for all four sides, written as the four side longhands for the same reason as the radius. It shows a colour only
   // while the sides agree.
   const sameColour = value(view => {
-    const sides = BORDER_SIDES.map(side => colourShown(view[`border-${side}-color`] ?? view['border-color'] ?? null));
-    return sides.every(item => item === sides[0]) ? sides[0] : MIXED;
+    const sideColours = BORDER_SIDES.map(side => colourShown(view[`border-${side}-color`] ?? view['border-color'] ?? null));
+    return sideColours.every(item => item === sideColours[0]) ? sideColours[0] : MIXED;
   });
-  const sidesColours = BORDER_SIDES.map(side => measured?.colors?.[`border${side[0].toUpperCase()}${side.slice(1)}Color`]);
+  const measuredColours = BORDER_SIDES.map(side => measured?.colors?.[`border${side[0].toUpperCase()}${side.slice(1)}Color`]);
   const allColour = colorField({
     key: 'stroke-all', label: 'Border', tip: 'Colour of all four borders', property: 'border-color',
     value: () => sameColour,
     run: (patch, label) => run(Object.fromEntries(BORDER_SIDES.map(side => [`border-${side}-color`, patch['border-color']])), label),
-    computed: sidesColours.every(item => item && item === sidesColours[0]) ? sidesColours[0] : null, tokens: [],
+    computed: measuredColours.every(item => item && item === measuredColours[0]) ? measuredColours[0] : null, tokens: [],
   });
   allColour.classList.add('br-all-colour');
   centre.append(allCorners, allColour);
   hole.append(centre);
-  // Tab order follows what a reader sees: the four corner radii, one colour selector per edge, then the middle.
-  box.append(corner('tl'), corner('tr'), corner('bl'), corner('br'), ...BORDER_SIDES.map(sideColour), hole);
-  const shell = el('div', 'br-shell');
-  shell.append(box);
-  followBand(box, hole, centre, shell);
+  // Reading order is the geometry: the top corners, the four sides, the middle, then the bottom corners.
+  box.append(sides.top, sides.right, sides.bottom, sides.left, hole);
+  const row = (name, ...nodes) => { const node = el('div', `br-row br-row-${name}`); node.append(...nodes); return node; };
+  // Hidden until the band has been measured (the same frame, before paint): a frame laid out on guessed rims would show the
+  // middle in a cut-out that is not its real size.
+  const shell = el('div', 'br-shell br-pending');
+  shell.append(row('top', corner('tl'), corner('tr')), box, row('bottom', corner('bl'), corner('br')));
+  followBand(box, sides, shell);
   return shell;
+}
+
+/** The seam between neighbouring sides, in px: a line like the box model band's own. */
+const FRAME_SEAM = 1;
+
+/**
+ * The four sides of a frame as clip polygons, in px of the frame's padding box: `W`×`H` is the whole frame and `l`, `t`, `r`, `b`
+ * the rim between its edge and the cut-out. Each diagonal joins an outer corner to the cut-out's matching corner; both sides that
+ * meet there give up half the seam, measured across the diagonal, so the gap is the same width however the rim is proportioned.
+ */
+function framePolygons(W, H, l, t, r, b, seam) {
+  const across = (rx, ry) => (seam * Math.hypot(rx, ry)) / 2;
+  const alongX = (rx, ry) => across(rx, ry) / Math.max(1, ry);
+  const alongY = (rx, ry) => across(rx, ry) / Math.max(1, rx);
+  const polygon = points => `polygon(${points.map(([x, y]) => `${x.toFixed(2)}px ${y.toFixed(2)}px`).join(', ')})`;
+  return {
+    top: polygon([[alongX(l, t), 0], [W - alongX(r, t), 0], [W - r - alongX(r, t), t], [l + alongX(l, t), t]]),
+    bottom: polygon([[alongX(l, b), H], [W - alongX(r, b), H], [W - r - alongX(r, b), H - b], [l + alongX(l, b), H - b]]),
+    left: polygon([[0, alongY(l, t)], [0, H - alongY(l, b)], [l, H - b - alongY(l, b)], [l, t + alongY(l, t)]]),
+    right: polygon([[W, alongY(r, t)], [W, H - alongY(r, b)], [W - r, H - b - alongY(r, b)], [W - r, t + alongY(r, t)]]),
+  };
 }
 
 /**
  * Follow the box model's border band: the frame is that band pulled out of the box, so it has the band's own outer size and its
  * cut-out is the padding band's own place inside it — measured, because the band narrows and widens with the inspector and with
- * the values written on its edges. When that cut-out is too small to hold the two middle controls they step out under the frame
- * instead of clipping, and when the band is not on screen the frame keeps its default shape.
+ * the values written on its edges. The middle controls always stay in the cut-out; when the band is not on screen the frame keeps
+ * a default shape.
  */
-function followBand(box, hole, centre, shell) {
+function followBand(box, sides, shell) {
   const panel = () => box.closest('#inspector');
   const apply = () => {
     const band = panel()?.querySelector('.boxmodel .bm-border');
@@ -513,23 +540,21 @@ function followBand(box, hole, centre, shell) {
     // written back already multiplied. `offsetLeft`/`offsetTop` are measured from the band's padding edge, which is exactly
     // where this frame's own absolutely placed parts start.
     const width = band ? band.offsetWidth : 0, height = band ? band.offsetHeight : 0;
-    const measuredHole = inner && width > 60 && height > 40 ? { left: inner.offsetLeft, top: inner.offsetTop, width: inner.offsetWidth, height: inner.offsetHeight } : null;
+    const known = inner && width > 60 && height > 40;
     box.style.width = width > 60 ? `${width}px` : '';
     box.style.height = height > 40 ? `${height}px` : '';
-    if (measuredHole) {
-      box.style.setProperty('--br-l', `${measuredHole.left}px`);
-      box.style.setProperty('--br-t', `${measuredHole.top}px`);
-      box.style.setProperty('--br-r', `${Math.max(0, band.clientWidth - measuredHole.left - measuredHole.width)}px`);
-      box.style.setProperty('--br-b', `${Math.max(0, band.clientHeight - measuredHole.top - measuredHole.height)}px`);
-    } else for (const name of ['--br-l', '--br-t', '--br-r', '--br-b']) box.style.removeProperty(name);
-    // Until the band has been measured the cut-out's size is a guess, so the pair waits under the frame rather than in a guess.
-    const roomy = !!measuredHole && measuredHole.width >= 120 && measuredHole.height >= 56;
-    shell.classList.toggle('br-compact', !roomy);
-    const home = roomy ? hole : shell;
-    if (centre.parentNode !== home) home.append(centre);
+    shell.style.setProperty('--br-w', width > 60 ? `${width}px` : '100%');
+    const rim = known ? { l: inner.offsetLeft, t: inner.offsetTop, r: Math.max(0, band.clientWidth - inner.offsetLeft - inner.offsetWidth), b: Math.max(0, band.clientHeight - inner.offsetTop - inner.offsetHeight) } : { l: 36, t: 20, r: 36, b: 20 };
+    for (const [name, px] of Object.entries(rim)) box.style.setProperty(`--br-${name}`, `${px}px`);
+    // The frame's padding box is the band's own, so its polygons come from the band, not from the (possibly hidden) frame.
+    if (known) shell.classList.remove('br-pending');
+    const W = known ? band.clientWidth : box.clientWidth, H = known ? band.clientHeight : box.clientHeight;
+    if (!(W > 0 && H > 0)) return;
+    const polygons = framePolygons(W, H, rim.l, rim.t, rim.r, rim.b, FRAME_SEAM);
+    for (const side of BORDER_SIDES) sides[side].style.clipPath = polygons[side];
   };
   apply();
-  requestAnimationFrame(apply);
+  requestAnimationFrame(() => { apply(); shell.classList.remove('br-pending'); });
   const observer = new ResizeObserver(apply);
   requestAnimationFrame(() => {
     const host = panel();

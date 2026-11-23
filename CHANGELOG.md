@@ -2,6 +2,15 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
+## 0.3.1 — Unreleased
+
+- **The Border frame, finished.** The four corner radii moved out of the frame, above and below its corners, so none covers a
+  side; the radius and the colour for all four sides never step out of the cut-out any more, because it always fits them (the
+  cut-out is measured from the padding band, exactly the band's size). A one-pixel seam in the box model band's own line now
+  separates the four colour trapezoids. The unit button on the right of a number is its own tinted area and no longer ends in a
+  `▾` glyph, and its colour is a background rather than blue text. The tab order is the reading order
+  (`web/lib/properties.js`, `web/board.css`, `web/tests/appearance.mjs`, `web/tests/fluid.mjs`, `web/tests/toolbars.mjs`).
+
 ## 0.3.0 — Border frame, unit menus and a steady box-model axis
 
 - **Border is a picture frame of colour selectors, cut like the band it copies.** The Border control is the box model's border
