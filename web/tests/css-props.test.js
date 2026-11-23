@@ -42,8 +42,6 @@ test('lengths, colours and single values parse what a person types', () => {
   assert.equal(css.cornerRadiusNumber({ 'border-top-left-radius': '1.5rem', 'border-radius': '4px' }, 'top-left'), '1.5'); assert.equal(css.cornerRadiusUnit({ 'border-top-left-radius': '1.5rem' }, 'top-left'), 'rem');
   assert.equal(css.cornerRadiusNumber({ 'border-radius': '9999px' }, 'top-left'), 'full'); assert.equal(css.cornerRadiusUnit({ 'border-radius': '9999px' }, 'top-left'), null);
   assert.equal(css.cornerRadiusNumber({}, 'top-left'), null);
-  assert.equal(css.cornerRadiusIn('16', 'px', 'rem'), '1'); assert.equal(css.cornerRadiusIn('1', 'rem', 'px'), '16'); assert.equal(css.cornerRadiusIn('2', 'em', 'px', { em: 10 }), '20');
-  assert.equal(css.cornerRadiusIn('50', 'px', '%'), '50', 'a percentage is a share of the box, so the number is kept');
   assert.equal(css.weightOf({ 'font-weight': 'bold' }), '700');
   assert.equal(css.fontSizeOf({ 'font-size': '1.5rem' }), '24');
 });

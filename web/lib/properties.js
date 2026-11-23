@@ -83,7 +83,7 @@ function toggle(iconName, tip, on, run) {
  */
 const UNIT_NAMES = { '%': 'Percent %', px: 'Pixels px', em: 'Em em', rem: 'Rem rem', '×': 'Multiple ×' };
 
-function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw => raw, stepFrom = Number.parseFloat, step = 1, min = -1e6, max = 1e6, variants = [], unit = '', units = null, convert = () => null, defaultUnit = null, spell = false } = {}) {
+function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw => raw, stepFrom = Number.parseFloat, step = 1, min = -1e6, max = 1e6, variants = [], unit = '', units = null, defaultUnit = null, spell = false } = {}) {
   const wrap = el('label', 'vf');
   const name = el('span', 'vf-k scrub', label);
   const input = el('input', 'vf-input');
@@ -121,19 +121,17 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
     const sync = () => { unitButton.textContent = now(); unitButton.hidden = /^[a-z][a-z-]*$/i.test(input.value.trim()); };
     adoptUnit = to => { chosen = to; sync(); };
     syncUnit = sync;
-    // A new unit rewrites the number, not the meaning: `24` px becomes `150` % or `1.5` em. The authored spelling is the
-    // source, so the switch really writes; with no value yet (`normal`, empty) it only remembers the unit for this field.
+    // A new unit changes only the unit: the number stays exactly as written, so `100` % switched to px is `100px`. Nothing is
+    // converted — the point is to correct a unit chosen by mistake without retyping the number. A field with no number yet
+    // (`normal`, a keyword, empty) only remembers the unit for the next one.
     const applyUnit = to => {
       const written = input.value.trim();
       chosen = to;
       sync();
-      const next = unit && written ? convert(written, unit, to) : null;
-      if (next == null || !written || to === unit) { if (written && unit) { chosen = null; sync(); } return; }
-      const spelled = to === '×' ? next : `${next}${to}`;
+      if (!/^-?(?:\d+\.?\d*|\.\d+)$/.test(written) || to === unit) { if (written && to === unit) { chosen = null; sync(); } return; }
+      const spelled = to === '×' ? written : `${written}${to}`;
       const parsed = parse(spelled);
-      if (parsed === undefined) { toast(`“${spelled}” is not a value for ${tip || label}`); return; }
-      input.value = next;
-      current = next;
+      if (parsed === undefined) { toast(`“${spelled}” is not a value for ${tip || label}`); chosen = null; sync(); return; }
       onCommit(parsed, spelled);
     };
     unitButton.addEventListener('pointerdown', event => event.stopPropagation());
@@ -430,13 +428,11 @@ function borderDiagram({ value, run, measured, tokens }) {
   const cell = (node, className) => { const wrap = el('div', `br-cell ${className}`); wrap.append(node); return wrap; };
   const CORNERS = [['tl', 'top-left'], ['tr', 'top-right'], ['bl', 'bottom-left'], ['br', 'bottom-right']];
   const measuredOf = corner => pxOf(measured?.colors?.[`radius${corner === 'tl' ? 'TopLeft' : corner === 'tr' ? 'TopRight' : corner === 'bl' ? 'BottomLeft' : 'BottomRight'}`]);
-  const fonts = { em: fontSizePx(measured), rem: 16 };
-  // The number and its unit are separate: the unit is a menu on the right of the field that rewrites the same radius in another
-  // spelling, and a bare number typed beside it takes that unit.
+  // The number and its unit are separate: the unit is a menu on the right of the field that swaps only the unit, and a bare
+  // number typed beside it takes that unit.
   const radiusOptions = (tip, quoted, unit) => ({
     tip, placeholder: quoted == null ? '—' : String(Math.round(quoted)), min: 0, max: 1e4, parse: css.radiusInput, spell: true,
     units: ['px', '%', 'rem', 'em'], defaultUnit: 'px', unit: unit === MIXED ? '' : unit || '',
-    convert: (number, from, to) => css.cornerRadiusIn(number, from, to, fonts),
   });
   const corner = key => {
     const named = CORNERS.find(([short]) => short === key)[1];
@@ -544,9 +540,6 @@ function followBand(box, hole, centre, shell) {
   });
 }
 
-/** The measured font size in px — what `%`, `em` and a unitless line height are measured against. */
-const fontSizePx = measured => Number.parseFloat(measured?.colors?.fontSize) || 16;
-
 const WEIGHTS = [['100', 'Thin 100'], ['200', 'Extra light 200'], ['300', 'Light 300'], ['400', 'Regular 400'], ['500', 'Medium 500'], ['600', 'Semibold 600'], ['700', 'Bold 700'], ['800', 'Extra bold 800'], ['900', 'Black 900']];
 
 function appearanceFold({ value, run, measured, tokens }) {
@@ -564,10 +557,8 @@ function appearanceFold({ value, run, measured, tokens }) {
     }),
     field('line-height', 'Lh', leading, next => run({ 'line-height': next }, `line height ${next ?? 'default'}`), {
       tip: 'Line height: 150%, 24px, 1.5em or 1.5', placeholder: 'normal', min: 0, max: 1000, parse: css.lineHeightInput,
-      // `%`, `em` and a unitless multiple are one value — all measure the element's own font size — so the unit button
-      // changes only the spelling, and px converts against that measured size. An unset line height opens on percent.
+      // The unit button swaps only the unit and keeps the number. An unset line height opens on percent.
       units: ['%', 'px', 'em', '×'], defaultUnit: '%', unit: leadingUnit === MIXED ? '' : leadingUnit || '',
-      convert: (number, from, to) => css.lineHeightIn(number, from, to, fontSizePx(measured)),
     }),
     pick('Weight', weight, WEIGHTS, next => run({ 'font-weight': next }, next ? `weight ${next}` : 'default weight'), { tip: 'Font weight' }),
   );

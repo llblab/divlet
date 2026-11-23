@@ -616,7 +616,7 @@ try {
   checks.push('line height: a multiple, a px step that lowers to the scale, readback, removal and one undo');
 
   // The unit beside the line height is a menu, not a caption: one value, spelled the way the author wants it. `%`, `em` and a
-  // multiple all measure the element's own font size, so switching rewrites only the spelling — and px converts against it.
+  // multiple; switching the unit changes only the unit and keeps the number.
   const lhUnit = () => page.locator('#inspector [data-key="unit:line-height"]');
   await waitUntil(async () => (await lhUnit().innerText()) === '%', 'an unset line height opens on percent');
   await page.locator('#inspector [data-key="line-height"]').fill('1.5'); await page.keyboard.press('Enter');
@@ -631,14 +631,13 @@ try {
   const unitChoices = await page.locator('.menu[aria-label="Unit"] .menu-item').allInnerTexts();
   assert.deepEqual(unitChoices, ['Percent %', 'Pixels px', 'Em em', 'Multiple ×'], 'every spelling is offered');
   await page.locator('.menu[aria-label="Unit"] .menu-item', { hasText: 'Percent %' }).click();
-  // The cta author wrote `text-[12.5px]`, so its 24px line height is 192% of its own font size — the conversion is measured,
-  // not a fixed ratio.
-  await waitUntil(() => classesOf('cta').includes('leading-[192%]'), '24px rewrites as the percent it is for this font size');
-  await waitUntil(async () => (await lhUnit().innerText()) === '%', 'and the button follows the rewrite');
-  await waitUntil(async () => (await page.locator('#inspector [data-key="line-height"]').inputValue()) === '192', 'with the number converted, not the unit swapped on the same number');
+  // Only the unit changes: 24px becomes 24%, the number is not converted against the font size.
+  await waitUntil(() => classesOf('cta').includes('leading-[24%]'), '24px becomes 24% — the unit alone changed');
+  await waitUntil(async () => (await lhUnit().innerText()) === '%', 'and the button follows the change');
+  await waitUntil(async () => (await page.locator('#inspector [data-key="line-height"]').inputValue()) === '24', 'with the number kept as it was');
   await page.keyboard.press('Control+z');
-  await waitUntil(() => classesOf('cta').includes('leading-6') && !classesOf('cta').includes('leading-[192%]'), 'one undo returns the px spelling');
-  checks.push('the line height unit is a menu that rewrites one value as %, px, em or a multiple, with one undo step');
+  await waitUntil(() => classesOf('cta').includes('leading-6') && !classesOf('cta').includes('leading-[24%]'), 'one undo returns the px spelling');
+  checks.push('the line height unit is a menu that swaps only the unit (%, px, em or a multiple), with one undo step');
 
   // Radius: a bare number, px/rem/em/%, full, and empty — all from one corner's own field in the ring. The element starts on
   // `rounded-xl` for all four corners, so editing one corner splits the shorthand and leaves the other three alone.
@@ -660,10 +659,13 @@ try {
   await waitUntil(() => classesOf('cta').includes('rounded-tl-[10em]'), 'a bare number takes the unit the button names');
   await page.locator('#inspector [data-key="radius-tl"]').fill('10px'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('rounded-tl-[10px]') && !classesOf('cta').some(name => /^rounded-tl-\[/.test(name) && name !== 'rounded-tl-[10px]'), 'a typed number and unit set an arbitrary radius and replace the previous one');
-  // The unit menu rewrites the same length in another unit, with no typing.
+  // The unit menu changes only the unit: the number stays, nothing is converted, and no typing is needed.
   await page.locator('#inspector [data-key="unit:radius-tl"]').click();
   await page.locator('.menu .menu-item', { hasText: /^Rem rem$/ }).click();
-  await waitUntil(() => classesOf('cta').includes('rounded-tl-[0.625rem]'), 'the unit menu rewrites 10px as 0.625rem');
+  await waitUntil(() => classesOf('cta').includes('rounded-tl-[10rem]'), 'the unit menu turns 10px into 10rem, the same number in another unit');
+  await page.locator('#inspector [data-key="unit:radius-tl"]').click();
+  await page.locator('.menu .menu-item', { hasText: /^Percent %$/ }).click();
+  await waitUntil(() => classesOf('cta').includes('rounded-tl-[10%]'), 'and 10rem into 10%, again with the number untouched');
   await page.locator('#inspector [data-key="radius-tl"]').fill('10px'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('rounded-tl-[10px]'), 'and the px spelling returns');
   assert.deepEqual(await borderWidths(), ['2px', '4px', '3px', '3px'], 'changing radius does not change border widths');

@@ -342,19 +342,6 @@ export function cornerRadiusUnit(view, corner) {
   return raw != null && /^-?(?:\d+\.?\d*|\.\d+)$/.test(String(raw).trim()) ? 'px' : null;
 }
 
-/**
- * The same radius spelled in another unit, as its number. `px`, `em` and `rem` are lengths, so they convert exactly against the
- * font sizes `em`/`rem` measure (`em` the element's own, `rem` the root's). `%` is a share of the box rather than a length: no
- * pixel value is "the same" as it for every box, so a switch to or from it keeps the number and changes only what it means.
- */
-export function cornerRadiusIn(number, from, to, { em = 16, rem = 16 } = {}) {
-  const value = Number.parseFloat(String(number ?? '').trim());
-  if (!from || !to || !Number.isFinite(value)) return null;
-  if (from === '%' || to === '%') return String(value);
-  const size = unit => (unit === 'em' ? em : unit === 'rem' ? rem : 1);
-  return String(Math.round(((value * size(from)) / size(to)) * 1000) / 1000);
-}
-
 /** Line height as written: a multiple (`1.5`), a length or percentage, or `normal`. */
 /** The line height's number for the field: its unit sits beside it in the unit button (`150%` → `150`, `24px` → `24`). */
 export function lineHeightOf(view) {
@@ -382,19 +369,6 @@ export function lineHeightUnit(text) {
   const written = /^[-+]?[\d.]+(px|rem|em|%)$/.exec(value);
   if (written) return written[1];
   return /^[-+]?[\d.]+$/.test(value) ? '×' : null;
-}
-
-/**
- * The same line height spelled in another unit, as its number: `24` px is `150` %, `1.5` em or `1.5` times. `%`, `em` and a
- * unitless multiple all measure the element's own font size — `base` px — so converting between them changes no value, and px
- * converts against that same size. Null when there is nothing to convert.
- */
-export function lineHeightIn(number, from, to, base = 16) {
-  const value = Number.parseFloat(String(number ?? '').trim());
-  if (!from || !to || !Number.isFinite(value) || !(base > 0)) return null;
-  const px = from === 'px' ? value : from === '%' ? (value / 100) * base : value * base;
-  const result = to === 'px' ? px : to === '%' ? (px / base) * 100 : px / base;
-  return String(Math.round(result * 1000) / 1000);
 }
 
 /**

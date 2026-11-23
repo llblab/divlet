@@ -9,7 +9,8 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
   trapezoids; each is the colour selector for its side and is painted in that colour. Each corner carries its radius with a
   unit menu, and the cut-out holds one radius for all corners and one colour for all four sides (written as the four side
   longhands). A unit typed into any unit-menu field (`100%`) moves to the clickable accent-coloured unit button on its right,
-  a bare number takes that unit, the menu rewrites px/rem/em exactly and keeps the number across `%`, and `full` has no unit.
+  a bare number takes that unit, the menu changes only the unit and keeps the number — no conversion, for the line height too —
+  and `full` has no unit.
   The four edge widths stay out of Border: a width has one home, the four sides of the box model's border band. The box
   model's band names became out-of-flow watermarks, so every top value now sits on the same axis as its bottom value
   (`web/lib/properties.js`, `web/lib/css-props.js`, `web/board.css`, `web/tests/appearance.mjs`, `web/tests/spacing.mjs`,
