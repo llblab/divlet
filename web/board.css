@@ -478,6 +478,10 @@ button.change:hover:not(:disabled) { background: var(--field); }
 /* A band too narrow for both gives the name less room first: it never clips, it steps down instead. */
 @container band (max-width: 180px) { .bm-caption { font-size: 10.5px; } }
 @container band (max-width: 130px) { .bm-caption { font-size: 8px; } }
+/* A band so narrow that its name cannot sit left of the centred top value (name, its inset and half a value must fit in half the band)
+   gives the name up rather than cover the value: the value's place on the centre axis is not negotiable, and the band keeps its
+   accessible name. The bound has room for a wider font than the one measured. */
+@container band (max-width: 62px) { .bm-caption { display: none; } }
 .bm-position > .bm-top > .bm-caption { color: var(--muted); }
 .bm-margin > .bm-top > .bm-caption { color: #8a5f3a; }
 .bm-border > .bm-top > .bm-caption { color: #a8843c; }

@@ -13,6 +13,7 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
   and `full` has no unit.
   The four edge widths stay out of Border: a width has one home, the four sides of the box model's border band. The box
   model's band names became out-of-flow watermarks, so every top value now sits on the same axis as its bottom value
+  (a band too narrow to hold its name beside that value gives the name up rather than cover it)
   (`web/lib/properties.js`, `web/lib/css-props.js`, `web/board.css`, `web/tests/appearance.mjs`, `web/tests/spacing.mjs`,
   `web/tests/toolbars.mjs`, `web/tests/css-props.test.js`).
 
