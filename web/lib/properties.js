@@ -142,7 +142,8 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
     unitButton.addEventListener('click', event => {
       event.preventDefault();
       event.stopPropagation();
-      openMenu(units.map(unitKey => ({ label: UNIT_NAMES[unitKey] || unitKey, checked: now() === unitKey, run: () => applyUnit(unitKey) })), { anchor: unitButton, label: 'Unit' });
+      // The entries are the units themselves (`px`, `%`, `rem`), never a name beside a symbol; the name is only the tooltip.
+      openMenu(units.map(unitKey => ({ label: unitKey, hint: UNIT_NAMES[unitKey], checked: now() === unitKey, run: () => applyUnit(unitKey) })), { anchor: unitButton, label: 'Unit', className: 'menu-units' });
     });
     input.addEventListener('input', sync);
     wrap.append(unitButton);
@@ -254,6 +255,28 @@ const SIDE_NAMES = { t: 'top', r: 'right', b: 'bottom', l: 'left' };
 const CORNER_NAMES = ['top-left', 'top-right', 'bottom-right', 'bottom-left'];
 const alphaOf = value => { const m = /^rgba\([^)]*,\s*([\d.]+)\s*\)$/.exec(String(value || '')); return m ? Number(m[1]) : 1; };
 
+let paintCanvas = null;
+/**
+ * A colour the page reports, in any notation, as `#rrggbb`: the plain `rgb()` forms are parsed, and anything else a browser can paint
+ * (`oklch()`, `color-mix()`, `color()`, a named colour) by painting one pixel with it and reading it back, so a colour set in a modern
+ * notation shows as itself instead of falling back to black. Transparent, or not a colour at all, is null.
+ */
+function paintedHex(colour) {
+  const text = String(colour ?? '').trim();
+  if (!text || /^(?:transparent|rgba?\([^)]*(?:,\s*0|\/\s*0)\s*\))$/i.test(text)) return null;
+  const plain = css.hexOf(text);
+  if (plain) return plain;
+  paintCanvas ??= Object.assign(document.createElement('canvas'), { width: 1, height: 1 }).getContext('2d', { willReadFrequently: true });
+  paintCanvas.clearRect(0, 0, 1, 1);
+  paintCanvas.fillStyle = '#fe01fd';
+  paintCanvas.fillStyle = text;
+  // An unparseable value leaves the sentinel in place; the sentinel itself is not a colour a page would report.
+  if (paintCanvas.fillStyle === '#fe01fd' && text.toLowerCase() !== '#fe01fd') return null;
+  paintCanvas.fillRect(0, 0, 1, 1);
+  const [r, g, b, a] = paintCanvas.getImageData(0, 0, 1, 1).data;
+  return a ? `#${[r, g, b].map(n => n.toString(16).padStart(2, '0')).join('')}` : null;
+}
+
 /** The colour a value stands for, as something to show: `#112233`, `var(--color-brand)` or the keyword. */
 const colourShown = value => (value == null ? null : String(value));
 
@@ -263,7 +286,7 @@ function colorField({ key, label, tip, property, value, run, computed, tokens, c
   // No colour of its own (the page's inherited one shows) or several different ones: the swatch says so with hatching.
   wrap.classList.toggle('mixed', current === MIXED);
   wrap.classList.toggle('unset', current == null);
-  const shownHex = current === MIXED ? null : css.hexOf(current) || KEYWORD_COLORS[current] || css.hexOf(computed);
+  const shownHex = current === MIXED ? null : css.hexOf(current) || KEYWORD_COLORS[current] || paintedHex(computed);
   const swatch = el('input', 'swatch color-pick');
   swatch.type = 'color';
   swatch.value = /^#[0-9a-f]{6}$/i.test(shownHex || '') ? shownHex : '#000000';
@@ -275,7 +298,7 @@ function colorField({ key, label, tip, property, value, run, computed, tokens, c
   hex.autocomplete = 'off';
   hex.dataset.key = key;
   hex.value = current === MIXED || current == null ? '' : current;
-  hex.placeholder = current === MIXED ? '—' : css.hexOf(computed) ?? (computed ? 'inherited' : 'none');
+  hex.placeholder = current === MIXED ? '—' : paintedHex(computed) ?? (computed ? 'inherited' : 'none');
   hex.setAttribute('aria-label', tip);
   const fitHex = () => hex.style.setProperty('--hex-width', `calc(${Math.max(7, (hex.value || hex.placeholder).length) + 2}ch + 8px)`);
   hex.addEventListener('input', fitHex);
@@ -728,25 +751,53 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
   // Every value of the box model is a number with its own unit: the unit sits beside the number as a small label (below it in a
   // narrow side strip) and becomes the unit menu while the cell has focus; a unit typed with the number moves there too.
   const LENGTH_UNITS = ['px', '%', 'rem', 'em'];
+  // A value is a slot of its resting size holding the field. While the field has focus it becomes an editor laid over the widget:
+  // the slot keeps its size, so nothing under the editor is moved, and the editor is painted above every band.
   const lengthField = (key, { raw, placeholder, tip, parse, units = LENGTH_UNITS, onCommit, min = -1e4 }) => {
     const parts = raw === MIXED ? null : css.lengthParts(raw);
-    const node = field(key, '', raw === MIXED ? MIXED : parts.number, onCommit, {
+    const vf = field(key, '', raw === MIXED ? MIXED : parts.number, onCommit, {
       tip, placeholder, min, parse, spell: true, units, defaultUnit: 'px', unit: parts?.unit ?? '', unitOnNumbers: true,
     });
-    node.querySelector('.vf-k')?.remove();
+    vf.querySelector('.vf-k')?.remove();
     // The unit label is not a tab stop of its own: a unit can be typed with the number, and the menu opens with the pointer.
-    node.querySelector('.vf-unit')?.setAttribute('tabindex', '-1');
-    return node;
+    vf.querySelector('.vf-unit')?.setAttribute('tabindex', '-1');
+    const input = vf.querySelector('input');
+    const slot = el('div', 'bm-slot');
+    slot.append(vf);
+    slot.vf = vf;
+    // The editor is as wide as its number and the unit button, never wider than that; it grows only with long text typed.
+    const fit = () => slot.style.setProperty('--bm-edit-chars', String(Math.max(3, (input.value || input.placeholder).length)));
+    const begin = () => {
+      if (slot.classList.contains('editing')) return;
+      slot.style.width = `${vf.offsetWidth}px`;
+      slot.style.height = `${vf.offsetHeight}px`;
+      // The widget lays itself out for the value as it stood, not for the text being typed.
+      input.dataset.rest = input.value || input.placeholder;
+      fit();
+      slot.classList.add('editing');
+    };
+    const end = () => {
+      if (!slot.classList.contains('editing')) return;
+      slot.classList.remove('editing');
+      slot.style.width = slot.style.height = '';
+      delete input.dataset.rest;
+      input.dispatchEvent(new Event('divlet:fit'));
+    };
+    slot.addEventListener('focusin', begin);
+    slot.addEventListener('focusout', event => { if (!slot.contains(event.relatedTarget)) end(); });
+    input.addEventListener('input', fit);
+    return slot;
   };
   const spaceField = (kind, short, side) => {
     const property = propertyOf(kind, side);
     const label = `${kind[0].toUpperCase()}${kind.slice(1)} ${SIDE_NAMES[side]}`;
-    const node = lengthField(`${short}-${side}`, {
+    const slot = lengthField(`${short}-${side}`, {
       raw: value(view => view[property] ?? null), tip: label,
       placeholder: measured?.[kind] ? String(measured[kind]['trbl'.indexOf(side)]) : '—',
       min: kind === 'padding' ? 0 : -1e4, parse: raw => css.lengthInput(raw, { negative: kind !== 'padding' }),
       onCommit: next => { run({ [property]: next }, `${kind} ${SIDE_NAMES[side]} ${next == null ? 'none' : next}`); },
     });
+    const node = slot.vf;
     node.classList.add('bm-field');
     node.setAttribute('aria-label', label);
     node.querySelector('input').setAttribute('aria-label', label);
@@ -755,31 +806,31 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     node.addEventListener('pointerleave', () => { if (!node.contains(document.activeElement)) light(false); });
     node.addEventListener('focusin', () => light(true));
     node.addEventListener('focusout', () => light(false));
-    return node;
+    return slot;
   };
   const number = value => Number.isFinite(value) ? String(Math.round(value * 1000) / 1000) : '—';
   // One border width per side, and only here: the Border block does not repeat them, so there is no second copy to keep in step.
   const widthField = side => {
     const property = `border-${SIDE_NAMES[side]}-width`, index = 'trbl'.indexOf(side);
-    const node = lengthField(`border-${side}`, {
+    const slot = lengthField(`border-${side}`, {
       raw: value(view => view[property] ?? null), tip: `Border ${SIDE_NAMES[side]}`, placeholder: number(measured?.border?.[index]),
       min: 0, units: ['px', 'rem', 'em'], parse: css.borderWidthInput,
       onCommit: next => { run({ [property]: next }, `${property} ${next ?? 'default'}`); },
     });
-    node.classList.add('bm-value');
-    return node;
+    slot.vf.classList.add('bm-value');
+    return slot;
   };
   const edgeField = (kind, side, index) => {
     if (kind === 'margin' || kind === 'padding') return spaceField(kind, kind === 'margin' ? 'm' : 'p', side);
     if (kind === 'position') {
       const name = SIDE_NAMES[side];
-      const node = lengthField(`inset-${side}`, {
+      const slot = lengthField(`inset-${side}`, {
         raw: value(view => view[name] ?? null), tip: `${name[0].toUpperCase()}${name.slice(1)} offset`,
         placeholder: measured?.inset?.[index]?.replace(/px$/, '') ?? 'auto', parse: raw => css.lengthInput(raw),
         onCommit: next => run({ [name]: next }, `${name} ${next ?? 'auto'}`),
       });
-      node.classList.add('bm-offset');
-      return node;
+      slot.vf.classList.add('bm-offset');
+      return slot;
     }
     return widthField(side);
   };
@@ -811,7 +862,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
       let side = 0, strip = 0;
       for (const cell of sq.querySelectorAll(':scope > .bm-cell, :scope > .bm-top > .bm-cell')) {
         const input = cell.querySelector('input');
-        const text = input ? input.value || input.placeholder : cell.textContent;
+        const text = input ? input.dataset.rest ?? (input.value || input.placeholder) : cell.textContent;
         const length = text.length;
         cell.style.setProperty('--bm-value-width', `calc(${length}ch + 2px)`);
         if (!cell.classList.contains('bm-l') && !cell.classList.contains('bm-r')) continue;
@@ -833,6 +884,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
       input.addEventListener('keydown', fitValues);
       input.addEventListener('change', fitValues);
       input.addEventListener('divlet:field-value', fitValues);
+      input.addEventListener('divlet:fit', fitValues);
     }
     for (const unit of sq.querySelectorAll(':scope > .bm-cell .vf-unit, :scope > .bm-top > .bm-cell .vf-unit')) new MutationObserver(fitValues).observe(unit, { childList: true, characterData: true, attributes: true, attributeFilter: ['hidden'] });
     fitValues();
@@ -866,10 +918,11 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
         }, `content ${axis} ${next ?? 'default'}`);
       },
     });
-    size.classList.add('bm-value', 'bm-dimension');
+    size.vf.classList.add('bm-value', 'bm-dimension');
     const input = size.querySelector('input');
-    const fit = () => size.style.setProperty('--bm-value-width', `calc(${(input.value || input.placeholder).length}ch + 4px)`);
-    for (const event of ['input', 'keydown', 'change']) input.addEventListener(event, fit);
+    // The core lays itself out for the value as it stood, not for the text being typed.
+    const fit = () => size.vf.style.setProperty('--bm-value-width', `calc(${(input.dataset.rest ?? (input.value || input.placeholder)).length}ch + 4px)`);
+    for (const event of ['change', 'divlet:fit']) input.addEventListener(event, fit);
     fit();
     core.append(size);
   }

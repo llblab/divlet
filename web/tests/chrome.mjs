@@ -223,6 +223,29 @@ try {
   await scaled.close();
   checks.push('the default left column and live minimum follow the measured button row at 100/125/150/175/200% without storing automatic widths');
 
+  /* ---- the tabs beside the dock until they touch --------------------------- */
+  // A narrow window is not by itself a reason to stretch the tabs across it: they keep their own corner, left of the dock, while the
+  // two fit side by side at their own widths, and only a window too narrow for both stacks them above the dock.
+  {
+    const side = await open(1000, 800);
+    const readFoot = async () => side.evaluate(() => { const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width }; }; return { tabs: box('#side-tabs'), dock: box('#dock'), brand: box('#brand'), stacked: document.documentElement.classList.contains('foot-stack'), phone: document.documentElement.classList.contains('w720') }; });
+    const desktop = await readFoot();
+    for (const width of [700, 640, 600]) {
+      await side.setViewportSize({ width, height: 800 });
+      await waitUntil(async () => (await readFoot()).phone, `${width}px uses the phone layout`);
+      await waitUntil(async () => { const now = await readFoot(); return !now.stacked && Math.abs(now.tabs.width - desktop.tabs.width) <= 2; }, `at ${width}px the tabs keep their own width and corner`);
+      const now = await readFoot();
+      assert.ok(now.tabs.left <= 12 && now.tabs.right < now.dock.left, `at ${width}px the tabs sit left of the dock, not over it (${now.tabs.right} vs ${now.dock.left})`);
+      assert.ok(Math.abs(now.tabs.bottom - now.dock.bottom) <= 6, `and on its row (${now.tabs.bottom} vs ${now.dock.bottom})`);
+    }
+    await side.setViewportSize({ width: 500, height: 800 });
+    await waitUntil(async () => (await readFoot()).stacked, 'a window too narrow for both stacks the tabs above the dock');
+    const stacked = await readFoot();
+    assert.ok(stacked.tabs.bottom <= stacked.dock.top + 2 && stacked.tabs.width > desktop.tabs.width * 1.5, 'across the whole width, above the dock');
+    await side.close();
+    checks.push('the sidebar tabs stay in their corner beside the dock until the two would touch, then stack above it');
+  }
+
   /* ---- phone -------------------------------------------------------------- */
   const phone = await open(390, 800);
   await select(phone);

@@ -2,6 +2,22 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
+## 0.3.3 — A box model that holds still, and tabs that stay in their corner
+
+- **A value's editor is an overlay.** Focusing a box-model value moves nothing in the widget: its slot keeps the resting size, the
+  editor is laid over every band (the left border's editor is no longer hidden behind the padding rectangle) and it is as wide as
+  a short number plus the unit button, which is now as tall as the editor instead of cut short. The widget also ignores the text
+  being typed until it is accepted. The four layer names are one size, stepping down with the whole widget
+  (`web/lib/properties.js`, `web/board.css`, `web/tests/spacing.mjs`).
+- **The unit menu lists the units.** `px`, `%`, `rem`, `em` and `×` appear as themselves, in a menu as narrow as they need, not as a
+  name beside a symbol (`web/lib/properties.js`, `web/board.css`, `web/tests/appearance.mjs`).
+- **The Border frame shows the colour the page really paints.** A side colour in `oklch()`, `color-mix()`, `color()` or `inherit`
+  showed black because only `rgb()` was understood; any colour a browser can paint is now read back from one painted pixel
+  (`web/lib/properties.js`, `web/tests/appearance.mjs`).
+- **The sidebar tabs stay in their corner until they touch the dock.** The phone layout used to stretch them over the window below
+  720px even with room beside the dock; now they stay at the sidebar's default width, left of the dock, and stack above it only
+  when the two would touch (`web/board.js`, `web/board.css`, `web/index.html`, `web/tests/chrome.mjs`).
+
 ## 0.3.2 — A unit on every box-model value, and a calmer Border frame
 
 - **Every value of the box model carries its unit.** Offsets, margins, border widths, paddings and the content size show `px`

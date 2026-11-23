@@ -33,6 +33,33 @@ new ResizeObserver(() => {
   if (height > 0) document.documentElement.style.setProperty('--dock-h', `${height}px`);
   else document.documentElement.style.removeProperty('--dock-h');
 }).observe(dock);
+// The sidebar's tabs stay in their own corner, left of the dock, while both fit side by side at their own widths (the tabs at the
+// sidebar's width, the dock as one row). Only when they would touch do the tabs stack above the dock, across the whole width.
+const tabs = $('#sidebar-foot');
+const fitFoot = () => {
+  const root = document.documentElement, ui = uiScale();
+  // Only the phone layout stacks them, and not while the sidebar is open (the tabs are then the sidebar's own foot, full width).
+  if (!root.classList.contains('w720') || document.body.classList.contains('has-sidebar') || !dock.getClientRects().length) { root.classList.remove('foot-stack'); return; }
+  const edge = Number.parseFloat(getComputedStyle(root).getPropertyValue('--edge')) || 16;
+  // The tabs' own width beside the dock is the brand row's natural width — the sidebar's default — not the stretched one the phone
+  // layout gives that row (it spans the window there), so it is the sum of the row's children and gap.
+  const brandRow = $('#brand'), gap = Number.parseFloat(getComputedStyle(brandRow).columnGap) || 0;
+  const tabsWidth = Math.max(240, [...brandRow.children].reduce((sum, child) => sum + child.offsetWidth + gap, -gap));
+  // The dock wraps on narrow screens, so its natural width is measured as one row.
+  const wrap = dock.style.flexWrap, width = dock.style.width;
+  dock.style.flexWrap = 'nowrap'; dock.style.width = 'max-content';
+  const dockWidth = dock.offsetWidth;
+  dock.style.flexWrap = wrap; dock.style.width = width;
+  root.style.setProperty('--foot-w', `${Math.round(tabsWidth)}px`);
+  root.classList.toggle('foot-stack', tabsWidth + dockWidth + 3 * edge > window.innerWidth / ui);
+};
+new ResizeObserver(fitFoot).observe(dock);
+new ResizeObserver(fitFoot).observe(tabs);
+addEventListener('resize', fitFoot);
+on('sidebar-width', fitFoot);
+on('sidebar', fitFoot);
+addEventListener('divlet:fit', fitFoot);
+fitFoot();
 const modeButtons = [['select', 'select', 'Select artboards and elements · V'], ['interact', 'play', 'Interact with the page · P']].map(([mode, name, tip]) => {
   const node = button(name, tip, () => canvas.setMode(mode), 'mode');
   node.dataset.mode = mode;

@@ -481,17 +481,17 @@ try {
     // The menu changes only the unit and keeps the number; a bare number then takes the unit in use.
     await page.locator('#inspector [data-key="border-t"]').focus();
     await unit('border-t').click();
-    await page.locator('.menu .menu-item', { hasText: /^Em em$/ }).click();
+    await page.locator('.menu .menu-item', { hasText: /^em$/ }).click();
     await waitUntil(() => authoredProp('border-top-width') === '0.25em', 'the unit menu turns 0.25rem into 0.25em, the number untouched');
     await page.locator('#inspector [data-key="border-t"]').fill('2'); await page.keyboard.press('Enter');
     await waitUntil(() => authoredProp('border-top-width') === '2em', 'a bare number takes the unit beside it');
     assert.equal(await page.locator('#inspector [data-key="border-t"]').getAttribute('aria-label'), 'Border top', 'the name does not carry the unit');
     // A border width has no percentage, so the menu does not offer one; margins and padding do.
     await page.locator('#inspector [data-key="border-t"]').focus(); await unit('border-t').click();
-    assert.deepEqual(await page.locator('.menu[aria-label="Unit"] .menu-item').allInnerTexts(), ['Pixels px', 'Rem rem', 'Em em'], 'a border width offers px, rem and em');
+    assert.deepEqual(await page.locator('.menu[aria-label="Unit"] .menu-item').allInnerTexts(), ['px', 'rem', 'em'], 'a border width offers px, rem and em, as the units themselves');
     await page.keyboard.press('Escape');
     await page.locator('#inspector [data-key="m-r"]').focus(); await unit('m-r').click();
-    assert.deepEqual(await page.locator('.menu[aria-label="Unit"] .menu-item').allInnerTexts(), ['Pixels px', 'Percent %', 'Rem rem', 'Em em'], 'a margin offers px, %, rem and em');
+    assert.deepEqual(await page.locator('.menu[aria-label="Unit"] .menu-item').allInnerTexts(), ['px', '%', 'rem', 'em'], 'a margin offers px, %, rem and em');
     await page.keyboard.press('Escape');
     // A keyword has no unit.
     await page.locator('#inspector [data-key="m-r"]').fill('auto'); await page.keyboard.press('Enter');
@@ -500,6 +500,43 @@ try {
     for (let step = 0; step < 4; step++) { await page.locator('#viewport').focus(); await page.keyboard.press('Control+z'); }
     await waitUntil(async () => (await widthNow()) === before, 'four undos restore the border width the page had');
     checks.push('every box-model value carries its own unit: px by default, a typed unit moves beside the number, the menu swaps only the unit and opens only while the cell has focus');
+  }
+
+  // The editor of a value is an overlay: focusing any value moves nothing in the widget, the editor is painted above every band (no
+  // band covers any part of it), it is as wide as a short number and its unit button, and that button is as tall as the editor.
+  {
+    const geometry = () => page.locator('#inspector .boxmodel').evaluate(model => [model, ...model.querySelectorAll('.bm-sq, .bm-core, .bm-slot')].map(node => { const r = node.getBoundingClientRect(); return [Math.round(r.left * 10), Math.round(r.top * 10), Math.round(r.width * 10), Math.round(r.height * 10)].join(','); }));
+    await page.mouse.move(5, 5);
+    await page.evaluate(() => document.activeElement?.blur());
+    const rest = await geometry();
+    // Sub-pixel text measurement may differ by a fraction of a pixel; a move is anything beyond half a pixel.
+    const unmoved = (now, expected) => now.length === expected.length && now.every((box, index) => box.split(',').every((value, part) => Math.abs(Number(value) - Number(expected[index].split(',')[part])) <= 5));
+    for (const key of ['inset-t', 'm-l', 'border-l', 'border-b', 'p-t', 'p-r', 'content-width', 'content-height']) {
+      await page.locator(`#inspector [data-key="${key}"]`).focus();
+      await waitUntil(() => page.locator(`#inspector [data-key="${key}"]`).evaluate(input => !!input.closest('.bm-slot.editing')), `${key} opens its editor`);
+      assert.ok(unmoved(await geometry(), rest), `focusing ${key} moves nothing in the widget`);
+      const editor = await page.locator(`#inspector [data-key="${key}"]`).evaluate(input => {
+        const vf = input.closest('.vf'), box = vf.getBoundingClientRect(), unit = vf.querySelector('.vf-unit:not([hidden])');
+        const top = point => { const hit = document.elementFromPoint(point[0], point[1]); return !!hit && vf.contains(hit); };
+        const cy = box.top + box.height / 2;
+        return { width: Math.round(box.width), height: Math.round(box.height), unit: unit ? [Math.round(unit.getBoundingClientRect().height), Math.round(unit.getBoundingClientRect().top - box.top)] : null, onTop: [box.left + 3, box.left + box.width / 2, box.right - 3].every(x => top([x, cy])) };
+      });
+      assert.ok(editor.onTop, `the ${key} editor is above every band: nothing covers its left, middle or right`);
+      assert.ok(editor.width <= 96, `the ${key} editor is compact (${editor.width}px)`);
+      if (editor.unit) assert.deepEqual(editor.unit, [editor.height, 0], `the ${key} unit button is as tall as its editor`);
+      await page.evaluate(() => document.activeElement?.blur());
+      await waitUntil(async () => unmoved(await geometry(), rest), `leaving ${key} restores the resting widget`);
+    }
+    // Typing a long value into an editor does not resize the widget either.
+    await page.locator('#inspector [data-key="m-l"]').focus();
+    await page.locator('#inspector [data-key="m-l"]').evaluate(input => { input.value = '123.4567rem'; input.dispatchEvent(new Event('input', { bubbles: true })); });
+    assert.ok(unmoved(await geometry(), rest), 'typing a long value moves nothing either');
+    await page.keyboard.press('Escape');
+    await page.evaluate(() => document.activeElement?.blur());
+    // The four layer names are one size.
+    const sizes = await page.locator('#inspector .boxmodel .bm-caption').evaluateAll(nodes => [...new Set(nodes.filter(node => node.getClientRects().length).map(node => getComputedStyle(node).fontSize))]);
+    assert.equal(sizes.length, 1, `position, margin, border and padding are named in one size (${sizes})`);
+    checks.push('a value\'s editor is an overlay above every band: nothing in the widget moves, it is compact, its unit button is as tall as it, and the four layer names are one size');
   }
 
   // Hold the first write: several Tab commits must compose against accepted state rather than the panel's old class string.

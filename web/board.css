@@ -329,6 +329,9 @@ body.is-expanded .resize-handle, body:has(> .boot-cover) .resize-handle, body:ha
 
 /* menus */
 .menu { position: fixed; z-index: 95; display: flex; flex-direction: column; min-width: min(200px, calc(var(--vw) - 16px)); max-width: min(320px, calc(var(--vw) - 16px)); max-height: calc(var(--vh) - 16px); overflow-y: auto; padding: 5px; border: 1px solid var(--hair); border-radius: var(--radius); background: var(--solid); box-shadow: var(--shadow), 0 0 0 .5px rgba(0, 0, 0, .04); animation: rise-ui .14s var(--ease); transform: scale(var(--ui)); transform-origin: 0 0; outline: none; }
+.menu.menu-units { min-width: 0; width: max-content; }
+.menu-units .icon-space { display: none; }
+.menu-units .menu-item { gap: 0; min-height: 28px; padding: 4px 12px; font: 11px var(--mono); }
 .menu-item { display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 4px 10px 4px 8px; border: 0; border-radius: var(--radius-small); background: transparent; color: var(--ink); text-align: left; }
 .menu-item:hover:not(:disabled), .menu-item:focus-visible { background: var(--accent-soft); outline: none; }
 .menu-item .icon { width: 15px; height: 15px; color: var(--muted); }
@@ -475,10 +478,11 @@ button.change:hover:not(:disabled) { background: var(--field); }
    watermark on the band's own fill: it sits out of the flow near the left edge and takes no part in placing any value. */
 .bm-top { position: absolute; top: 1px; left: 0; right: 0; height: 18px; display: flex; align-items: center; justify-content: center; }
 /* The band name is a watermark on its own fill: larger than a value and darker than the colour it sits on. */
-.bm-caption { position: absolute; top: 0; left: 5px; width: max-content; white-space: nowrap; display: flex; align-items: center; height: 18px; font: 600 12.5px/18px var(--font); letter-spacing: .01em; pointer-events: none; }
-/* A band too narrow for both gives the name less room first: it never clips, it steps down instead. */
-@container band (max-width: 180px) { .bm-caption { font-size: 10.5px; } }
-@container band (max-width: 130px) { .bm-caption { font-size: 8px; } }
+.bm-caption { position: absolute; top: 0; left: 5px; width: max-content; white-space: nowrap; display: flex; align-items: center; height: 18px; font: 600 11.5px/18px var(--font); letter-spacing: .01em; pointer-events: none; }
+/* All four names are one size, which steps down with the whole widget (never with one band, or the layers would read as a
+   decreasing series): it never clips, it gets smaller first. */
+@container boxmodel (max-width: 270px) { .bm-caption { font-size: 9.5px; } }
+@container boxmodel (max-width: 230px) { .bm-caption { font-size: 9px; } }
 /* A band so narrow that its name cannot sit left of the centred top value (name, its inset and half a value must fit in half the band)
    gives the name up rather than cover the value: the value's place on the centre axis is not negotiable, and the band keeps its
    accessible name. The bound has room for a wider font than the one measured. */
@@ -498,27 +502,30 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .bm-cell.bm-r { right: 1px; }
 .bm-cell { width: auto; min-width: var(--bm-field); max-width: calc(100% - 4px); }
 /* A value is its number with its unit beside it (under it in a side strip): the cell is as wide as the two together. */
-.bm-sq > .bm-cell > .vf, .bm-top > .bm-cell > .vf { width: auto; max-width: 100%; }
-.bm-cell.bm-l > .vf, .bm-cell.bm-r > .vf { width: 100%; flex-direction: column; justify-content: center; gap: 0; }
+.bm-sq > .bm-cell > .bm-slot > .vf, .bm-top > .bm-cell > .bm-slot > .vf { width: auto; max-width: 100%; }
+.bm-cell.bm-l > .bm-slot, .bm-cell.bm-r > .bm-slot { width: 100%; }
+.bm-cell.bm-l > .bm-slot > .vf, .bm-cell.bm-r > .bm-slot > .vf { width: 100%; flex-direction: column; justify-content: center; gap: 0; }
 .bm-centre { min-width: 0; }
 .vf.bm-field, .vf.bm-offset, .vf.bm-value { flex: none; width: auto; min-width: var(--bm-field); min-height: 18px; height: auto; gap: 1px; justify-content: center; padding: 0; border-radius: var(--radius-small); background: transparent; box-shadow: none; color: inherit; }
 .bm-field:hover, .bm-offset:hover, .bm-value:hover { background: #ffffff30; }
 .bm-field:focus-within, .bm-offset:focus-within, .bm-value:focus-within { background: var(--solid); color: var(--ink); }
-/* While a value has focus its cell grows into an editor above its neighbours: the number, then the unit as a real menu button on
-   the selector surface, flush with the editor's end. */
-.bm-field:focus-within, .bm-offset:focus-within, .bm-value:focus-within { position: relative; z-index: 5; flex-direction: row; width: 92px; min-height: 22px; box-shadow: 0 1px 5px rgba(0, 0, 0, .35); }
-.bm-field:focus-within .vf-input, .bm-offset:focus-within .vf-input, .bm-value:focus-within .vf-input { flex: 1; width: auto; min-width: 40px; padding-left: 5px; text-align: left; }
-.bm-field:focus-within .vf-unit.unit-switch, .bm-offset:focus-within .vf-unit.unit-switch, .bm-value:focus-within .vf-unit.unit-switch { pointer-events: auto; opacity: 1; background: var(--control); color: var(--ink); font: 10px var(--mono); min-width: 30px; padding: 0 6px; border-radius: 0 var(--radius-small) var(--radius-small) 0; }
-.bm-field:focus-within .vf-unit.unit-switch:hover, .bm-offset:focus-within .vf-unit.unit-switch:hover, .bm-value:focus-within .vf-unit.unit-switch:hover { background: var(--control-hover); }
-/* A side value is stacked at rest; its editor is the same row as every other. */
-.bm-cell.bm-l > .vf:focus-within, .bm-cell.bm-r > .vf:focus-within { flex-direction: row; width: 92px; max-width: none; justify-content: center; }
-.bm-cell.bm-l > .vf:focus-within .vf-input, .bm-cell.bm-r > .vf:focus-within .vf-input { width: auto; }
 .bm-field .vf-input, .bm-offset .vf-input, .bm-value .vf-input { flex: none; width: var(--bm-value-width, 2ch); max-width: 100%; min-width: 0; padding: 0; color: inherit; font: 10px/16px var(--mono); text-align: center; }
 .bm-cell.bm-l .vf-input, .bm-cell.bm-r .vf-input { width: 100%; }
 /* At rest the unit is only a small label beside its number, taking no pointer: a click lands on the number. */
-.bm-cell.bm-t > .vf, .bm-cell.bm-b > .vf, .vf.bm-value { align-items: baseline; }
+.bm-cell.bm-t > .bm-slot > .vf, .bm-cell.bm-b > .bm-slot > .vf, .vf.bm-value { align-items: baseline; }
 .bm-cell.bm-t .vf-unit.unit-switch, .bm-cell.bm-b .vf-unit.unit-switch, .bm-value .vf-unit.unit-switch { align-self: baseline; }
 .bm-field .vf-unit.unit-switch, .bm-offset .vf-unit.unit-switch, .bm-value .vf-unit.unit-switch { align-self: center; min-width: 0; margin: 0; padding: 0 1px; border-radius: 0; background: transparent; color: inherit; opacity: .72; font: 8.5px/10px var(--mono); pointer-events: none; }
+/* A value is a slot of its resting size. While it has focus its field becomes an editor laid over the widget: the slot keeps its size,
+   so nothing under it moves, and every band that holds it rises above its siblings, so no band covers any part of it. The editor is as
+   wide as a short number and the unit button, which stands the full height of the editor. */
+.bm-slot { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; max-width: 100%; }
+.boxmodel .bm-sq .bm-slot.editing > .vf { position: absolute; z-index: 30; left: 50%; top: 50%; transform: translate(-50%, -50%); width: max-content; max-width: none; min-width: 0; height: 24px; min-height: 24px; flex-direction: row; align-items: stretch; gap: 0; padding: 0; border-radius: var(--radius-small); background: var(--solid); color: var(--ink); box-shadow: 0 2px 8px rgba(0, 0, 0, .35); }
+.boxmodel .bm-sq .bm-slot.editing .vf-input { flex: none; width: calc(var(--bm-edit-chars, 3) * 1ch + 10px); max-width: none; padding: 0 5px; text-align: center; font: 11px/22px var(--mono); }
+.boxmodel .bm-sq .bm-slot.editing .vf-unit.unit-switch { align-self: stretch; pointer-events: auto; min-width: 26px; padding: 0 6px; border-radius: 0 var(--radius-small) var(--radius-small) 0; background: var(--control); color: var(--ink); opacity: 1; font: 10px var(--mono); }
+.boxmodel .bm-sq .bm-slot.editing .vf-unit.unit-switch:hover { background: var(--control-hover); }
+.bm-cell:has(> .bm-slot.editing) { z-index: 30; }
+.bm-cell.bm-t:has(> .bm-slot.editing) { position: relative; }
+.bm-sq:has(.bm-slot.editing), .boxmodel:has(.bm-slot.editing) { z-index: 30; }
 .bm-field .vf-input::placeholder, .bm-offset .vf-input::placeholder, .bm-value .vf-input::placeholder { color: inherit; opacity: 1; }
 .bm-core { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 3px; min-width: 0; min-height: 23px; padding: 2px; border: 1px solid #314554; background: #8eaec2; color: #17232b; font: 10px/15px var(--mono); }
 .vf.bm-dimension { width: auto; min-width: 3ch; }
@@ -538,7 +545,7 @@ button.change:hover:not(:disabled) { background: var(--field); }
   .bm-cell.bm-l { left: 0; }
   .bm-cell.bm-r { right: 0; }
   .bm-cell, .bm-field .vf-input, .bm-offset .vf-input, .bm-core { font-size: 9px; }
-  .bm-cell.bm-l > .vf, .bm-cell.bm-r > .vf { width: auto; flex-direction: row; }
+  .bm-cell.bm-l > .bm-slot > .vf, .bm-cell.bm-r > .bm-slot > .vf { width: auto; flex-direction: row; }
   .bm-cell.bm-l .vf-input, .bm-cell.bm-r .vf-input { width: var(--bm-value-width, 2ch); }
 }
 /* Side values too long for a side band earn a row, not clipping or tiny type: left and right share the row under the top
@@ -546,7 +553,7 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .bm-stacked-sides { --bm-side: var(--bm-edge); padding-top: 40px; padding-bottom: 40px; }
 /* On a row of its own the value earns its own width again: the strip it was centred in no longer exists. */
 .bm-stacked-sides > .bm-l, .bm-stacked-sides > .bm-r { width: auto; min-width: var(--bm-field); }
-.bm-stacked-sides > .bm-l > .vf, .bm-stacked-sides > .bm-r > .vf { width: auto; flex-direction: row; }
+.bm-stacked-sides > .bm-l > .bm-slot > .vf, .bm-stacked-sides > .bm-r > .bm-slot > .vf { width: auto; flex-direction: row; }
 .bm-stacked-sides > .bm-l .vf-input, .bm-stacked-sides > .bm-r .vf-input { width: var(--bm-value-width, 2ch); }
 .bm-stacked-sides > .bm-l { top: 20px; left: 2px; bottom: auto; transform: none; }
 .bm-stacked-sides > .bm-r { top: 20px; right: 2px; bottom: auto; transform: none; }
@@ -969,14 +976,19 @@ html[data-sidebar="tiny"] .chat-list { padding: 0 1px; }
    Only one big surface is shown at a time. */
 html.w720 { --edge: 8px; }
 html.w720 .brand { right: var(--edge); max-width: none; justify-content: space-between; }
-html.w720 .sidebar-foot { right: var(--edge); width: auto; max-width: none; }
+/* The tabs take the whole width, above the dock, only when they cannot sit beside it (board.js sets .foot-stack) or sit on a sheet. */
+html.foot-stack .sidebar-foot, html.w720 body.has-sidebar .sidebar-foot { right: var(--edge); width: auto; max-width: none; }
 html.w720 .side-tabs .tab { flex: 1 1 0; }
 html.w720 body.has-sidebar .sidebar-foot { bottom: max(var(--edge), env(safe-area-inset-bottom)); }
+/* Beside the dock the tabs keep the width of their own corner (the brand row's), not the width a stretched row has on a phone. */
+html.w720:not(.foot-stack) body:not(.has-sidebar) .sidebar-foot { width: var(--foot-w, 247px); }
 html.w720 .panel.left { right: var(--edge); width: auto; }
 html.w720 .dock { bottom: max(var(--edge), env(safe-area-inset-bottom)); right: var(--edge); }
-html.w720 .sidebar-foot { bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + 8px); }
-html.w720 .crumbs-bar { bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + var(--chrome-h) + 12px + var(--agent-float-h, 0px)); }
-html.w720 .panel.right { left: var(--edge); right: var(--edge); width: auto; bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + var(--chrome-h) + 16px + var(--agent-float-h, 0px)); max-height: calc(var(--vh) * 0.5); }
+html.foot-stack .sidebar-foot { bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + 8px); }
+html.w720 { --foot-h: 0px; }
+html.w720.foot-stack { --foot-h: var(--chrome-h); }
+html.w720 .crumbs-bar { bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + var(--foot-h) + 12px + var(--agent-float-h, 0px)); }
+html.w720 .panel.right { left: var(--edge); right: var(--edge); width: auto; bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + var(--dock-h, var(--chrome-h)) + var(--foot-h) + 16px + var(--agent-float-h, 0px)); max-height: calc(var(--vh) * 0.5); }
 html.w720 body.agent-busy:not(.has-sidebar) .panel.right { max-height: min(calc(var(--vh) * 0.5), calc(var(--vh) - var(--dock-h, var(--chrome-h)) - var(--chrome-h) - 2 * var(--edge) - var(--brand-h) - 24px - var(--agent-float-h, 0px))); }
 html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { display: none; }
       html.w440 .search-pill-text, html.w440 .search-pill kbd { display: none; } html.w440 .search-pill { padding: 0 9px; }

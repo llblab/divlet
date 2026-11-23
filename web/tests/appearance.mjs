@@ -476,6 +476,19 @@ try {
     checks.push('a colour selector on each edge colours that side on the page and paints the ring; Delete removes one side alone and every pick undoes by itself');
   }
 
+  // A colour the page reports in a modern notation shows as itself in the Border frame, never as the black a parser would fall back to.
+  {
+    const swatches = () => page.locator('#inspector .br-side .swatch').evaluateAll(nodes => nodes.map(node => node.value));
+    const before0 = await swatches();
+    await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-top-color': 'oklch(0.7 0.15 200)', 'border-left-color': 'color-mix(in srgb, red 50%, blue)', 'border-right-color': 'inherit' } } } } });
+    await waitUntil(async () => (await swatches())[0] === '#00b9c3' && (await swatches())[3] === '#800080', 'an oklch() and a color-mix() side colour show as the colours they paint');
+    const [, inherited] = await swatches();
+    assert.notEqual(inherited, '#000000', 'an inherited side colour shows the colour it really inherited, not black');
+    assert.equal(inherited, await page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => { const [r, g, b] = getComputedStyle(node).borderRightColor.match(/\d+/g).map(Number); return '#' + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join(''); }), 'and it is the page\'s own colour');
+    await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-top-color': before0[0], 'border-left-color': before0[3], 'border-right-color': before0[1] } } } } });
+    checks.push('a side colour in oklch(), color-mix() or inherit shows the colour the page really paints in the Border frame');
+  }
+
   // A compiler-lowered border width remains visible as the measured fallback, and one side can override it — in the box model
   // band, which is the only place a width is written now that the Border ring carries radii and colour instead.
   await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-width': '3px' } } } } });
@@ -653,8 +666,8 @@ try {
   await lhUnit().click();
   await page.waitForSelector('.menu[aria-label="Unit"] .menu-item');
   const unitChoices = await page.locator('.menu[aria-label="Unit"] .menu-item').allInnerTexts();
-  assert.deepEqual(unitChoices, ['Percent %', 'Pixels px', 'Em em', 'Multiple ×'], 'every spelling is offered');
-  await page.locator('.menu[aria-label="Unit"] .menu-item', { hasText: 'Percent %' }).click();
+  assert.deepEqual(unitChoices, ['%', 'px', 'em', '×'], 'every spelling is offered, as the unit itself with no name beside it');
+  await page.locator('.menu[aria-label="Unit"] .menu-item', { hasText: /^%$/ }).click();
   // Only the unit changes: 24px becomes 24%, the number is not converted against the font size.
   await waitUntil(() => classesOf('cta').includes('leading-[24%]'), '24px becomes 24% — the unit alone changed');
   await waitUntil(async () => (await lhUnit().innerText()) === '%', 'and the button follows the change');
@@ -685,10 +698,10 @@ try {
   await waitUntil(() => classesOf('cta').includes('rounded-tl-[10px]') && !classesOf('cta').some(name => /^rounded-tl-\[/.test(name) && name !== 'rounded-tl-[10px]'), 'a typed number and unit set an arbitrary radius and replace the previous one');
   // The unit menu changes only the unit: the number stays, nothing is converted, and no typing is needed.
   await page.locator('#inspector [data-key="unit:radius-tl"]').click();
-  await page.locator('.menu .menu-item', { hasText: /^Rem rem$/ }).click();
+  await page.locator('.menu .menu-item', { hasText: /^rem$/ }).click();
   await waitUntil(() => classesOf('cta').includes('rounded-tl-[10rem]'), 'the unit menu turns 10px into 10rem, the same number in another unit');
   await page.locator('#inspector [data-key="unit:radius-tl"]').click();
-  await page.locator('.menu .menu-item', { hasText: /^Percent %$/ }).click();
+  await page.locator('.menu .menu-item', { hasText: /^%$/ }).click();
   await waitUntil(() => classesOf('cta').includes('rounded-tl-[10%]'), 'and 10rem into 10%, again with the number untouched');
   await page.locator('#inspector [data-key="radius-tl"]').fill('10px'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('rounded-tl-[10px]'), 'and the px spelling returns');

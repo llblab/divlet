@@ -8,7 +8,7 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%22%20fill%3D%22none%22%20color%3D%22%235b5bf0%22%20stroke%3D%22currentColor%22%20stroke-width%3D%221.5%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M8%204.5%202.5%2010%208%2015.5%22%20fill%3D%22none%22%2F%3E%3Cpath%20d%3D%22M10.5%204.5H12L17.5%2010%2012%2015.5h-1.5Z%22%20fill%3D%22currentColor%22%20stroke%3D%22none%22%2F%3E%3C%2Fsvg%3E">
     <script>try { const theme = localStorage.getItem('divlet:theme'); if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme; const ui = Number(localStorage.getItem('divlet:ui')); if (ui >= 1 && ui <= 2) document.documentElement.style.setProperty('--ui', String(ui)); } catch {}
       // Layouts react to the width the interface really has: the window divided by the interface size.
-      const fit = () => { const w = innerWidth / (Number.parseFloat(document.documentElement.style.getPropertyValue('--ui')) || 1); for (const t of [720, 560, 440, 420]) document.documentElement.classList.toggle('w' + t, w <= t); };
+      const fit = () => { const w = innerWidth / (Number.parseFloat(document.documentElement.style.getPropertyValue('--ui')) || 1); for (const t of [720, 560, 440, 420]) document.documentElement.classList.toggle('w' + t, w <= t); dispatchEvent(new Event('divlet:fit')); };
       fit(); addEventListener('resize', fit); window.__divletFit = fit;</script>
     <link rel="stylesheet" href="./board.css">
     <script type="module" src="./board.js"></script>
