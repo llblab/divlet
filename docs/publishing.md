@@ -22,16 +22,16 @@ npm refused the original unscoped `divlet` name as too similar to `figlet`. The 
 
 Core's HTTP composition imports web's public asset locator; generic model/format modules do not import web. Web's portable contracts own opaque host payloads, not project validation/writes, and have no type/JSDoc back-edge to core. Browser modules use host HTTP/SSE and preview ports, not imports of the Node runtime. Backend plugins consume core contracts; client plugins use the served web module graph. See [architecture](architecture.md).
 
-The root owns `@divlet/core`, `web/` owns `@divlet/web`, and `cli/`, `mcp/` and `pi/` own the adapters, without wrappers. All five versions match. The 0.3.3 adapters pin `@divlet/core@0.3.3`; core pins `@divlet/web@0.3.3`. Core has no bins, Pi manifest/peer requirements or `./pi` export. Its tarball excludes the web and adapter implementations. Web owns its only client copy and portable declarations. Built-in plugins remain bundled in core, not separately published.
+The root owns `@divlet/core`, `web/` owns `@divlet/web`, and `cli/`, `mcp/` and `pi/` own the adapters, without wrappers. All five versions match. The 0.3.4 adapters pin `@divlet/core@0.3.4`; core pins `@divlet/web@0.3.4`. Core has no bins, Pi manifest/peer requirements or `./pi` export. Its tarball excludes the web and adapter implementations. Web owns its only client copy and portable declarations. Built-in plugins remain bundled in core, not separately published.
 
-Node.js 22.19 or later is required. Pi is not required for CLI/MCP. Shared configurations should pin adapter versions, including `npm:@divlet/pi@0.3.3` after verifying that version is published. For MCP:
+Node.js 22.19 or later is required. Pi is not required for CLI/MCP. Shared configurations should pin adapter versions, including `npm:@divlet/pi@0.3.4` after verifying that version is published. For MCP:
 
 ```json
 {
   "mcpServers": {
     "divlet": {
       "command": "npx",
-      "args": ["-y", "@divlet/mcp@0.3.3", "--cwd", "/absolute/path/to/workspace"]
+      "args": ["-y", "@divlet/mcp@0.3.4", "--cwd", "/absolute/path/to/workspace"]
     }
   }
 }
@@ -65,7 +65,7 @@ The [Release workflow](https://github.com/llblab/divlet/blob/main/.github/workfl
 Align the five manifests, exact pins, lockfile and the changelog first. The changelog's `## X.Y.Z — <title>` heading must already name the release (not `Unreleased`): the GitHub Release is written from that section, so the flow refuses a missing, empty or still-unreleased one before anything is published. Then, under separate Git authorization, create the stable tag on the intended `main` commit and push it:
 
 ```bash
-git tag -a v0.3.3 -m "divlet 0.3.3" && git push origin v0.3.3
+git tag -a v0.3.4 -m "divlet 0.3.4" && git push origin v0.3.4
 ```
 
 The tag push is the whole release action; there is nothing to dispatch. The tag must resolve to a commit that is on `main` (a tag on a side branch is refused before any package script runs), and that commit is the one the archives are built from, so automatic npm provenance names the same source commit. A tag that was pushed before its commit was ready is never moved on the registry's behalf: if validation fails, nothing was published, so fix `main`, delete the unpublished tag and push it again on the new commit.

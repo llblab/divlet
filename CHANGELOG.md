@@ -2,7 +2,7 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
-## 0.3.4 — Unreleased
+## 0.3.4 — Hatching means the default, and Undo reaches a colour selector
 
 - **Hatching means the browser's default, and Undo works from a colour selector.** A Border side is hatched only when nothing
   authors its colour and the page paints the fallback; `inherit`, an authored colour and a stylesheet's colour show plain, and the
