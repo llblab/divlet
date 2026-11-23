@@ -43,12 +43,12 @@ Keep all five versions aligned and update every exact internal dependency pin pl
 
 ## GitHub Actions publishing
 
-The [Release workflow](https://github.com/llblab/divlet/blob/main/.github/workflows/release.yml) uses **npm Trusted Publishing (OIDC)**, not a stored `NPM_TOKEN`. It is manually dispatched from `main` with an existing stable `release_tag`, for example `v0.0.2`. Ordinary pushes, tag pushes and GitHub Release creation do not publish npm packages. Prereleases are not supported by this workflow.
+The [Release workflow](https://github.com/llblab/divlet/blob/main/.github/workflows/release.yml) uses **npm Trusted Publishing (OIDC)**, not a stored `NPM_TOKEN`. It is one flow started by pushing a stable `vX.Y.Z` tag on a commit of `main`: it validates and freezes the candidate, publishes the **GitHub Release**, then publishes **npm**, then verifies the registry install. Ordinary pushes, branch pushes and a hand-created GitHub Release do not publish npm packages. Prereleases are not supported by this workflow.
 
 ### One-time maintainer setup
 
-1. Push the reviewed workflow and its scripts to `main` only when Git/Pages delivery is authorized. The workflow must exist on the default branch before dispatch. No setup command in this guide creates tags, pushes or publishes automatically.
-2. In GitHub Settings → Environments, create **`npm`** and restrict deployment branches to `main`. Add required reviewers if an approval gate is wanted; a solo maintainer must not enable a self-review prohibition that prevents any approval.
+1. Push the reviewed workflow and its scripts to `main` only when Git/Pages delivery is authorized. The workflow file at the tagged commit is the one that runs. No setup command in this guide creates tags, pushes or publishes automatically.
+2. In GitHub Settings → Environments, create **`npm`** and under Deployment branches and tags allow the **tag** rule `v*.*.*` (a run started by a tag has a tag ref, so a branch-only rule refuses the publish job; the `main` branch rule may stay). Add required reviewers if an approval gate is wanted; a solo maintainer must not enable a self-review prohibition that prevents any approval. Also protect the `v*` tags with a tag ruleset (no deletion or update, creation by maintainers only): the environment rule checks only the ref's name, and the workflow itself additionally refuses a tag whose commit is not on `main`.
 3. For **each** of `@divlet/web`, `@divlet/core`, `@divlet/cli`, `@divlet/mcp` and `@divlet/pi`, open npm package Settings → Trusted Publisher and add GitHub Actions with these exact, case-sensitive values:
    | Field | Value |
    | --- | --- |
@@ -62,25 +62,26 @@ The [Release workflow](https://github.com/llblab/divlet/blob/main/.github/workfl
 
 ### Run a release
 
-Align the five manifests, exact pins, lockfile and candidate notes, then create the new stable tag on the intended `main` commit under separate Git authorization. The tag must resolve to **the same SHA as the dispatched `main` revision**. This prevents automatic npm provenance from naming a different source commit than the one used to build the archives. If `main` has advanced past an old tag, this workflow refuses it rather than falsifying provenance or moving a tag.
-
-Select Actions → **Release** → Run workflow, branch `main`, and supply the tag. The equivalent explicit publication action is:
+Align the five manifests, exact pins, lockfile and the changelog first. The changelog's `## X.Y.Z — <title>` heading must already name the release (not `Unreleased`): the GitHub Release is written from that section, so the flow refuses a missing, empty or still-unreleased one before anything is published. Then, under separate Git authorization, create the stable tag on the intended `main` commit and push it:
 
 ```bash
-gh workflow run release.yml --ref main -f release_tag=v0.3.1
+git tag -a v0.3.1 -m "divlet 0.3.1" && git push origin v0.3.1
 ```
 
-The workflow has three boundaries:
+The tag push is the whole release action; there is nothing to dispatch. The tag must resolve to a commit that is on `main` (a tag on a side branch is refused before any package script runs), and that commit is the one the archives are built from, so automatic npm provenance names the same source commit. A tag that was pushed before its commit was ready is never moved on the registry's behalf: if validation fails, nothing was published, so fix `main`, delete the unpublished tag and push it again on the new commit.
+
+The workflow has four boundaries:
 
 - **Validate and freeze:** Node 22.19.0, clean locked dependencies without install hooks or restored Actions caches, source units/types, the full browser battery, then one build and five hook-free packs. Test the exact frozen archives through the installed CLI/MCP and required isolated Pi 1.5.2 host before uploading the candidate artifact. No OIDC permission is available here.
-- **Publish npm:** A separate hosted runner, the `npm` environment, read-only GitHub history access and `id-token: write`. npm 11.19.0 performs OIDC/provenance with upload transport retries explicitly disabled (`--fetch-retries=0`); a retryable network response cannot silently replay the package PUT. No checkout dependencies, product builds or package lifecycle scripts run in this job. The script rechecks tag/commit, package order and archive SHA-512, checks all five registry names, then publishes web → core → adapters and waits for each exact version/integrity. The whole workflow is serialized without cancelling a running publication.
+- **Publish GitHub Release:** Only after validation, a job with `contents: write` and no OIDC or npm credential creates the Release for the tag from its changelog section (title `X.Y.Z: <title>`), unless that tag already has one. It installs and builds nothing. If it fails, npm is not published.
+- **Publish npm:** After the Release, a separate hosted runner, the `npm` environment, read-only GitHub history access and `id-token: write`. npm 11.19.0 performs OIDC/provenance with upload transport retries explicitly disabled (`--fetch-retries=0`); a retryable network response cannot silently replay the package PUT. No checkout dependencies, product builds or package lifecycle scripts run in this job. The script rechecks tag/commit, package order and archive SHA-512, checks all five registry names, then publishes web → core → adapters and waits for each exact version/integrity. The whole workflow is serialized without cancelling a running publication.
 - **Verify registry installation:** A fresh non-OIDC job installs by public registry names, checks archive and installed-lock integrity against the frozen manifest, serves the actual board/client/plugin routes, exercises MCP's seven tools and runs the real isolated Pi/font/history cases. It does not reload any active user session or install Pi globally.
 
 ### Failure and recovery
 
 Keep the `npm-candidate-<run-id>` archive set and `npm-outcome-<run-id>-<attempt>` receipt. They have 90-day artifact retention; download the evidence if longer retention is required. The publisher records `attempt_started` before invoking npm, `npm_accepted` after success and `registry_verified` only after exact-byte visibility. Registry absence after an attempt means wait/read or stop, never another upload.
 
-Publication jobs **cannot be rerun automatically**: attempts after the first are refused, and a fresh dispatch checks prior runs of this workflow for the same tag, including all job attempts. A previously started publisher requires explicit operator recovery even if no registry version is visible. Do not delete run history or edit the run title to bypass that guard. Runs whose publisher was skipped because validation failed do not count as upload attempts; use a fresh dispatch after fixing validation while preserving the tag/source constraint. A failed registry verification after all uploads is not permission to publish again; rerun only the read-only verification job.
+Publication jobs **cannot be rerun automatically**: attempts after the first are refused, and a fresh run for the same tag checks prior runs of this workflow for it, including all job attempts. A previously started publisher requires explicit operator recovery even if no registry version is visible. Do not delete run history or edit the run title to bypass that guard. Runs whose publisher was skipped because validation or the GitHub Release job failed do not count as upload attempts; after fixing the cause, push the tag again on a commit of `main` (delete the unpublished tag first, and keep the old one as an `archive/` ref if its history matters). A failed registry verification after all uploads is not permission to publish again; rerun only the read-only verification job. The GitHub Release is published before npm, so an npm failure leaves a public Release for a version the registry may not have: say so on the Release, and, because a re-run skips a tag that already has one, edit or delete that Release deliberately before the retry rather than letting a stale one stand.
 
 For partial or uncertain outcomes, inspect the original logs, frozen bytes, receipt and fresh registry metadata before choosing an explicit manual recovery or a new aligned version. Do not rebuild a failed release's archives, overwrite accepted versions, infer token rights from `npm whoami`, or run manual and CI publishing concurrently. A local/mock pass proves guard behavior, not a successful live OIDC exchange. The first real CI release was verified for 0.0.2; changes to workflow identity, environment bindings or account policy still require their own live authorization check.
 

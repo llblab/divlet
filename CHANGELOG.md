@@ -2,6 +2,16 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
+## 0.3.2 — Unreleased
+
+- **One release flow, started by a tag.** Pushing a stable `vX.Y.Z` tag on a commit of `main` now validates and freezes the
+  candidate, creates the GitHub Release from that version's CHANGELOG section, publishes the five packages to npm through OIDC
+  and verifies the registry install, instead of a manual dispatch plus a hand-made Release. A tag whose commit is not on `main`,
+  or whose changelog section is missing, empty or still `Unreleased`, is refused before anything is published; the GitHub
+  Release comes after validation and before npm, and an existing Release for the tag is left as it is
+  (`.github/workflows/release.yml`, `scripts/release-notes.mjs`, `scripts/npm-release.mjs`, `docs/publishing.md`,
+  `core/tests/release-notes.test.js`, `core/tests/npm-release.test.js`).
+
 ## 0.3.1 — Unreleased
 
 - **The Border frame, finished.** The four corner radii moved out of the frame, above and below its corners, so none covers a

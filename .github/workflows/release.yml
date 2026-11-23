@@ -1,13 +1,11 @@
 name: Release
-run-name: npm ${{ inputs.release_tag }}
+run-name: npm ${{ github.ref_name }}
 
+# One flow, started by a stable release tag on a commit of main: validate and freeze, publish the GitHub Release, then npm.
 on:
-  workflow_dispatch:
-    inputs:
-      release_tag:
-        description: 'Existing stable tag at the dispatched main commit (for example v0.0.2)'
-        type: string
-        required: true
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 permissions:
   contents: read
@@ -17,13 +15,13 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  RELEASE_TAG: ${{ inputs.release_tag }}
+  RELEASE_TAG: ${{ github.ref_name }}
   NODE_OPTIONS: ''
 
 jobs:
   prepare:
     name: Validate and freeze
-    if: github.repository == 'llblab/divlet' && github.ref == 'refs/heads/main'
+    if: github.repository == 'llblab/divlet' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -36,7 +34,10 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          test "$GITHUB_REF" = "refs/tags/$RELEASE_TAG"
           test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$GITHUB_SHA"
+          # Only code that reached main can be released; a tag on a side branch is refused before any package script runs.
+          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '22.19.0'
@@ -73,9 +74,38 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  github-release:
+    name: Publish GitHub Release
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.19.0'
+          package-manager-cache: false
+      # The text comes from this tag's own CHANGELOG.md section, which must already name the release. No npm credential or OIDC
+      # token exists in this job, and nothing from the checkout is installed or built.
+      - name: Create the release from the changelog, unless the tag already has one
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "::notice::$RELEASE_TAG already has a GitHub Release; leaving it as it is."
+            exit 0
+          fi
+          node scripts/release-notes.mjs notes "$RELEASE_TAG" > "$RUNNER_TEMP/release-notes.md"
+          gh release create "$RELEASE_TAG" --verify-tag --title "$(node scripts/release-notes.mjs title "$RELEASE_TAG")" --notes-file "$RUNNER_TEMP/release-notes.md"
+
   publish:
     name: Publish npm
-    needs: prepare
+    needs: [prepare, github-release]
     environment: npm
     runs-on: ubuntu-24.04
     timeout-minutes: 60

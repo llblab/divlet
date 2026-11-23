@@ -32,10 +32,10 @@ test('stable aligned releases require exact internal pins, package ownership and
   }
 });
 
-test('publisher accepts only the named main workflow, first attempt and OIDC without npm tokens', () => {
-  const env = { GITHUB_REPOSITORY: 'llblab/divlet', GITHUB_REF: 'refs/heads/main', GITHUB_WORKFLOW_REF: 'llblab/divlet/.github/workflows/release.yml@refs/heads/main', GITHUB_RUN_ATTEMPT: '1', GITHUB_RUN_ID: '123', GH_TOKEN: 'test-read-token', ACTIONS_ID_TOKEN_REQUEST_URL: 'test', ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'test' };
+test('publisher accepts only the named workflow on a stable tag push, first attempt and OIDC without npm tokens', () => {
+  const env = { GITHUB_REPOSITORY: 'llblab/divlet', GITHUB_EVENT_NAME: 'push', GITHUB_REF: 'refs/tags/v0.0.2', GITHUB_REF_NAME: 'v0.0.2', GITHUB_WORKFLOW_REF: 'llblab/divlet/.github/workflows/release.yml@refs/tags/v0.0.2', GITHUB_RUN_ATTEMPT: '1', GITHUB_RUN_ID: '123', GH_TOKEN: 'test-read-token', ACTIONS_ID_TOKEN_REQUEST_URL: 'test', ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'test' };
   publicationContext(env);
-  for (const [key, value] of [['GITHUB_REPOSITORY', 'fork/divlet'], ['GITHUB_REF', 'refs/heads/dev'], ['GITHUB_WORKFLOW_REF', 'other.yml'], ['GITHUB_RUN_ATTEMPT', '2'], ['GH_TOKEN', ''], ['ACTIONS_ID_TOKEN_REQUEST_TOKEN', ''], ['NPM_TOKEN', 'do-not-use'], ['NODE_AUTH_TOKEN', 'do-not-use']]) assert.throws(() => publicationContext({ ...env, [key]: value }));
+  for (const [key, value] of [['GITHUB_REPOSITORY', 'fork/divlet'], ['GITHUB_EVENT_NAME', 'workflow_dispatch'], ['GITHUB_REF', 'refs/heads/main'], ['GITHUB_REF_NAME', 'v0.0.3'], ['GITHUB_REF_NAME', 'v0.0.2-rc.1'], ['GITHUB_WORKFLOW_REF', 'other.yml'], ['GITHUB_RUN_ATTEMPT', '2'], ['GH_TOKEN', ''], ['ACTIONS_ID_TOKEN_REQUEST_TOKEN', ''], ['NPM_TOKEN', 'do-not-use'], ['NODE_AUTH_TOKEN', 'do-not-use']]) assert.throws(() => publicationContext({ ...env, [key]: value }));
 });
 
 test('prior-publication guard paginates runs and all job attempts; skipped validation is not publication', async () => {
@@ -152,15 +152,22 @@ test('npm transport sends only one package PUT after a retryable 502', async t =
 test('workflow separates validation and registry checks from OIDC and retains frozen candidate/outcome', async () => {
   const workflow = parse(await readFile(path.join(root, '.github/workflows/release.yml'), 'utf8'));
   assert.equal(workflow.name, 'Release');
-  assert.deepEqual(Object.keys(workflow.on), ['workflow_dispatch']);
-  assert.equal(workflow['run-name'], 'npm ${{ inputs.release_tag }}');
+  assert.deepEqual(Object.keys(workflow.on), ['push']);
+  assert.deepEqual(workflow.on.push, { tags: ['v[0-9]+.[0-9]+.[0-9]+'] }, 'only a stable tag starts a release');
+  assert.equal(workflow['run-name'], 'npm ${{ github.ref_name }}', 'the run title is what the prior-publication guard looks for');
   assert.equal(workflow.concurrency['cancel-in-progress'], false);
   assert.equal(workflow.jobs.publish.name, 'Publish npm');
   assert.equal(workflow.jobs.publish.environment, 'npm');
   assert.equal(workflow.jobs.publish.permissions['id-token'], 'write');
   assert.equal(workflow.jobs.prepare.permissions?.['id-token'], undefined);
   assert.equal(workflow.jobs.verify.permissions?.['id-token'], undefined);
-  assert.equal(workflow.jobs.publish.needs, 'prepare');
+  assert.deepEqual(workflow.jobs.publish.needs, ['prepare', 'github-release'], 'the GitHub Release is published first, then npm');
+  assert.equal(workflow.jobs['github-release'].needs, 'prepare', 'and only after validation');
+  assert.deepEqual(workflow.jobs['github-release'].permissions, { contents: 'write' });
+  assert.equal(workflow.jobs['github-release'].environment, undefined);
+  assert.ok(workflow.jobs['github-release'].steps.some(step => /release-notes\.mjs notes/.test(step.run ?? '') && /gh release create .*--verify-tag/.test(step.run ?? '')));
+  assert.ok(!workflow.jobs['github-release'].steps.some(step => /npm (ci|install|publish)/.test(step.run ?? '')), 'the release job installs and publishes no package');
+  assert.match(workflow.jobs.prepare.steps.find(step => /merge-base --is-ancestor/.test(step.run ?? ''))?.run ?? '', /GITHUB_SHA.*origin\/main/, 'a tag must be on main');
   assert.equal(workflow.jobs.verify.needs, 'publish');
   for (const job of Object.values(workflow.jobs)) for (const step of job.steps) if (step.uses) assert.match(step.uses, /^actions\/[\w-]+@[a-f0-9]{40}$/);
   assert.ok(workflow.jobs.publish.steps.some(step => step.if === 'always()' && step.with.name.startsWith('npm-outcome-')));

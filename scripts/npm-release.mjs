@@ -54,8 +54,10 @@ export function validateCandidate(candidate, tag, commit) {
 
 export function publicationContext(env) {
   assert.equal(env.GITHUB_REPOSITORY, 'llblab/divlet');
-  assert.equal(env.GITHUB_REF, 'refs/heads/main', 'Dispatch the workflow from main.');
-  assert.equal(env.GITHUB_WORKFLOW_REF, 'llblab/divlet/.github/workflows/release.yml@refs/heads/main');
+  assert.equal(env.GITHUB_EVENT_NAME, 'push', 'Release by pushing a stable tag; the workflow has no other trigger.');
+  releaseVersion(env.GITHUB_REF_NAME ?? '');
+  assert.equal(env.GITHUB_REF, `refs/tags/${env.GITHUB_REF_NAME}`, 'Release from a tag.');
+  assert.equal(env.GITHUB_WORKFLOW_REF, `llblab/divlet/.github/workflows/release.yml@${env.GITHUB_REF}`);
   assert.equal(env.GITHUB_RUN_ATTEMPT, '1', 'Do not rerun publication jobs; review the original attempt and artifacts.');
   assert.match(env.GITHUB_RUN_ID ?? '', /^\d+$/);
   assert.ok(env.GH_TOKEN, 'A read-only GitHub Actions token is required to inspect prior attempts.');
