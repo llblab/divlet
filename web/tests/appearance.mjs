@@ -449,6 +449,9 @@ try {
     // The browser does not report a native colour input's inner swatch through getComputedStyle, so the rule itself is checked.
     assert.equal(await page.evaluate(() => [...document.styleSheets].some(sheet => [...sheet.cssRules].some(rule => /color-field\.unset \.swatch::-webkit-color-swatch/.test(rule.selectorText ?? '') && /repeating-linear-gradient/.test(rule.cssText)))), true, 'which is hatched');
     assert.equal(await page.locator('#inspector .br-centre .color-field.unset, #inspector .br-centre .color-field.mixed').count(), 1, 'the colour for all four sides is hatched too while they share none of their own');
+    // A default is not a value: the field says what the browser does (`currentColor`), never a hex that looks like a chosen colour, and
+    // the hex of the text colour it resolves to is only in the tip.
+    assert.equal(await page.locator('#inspector .br-centre [data-key="stroke-all"]').getAttribute('placeholder'), 'currentColor', 'the colour for all sides says currentColor while none is set');
     // The native colour picker reports `input` while a colour is chosen and `change` when it is committed; the field follows
     // both, so this drives the same path a person's picker does.
     const pick = async (side, hex) => swatch(side).evaluate((node, hex) => { node.value = hex; node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new Event('change', { bubbles: true })); }, hex);
@@ -467,7 +470,7 @@ try {
     await page.keyboard.press('Control+z');
     await waitUntil(async () => (await sideColours())[1] === beforeRight, 'Ctrl+Z from the focused colour selector returns the side to the colour it had before');
     // Each selector says what it paints and quotes the colour, so a colour set by a stylesheet is still visible.
-    assert.match(await swatch('r').evaluate(node => node.dataset.tip ?? ''), /^Right border · #/, 'a side names itself and quotes the page colour');
+    assert.match(await swatch('r').evaluate(node => node.dataset.tip ?? ''), /^Right border · (#|not set: the browser paints the text colour, #)/, 'a side names itself and quotes the page colour');
     // Delete removes that side's own colour, leaving the rest of the border alone.
     // A measurement-driven repaint can replace the selector between focusing it and the key; Delete on the canvas would delete the
     // element itself, so hold the key until the selector really has focus.

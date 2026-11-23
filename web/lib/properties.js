@@ -287,7 +287,8 @@ function colorField({ key, label, tip, property, value, run, computed, tokens, c
   // the default falls back to — none authored anywhere and the page painting exactly that fallback. A colour that is inherited, or
   // set by a stylesheet, is a colour, not a default, so the swatch shows it plain.
   wrap.classList.toggle('mixed', current === MIXED);
-  wrap.classList.toggle('unset', defaultTo != null && current == null && !!computed && (computed === defaultTo || paintedHex(computed) === paintedHex(defaultTo)));
+  const isDefault = defaultTo != null && current == null && !!computed && (computed === defaultTo || paintedHex(computed) === paintedHex(defaultTo));
+  wrap.classList.toggle('unset', isDefault);
   const shownHex = current === MIXED ? null : css.hexOf(current) || KEYWORD_COLORS[current] || paintedHex(computed);
   const swatch = el('input', 'swatch color-pick');
   swatch.type = 'color';
@@ -300,7 +301,9 @@ function colorField({ key, label, tip, property, value, run, computed, tokens, c
   hex.autocomplete = 'off';
   hex.dataset.key = key;
   hex.value = current === MIXED || current == null ? '' : current;
-  hex.placeholder = current === MIXED ? '—' : paintedHex(computed) ?? (computed ? 'inherited' : 'none');
+  // A default is not a value: the field says `currentColor` (what the browser paints when no colour is set), and the swatch beside
+  // it shows the colour that resolves to, under the hatching. The hex of that text colour is in the tip, never in the field.
+  hex.placeholder = current === MIXED ? '—' : isDefault ? 'currentColor' : paintedHex(computed) ?? (computed ? 'inherited' : 'none');
   hex.setAttribute('aria-label', tip);
   const fitHex = () => hex.style.setProperty('--hex-width', `calc(${Math.max(7, (hex.value || hex.placeholder).length) + 2}ch + 8px)`);
   hex.addEventListener('input', fitHex);
@@ -383,7 +386,7 @@ function colorField({ key, label, tip, property, value, run, computed, tokens, c
     wrap.classList.add('color-swatch-only');
     name.remove();
     swatch.setAttribute('aria-label', label);
-    swatch.dataset.tip = `${label} · ${hex.placeholder || hex.value || 'open the colour picker'}`;
+    swatch.dataset.tip = `${label} · ${isDefault ? `not set: the browser paints the text colour, ${paintedHex(computed)}` : hex.placeholder || hex.value || 'open the colour picker'}`;
     swatch.addEventListener('keydown', event => {
       if (event.key !== 'Delete' && event.key !== 'Backspace') return;
       event.preventDefault();

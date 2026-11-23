@@ -2,6 +2,12 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
+## 0.3.5 — Unreleased
+
+- **A default colour no longer reads as a chosen one.** A Border side with no colour set showed the text colour it resolves to as a
+  hex in the field, as if it had been picked. The field now says `currentColor`, the swatch keeps the resolved colour under the
+  hatching, and the hex of the text colour is only in the tip (`web/lib/properties.js`, `web/tests/appearance.mjs`).
+
 ## 0.3.4 — Hatching means the default, and Undo reaches a colour selector
 
 - **Hatching means the browser's default, and Undo works from a colour selector.** A Border side is hatched only when nothing
