@@ -854,6 +854,9 @@ export async function render({ force = false } = {}) {
   const key = panel.contains(focused) ? focused.dataset.key : null;
   const caret = key && 'selectionStart' in focused ? [focused.selectionStart, focused.selectionEnd] : null;
   const pending = key && TRANSIENT.test(key) ? focused.value : null;
+  // A section's disclosure header has no key of its own: it is found again by the section it heads, so a repaint never drops a
+  // keyboard user's place at it onto the page.
+  const section = !key && panel.contains(focused) && focused.tagName === 'SUMMARY' ? focused.closest('[data-section]')?.dataset.section : null;
   const open = new Map([...panel.querySelectorAll('details')].map(node => [node.parentElement?.dataset.section, node.open]));
   const scroll = panel.scrollTop;
   const sameView = panel.dataset.view === viewKey();
@@ -870,6 +873,7 @@ export async function render({ force = false } = {}) {
   // The widest label in a group depends on the interface size, so a resized panel measures again.
   labelObserver.observe(panel);
   const claimed = focusWanted();
+  if (section && !claimed) panel.querySelector(`[data-section="${section}"] summary`)?.focus({ preventScroll: true });
   if (key && !claimed) {
     const target = [...panel.querySelectorAll('[data-key]')].find(node => node.dataset.key === key);
     if (target) {

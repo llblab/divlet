@@ -508,10 +508,14 @@ try {
     const geometry = () => page.locator('#inspector .boxmodel').evaluate(model => [model, ...model.querySelectorAll('.bm-sq, .bm-core, .bm-slot')].map(node => { const r = node.getBoundingClientRect(); return [Math.round(r.left * 10), Math.round(r.top * 10), Math.round(r.width * 10), Math.round(r.height * 10)].join(','); }));
     await page.mouse.move(5, 5);
     await page.evaluate(() => document.activeElement?.blur());
-    const rest = await geometry();
+    // The widget settles after the previous steps (measured numbers arrive a report later): the resting geometry is what two reads
+    // a moment apart agree on, so focusing is compared with a layout that was not still changing by itself.
+    const settled = async () => { let last = await geometry(); for (let attempt = 0; attempt < 30; attempt++) { await sleep(120); const next = await geometry(); if (next.join('|') === last.join('|')) return next; last = next; } return last; };
+    let rest = await settled();
     // Sub-pixel text measurement may differ by a fraction of a pixel; a move is anything beyond half a pixel.
     const unmoved = (now, expected) => now.length === expected.length && now.every((box, index) => box.split(',').every((value, part) => Math.abs(Number(value) - Number(expected[index].split(',')[part])) <= 5));
     for (const key of ['inset-t', 'm-l', 'border-l', 'border-b', 'p-t', 'p-r', 'content-width', 'content-height']) {
+      rest = await settled();
       await page.locator(`#inspector [data-key="${key}"]`).focus();
       await waitUntil(() => page.locator(`#inspector [data-key="${key}"]`).evaluate(input => !!input.closest('.bm-slot.editing')), `${key} opens its editor`);
       assert.ok(unmoved(await geometry(), rest), `focusing ${key} moves nothing in the widget`);
@@ -590,6 +594,10 @@ try {
   await page.evaluate(async id => (await import('./lib/store.js')).selectNodes(id, ['box-probe']), probe.id);
   await page.evaluate(() => document.activeElement?.blur());
   await page.mouse.move(5, 5);
+  // A repaint of the inspector keeps a keyboard user's place at a section's disclosure header, which has no data-key of its own.
+  await page.locator('#inspector [data-section="border"] summary').focus();
+  await page.evaluate(async () => (await import('./lib/inspector.js')).render({ force: true }));
+  await waitUntil(() => page.evaluate(() => document.activeElement?.tagName === 'SUMMARY' && document.activeElement.closest('[data-section]')?.dataset.section === 'border'), 'a repaint keeps focus on the section header it was on');
   checks.push('held network writes preserve every rapid Tab edit and the next field focus');
 
   const patchProbe = async style => {
@@ -598,8 +606,9 @@ try {
   };
   await patchProbe({ 'box-sizing': 'content-box', width: '65.328125px', height: '34px', transform: 'scale(1.5)', 'margin-top': '-6.5px', 'border-right-width': '3px' });
   await waitUntil(async () => (await page.locator('#inspector [data-key="border-r"]').inputValue()) === '3', 'asymmetric authored border readback');
-  assert.match(await page.locator('#inspector .bm-core').getAttribute('aria-label'), /65\.328 by 34/, 'content-box and transforms do not inflate the content measurement');
-  assert.equal(await page.locator('#inspector [data-key="m-t"]').getAttribute('placeholder'), '-6.5', 'negative measured margins are not clamped to zero');
+  // The measured placeholders follow the authored value by one more report from the page, so they are waited for, not read once.
+  await waitUntil(async () => /65\.328 by 34/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'content-box and transforms do not inflate the content measurement');
+  await waitUntil(async () => (await page.locator('#inspector [data-key="m-t"]').getAttribute('placeholder')) === '-6.5', 'negative measured margins are not clamped to zero');
   assert.ok(await probeFrame.locator('[data-divlet-id="box-probe"]').evaluate(node => node.getBoundingClientRect().width > 100));
   await patchProbe({ display: 'none' });
   await waitUntil(async () => /— by —/.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'a hidden element has no fabricated content size');

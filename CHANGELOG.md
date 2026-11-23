@@ -14,6 +14,9 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 - **The Border frame shows the colour the page really paints.** A side colour in `oklch()`, `color-mix()`, `color()` or `inherit`
   showed black because only `rgb()` was understood; any colour a browser can paint is now read back from one painted pixel
   (`web/lib/properties.js`, `web/tests/appearance.mjs`).
+- **A repaint keeps a keyboard user's place at a section header.** The inspector found a focused control again by its key after a
+  repaint, but a section's disclosure header has none, so the focus dropped onto the page; it is now found by the section it
+  heads (`web/lib/inspector.js`, `web/tests/spacing.mjs`).
 - **The sidebar tabs stay in their corner until they touch the dock.** The phone layout used to stretch them over the window below
   720px even with room beside the dock; now they stay at the sidebar's default width, left of the dock, and stack above it only
   when the two would touch (`web/board.js`, `web/board.css`, `web/index.html`, `web/tests/chrome.mjs`).
