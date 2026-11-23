@@ -458,9 +458,11 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .vf-input::placeholder { color: var(--faint); }
 .vf-unit, .num-unit { flex: none; font: 10px var(--mono); color: var(--muted); pointer-events: none; user-select: none; }
 .vf-unit[hidden], .vf-unit.unit-switch[hidden] { display: none; }
-/* A unit that can be switched is a menu button, so it keeps the same look but takes the pointer and a caret. */
-.vf-unit.unit-switch { pointer-events: auto; display: inline-flex; align-items: center; justify-content: center; align-self: stretch; min-width: 24px; margin: 2px 2px 2px 0; padding: 0 5px; border: 0; border-radius: var(--radius-small); background: var(--accent-soft); color: var(--accent-ink); font: 10px var(--mono); cursor: pointer; }
-.vf-unit.unit-switch:hover:not(:disabled), .vf-unit.unit-switch:focus-visible { background: color-mix(in srgb, var(--accent) 26%, transparent); color: var(--ink); }
+/* A unit that can be switched is a menu button on the selector surface (a field's own, lighter step), at the field's end. */
+.vf-unit.unit-switch { pointer-events: auto; display: inline-flex; align-items: center; justify-content: center; align-self: stretch; min-width: 26px; margin: 0; padding: 0 7px; border: 0; border-radius: 0 var(--radius-small) var(--radius-small) 0; background: var(--control); color: var(--ink); font: 10px var(--mono); cursor: pointer; }
+.vf-unit.unit-switch:hover:not(:disabled), .vf-unit.unit-switch:focus-visible { background: var(--control-hover); }
+/* A field that ends in a unit button, or in a clear button, ends flush against its own right edge. */
+.vf:has(> .vf-unit.unit-switch) { padding-right: 0; }
 .num-unit { padding-right: 8px; }
 /* Developer-tools box model: nested, non-proportional CSS bands with the actual values on each edge. */
 .boxmodel { --bm-edge: 24px; --bm-field: 24px; position: relative; min-width: 0; container: boxmodel / inline-size; }
@@ -485,7 +487,7 @@ button.change:hover:not(:disabled) { background: var(--field); }
 .bm-margin > .bm-top > .bm-caption { color: #8a5f3a; }
 .bm-border > .bm-top > .bm-caption { color: #a8843c; }
 .bm-padding > .bm-top > .bm-caption { color: #7d9750; }
-.bm-cell { position: absolute; display: flex; justify-content: center; align-items: center; width: var(--bm-field); height: 18px; min-width: 0; font: 10px/16px var(--mono); }
+.bm-cell { position: absolute; display: flex; justify-content: center; align-items: center; width: var(--bm-field); min-height: 18px; min-width: 0; font: 10px/16px var(--mono); }
 /* Neither the name nor the value gives ground: the row keeps both whole and lets the band's own font steps below make the room. */
 .bm-cell.bm-t { position: static; flex: none; margin: 0 auto; max-width: none; }
 .bm-cell.bm-b { bottom: 1px; left: 50%; transform: translateX(-50%); }
@@ -494,16 +496,32 @@ button.change:hover:not(:disabled) { background: var(--field); }
 /* One pixel in from the band's frame: a side value that touched the line read as part of it. */
 .bm-cell.bm-l { left: 1px; }
 .bm-cell.bm-r { right: 1px; }
-.bm-cell { width: max(var(--bm-field), var(--bm-value-width, 0px)); max-width: calc(100% - 4px); }
-.bm-sq > .bm-cell > .vf, .bm-top > .bm-cell > .vf { width: 100%; }
+.bm-cell { width: auto; min-width: var(--bm-field); max-width: calc(100% - 4px); }
+/* A value is its number with its unit beside it (under it in a side strip): the cell is as wide as the two together. */
+.bm-sq > .bm-cell > .vf, .bm-top > .bm-cell > .vf { width: auto; max-width: 100%; }
+.bm-cell.bm-l > .vf, .bm-cell.bm-r > .vf { width: 100%; flex-direction: column; justify-content: center; gap: 0; }
 .bm-centre { min-width: 0; }
-.vf.bm-field, .vf.bm-offset, .vf.bm-value { flex: none; width: var(--bm-field); min-height: 18px; height: 18px; padding: 0; border-radius: var(--radius-small); background: transparent; box-shadow: none; color: inherit; }
+.vf.bm-field, .vf.bm-offset, .vf.bm-value { flex: none; width: auto; min-width: var(--bm-field); min-height: 18px; height: auto; gap: 1px; justify-content: center; padding: 0; border-radius: var(--radius-small); background: transparent; box-shadow: none; color: inherit; }
 .bm-field:hover, .bm-offset:hover, .bm-value:hover { background: #ffffff30; }
 .bm-field:focus-within, .bm-offset:focus-within, .bm-value:focus-within { background: var(--solid); color: var(--ink); }
-.bm-field .vf-input, .bm-offset .vf-input, .bm-value .vf-input { width: 100%; min-width: 0; padding: 0; color: inherit; font: 10px/16px var(--mono); text-align: center; }
+/* While a value has focus its cell grows into an editor above its neighbours: the number, then the unit as a real menu button on
+   the selector surface, flush with the editor's end. */
+.bm-field:focus-within, .bm-offset:focus-within, .bm-value:focus-within { position: relative; z-index: 5; flex-direction: row; width: 92px; min-height: 22px; box-shadow: 0 1px 5px rgba(0, 0, 0, .35); }
+.bm-field:focus-within .vf-input, .bm-offset:focus-within .vf-input, .bm-value:focus-within .vf-input { flex: 1; width: auto; min-width: 40px; padding-left: 5px; text-align: left; }
+.bm-field:focus-within .vf-unit.unit-switch, .bm-offset:focus-within .vf-unit.unit-switch, .bm-value:focus-within .vf-unit.unit-switch { pointer-events: auto; opacity: 1; background: var(--control); color: var(--ink); font: 10px var(--mono); min-width: 30px; padding: 0 6px; border-radius: 0 var(--radius-small) var(--radius-small) 0; }
+.bm-field:focus-within .vf-unit.unit-switch:hover, .bm-offset:focus-within .vf-unit.unit-switch:hover, .bm-value:focus-within .vf-unit.unit-switch:hover { background: var(--control-hover); }
+/* A side value is stacked at rest; its editor is the same row as every other. */
+.bm-cell.bm-l > .vf:focus-within, .bm-cell.bm-r > .vf:focus-within { flex-direction: row; width: 92px; max-width: none; justify-content: center; }
+.bm-cell.bm-l > .vf:focus-within .vf-input, .bm-cell.bm-r > .vf:focus-within .vf-input { width: auto; }
+.bm-field .vf-input, .bm-offset .vf-input, .bm-value .vf-input { flex: none; width: var(--bm-value-width, 2ch); max-width: 100%; min-width: 0; padding: 0; color: inherit; font: 10px/16px var(--mono); text-align: center; }
+.bm-cell.bm-l .vf-input, .bm-cell.bm-r .vf-input { width: 100%; }
+/* At rest the unit is only a small label beside its number, taking no pointer: a click lands on the number. */
+.bm-cell.bm-t > .vf, .bm-cell.bm-b > .vf, .vf.bm-value { align-items: baseline; }
+.bm-cell.bm-t .vf-unit.unit-switch, .bm-cell.bm-b .vf-unit.unit-switch, .bm-value .vf-unit.unit-switch { align-self: baseline; }
+.bm-field .vf-unit.unit-switch, .bm-offset .vf-unit.unit-switch, .bm-value .vf-unit.unit-switch { align-self: center; min-width: 0; margin: 0; padding: 0 1px; border-radius: 0; background: transparent; color: inherit; opacity: .72; font: 8.5px/10px var(--mono); pointer-events: none; }
 .bm-field .vf-input::placeholder, .bm-offset .vf-input::placeholder, .bm-value .vf-input::placeholder { color: inherit; opacity: 1; }
 .bm-core { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 3px; min-width: 0; min-height: 23px; padding: 2px; border: 1px solid #314554; background: #8eaec2; color: #17232b; font: 10px/15px var(--mono); }
-.vf.bm-dimension { width: min(100%, var(--bm-value-width)); min-width: 3ch; }
+.vf.bm-dimension { width: auto; min-width: 3ch; }
 .bm-value .vf-input { font-size: inherit; }
 .spacing-box { display: grid; gap: 6px; }
 @container boxmodel (max-width: 270px) {
@@ -513,24 +531,28 @@ button.change:hover:not(:disabled) { background: var(--field); }
 /* At phone/200% widths, stagger the side values down the bands instead of hiding or overlapping them. */
 @container boxmodel (max-width: 230px) {
   .bm-sq { --bm-edge: 8px; --bm-field: 24px; --bm-side: var(--bm-edge); }
-  .bm-cell.bm-l, .bm-cell.bm-r { width: max(var(--bm-field), var(--bm-value-width, 0px)); }
+  .bm-cell.bm-l, .bm-cell.bm-r { width: auto; min-width: var(--bm-field); }
   .bm-padding { --bm-edge: 24px; }
   .bm-cell.bm-l, .bm-cell.bm-r { top: auto; bottom: 4px; transform: none; }
   /* On a row of their own the values take the whole width they can get; the one-pixel air belongs to the strip above. */
   .bm-cell.bm-l { left: 0; }
   .bm-cell.bm-r { right: 0; }
   .bm-cell, .bm-field .vf-input, .bm-offset .vf-input, .bm-core { font-size: 9px; }
+  .bm-cell.bm-l > .vf, .bm-cell.bm-r > .vf { width: auto; flex-direction: row; }
+  .bm-cell.bm-l .vf-input, .bm-cell.bm-r .vf-input { width: var(--bm-value-width, 2ch); }
 }
 /* Side values too long for a side band earn a row, not clipping or tiny type: left and right share the row under the top
    value, and the bottom gets the same height, so the band stays symmetric. */
 .bm-stacked-sides { --bm-side: var(--bm-edge); padding-top: 40px; padding-bottom: 40px; }
 /* On a row of its own the value earns its own width again: the strip it was centred in no longer exists. */
-.bm-stacked-sides > .bm-l, .bm-stacked-sides > .bm-r { width: max(var(--bm-field), var(--bm-value-width, 0px)); }
+.bm-stacked-sides > .bm-l, .bm-stacked-sides > .bm-r { width: auto; min-width: var(--bm-field); }
+.bm-stacked-sides > .bm-l > .vf, .bm-stacked-sides > .bm-r > .vf { width: auto; flex-direction: row; }
+.bm-stacked-sides > .bm-l .vf-input, .bm-stacked-sides > .bm-r .vf-input { width: var(--bm-value-width, 2ch); }
 .bm-stacked-sides > .bm-l { top: 20px; left: 2px; bottom: auto; transform: none; }
 .bm-stacked-sides > .bm-r { top: 20px; right: 2px; bottom: auto; transform: none; }
 @container boxmodel (max-width: 230px) {
   .bm-wide-sides { padding-top: 40px; padding-bottom: 40px; }
-  .bm-wide-sides > .bm-l, .bm-wide-sides > .bm-r { width: max(var(--bm-field), var(--bm-value-width, 0px)); }
+  .bm-wide-sides > .bm-l, .bm-wide-sides > .bm-r { width: auto; min-width: var(--bm-field); }
   .bm-wide-sides > .bm-l { top: 20px; left: 2px; bottom: auto; transform: none; }
   .bm-wide-sides > .bm-r { top: 20px; right: 2px; bottom: auto; transform: none; }
 }
@@ -1007,7 +1029,7 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
    padding band's own place) always holds one radius and one colour for all four. Edge widths are not repeated here — they own the
    four sides of the box model's border band. The --br-* rim is the cut-out's measured place; the sides' clip polygons are set from
    it in px. */
-.br-shell { --br-field: 24px; position: relative; display: grid; justify-items: center; gap: 4px; margin: 2px 0 0; container: ring / inline-size; }
+.br-shell { --br-field: 24px; --br-chip: 44px; position: relative; display: grid; justify-items: center; gap: 0 2px; margin: 2px 0 0; container: ring / inline-size; }
 .br-shell.br-pending { display: none; }
 .br-box { --br-l: 36px; --br-t: 20px; --br-r: 36px; --br-b: 20px; position: relative; box-sizing: border-box; width: 100%; min-height: 108px; border: 1px solid #4c4b40; border-radius: 0; background: #4c4b40; color: var(--ink); }
 /* A side is the whole shape between the outer edge and the cut-out; the pointer only reaches its own trapezoid. */
@@ -1018,10 +1040,20 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .br-side > .color-field .swatch:focus-visible { outline: var(--focus-ring) solid var(--accent); outline-offset: -4px; }
 /* The cut-out: the panel's own surface, as if the inside of the band had been cut away, framed like the band's inner edge. */
 .br-hole { position: absolute; left: var(--br-l); top: var(--br-t); right: var(--br-r); bottom: var(--br-b); display: grid; align-content: center; background: var(--solid); outline: 1px solid #4c4b40; }
-/* Corner radii: the top two over the frame's corners, the bottom two under them, as wide as the frame so each sits at its own corner. */
-.br-row { display: flex; justify-content: space-between; gap: 4px; width: var(--br-w, 100%); min-width: 0; }
-.br-row .vf.br-field { flex: none; gap: 0; width: auto; height: var(--br-field); min-height: var(--br-field); padding: 0 0 0 4px; }
-.br-row .vf.br-field .vf-input { flex: none; width: 4ch; min-width: 0; padding: 0; font: 11px/16px var(--mono); text-align: center; }
+/* Corner radii: in the gutters beside the frame, the two left ones at its top and bottom and the two right ones likewise, so the
+   control costs no extra height. A panel too narrow for a gutter (.br-narrow) puts them above and below the frame instead. */
+.br-shell { grid-template-columns: minmax(0, 1fr) var(--br-w, 100%) minmax(0, 1fr); align-items: stretch; }
+.br-col { display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
+.br-col-left { align-items: flex-start; } .br-col-right { align-items: flex-end; }
+.br-col .vf.br-field { flex: none; gap: 0; width: var(--br-chip, 44px); height: var(--br-field); min-height: var(--br-field); padding: 0 0 0 3px; }
+.br-col .vf.br-field .vf-input { flex: 1; width: auto; min-width: 0; padding: 0; font: 10.5px/16px var(--mono); text-align: center; }
+.br-col .vf.br-field .vf-unit.unit-switch { min-width: 20px; padding: 0 2px; font-size: 8.5px; }
+.br-shell.br-narrow { grid-template-columns: 1fr 1fr; grid-template-areas: "tl tr" "box box" "bl br"; width: var(--br-w, 100%); }
+.br-narrow .br-col { display: contents; }
+.br-narrow .br-box { grid-area: box; width: 100%; }
+.br-narrow .br-tl { grid-area: tl; justify-self: start; } .br-narrow .br-tr { grid-area: tr; justify-self: end; }
+.br-narrow .br-bl { grid-area: bl; justify-self: start; } .br-narrow .br-br { grid-area: br; justify-self: end; }
+.br-narrow .vf.br-field { width: max(var(--br-chip), 52px); }
 /* The middle: the one radius for every corner above the one colour for every side, each as wide as the cut-out. */
 .br-centre { display: grid; gap: 4px; min-width: 0; width: 100%; padding: 0 4px; box-sizing: border-box; }
 .br-centre > .vf, .br-centre .color-field { height: 24px; min-height: 24px; box-sizing: border-box; }
@@ -1032,13 +1064,12 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .br-centre .color-field .vf-k { display: none; }
 .br-centre .color-field .swatch { width: 18px; height: 18px; margin-left: 3px; }
 .br-centre .color-field .color-hex { flex: 1 1 0; min-width: 0; width: 100%; min-height: 24px; font-size: 10.5px; }
-.br-centre .color-field .color-clear { min-width: 22px; height: 22px; }
 @container ring (max-width: 132px) {
-  .br-row .vf.br-field .vf-input { width: 3.5ch; font-size: 10px; }
   .br-centre .vf .vf-input, .br-centre .color-field .color-hex { font-size: 9.5px; }
 }
 @media (pointer: coarse) {
-  .br-shell { --br-field: 28px; }
+  .br-shell { --br-field: 28px; --br-chip: 54px; }
+  .br-col .vf.br-field .vf-unit.unit-switch { min-width: 24px; }
   .br-centre > .vf, .br-centre .color-field { height: 28px; min-height: 28px; }
   .br-centre .color-field .swatch { width: 24px; height: 24px; }
 }
@@ -1056,7 +1087,7 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .font-upload[aria-busy="true"]::after { content: ""; position: absolute; inset: 0; margin: auto; width: 12px; height: 12px; border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
 .font-family-scroll { min-width: 0; max-width: 100%; overflow-x: auto; border-radius: var(--radius-inner); }
 .font-family { width: 100%; min-width: max-content; }
-.color-field { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; min-width: 0; min-height: 28px; padding: 0 2px 0 0; border-radius: var(--radius-inner); background: var(--field); }
+.color-field { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; min-width: 0; min-height: 28px; padding: 0; border-radius: var(--radius-inner); background: var(--field); }
 .color-field:focus-within { outline-offset: 1px; outline: var(--focus-ring) solid var(--accent); }
 .color-field .vf-k { min-width: 30px; cursor: pointer; }
 .color-field .swatch { flex: none; width: 20px; height: 20px; border-radius: var(--radius-small); }
@@ -1064,6 +1095,10 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 .color-field .color-hex { flex: 1 1 var(--hex-width, 9ch); min-width: min(100%, var(--hex-width, 9ch)); min-height: 28px; }
 /* A content-sized field must not inherit the wrapper's `width: 100%` as its flex base, or it takes a whole line by itself. */
 @supports (field-sizing: content) { .color-field .color-hex { field-sizing: content; flex: 1 0 auto; width: auto; min-width: 0; max-width: 100%; } }
+.color-field .color-clear { align-self: stretch; height: auto; min-width: 26px; margin: 0; border-radius: 0 var(--radius-inner) var(--radius-inner) 0; }
+/* Hatched: several different colours (mixed), or none of its own so the colour the page inherits shows through (unset). */
+.color-field.mixed .swatch::-webkit-color-swatch { background: repeating-linear-gradient(45deg, #b9b8b0 0 3px, #77766e 3px 6px); }
+.color-field.unset .swatch::-webkit-color-swatch { background-image: repeating-linear-gradient(45deg, transparent 0 3px, rgba(0, 0, 0, .45) 3px 4px); }
 .color-block { display: grid; gap: 4px; }
 .token-swatches { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 36px; }
 .token-swatch { width: 18px; height: 18px; padding: 0; border: 1px solid var(--hair); border-radius: 50%; cursor: pointer; }

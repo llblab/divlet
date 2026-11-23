@@ -42,6 +42,13 @@ test('lengths, colours and single values parse what a person types', () => {
   assert.equal(css.cornerRadiusNumber({ 'border-top-left-radius': '1.5rem', 'border-radius': '4px' }, 'top-left'), '1.5'); assert.equal(css.cornerRadiusUnit({ 'border-top-left-radius': '1.5rem' }, 'top-left'), 'rem');
   assert.equal(css.cornerRadiusNumber({ 'border-radius': '9999px' }, 'top-left'), 'full'); assert.equal(css.cornerRadiusUnit({ 'border-radius': '9999px' }, 'top-left'), null);
   assert.equal(css.cornerRadiusNumber({}, 'top-left'), null);
+  // A box-model value is its number and its unit apart: px by default, a keyword or expression has none.
+  assert.deepEqual(css.lengthParts('12px'), { number: '12', unit: 'px' }); assert.deepEqual(css.lengthParts('1.5rem'), { number: '1.5', unit: 'rem' });
+  assert.deepEqual(css.lengthParts('50%'), { number: '50', unit: '%' }); assert.deepEqual(css.lengthParts('0'), { number: '0', unit: 'px' });
+  assert.deepEqual(css.lengthParts('-123.4567px'), { number: '-123.457', unit: 'px' }); assert.deepEqual(css.lengthParts(null), { number: '', unit: null });
+  assert.deepEqual(css.lengthParts('auto'), { number: 'auto', unit: null }); assert.deepEqual(css.lengthParts('var(--gap)'), { number: 'var(--gap)', unit: null });
+  assert.equal(css.borderWidthInput('3'), '3px'); assert.equal(css.borderWidthInput('0.5rem'), '0.5rem'); assert.equal(css.borderWidthInput('thin'), 'thin');
+  assert.equal(css.borderWidthInput(''), null); assert.equal(css.borderWidthInput('50%'), undefined, 'a border width has no percentage'); assert.equal(css.borderWidthInput('-1'), undefined);
   assert.equal(css.weightOf({ 'font-weight': 'bold' }), '700');
   assert.equal(css.fontSizeOf({ 'font-size': '1.5rem' }), '24');
 });

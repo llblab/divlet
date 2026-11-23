@@ -150,6 +150,31 @@ export function lengthInput(raw, { keywords = ['auto'], negative = true } = {}) 
   return undefined;
 }
 
+/**
+ * An authored length split for a value that shows its unit apart from its number: `12px` → 12 and px, `1.5rem` → 1.5 and rem,
+ * `50%` → 50 and %, a bare `0` or `12` → px (what the page reads it as). A keyword or expression (`auto`, `var(--gap)`, `calc(…)`)
+ * keeps its whole text as the number and has no unit; nothing authored gives an empty number and no unit.
+ */
+export function lengthParts(raw) {
+  if (raw == null || raw === '') return { number: '', unit: null };
+  const text = String(raw).trim();
+  const written = /^(-?(?:\d+\.?\d*|\.\d+))(px|rem|em|%|vh|vw|ch|pt)?$/i.exec(text);
+  if (!written) return { number: text, unit: null };
+  return { number: String(Math.round(Number(written[1]) * 1000) / 1000), unit: (written[2] ?? 'px').toLowerCase() };
+}
+
+/**
+ * A border width from what a person typed: `3` → `3px`, `0.5rem`, `1.5em`, or `thin`/`medium`/`thick`; '' → null (remove);
+ * undefined when invalid. A border width is never negative and, unlike other lengths, never a percentage.
+ */
+export function borderWidthInput(raw) {
+  const text = String(raw ?? '').trim().toLowerCase().replace(/\s+/g, '');
+  if (!text) return null;
+  if (/^(?:\d+\.?\d*|\.\d+)$/.test(text)) return `${Number(text)}px`;
+  if (/^(?:\d+\.?\d*|\.\d+)(?:px|rem|em)$/.test(text)) return text;
+  return /^(?:thin|medium|thick)$/.test(text) ? text : undefined;
+}
+
 /** `rgb()` colours the page reports → `#rrggbb`; null when not a plain colour. */
 export const hexOf = css => {
   const m = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(String(css || ''));

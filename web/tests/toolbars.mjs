@@ -222,6 +222,8 @@ try {
   const weak = await page.evaluate(() => [...document.querySelectorAll('#inspector, #sidebar, #dock, .brand, .side-tabs')].flatMap(area => [...area.querySelectorAll('button, input, select, textarea, [role=button], [role=tab]')]).filter(node => {
     const style = getComputedStyle(node), r = node.getBoundingClientRect();
     if (node.closest('[hidden]') || style.display === 'none' || style.visibility === 'hidden' || !r.width) return false;
+    // A box-model unit at rest is a label beside its number, taking no pointer: the number is the target there.
+    if (style.pointerEvents === 'none') return false;
     const named = (node.getAttribute('aria-label') || node.title || node.textContent || node.getAttribute('placeholder') || node.closest('label')?.textContent || '').trim();
     return !named || (node.tagName === 'BUTTON' && (r.width < 20 || r.height < 20));
   }).map(node => `${node.tagName.toLowerCase()}.${String(node.className).slice(0, 40)}`));
@@ -332,7 +334,9 @@ try {
     });
     // Exactly the three radius tokens: the outer surface, an inner control and a small one. A pill is half its own height,
     // so it needs no fourth radius.
-    assert.deepEqual(design.radii.filter(radius => radius !== '0px'), ['14px', '6px', '9px'], `controls use the three radius tokens (${design.radii.join(', ')})`);
+    // A control that ends flush against its field's edge (a unit or clear button) rounds only its outer corners, so a compound
+    // value such as `0px 6px 6px 0px` is still built from the three tokens and square corners.
+    assert.deepEqual([...new Set(design.radii.flatMap(radius => radius.split(' ')))].filter(radius => radius !== '0px').sort(), ['14px', '6px', '9px'].sort(), `controls use the three radius tokens (${design.radii.join(', ')})`);
     for (const [name, heights] of Object.entries(design.family)) assert.ok(heights.length <= 1, `${name} share one height (${heights.join(', ')})`);
     assert.deepEqual(design.family.fields, [28], 'standard fields keep the full control height');
     assert.deepEqual(design.family.boxFields, [18], 'all compact box-model fields, including offsets, borders and dimensions, share their own height');
@@ -590,7 +594,8 @@ try {
     await touch.waitForTimeout(500);
     const small = await touch.evaluate(() => [...document.querySelectorAll('#inspector button, #inspector input:not(.vf-input):not(.num-input):not(.cls-input):not(.ident-input), #dock button, #side-tabs button')].filter(node => {
       const r = node.getBoundingClientRect(), style = getComputedStyle(node);
-      return r.width && r.height && style.visibility !== 'hidden' && style.display !== 'none' && !node.closest('[hidden]') && (r.width < 24 || r.height < 24);
+      // A box-model unit at rest is a label that takes no pointer (the number beside it is the target).
+      return r.width && r.height && style.visibility !== 'hidden' && style.display !== 'none' && style.pointerEvents !== 'none' && !node.closest('[hidden]') && (r.width < 24 || r.height < 24);
     }).map(node => `${node.tagName.toLowerCase()}.${String(node.className).slice(0, 24)} ${Math.round(node.getBoundingClientRect().width)}x${Math.round(node.getBoundingClientRect().height)}`));
     assert.deepEqual(small, [], `no touch target below 24px (${view})`);
   }

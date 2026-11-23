@@ -51,7 +51,7 @@ try {
       const diagram = document.querySelector('#inspector .br-box');
       if (!(diagram?.getBoundingClientRect().width > 100)) return false;
       const frame = diagram.getBoundingClientRect(), inspector = document.querySelector('#inspector').getBoundingClientRect();
-      const key = [frame.width, frame.right, inspector.right, ...[...document.querySelectorAll('#inspector .br-row .br-field')].map(node => node.getBoundingClientRect().right)].map(value => Math.round(value * 10)).join(',');
+      const key = [frame.width, frame.right, inspector.right, ...[...document.querySelectorAll('#inspector .br-col .br-field')].map(node => node.getBoundingClientRect().right)].map(value => Math.round(value * 10)).join(',');
       const settled = window.__brBoxKey === key;
       window.__brBoxKey = key;
       return settled;
@@ -66,8 +66,10 @@ try {
       const frame = diagram.getBoundingClientRect(), cell = radius.getBoundingClientRect();
       const middle = document.querySelector('#inspector .br-centre');
       return {
-        columns: [...document.querySelectorAll('#inspector .br-row .br-field')].filter(node => { const box = node.getBoundingClientRect(); return box.left >= frame.left - 1 && box.right <= frame.right + 1; }).length === 4 ? 3 : 0,
-        readable: context.measureText('Full').width <= radius.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1,
+        // No corner field covers the frame, and every one stays inside the inspector.
+        columns: [...document.querySelectorAll('#inspector .br-col .br-field')].every(node => { const box = node.getBoundingClientRect(); return box.right <= inspector.right + 1 && box.left >= inspector.left - 1 && !(Math.min(box.right, frame.right) - Math.max(box.left, frame.left) > 1 && Math.min(box.bottom, frame.bottom) - Math.max(box.top, frame.top) > 1); }) ? 3 : 0,
+        // `full` has no unit, so the field gives its unit button's room to the word: the number box plus that room must hold it.
+        readable: context.measureText('full').width <= radius.clientWidth + (radius.closest('.vf').querySelector('.vf-unit:not([hidden])')?.offsetWidth ?? 0) - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) + 1,
         inside: frame.right <= inspector.right + 1 && cell.right <= frame.right + 1 && !!middle && middle.scrollWidth <= middle.clientWidth + 1,
       };
     });

@@ -163,7 +163,7 @@ try {
   await colorRow('project color swatches');
   assert.equal(await page.locator('#inspector [data-section="spacing"] [data-key="radius"], #inspector [data-section="spacing"] .br-box').count(), 0, 'the box model keeps no radius field');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="radius-tl"]').count(), 1, 'Border gives each corner its own radius field, in its ring');
-  assert.equal(await page.locator('#inspector [data-section="border"] .br-row .br-field').count(), 4, 'one radius for each corner, outside the frame');
+  assert.equal(await page.locator('#inspector [data-section="border"] .br-col .br-field').count(), 4, 'one radius for each corner, outside the frame');
   assert.equal(await page.locator('#inspector [data-section="border"] .br-side input[type="color"]').count(), 4, 'every side is its own colour selector: one trapezoid of the frame each');
   assert.equal(await page.locator('#inspector [data-section="border"] .br-centre [data-key="stroke-all"]').count(), 1, 'and one colour in the middle gives all four sides the same colour');
   assert.equal(await page.locator('#inspector [data-section="border"] [data-key="stroke"]').count(), 0, 'there is no legacy shared colour field');
@@ -384,7 +384,7 @@ try {
   // The ring: a radius in each corner, a width at each edge's centre, the colour in the middle, and one control naming the side.
   {
     const diagram = page.locator('#inspector [data-section="border"] .br-shell');
-    assert.equal(await diagram.locator('.br-row .br-field').count(), 4, 'one field per corner');
+    assert.equal(await diagram.locator('.br-col .br-field').count(), 4, 'one field per corner');
     assert.equal(await diagram.locator('.br-edge').count(), 0, 'no edge widths in the ring');
     assert.equal(await diagram.locator('.br-centre [data-key="radius"]').count(), 1, 'one radius for all four corners in the middle');
     assert.equal(await page.locator('#inspector [data-section="border"] .br-centre [data-key="radius"]').count(), 1, 'and the one radius for every corner in the middle of the ring');
@@ -432,6 +432,23 @@ try {
     });
     const swatch = side => page.locator(`#inspector .br-side.br-${side} .swatch`);
     const before = await sideColours();
+    // A side with no colour of its own shows the colour the page really gives it (the inherited one, not a default black), hatched so
+    // it reads as not set; the swatches of sides with a colour of their own are plain.
+    // A field ends flush against its own right edge in its unit button or its clear button: no gap on the right.
+    const flush = await page.evaluate(() => {
+      const gap = (inner, outer) => Math.round((outer.getBoundingClientRect().right - inner.getBoundingClientRect().right) * 10) / 10;
+      const unit = document.querySelector('#inspector [data-key="unit:line-height"]'), clear = document.querySelector('#inspector [data-key="fill"]')?.closest('.color-field')?.querySelector('.color-clear');
+      return { unit: unit ? gap(unit, unit.closest('.vf')) : null, clear: clear ? gap(clear, clear.closest('.color-field')) : null };
+    });
+    assert.deepEqual(flush, { unit: 0, clear: 0 }, 'a unit button and a clear button end flush with their field');
+    const unsetSides = await page.locator('#inspector .br-side .color-field.unset').count();
+    assert.equal(unsetSides, 4, 'every side without its own colour is marked as not set');
+    const shown = await page.locator('#inspector .br-side .swatch').evaluateAll(nodes => nodes.map(node => node.value));
+    const rgb = css => '#' + (/\d+/g[Symbol.match](css) ?? []).slice(0, 3).map(n => Number(n).toString(16).padStart(2, '0')).join('');
+    assert.deepEqual(shown, before.map(rgb), 'and its swatch holds the colour the page paints, not black');
+    // The browser does not report a native colour input's inner swatch through getComputedStyle, so the rule itself is checked.
+    assert.equal(await page.evaluate(() => [...document.styleSheets].some(sheet => [...sheet.cssRules].some(rule => /color-field\.unset \.swatch::-webkit-color-swatch/.test(rule.selectorText ?? '') && /repeating-linear-gradient/.test(rule.cssText)))), true, 'which is hatched');
+    assert.equal(await page.locator('#inspector .br-centre .color-field.unset, #inspector .br-centre .color-field.mixed').count(), 1, 'the colour for all four sides is hatched too while they share none of their own');
     // The native colour picker reports `input` while a colour is chosen and `change` when it is committed; the field follows
     // both, so this drives the same path a person's picker does.
     const pick = async (side, hex) => swatch(side).evaluate((node, hex) => { node.value = hex; node.dispatchEvent(new Event('input', { bubbles: true })); node.dispatchEvent(new Event('change', { bubbles: true })); }, hex);
@@ -444,7 +461,10 @@ try {
     // Each selector says what it paints and quotes the colour, so a colour set by a stylesheet is still visible.
     assert.match(await swatch('r').evaluate(node => node.dataset.tip ?? ''), /^Right border · #/, 'a side names itself and quotes the page colour');
     // Delete removes that side's own colour, leaving the rest of the border alone.
-    await swatch('l').focus(); await page.keyboard.press('Delete');
+    // A measurement-driven repaint can replace the selector between focusing it and the key; Delete on the canvas would delete the
+    // element itself, so hold the key until the selector really has focus.
+    await waitUntil(async () => { await swatch('l').focus(); return page.evaluate(() => !!document.activeElement?.closest('.br-side.br-l')); }, 'the left selector holds focus');
+    await page.keyboard.press('Delete');
     await waitUntil(async () => (await sideColours())[3] !== 'rgb(255, 0, 0)', 'Delete removes the colour that side authored');
     // A re-render paints the ring from the page again, and each pick undone alone restores what it replaced.
     await page.evaluate(async () => { const st = await import('./lib/store.js'); st.selectNodes('welcome', ['hero']); st.selectNodes('welcome', ['cta']); });
@@ -468,13 +488,13 @@ try {
   await page.locator('#inspector [data-key="border-r"]').fill('4'); await page.keyboard.press('Tab');
   await waitUntil(async () => JSON.stringify(await borderWidths()) === JSON.stringify(['2px', '4px', '3px', '3px']), 'a second side takes its own width');
   assert.equal(await page.locator('#inspector [data-key^="border-width-"]').count(), 0, 'no second copy of a width appeared while editing');
-  // The reading order is geometry: the top corners (each number, then its unit), one colour selector per side (top, right,
-  // bottom, left), then the middle's radius and colour, then the bottom corners.
-  await page.locator('#inspector [data-key="radius-tr"]').focus();
+  // The reading order is geometry: the left corners (each number, then its unit), the frame — one colour selector per side (top,
+  // right, bottom, left), then the middle's radius and colour — then the right corners.
+  await page.locator('#inspector [data-key="radius-bl"]').focus();
   await page.keyboard.press('Tab');
-  assert.equal(await page.evaluate(() => document.activeElement?.dataset.key ?? ''), 'unit:radius-tr', 'a corner\'s unit menu follows its number');
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset.key ?? ''), 'unit:radius-bl', 'a corner\'s unit menu follows its number');
   await page.keyboard.press('Tab');
-  assert.equal(await page.evaluate(() => document.activeElement?.closest('.br-side')?.className.includes('br-t') ?? false), true, 'after the top corners comes the top side\'s colour');
+  assert.equal(await page.evaluate(() => document.activeElement?.closest('.br-side')?.className.includes('br-t') ?? false), true, 'after the left corners comes the top side\'s colour');
   await page.locator('#inspector .br-side.br-l .swatch').focus();
   await page.keyboard.press('Tab');
   assert.equal(await page.evaluate(() => document.activeElement?.dataset.key ?? ''), 'radius', 'after the last side comes the one radius for every corner');
@@ -673,8 +693,11 @@ try {
   await page.locator('#inspector [data-key="radius-tl"]').fill('10px'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('rounded-tl-[10px]'), 'and the px spelling returns');
   assert.deepEqual(await borderWidths(), ['2px', '4px', '3px', '3px'], 'changing radius does not change border widths');
+  const chipWidth = () => page.locator('#inspector [data-key="radius-tl"]').evaluate(input => input.closest('.vf').offsetWidth);
+  const chipWithUnit = await chipWidth();
   await page.locator('#inspector [data-key="radius-tl"]').fill('full'); await page.keyboard.press('Enter');
   await waitUntil(() => classesOf('cta').includes('rounded-tl-full'), 'typing Full sets the full corner');
+  await waitUntil(async () => (await chipWidth()) === chipWithUnit, 'a value with no unit keeps the field as wide as one with a unit');
   await waitUntil(async () => (await page.locator('#inspector [data-key="unit:radius-tl"]').count()) === 0 || !(await page.locator('#inspector [data-key="unit:radius-tl"]').isVisible()), 'full has no unit, so the unit button steps aside');
   await page.locator('#inspector [data-key="radius-tl"]').fill(''); await page.keyboard.press('Enter');
   await waitUntil(() => !classesOf('cta').some(name => /^rounded-tl/.test(name)), 'an empty radius removes that corner');
@@ -798,11 +821,13 @@ try {
       if (!ring) bad.push('the copy is missing');
       else {
         const frame = ring.getBoundingClientRect(), hole = ring.querySelector('.br-hole').getBoundingClientRect();
-        // The corner radii sit outside the frame, above and below its corners: within its width, never over a side.
-        for (const field of section.querySelectorAll('.br-row .br-field')) {
+        // The corner radii sit outside the frame — in the gutters beside it, or above and below it in a panel too narrow for a
+        // gutter — inside the section, never over a side.
+        const sectionBox = section.getBoundingClientRect();
+        for (const field of section.querySelectorAll('.br-col .br-field')) {
           const box = field.getBoundingClientRect();
-          if (box.left < frame.left - 1 || box.right > frame.right + 1) bad.push(`${field.dataset.key || field.className.slice(-8)} leaves the frame's width`);
-          if (Math.min(box.bottom, frame.bottom) - Math.max(box.top, frame.top) > 1) bad.push(`${field.className.slice(-8)} covers the frame`);
+          if (box.left < sectionBox.left - 1 || box.right > sectionBox.right + 1) bad.push(`${field.dataset.key || field.className.slice(-8)} leaves the section`);
+          if (Math.min(box.right, frame.right) - Math.max(box.left, frame.left) > 1 && Math.min(box.bottom, frame.bottom) - Math.max(box.top, frame.top) > 1) bad.push(`${field.className.slice(-8)} covers the frame`);
         }
         // The middle always stays in the cut-out.
         const centre = section.querySelector('.br-centre').getBoundingClientRect();

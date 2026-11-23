@@ -83,7 +83,7 @@ function toggle(iconName, tip, on, run) {
  */
 const UNIT_NAMES = { '%': 'Percent %', px: 'Pixels px', em: 'Em em', rem: 'Rem rem', '×': 'Multiple ×' };
 
-function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw => raw, stepFrom = Number.parseFloat, step = 1, min = -1e6, max = 1e6, variants = [], unit = '', units = null, defaultUnit = null, spell = false } = {}) {
+function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw => raw, stepFrom = Number.parseFloat, step = 1, min = -1e6, max = 1e6, variants = [], unit = '', units = null, defaultUnit = null, spell = false, unitOnNumbers = false } = {}) {
   const wrap = el('label', 'vf');
   const name = el('span', 'vf-k scrub', label);
   const input = el('input', 'vf-input');
@@ -118,7 +118,11 @@ function field(key, label, value, onCommit, { tip, placeholder = '', parse = raw
     const now = () => chosen || unit || defaultUnit;
     if (spell) spelling = text => (/^-?(?:\d+\.?\d*|\.\d+)$/.test(text) && now() && now() !== '×' ? `${text}${now()}` : text);
     // A keyword such as `full` or `normal` is not a number and has no unit, so the button steps aside until a number returns.
-    const sync = () => { unitButton.textContent = now(); unitButton.hidden = /^[a-z][a-z-]*$/i.test(input.value.trim()); };
+    // `unitOnNumbers`: the unit belongs to a plain number only, whether typed or quoted by the placeholder (`auto`, `var(--x)` have none).
+    const sync = () => {
+      unitButton.textContent = now();
+      unitButton.hidden = unitOnNumbers ? !/^-?(?:\d+\.?\d*|\.\d+)$/.test(input.value.trim() || input.placeholder) : /^[a-z][a-z-]*$/i.test(input.value.trim());
+    };
     adoptUnit = to => { chosen = to; sync(); };
     syncUnit = sync;
     // A new unit changes only the unit: the number stays exactly as written, so `100` % switched to px is `100px`. Nothing is
@@ -256,6 +260,9 @@ const colourShown = value => (value == null ? null : String(value));
 function colorField({ key, label, tip, property, value, run, computed, tokens, compact = false }) {
   const wrap = el('div', 'color-field');
   const current = value(view => colourShown(view[property]));
+  // No colour of its own (the page's inherited one shows) or several different ones: the swatch says so with hatching.
+  wrap.classList.toggle('mixed', current === MIXED);
+  wrap.classList.toggle('unset', current == null);
   const shownHex = current === MIXED ? null : css.hexOf(current) || KEYWORD_COLORS[current] || css.hexOf(computed);
   const swatch = el('input', 'swatch color-pick');
   swatch.type = 'color';
@@ -417,7 +424,8 @@ const pxOf = raw => {
  * The border as a frame: the box model's border band pulled out at its own size, its four sides cut on the diagonals into the
  * trapezoids of a picture frame with a one-pixel seam between them, like the band's own line. Each trapezoid is the colour
  * selector of its own side and is painted in that colour, so the preview and the control are one thing. The four corner radii sit
- * outside the frame, above and below its corners where they can never cover a side, and the cut-out middle — the box model's
+ * outside the frame, in the gutters beside its corners (above and below it in a panel too narrow for a gutter), where they can never
+ * cover a side, and the cut-out middle — the box model's
  * padding band — always holds one radius for all four corners and one colour for all four sides. Edge widths are not repeated
  * here: they live on the four sides of the box model's border band.
  */
@@ -493,13 +501,13 @@ function borderDiagram({ value, run, measured, tokens }) {
   allColour.classList.add('br-all-colour');
   centre.append(allCorners, allColour);
   hole.append(centre);
-  // Reading order is the geometry: the top corners, the four sides, the middle, then the bottom corners.
+  // Reading order is the geometry: the left corners, the frame (its four sides, then the middle), the right corners.
   box.append(sides.top, sides.right, sides.bottom, sides.left, hole);
-  const row = (name, ...nodes) => { const node = el('div', `br-row br-row-${name}`); node.append(...nodes); return node; };
+  const column = (name, ...nodes) => { const node = el('div', `br-col br-col-${name}`); node.append(...nodes); return node; };
   // Hidden until the band has been measured (the same frame, before paint): a frame laid out on guessed rims would show the
   // middle in a cut-out that is not its real size.
   const shell = el('div', 'br-shell br-pending');
-  shell.append(row('top', corner('tl'), corner('tr')), box, row('bottom', corner('bl'), corner('br')));
+  shell.append(column('left', corner('tl'), corner('bl')), box, column('right', corner('tr'), corner('br')));
   followBand(box, sides, shell);
   return shell;
 }
@@ -544,6 +552,11 @@ function followBand(box, sides, shell) {
     box.style.width = width > 60 ? `${width}px` : '';
     box.style.height = height > 40 ? `${height}px` : '';
     shell.style.setProperty('--br-w', width > 60 ? `${width}px` : '100%');
+    // The corner radii sit in the gutters beside the frame while a gutter can hold one (a number and its unit); in a narrower panel
+    // they go above and below it instead, which is the only place left.
+    const gutter = ((shell.parentElement?.clientWidth || 0) - width) / 2 - 2;
+    // Without a band to copy there are no gutters to know, so the radii take the rows above and below.
+    shell.classList.toggle('br-narrow', !(width > 60) || gutter < (parseFloat(getComputedStyle(shell).getPropertyValue('--br-chip')) || 44));
     const rim = known ? { l: inner.offsetLeft, t: inner.offsetTop, r: Math.max(0, band.clientWidth - inner.offsetLeft - inner.offsetWidth), b: Math.max(0, band.clientHeight - inner.offsetTop - inner.offsetHeight) } : { l: 36, t: 20, r: 36, b: 20 };
     for (const [name, px] of Object.entries(rim)) box.style.setProperty(`--br-${name}`, `${px}px`);
     // The frame's padding box is the band's own, so its polygons come from the band, not from the (possibly hidden) frame.
@@ -713,19 +726,33 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
   spacing.append(pick('Position', position, POSITION, next => run({ position: next }, next ? next : 'default position'), { variants: variants('position') }));
   const model = el('div', 'boxmodel');
   model.setAttribute('role', 'group');
-  model.setAttribute('aria-label', 'CSS box model in pixels');
+  model.setAttribute('aria-label', 'CSS box model');
   const propertyOf = (kind, side) => (kind === 'inset' ? SIDE_NAMES[side] : `${kind}-${SIDE_NAMES[side]}`);
+  // Every value of the box model is a number with its own unit: the unit sits beside the number as a small label (below it in a
+  // narrow side strip) and becomes the unit menu while the cell has focus; a unit typed with the number moves there too.
+  const LENGTH_UNITS = ['px', '%', 'rem', 'em'];
+  const lengthField = (key, { raw, placeholder, tip, parse, units = LENGTH_UNITS, onCommit, min = -1e4 }) => {
+    const parts = raw === MIXED ? null : css.lengthParts(raw);
+    const node = field(key, '', raw === MIXED ? MIXED : parts.number, onCommit, {
+      tip, placeholder, min, parse, spell: true, units, defaultUnit: 'px', unit: parts?.unit ?? '', unitOnNumbers: true,
+    });
+    node.querySelector('.vf-k')?.remove();
+    // The unit label is not a tab stop of its own: a unit can be typed with the number, and the menu opens with the pointer.
+    node.querySelector('.vf-unit')?.setAttribute('tabindex', '-1');
+    return node;
+  };
   const spaceField = (kind, short, side) => {
     const property = propertyOf(kind, side);
-    const authored = value(view => view[property] ?? null);
-    const node = field(`${short}-${side}`, '', authored === MIXED ? MIXED : css.show(authored), next => {
-      run({ [property]: next }, `${kind} ${SIDE_NAMES[side]} ${next == null ? 'none' : css.show(next)}`);
-    }, { tip: '', placeholder: measured?.[kind] ? String(measured[kind]['trbl'.indexOf(side)]) : '—', min: kind === 'padding' ? 0 : -1e4, parse: raw => css.lengthInput(raw, { negative: kind !== 'padding' }) });
+    const label = `${kind[0].toUpperCase()}${kind.slice(1)} ${SIDE_NAMES[side]}`;
+    const node = lengthField(`${short}-${side}`, {
+      raw: value(view => view[property] ?? null), tip: label,
+      placeholder: measured?.[kind] ? String(measured[kind]['trbl'.indexOf(side)]) : '—',
+      min: kind === 'padding' ? 0 : -1e4, parse: raw => css.lengthInput(raw, { negative: kind !== 'padding' }),
+      onCommit: next => { run({ [property]: next }, `${kind} ${SIDE_NAMES[side]} ${next == null ? 'none' : next}`); },
+    });
     node.classList.add('bm-field');
-    const label = `${kind[0].toUpperCase()}${kind.slice(1)} ${SIDE_NAMES[side]}, px`;
     node.setAttribute('aria-label', label);
     node.querySelector('input').setAttribute('aria-label', label);
-    node.querySelector('.vf-k')?.remove();
     const light = on => spacingFocus?.(on ? { kind, sides: [side] } : null);
     node.addEventListener('pointerenter', () => light(true));
     node.addEventListener('pointerleave', () => { if (!node.contains(document.activeElement)) light(false); });
@@ -734,31 +761,26 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
     return node;
   };
   const number = value => Number.isFinite(value) ? String(Math.round(value * 1000) / 1000) : '—';
-  const nonnegative = raw => raw === '' ? null : /^(?:\d+(?:\.\d+)?|\.\d+)(?:px)?$/.test(raw) && Number.isFinite(parseFloat(raw)) ? parseFloat(raw) : undefined;
-  const bareField = (key, label, shown, placeholder, onCommit) => {
-    const node = field(key, '', shown, onCommit, { tip: label, placeholder, min: 0, parse: nonnegative });
-    node.querySelector('.vf-k').remove();
-    node.classList.add('bm-value');
-    return node;
-  };
   // One border width per side, and only here: the Border block does not repeat them, so there is no second copy to keep in step.
   const widthField = side => {
     const property = `border-${SIDE_NAMES[side]}-width`, index = 'trbl'.indexOf(side);
-    const authored = value(view => view[property] ?? null);
-    const shown = authored === MIXED ? MIXED : authored == null ? null : css.show(authored);
-    const placeholder = number(measured?.border?.[index]);
-    const commitWidth = next => { run({ [property]: next === null ? null : `${next}px` }, `${property} ${next ?? 'default'}`); };
-    const node = field(`border-${side}`, '', shown, commitWidth, { tip: `Border ${SIDE_NAMES[side]}, px`, placeholder, min: 0, parse: nonnegative });
-    node.querySelector('.vf-k')?.remove();
+    const node = lengthField(`border-${side}`, {
+      raw: value(view => view[property] ?? null), tip: `Border ${SIDE_NAMES[side]}`, placeholder: number(measured?.border?.[index]),
+      min: 0, units: ['px', 'rem', 'em'], parse: css.borderWidthInput,
+      onCommit: next => { run({ [property]: next }, `${property} ${next ?? 'default'}`); },
+    });
     node.classList.add('bm-value');
     return node;
   };
   const edgeField = (kind, side, index) => {
     if (kind === 'margin' || kind === 'padding') return spaceField(kind, kind === 'margin' ? 'm' : 'p', side);
     if (kind === 'position') {
-      const authored = value(view => view[SIDE_NAMES[side]] ?? null);
-      const node = field(`inset-${side}`, '', authored === MIXED ? MIXED : css.show(authored), next => run({ [SIDE_NAMES[side]]: next }, `${SIDE_NAMES[side]} ${next ?? 'auto'}`), { tip: `${SIDE_NAMES[side][0].toUpperCase()}${SIDE_NAMES[side].slice(1)} offset, px`, placeholder: measured?.inset?.[index]?.replace(/px$/, '') ?? 'auto', parse: raw => css.lengthInput(raw) });
-      node.querySelector('.vf-k')?.remove();
+      const name = SIDE_NAMES[side];
+      const node = lengthField(`inset-${side}`, {
+        raw: value(view => view[name] ?? null), tip: `${name[0].toUpperCase()}${name.slice(1)} offset`,
+        placeholder: measured?.inset?.[index]?.replace(/px$/, '') ?? 'auto', parse: raw => css.lengthInput(raw),
+        onCommit: next => run({ [name]: next }, `${name} ${next ?? 'auto'}`),
+      });
       node.classList.add('bm-offset');
       return node;
     }
@@ -797,7 +819,13 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
         cell.style.setProperty('--bm-value-width', `calc(${length}ch + 2px)`);
         if (!cell.classList.contains('bm-l') && !cell.classList.contains('bm-r')) continue;
         side = Math.max(side, length);
-        if (input) { measuring.font = getComputedStyle(input).font; strip = Math.max(strip, measuring.measureText(text).width + 4); }
+        if (input) {
+          measuring.font = getComputedStyle(input).font;
+          strip = Math.max(strip, measuring.measureText(text).width + 4);
+          // The unit stands under the number in a side strip, so the strip is as wide as the wider of the two.
+          const unit = cell.querySelector('.vf-unit');
+          if (unit && !unit.hidden) { measuring.font = getComputedStyle(unit).font; strip = Math.max(strip, measuring.measureText(unit.textContent).width + 4); }
+        }
       }
       sq.style.setProperty('--bm-side-width', strip ? `${Math.ceil(strip)}px` : `calc(${side}ch + 4px)`);
       sq.classList.toggle('bm-wide-sides', side > 4);
@@ -809,6 +837,7 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
       input.addEventListener('change', fitValues);
       input.addEventListener('divlet:field-value', fitValues);
     }
+    for (const unit of sq.querySelectorAll(':scope > .bm-cell .vf-unit, :scope > .bm-top > .bm-cell .vf-unit')) new MutationObserver(fitValues).observe(unit, { childList: true, characterData: true, attributes: true, attributeFilter: ['hidden'] });
     fitValues();
     return sq;
   };
@@ -819,18 +848,28 @@ export function propertySections(nodes, { parent, apply, spacingFocus, measured 
   for (const [index, axis] of ['width', 'height'].entries()) {
     if (index) core.append(el('span', 'bm-times', '×'));
     const dimension = axis === 'width' ? width : height;
-    const authored = nodes.length === 1 && views[0][axis] != null;
-    const size = bareField(`content-${axis}`, `Content ${axis}, px`, authored ? dimension : null, dimension, next => {
-      run(async () => {
-        if (next === null) return { [axis]: null };
-        const box = await readMeasured();
-        if (nodes.length !== 1 || !Number.isFinite(box?.content?.[axis])) throw new Error('Select one visible element to edit its content size.');
-        const sides = axis === 'width' ? [1, 3] : [0, 2];
-        const extra = box.boxSizing === 'border-box' ? sides.reduce((sum, side) => sum + box.padding[side] + box.border[side], 0) : 0;
-        return { [axis]: `${next + extra}px` };
-      }, `content ${axis} ${next ?? 'default'}`);
+    const authoredRaw = nodes.length === 1 ? views[0][axis] ?? null : null;
+    // An authored size in a unit the box does not measure in (`20rem`) shows as written; otherwise the measured content px.
+    const asWritten = authoredRaw != null && css.lengthParts(authoredRaw).unit && css.lengthParts(authoredRaw).unit !== 'px' && measured?.boxSizing !== 'border-box';
+    const size = lengthField(`content-${axis}`, {
+      raw: asWritten ? authoredRaw : authoredRaw != null ? dimension : null, tip: `Content ${axis}`, placeholder: dimension, min: 0,
+      parse: raw => css.lengthInput(raw, { keywords: [], negative: false }),
+      onCommit: next => {
+        run(async () => {
+          if (next === null) return { [axis]: null };
+          const box = await readMeasured();
+          if (nodes.length !== 1 || !Number.isFinite(box?.content?.[axis])) throw new Error('Select one visible element to edit its content size.');
+          const sides = axis === 'width' ? [1, 3] : [0, 2];
+          const extra = box.boxSizing === 'border-box' ? sides.reduce((sum, side) => sum + box.padding[side] + box.border[side], 0) : 0;
+          const px = next === '0' ? 0 : /^(\d+(?:\.\d+)?)px$/.exec(next)?.[1];
+          if (px !== undefined) return { [axis]: `${Number(px) + extra}px` };
+          // The border box adds padding and border in px, so a size in another unit is only the content's own when there are none.
+          if (extra > 0) throw new Error(`A content ${axis} in ${next.replace(/[\d.]+/, '')} needs box-sizing: content-box here, or no padding and border; use px instead.`);
+          return { [axis]: next };
+        }, `content ${axis} ${next ?? 'default'}`);
+      },
     });
-    size.classList.add('bm-dimension');
+    size.classList.add('bm-value', 'bm-dimension');
     const input = size.querySelector('input');
     const fit = () => size.style.setProperty('--bm-value-width', `calc(${(input.value || input.placeholder).length}ch + 4px)`);
     for (const event of ['input', 'keydown', 'change']) input.addEventListener(event, fit);

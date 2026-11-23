@@ -89,20 +89,21 @@ try {
       captions: [...box.querySelectorAll('.bm-caption')].map(node => node.textContent),
       border: box.querySelectorAll('.bm-border > .bm-cell input, .bm-border > .bm-top > .bm-cell input').length,
       outline: getComputedStyle(box.querySelector('.bm-position')).borderStyle,
-      switches: box.querySelectorAll('button').length,
+      switches: box.querySelectorAll('button:not(.vf-unit)').length,
       height: box.getBoundingClientRect().height,
     };
   });
-  assert.equal(sized.widths.length, 1, `one field size for all eight numbers (${sized.widths})`);
+  // A value is its number with its unit beside it, so a cell is as wide as the two together; none is narrower than the base field.
+  assert.ok(Math.min(...sized.widths) >= 24, `no field is narrower than the base size (${sized.widths})`);
   assert.equal(sized.keys, 0, 'no letter keys: the square a number sits on says which side it is');
   assert.equal(sized.tips, 0, 'side captions do not add tooltip noise');
   assert.deepEqual(sized.captions, ['position', 'margin', 'border', 'padding']);
   assert.equal(sized.border, 4, 'all four border widths are editable');
   assert.equal(sized.outline, 'none', 'the position band has no outer outline');
   assert.equal(await page.locator('#inspector [data-section="layout"] [data-key="pick:Position"]').count(), 0, 'position mode has one home, with its offsets in Spacing');
-  assert.equal(sized.switches, 0, 'no linking switches or separate legend');
+  assert.equal(sized.switches, 0, 'no linking switches or separate legend (the unit labels are the only buttons)');
   assert.ok(sized.height <= 225, `the four-layer widget stays compact (${sized.height})`);
-  assert.deepEqual(sized.labels, ['Margin top, px', 'Margin right, px', 'Margin bottom, px', 'Margin left, px', 'Padding top, px', 'Padding right, px', 'Padding bottom, px', 'Padding left, px'], 'the accessible name still says which side and unit');
+  assert.deepEqual(sized.labels, ['Margin top', 'Margin right', 'Margin bottom', 'Margin left', 'Padding top', 'Padding right', 'Padding bottom', 'Padding left'], 'the accessible name says which side; the unit is its own control beside the number');
 
   // A tight panel keeps the shape and the sizes: the model narrows as a whole rather than one square into the other.
   await page.evaluate(() => { document.querySelector('#inspector').style.width = '240px'; });
@@ -117,7 +118,7 @@ try {
   });
   assert.ok(tight.overflow <= 1, `the widget never overflows a 240px panel (${tight.overflow})`);
   assert.ok(tight.nested, 'and stays nested');
-  assert.equal(tight.sizes.length, 1, `every number keeps the same size (${tight.sizes})`);
+  assert.ok(Math.min(...tight.sizes) >= 24 && Math.max(...tight.sizes) - Math.min(...tight.sizes) <= 8, `every number keeps its size within the width of a unit label (${tight.sizes})`);
   assert.deepEqual(tight.clipped, [], 'and no value is cut off, even a word like auto');
   await page.evaluate(() => { document.querySelector('#inspector').style.width = ''; });
   await sleep(300);
@@ -172,7 +173,7 @@ try {
   }
   await waitUntil(() => classes().includes('p-2') && !classes().some(name => /^p[trbl]-/.test(name)), 'independent equal values still normalize to the shortest class');
   checks.push('each spacing input changes only its own side; equal values still normalize without any linking mode');
-  await page.locator('#inspector label[aria-label="Margin top, px"]').click({ position: { x: 12, y: 5 } });
+  await page.locator('#inspector label[aria-label="Margin top"]').click({ position: { x: 12, y: 5 } });
   assert.equal(await page.locator('#inspector [data-key="m-t"]').evaluate(node => document.activeElement === node), true, 'the side caption is part of the native input target');
   await page.keyboard.press('Escape');
 
@@ -461,6 +462,45 @@ try {
     await waitUntil(async () => expected.test(await page.locator('#inspector .bm-core').getAttribute('aria-label') ?? ''), 'one undo per edited value restores the measured size');
   }
   checks.push('border sides and both content dimensions edit the actual inline-styled page with undo and correct border-box semantics');
+
+  // Every value of the widget carries a unit of its own: px beside each plain number by default, a unit typed with the number moves
+  // beside it, a bare number takes it, and the unit is a menu only while its cell has focus.
+  {
+    const unit = key => page.locator(`#inspector [data-key="unit:${key}"]`);
+    const authoredProp = property => { const node = runtime.read({ view: 'document', documentId: probe.id }).nodes['box-probe']; return node.style[property] ?? classView(node.className)[property]; };
+    const widthNow = () => probeFrame.locator('[data-divlet-id="box-probe"]').evaluate(node => getComputedStyle(node).borderTopWidth);
+    const before = await widthNow();
+    assert.equal(await unit('border-t').innerText(), 'px', 'px is shown beside a plain number by default');
+    assert.equal(await unit('border-t').evaluate(node => getComputedStyle(node).pointerEvents), 'none', 'at rest the unit is a label that takes no pointer');
+    await page.locator('#inspector [data-key="border-t"]').focus();
+    assert.equal(await unit('border-t').evaluate(node => getComputedStyle(node).pointerEvents), 'auto', 'while its cell has focus the unit is the menu button');
+    await page.locator('#inspector [data-key="border-t"]').fill('0.25rem'); await page.keyboard.press('Enter');
+    await waitUntil(async () => (await widthNow()) === '4px', 'a border width in rem reaches the page');
+    await waitUntil(() => authoredProp('border-top-width') === '0.25rem', 'and is written as typed');
+    await waitUntil(async () => (await page.locator('#inspector [data-key="border-t"]').inputValue()) === '0.25' && (await unit('border-t').innerText()) === 'rem', 'the field keeps the number and the unit moves beside it');
+    // The menu changes only the unit and keeps the number; a bare number then takes the unit in use.
+    await page.locator('#inspector [data-key="border-t"]').focus();
+    await unit('border-t').click();
+    await page.locator('.menu .menu-item', { hasText: /^Em em$/ }).click();
+    await waitUntil(() => authoredProp('border-top-width') === '0.25em', 'the unit menu turns 0.25rem into 0.25em, the number untouched');
+    await page.locator('#inspector [data-key="border-t"]').fill('2'); await page.keyboard.press('Enter');
+    await waitUntil(() => authoredProp('border-top-width') === '2em', 'a bare number takes the unit beside it');
+    assert.equal(await page.locator('#inspector [data-key="border-t"]').getAttribute('aria-label'), 'Border top', 'the name does not carry the unit');
+    // A border width has no percentage, so the menu does not offer one; margins and padding do.
+    await page.locator('#inspector [data-key="border-t"]').focus(); await unit('border-t').click();
+    assert.deepEqual(await page.locator('.menu[aria-label="Unit"] .menu-item').allInnerTexts(), ['Pixels px', 'Rem rem', 'Em em'], 'a border width offers px, rem and em');
+    await page.keyboard.press('Escape');
+    await page.locator('#inspector [data-key="m-r"]').focus(); await unit('m-r').click();
+    assert.deepEqual(await page.locator('.menu[aria-label="Unit"] .menu-item').allInnerTexts(), ['Pixels px', 'Percent %', 'Rem rem', 'Em em'], 'a margin offers px, %, rem and em');
+    await page.keyboard.press('Escape');
+    // A keyword has no unit.
+    await page.locator('#inspector [data-key="m-r"]').fill('auto'); await page.keyboard.press('Enter');
+    await waitUntil(async () => !(await unit('m-r').isVisible()), 'auto has no unit');
+    // Undo returns every step, one at a time.
+    for (let step = 0; step < 4; step++) { await page.locator('#viewport').focus(); await page.keyboard.press('Control+z'); }
+    await waitUntil(async () => (await widthNow()) === before, 'four undos restore the border width the page had');
+    checks.push('every box-model value carries its own unit: px by default, a typed unit moves beside the number, the menu swaps only the unit and opens only while the cell has focus');
+  }
 
   // Hold the first write: several Tab commits must compose against accepted state rather than the panel's old class string.
   await page.evaluate(async id => (await import('./lib/store.js')).selectNodes(id, ['box-other']), probe.id);

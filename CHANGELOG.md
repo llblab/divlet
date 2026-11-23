@@ -2,6 +2,24 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
+## 0.3.2 — A unit on every box-model value, and a calmer Border frame
+
+- **Every value of the box model carries its unit.** Offsets, margins, border widths, paddings and the content size show `px`
+  beside each plain number — under it in a side strip, wrapping to a new line when there is no room — and while a value has
+  focus its cell grows into an editor whose unit is a menu button, so the widget now enters any length: a border width in `rem`,
+  a padding in `%`, an offset in `em`. A unit typed with the number moves beside it, a bare number takes the unit in use, and a
+  keyword such as `auto` has none; a border width offers px, rem and em, and a content size in another unit than px is
+  refused when padding or border would make it a different box (`web/lib/properties.js`, `web/lib/css-props.js`,
+  `web/board.css`, `web/tests/spacing.mjs`, `web/tests/css-props.test.js`).
+- **A unit button is a selector.** It takes the selector surface instead of the accent blue, ends flush against its field's
+  right edge, and so does a colour field's clear button; a value with no unit (`full`) keeps the field as wide as one with a
+  unit (`web/board.css`, `web/tests/appearance.mjs`).
+- **The Border frame costs no extra height and says when a colour is not set.** The four corner radii moved from the rows above
+  and below the frame into the gutters beside it (above and below only in a panel too narrow for a gutter); a side with no
+  colour of its own shows the colour the page gives it, not a default black, hatched with one-pixel diagonal lines in the
+  frame's line colour, and so does a colour the sides do not share (`web/lib/properties.js`, `web/board.css`,
+  `web/tests/appearance.mjs`, `web/tests/fluid.mjs`).
+
 ## 0.3.1 — The finished Border frame and one release flow started by a tag
 
 - **One release flow, started by a tag.** Pushing a stable `vX.Y.Z` tag on a commit of `main` now validates and freezes the
