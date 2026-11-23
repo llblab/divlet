@@ -2,6 +2,13 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
+## 0.3.4 — Unreleased
+
+- **Closing a website connection is bounded.** Closing the page and the browser context after a navigation to another origin could
+  in principle wait for ever; each step now gives up after ten seconds with a warning that names it, and the browser-MCP suite
+  prints those warnings (and an evaluate that never settles) in its log (`core/lib/browser-mcp.ts`,
+  `web/tests/browser-mcp.mjs`).
+
 ## 0.3.3 — A box model that holds still, and tabs that stay in their corner
 
 - **A value's editor is an overlay.** Focusing a box-model value moves nothing in the widget: its slot keeps the resting size, the

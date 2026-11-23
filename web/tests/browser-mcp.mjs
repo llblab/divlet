@@ -54,7 +54,8 @@ const site = await serve((req, res) => {
 });
 const base = `http://127.0.0.1:${site.address().port}${prefix}`;
 const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'], ...(process.env.PI_DIVLET_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PI_DIVLET_CHROMIUM_EXECUTABLE } : {}) });
-const connect = (url = base, options = {}) => connectBrowserMcp(url, { browser, readyTimeoutMs: 5000, ...options });
+// The transport's own warnings (a close that stalled, say) go to the log, so a hung run names its step instead of falling silent.
+const connect = (url = base, options = {}) => connectBrowserMcp(url, { browser, readyTimeoutMs: 5000, onEvent: event => { if (event.type === 'warning') console.error(`[browser-mcp] ${event.message}`); options.onEvent?.(event); }, ...options });
 const text = (page, selector) => page.$eval(selector, node => node.textContent);
 
 test.after(async () => { await browser.close(); site.close(); other.close(); });
@@ -161,7 +162,12 @@ test('readiness: an async provider is awaited; a page without one fails fast', a
 test('origin boundaries: a cross-origin redirect is refused and leaving the origin closes the connection', async () => {
   await assert.rejects(connect(`${base}redirect`), error => error.code === 'ORIGIN_CHANGED');
   const connection = await connect();
-  await connection.page.evaluate(href => { location.href = href; }, `${otherOrigin}/elsewhere`);
+  // The evaluate that starts a navigation to another origin may never settle (its context is destroyed under it): the outcome is
+  // what the connection does next, so wait for it, but never for ever, and say so.
+  let settled = false;
+  const navigation = connection.page.evaluate(href => { location.href = href; }, `${otherOrigin}/elsewhere`).catch(() => {}).finally(() => { settled = true; });
+  const stalled = new Promise(resolve => setTimeout(() => { if (!settled) console.error('[browser-mcp] the evaluate that navigates away did not settle within 10 s'); resolve(); }, 10_000).unref());
+  await Promise.race([navigation, stalled]);
   await connection.page.waitForURL(`${otherOrigin}/elsewhere`).catch(() => {});
   await new Promise(resolve => setTimeout(resolve, 100));
   assert.equal(connection.state, 'closed');

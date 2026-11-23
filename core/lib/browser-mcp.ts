@@ -215,6 +215,13 @@ export async function connectBrowserMcp(url: string, options: BrowserMcpOptions 
     failPending(new BrowserMcpError('PROVIDER_RELOADED', `The website's provider is gone (${reason}); reconnect to continue. The call may or may not have completed.`));
     emit({ type: 'stale', reason });
   };
+  const CLOSE_MS = 10_000;
+  const bounded = async (step: string, work: Promise<unknown>) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([work.catch(() => {}), new Promise<void>(resolve => { timer = setTimeout(() => { emit({ type: 'warning', message: `${step} did not finish within ${CLOSE_MS} ms; going on without it.` }); resolve(); }, CLOSE_MS); })]);
+    } finally { clearTimeout(timer); }
+  };
   let closing: Promise<void> | null = null;
   let closedBy: BrowserMcpError | null = null;
   const shutdown = (reason: string, cause?: BrowserMcpError) => {
@@ -225,7 +232,12 @@ export async function connectBrowserMcp(url: string, options: BrowserMcpOptions 
     generation++;
     failPending(new BrowserMcpError('CLOSED', `The connection closed (${reason}).`));
     emit({ type: 'closed', reason });
-    closing = (async () => { if (!page.isClosed()) await page.close().catch(() => {}); await owned(); })();
+    // Closing is bounded and says which step stalled: a page or context that never finishes closing (a navigation to another origin
+    // swaps the renderer under it) must not hold the connection, or a caller waiting on it, for ever.
+    closing = (async () => {
+      if (!page.isClosed()) await bounded('closing the page', page.close());
+      await bounded('closing the browser context', owned());
+    })();
     return closing;
   };
 
