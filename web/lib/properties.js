@@ -280,12 +280,14 @@ function paintedHex(colour) {
 /** The colour a value stands for, as something to show: `#112233`, `var(--color-brand)` or the keyword. */
 const colourShown = value => (value == null ? null : String(value));
 
-function colorField({ key, label, tip, property, value, run, computed, tokens, compact = false }) {
+function colorField({ key, label, tip, property, value, run, computed, tokens, compact = false, defaultTo = null }) {
   const wrap = el('div', 'color-field');
   const current = value(view => colourShown(view[property]));
-  // No colour of its own (the page's inherited one shows) or several different ones: the swatch says so with hatching.
+  // Hatching says a colour is the browser's default: several different ones (mixed), or — for a field given `defaultTo`, the colour
+  // the default falls back to — none authored anywhere and the page painting exactly that fallback. A colour that is inherited, or
+  // set by a stylesheet, is a colour, not a default, so the swatch shows it plain.
   wrap.classList.toggle('mixed', current === MIXED);
-  wrap.classList.toggle('unset', current == null);
+  wrap.classList.toggle('unset', defaultTo != null && current == null && !!computed && (computed === defaultTo || paintedHex(computed) === paintedHex(defaultTo)));
   const shownHex = current === MIXED ? null : css.hexOf(current) || KEYWORD_COLORS[current] || paintedHex(computed);
   const swatch = el('input', 'swatch color-pick');
   swatch.type = 'color';
@@ -483,7 +485,7 @@ function borderDiagram({ value, run, measured, tokens }) {
     const label = `${BORDER_SIDES_MENU.find(([key]) => key === side)[1]} border`;
     const node = colorField({
       key: `stroke-${side}`, label, tip: `Border ${side} color`, property: `border-${side}-color`, value, run,
-      computed: measured?.colors?.[`border${side[0].toUpperCase()}${side.slice(1)}Color`], tokens, compact: true,
+      computed: measured?.colors?.[`border${side[0].toUpperCase()}${side.slice(1)}Color`], tokens, compact: true, defaultTo: measured?.colors?.color ?? null,
     });
     node.classList.add('br-colour');
     node.setAttribute('aria-label', `${label} colour`);
@@ -519,9 +521,11 @@ function borderDiagram({ value, run, measured, tokens }) {
     key: 'stroke-all', label: 'Border', tip: 'Colour of all four borders', property: 'border-color',
     value: () => sameColour,
     run: (patch, label) => run(Object.fromEntries(BORDER_SIDES.map(side => [`border-${side}-color`, patch['border-color']])), label),
-    computed: measuredColours.every(item => item && item === measuredColours[0]) ? measuredColours[0] : null, tokens: [],
+    computed: measuredColours.every(item => item && item === measuredColours[0]) ? measuredColours[0] : null, tokens: [], defaultTo: measured?.colors?.color ?? null,
   });
   allColour.classList.add('br-all-colour');
+  // Sides that nothing authors but that the page paints differently (one inherited, one from a stylesheet) are several colours too.
+  if (!measuredColours.every(item => item && item === measuredColours[0]) && sameColour == null) allColour.classList.add('mixed');
   centre.append(allCorners, allColour);
   hole.append(centre);
   // Reading order is the geometry: the left corners, the frame (its four sides, then the middle), the right corners.

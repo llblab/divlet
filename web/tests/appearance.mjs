@@ -458,6 +458,14 @@ try {
     await pick('t', '#0044ff');
     await waitUntil(async () => JSON.stringify(await sideColours()) === JSON.stringify(['rgb(0, 68, 255)', ...(await sideColours()).slice(1)]), 'the top selector colours only the top border');
     assert.deepEqual((await sideColours()).slice(1), [before[1], before[2], 'rgb(255, 0, 0)'], 'the other sides keep the colour they had');
+    // Undo works from the selector itself: a pick leaves focus on the swatch, and Ctrl+Z there must undo the pick, not be swallowed
+    // as if it edited text.
+    const beforeRight = (await sideColours())[1];
+    await pick('r', '#123456');
+    await waitUntil(async () => (await sideColours())[1] === 'rgb(18, 52, 86)', 'the right selector colours the right border');
+    await waitUntil(() => page.evaluate(() => { const swatch = document.querySelector('#inspector .br-side.br-r .swatch'); swatch.focus(); return document.activeElement === swatch; }), 'the right selector holds focus');
+    await page.keyboard.press('Control+z');
+    await waitUntil(async () => (await sideColours())[1] === beforeRight, 'Ctrl+Z from the focused colour selector returns the side to the colour it had before');
     // Each selector says what it paints and quotes the colour, so a colour set by a stylesheet is still visible.
     assert.match(await swatch('r').evaluate(node => node.dataset.tip ?? ''), /^Right border · #/, 'a side names itself and quotes the page colour');
     // Delete removes that side's own colour, leaving the rest of the border alone.
@@ -485,6 +493,16 @@ try {
     const [, inherited] = await swatches();
     assert.notEqual(inherited, '#000000', 'an inherited side colour shows the colour it really inherited, not black');
     assert.equal(inherited, await page.locator('iframe[data-document-id="welcome"]').contentFrame().locator('[data-divlet-id="cta"]').evaluate(node => { const [r, g, b] = getComputedStyle(node).borderRightColor.match(/\d+/g).map(Number); return '#' + [r, g, b].map(n => n.toString(16).padStart(2, '0')).join(''); }), 'and it is the page\'s own colour');
+    await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-top-color': before0[0], 'border-left-color': before0[3], 'border-right-color': before0[1] } } } } });
+    // Hatching is for the browser's default only: a side that nothing authors and the page paints in its fallback (the text colour). An
+    // authored colour, `inherit`, or a colour a stylesheet gives it is a colour, so it shows plain.
+    const unsetNow = () => page.locator('#inspector .br-side .color-field.unset').count();
+    await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-top-color': 'oklch(0.7 0.15 200)', 'border-left-color': 'color-mix(in srgb, red 50%, blue)', 'border-right-color': 'inherit' } } } } });
+    await waitUntil(async () => (await unsetNow()) === 1, 'only the side nothing sets is hatched; authored and inherited sides are plain');
+    const frameCss = runtime.getEntry('welcome').document.css ?? '';
+    await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), patch: { css: `${frameCss}\nbutton { border-bottom-color: teal; }` } });
+    await waitUntil(async () => (await unsetNow()) === 0, 'a colour a stylesheet gives the last side is a colour, not a default');
+    await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), patch: { css: frameCss } });
     await runtime.patch({ documentId: 'welcome', expectedVersion: await afterVersion(), actor: 'user', patch: { nodes: { cta: { styles: { 'border-top-color': before0[0], 'border-left-color': before0[3], 'border-right-color': before0[1] } } } } });
     checks.push('a side colour in oklch(), color-mix() or inherit shows the colour the page really paints in the Border frame');
   }

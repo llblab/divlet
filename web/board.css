@@ -1107,9 +1107,9 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
 /* A content-sized field must not inherit the wrapper's `width: 100%` as its flex base, or it takes a whole line by itself. */
 @supports (field-sizing: content) { .color-field .color-hex { field-sizing: content; flex: 1 0 auto; width: auto; min-width: 0; max-width: 100%; } }
 .color-field .color-clear { align-self: stretch; height: auto; min-width: 26px; margin: 0; border-radius: 0 var(--radius-inner) var(--radius-inner) 0; }
-/* Hatched: several different colours (mixed), or none of its own so the colour the page inherits shows through (unset). */
-.color-field.mixed .swatch::-webkit-color-swatch { background: repeating-linear-gradient(45deg, #b9b8b0 0 3px, #77766e 3px 6px); }
-.color-field.unset .swatch::-webkit-color-swatch { background-image: repeating-linear-gradient(45deg, transparent 0 3px, rgba(0, 0, 0, .45) 3px 4px); }
+/* Hatched: several different colours (mixed), or the browser's default (unset: nothing authors it and the page paints the fallback). */
+.color-field.mixed .swatch::-webkit-color-swatch { background: repeating-linear-gradient(135deg, #b9b8b0 0 3px, #77766e 3px 6px); }
+.color-field.unset .swatch::-webkit-color-swatch { background-image: repeating-linear-gradient(135deg, transparent 0 3px, rgba(0, 0, 0, .45) 3px 4px); }
 .color-block { display: grid; gap: 4px; }
 .token-swatches { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 36px; }
 .token-swatch { width: 18px; height: 18px; padding: 0; border: 1px solid var(--hair); border-radius: 50%; cursor: pointer; }

@@ -4,6 +4,10 @@ Implemented product outcomes live here. Contributor constraints are in [AGENTS.m
 
 ## 0.3.4 — Unreleased
 
+- **Hatching means the browser's default, and Undo works from a colour selector.** A Border side is hatched only when nothing
+  authors its colour and the page paints the fallback; `inherit`, an authored colour and a stylesheet's colour show plain, and the
+  lines now rise to the right. After a pick the swatch keeps focus and the board ignored Ctrl+Z there as if it edited text; Undo
+  and Redo now work from it (`web/lib/properties.js`, `web/board.css`, `web/board.js`, `web/tests/appearance.mjs`).
 - **Closing a website connection is bounded.** Closing the page and the browser context after a navigation to another origin could
   in principle wait for ever; each step now gives up after ten seconds with a warning that names it, and the browser-MCP suite
   prints those warnings (and an evaluate that never settles) in its log (`core/lib/browser-mcp.ts`,

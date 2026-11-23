@@ -374,7 +374,10 @@ function handleKey(event) {
 canvas.setKeyHandler(handleKey);
 window.addEventListener('keydown', event => {
   const target = event.target;
-  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target?.isContentEditable) return;
+  // A colour swatch edits no text and keeps focus after a pick, so the board's own Undo and Redo work from it; every other key it
+  // receives stays the picker's.
+  const pickerHistory = target instanceof HTMLInputElement && target.type === 'color' && (event.ctrlKey || event.metaKey) && !event.altKey && /^[zy]$/i.test(event.key);
+  if (!pickerHistory && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target?.isContentEditable)) return;
   if (event.code === 'Space' || (event.repeat && /^(Delete|Backspace|Enter)$/.test(event.key))) return;
   if ((event.key === 'Enter' || event.key === ' ') && target?.closest?.('button, summary, a[href]')) return;
   handleKey(event);
