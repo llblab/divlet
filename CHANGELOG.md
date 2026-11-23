@@ -2,7 +2,7 @@
 
 Implemented product outcomes live here. Contributor constraints are in [AGENTS.md](AGENTS.md), current contracts in [docs/](docs/README.md), and remaining work in [BACKLOG.md](BACKLOG.md).
 
-## 0.3.0 — Unreleased
+## 0.3.0 — Border frame, unit menus and a steady box-model axis
 
 - **Border is a picture frame of colour selectors, cut like the band it copies.** The Border control is the box model's border
   band at its own measured outer size with the padding band's measured place cut out, divided on the diagonals into four
