@@ -504,9 +504,7 @@ function borderDiagram({ value, run, measured, tokens }) {
   // Reading order is the geometry: the left corners, the frame (its four sides, then the middle), the right corners.
   box.append(sides.top, sides.right, sides.bottom, sides.left, hole);
   const column = (name, ...nodes) => { const node = el('div', `br-col br-col-${name}`); node.append(...nodes); return node; };
-  // Hidden until the band has been measured (the same frame, before paint): a frame laid out on guessed rims would show the
-  // middle in a cut-out that is not its real size.
-  const shell = el('div', 'br-shell br-pending');
+  const shell = el('div', 'br-shell');
   shell.append(column('left', corner('tl'), corner('bl')), box, column('right', corner('tr'), corner('br')));
   followBand(box, sides, shell);
   return shell;
@@ -557,17 +555,16 @@ function followBand(box, sides, shell) {
     const gutter = ((shell.parentElement?.clientWidth || 0) - width) / 2 - 2;
     // Without a band to copy there are no gutters to know, so the radii take the rows above and below.
     shell.classList.toggle('br-narrow', !(width > 60) || gutter < (parseFloat(getComputedStyle(shell).getPropertyValue('--br-chip')) || 44));
-    const rim = known ? { l: inner.offsetLeft, t: inner.offsetTop, r: Math.max(0, band.clientWidth - inner.offsetLeft - inner.offsetWidth), b: Math.max(0, band.clientHeight - inner.offsetTop - inner.offsetHeight) } : { l: 36, t: 20, r: 36, b: 20 };
+    const rim = known ? { l: inner.offsetLeft, t: inner.offsetTop, r: Math.max(0, band.clientWidth - inner.offsetLeft - inner.offsetWidth), b: Math.max(0, band.clientHeight - inner.offsetTop - inner.offsetHeight) } : { l: 16, t: 20, r: 16, b: 20 };
     for (const [name, px] of Object.entries(rim)) box.style.setProperty(`--br-${name}`, `${px}px`);
     // The frame's padding box is the band's own, so its polygons come from the band, not from the (possibly hidden) frame.
-    if (known) shell.classList.remove('br-pending');
     const W = known ? band.clientWidth : box.clientWidth, H = known ? band.clientHeight : box.clientHeight;
     if (!(W > 0 && H > 0)) return;
     const polygons = framePolygons(W, H, rim.l, rim.t, rim.r, rim.b, FRAME_SEAM);
     for (const side of BORDER_SIDES) sides[side].style.clipPath = polygons[side];
   };
   apply();
-  requestAnimationFrame(() => { apply(); shell.classList.remove('br-pending'); });
+  requestAnimationFrame(apply);
   const observer = new ResizeObserver(apply);
   requestAnimationFrame(() => {
     const host = panel();

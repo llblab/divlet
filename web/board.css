@@ -1030,8 +1030,7 @@ html.w720 body.has-sidebar .panel.right, html.w720 body.has-sidebar .dock { disp
    four sides of the box model's border band. The --br-* rim is the cut-out's measured place; the sides' clip polygons are set from
    it in px. */
 .br-shell { --br-field: 24px; --br-chip: 44px; position: relative; display: grid; justify-items: center; gap: 0 2px; margin: 2px 0 0; container: ring / inline-size; }
-.br-shell.br-pending { display: none; }
-.br-box { --br-l: 36px; --br-t: 20px; --br-r: 36px; --br-b: 20px; position: relative; box-sizing: border-box; width: 100%; min-height: 108px; border: 1px solid #4c4b40; border-radius: 0; background: #4c4b40; color: var(--ink); }
+.br-box { --br-l: 16px; --br-t: 20px; --br-r: 16px; --br-b: 20px; position: relative; box-sizing: border-box; width: 100%; min-height: 108px; border: 1px solid #4c4b40; border-radius: 0; background: #4c4b40; color: var(--ink); }
 /* A side is the whole shape between the outer edge and the cut-out; the pointer only reaches its own trapezoid. */
 .br-side { position: absolute; inset: 0; }
 .br-side > .color-field, .br-side > .color-field .swatch { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
