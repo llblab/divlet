@@ -1,7 +1,7 @@
 // Browser MCP transport against real static pages in a real Chromium: connect by URL, discover, call, observe the UI, and
 // the reliability/security boundaries. The fixture site is bundled to plain files and served by a file-only server; no MCP
 // server process or HTTP endpoint takes part.
-import test from 'node:test';
+import nodeTest from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { promises as fs } from 'node:fs';
@@ -11,6 +11,13 @@ import { build } from 'esbuild';
 import { chromium } from 'playwright';
 import { Client } from '@modelcontextprotocol/client';
 import { connectBrowserMcp, browserMcpTransport, BrowserMcpError } from '../../core/lib/browser-mcp.ts';
+
+// A hung transport must fail the suite fast and say where, not hold a release for the job's whole timeout (it has done that on the
+// hosted runner, never locally): every test has its own deadline, and the file a watchdog that names the test it is stuck in.
+let running = '(before the first test)';
+const test = (name, fn) => nodeTest(name, { timeout: 90_000 }, async context => { running = name; return fn(context); });
+test.after = nodeTest.after;
+setTimeout(() => { console.error(`browser-mcp suite hung in "${running}"`); process.exit(1); }, 300_000).unref();
 
 const fixture = fileURLToPath(new URL('./fixtures/browser-mcp-site/', import.meta.url));
 const bundle = async (entry, extra = {}) => (await build({ entryPoints: [entry], bundle: true, write: false, format: 'esm', platform: 'browser', target: 'es2022', conditions: ['divlet-source'], ...extra })).outputFiles[0].text;
